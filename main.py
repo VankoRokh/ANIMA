@@ -1,10 +1,18 @@
+from anima.memory.memory_store import MemoryStore
+from anima.memory.filter import MemoryFilter
 from anima.memory.episodic import EpisodicMemory
 from anima.memory.event_log import EventLog
 from anima.core.state import AnimaState
 from anima.core.event_bus import EventBus
 
 
-def process_events(anima, event_bus, event_log):
+def process_events(
+    anima,
+    event_bus,
+    event_log,
+    memory_filter,
+    memory_store,
+):
     while event_bus.has_events():
         event = event_bus.next_event()
 
@@ -15,6 +23,11 @@ def process_events(anima, event_bus, event_log):
         )
 
         event_log.write(event)
+
+        if memory_filter.is_meaningful(event):
+            memory = memory_filter.create_memory(event)
+            memory_store.write(memory)
+
         anima.register_event()
 
 
@@ -23,11 +36,19 @@ def main():
     event_bus = EventBus()
     event_log = EventLog()
     memory = EpisodicMemory()
+    memory_store = MemoryStore()
+    memory_filter = MemoryFilter()
 
     anima.wake()
 
     event_bus.emit("wake")
-    process_events(anima, event_bus, event_log)
+    process_events(
+        anima,
+        event_bus,
+        event_log,
+        memory_filter,
+        memory_store,
+    )
 
     state = anima.get()
 
@@ -64,12 +85,26 @@ def main():
         }
     )
 
-    process_events(anima, event_bus, event_log)
+    process_events(
+        anima,
+        event_bus,
+        event_log,
+        memory_filter,
+        memory_store,
+    )
+
 
     input("Press Enter to put ANIMA to sleep...")
 
     event_bus.emit("sleep")
-    process_events(anima, event_bus, event_log)
+    process_events(
+        anima,
+        event_bus,
+        event_log,
+        memory_filter,
+        memory_store,
+    )
+
 
     anima.sleep()
 
