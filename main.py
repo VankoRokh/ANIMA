@@ -1,8 +1,10 @@
+from anima.memory.episodic import EpisodicMemory
+from anima.memory.event_log import EventLog
 from anima.core.state import AnimaState
 from anima.core.event_bus import EventBus
 
 
-def process_events(anima, event_bus):
+def process_events(anima, event_bus, event_log):
     while event_bus.has_events():
         event = event_bus.next_event()
 
@@ -12,17 +14,20 @@ def process_events(anima, event_bus):
             f"{event.payload if event.payload else ''}"
         )
 
+        event_log.write(event)
         anima.register_event()
 
 
 def main():
     anima = AnimaState()
     event_bus = EventBus()
+    event_log = EventLog()
+    memory = EpisodicMemory()
 
     anima.wake()
 
     event_bus.emit("wake")
-    process_events(anima, event_bus)
+    process_events(anima, event_bus, event_log)
 
     state = anima.get()
 
@@ -35,7 +40,19 @@ def main():
     print(f"Created:          {state['created_at']}")
     print(f"Last wake:        {state['last_wake']}")
     print(f"Events processed: {state['events_processed']}")
+    print(f"Memories stored:  {memory.count()}")
     print("=" * 40)
+    print()
+
+    print("\nRecent memories:")
+
+    for event in memory.last(3):
+        print(
+            f"- [{event['timestamp']}] "
+            f"{event['type']}: "
+            f"{event['payload']}"
+        )
+
     print()
 
     user_input = input("Say something to ANIMA: ")
@@ -47,12 +64,12 @@ def main():
         }
     )
 
-    process_events(anima, event_bus)
+    process_events(anima, event_bus, event_log)
 
     input("Press Enter to put ANIMA to sleep...")
 
     event_bus.emit("sleep")
-    process_events(anima, event_bus)
+    process_events(anima, event_bus, event_log)
 
     anima.sleep()
 

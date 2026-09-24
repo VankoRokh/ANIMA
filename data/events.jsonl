@@ -1,0 +1,9 @@
+{"type": "wake", "payload": null, "timestamp": "2026-09-24T18:32:09"}
+{"type": "user_input", "payload": {"text": "Ошибки необходимы, ибо они делают нас лучше."}, "timestamp": "2026-09-24T18:33:55"}
+{"type": "sleep", "payload": null, "timestamp": "2026-09-24T18:33:59"}
+{"type": "wake", "payload": null, "timestamp": "2026-09-24T18:41:09"}
+{"type": "user_input", "payload": {"text": "test"}, "timestamp": "2026-09-24T18:42:51"}
+{"type": "sleep", "payload": null, "timestamp": "2026-09-24T18:42:52"}
+{"type": "wake", "payload": null, "timestamp": "2026-09-24T18:45:20"}
+{"type": "user_input", "payload": {"text": "test2"}, "timestamp": "2026-09-24T18:45:56"}
+{"type": "sleep", "payload": null, "timestamp": "2026-09-24T18:45:57"}
