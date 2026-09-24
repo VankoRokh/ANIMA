@@ -5,4 +5,7 @@ __pycache__/
 logs/
 snapshots/
 
+data/*.json
+data/*.jsonl
+
 .env
