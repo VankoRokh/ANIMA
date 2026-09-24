@@ -2,9 +2,9 @@
     "name": "ANIMA",
     "version": "00.1-alpha",
     "status": "sleeping",
-    "session": 3,
+    "session": 4,
     "created_at": "2026-09-24T17:36:00",
-    "last_wake": "2026-09-24T17:40:02",
-    "last_sleep": "2026-09-24T17:40:39",
-    "events_processed": 0
+    "last_wake": "2026-09-24T17:59:44",
+    "last_sleep": "2026-09-24T18:01:38",
+    "events_processed": 3
 }
