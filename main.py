@@ -67,11 +67,11 @@ def main():
 
     print("\nRecent memories:")
 
-    for event in memory.last(3):
+    for stored_memory in memory.last(3):
         print(
-            f"- [{event['timestamp']}] "
-            f"{event['type']}: "
-            f"{event['payload']}"
+            f"- [{stored_memory['timestamp']}] "
+            f"{stored_memory['source']}: "
+            f"{stored_memory['content']}"
         )
 
     print()
