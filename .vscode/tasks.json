@@ -1,0 +1,33 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "ANIMA: Setup",
+      "type": "process",
+      "command": "bash",
+      "args": ["${workspaceFolder}/scripts/setup.sh"],
+      "options": {"cwd": "${workspaceFolder}"},
+      "problemMatcher": [],
+      "presentation": {"reveal": "always", "panel": "dedicated"}
+    },
+    {
+      "label": "ANIMA: Check",
+      "type": "process",
+      "command": "bash",
+      "args": ["${workspaceFolder}/scripts/check.sh"],
+      "options": {"cwd": "${workspaceFolder}"},
+      "group": {"kind": "test", "isDefault": true},
+      "problemMatcher": [],
+      "presentation": {"reveal": "always", "panel": "dedicated"}
+    },
+    {
+      "label": "ANIMA: Run",
+      "type": "process",
+      "command": "bash",
+      "args": ["${workspaceFolder}/scripts/run.sh"],
+      "options": {"cwd": "${workspaceFolder}"},
+      "problemMatcher": [],
+      "presentation": {"reveal": "always", "focus": true, "panel": "dedicated"}
+    }
+  ]
+}

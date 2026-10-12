@@ -5,7 +5,16 @@ __pycache__/
 logs/
 snapshots/
 
-data/*.json
-data/*.jsonl
+# Instance data and local model files are backed up separately from source.
+/data/
+/ANIMA_DATA/
+/models/
+/backups/
+
+# Personal Obsidian workspace; Markdown documentation stays in Git.
+docs/.obsidian/
+docs/.trash/
 
 .env
+.env.*
+!.env.example
