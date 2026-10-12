@@ -15,7 +15,6 @@ tags: [anima]
 
 | ID | Модуль | Решение | Реализация | Точное описание |
 |---|---|---|---|---|
-
 | CORE-01 | Идентичность | Draft | Planned | [Описание](../02_ARCHITECTURE/Core.md#core-01) |
 | CORE-02 | Состояние экземпляра | Accepted | Prototype | [Описание](../02_ARCHITECTURE/Core.md#core-02) |
 | CORE-03 | События и EventBus | Accepted | Prototype | [Описание](../02_ARCHITECTURE/Core.md#core-03) |
