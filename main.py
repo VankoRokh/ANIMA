@@ -1,3 +1,4 @@
+from anima.core.identity import Identity
 from anima.memory.memory_store import MemoryStore
 from anima.memory.filter import MemoryFilter
 from anima.memory.episodic import EpisodicMemory
@@ -33,6 +34,7 @@ def process_events(
 
 def main():
     anima = AnimaState()
+    identity = Identity()
     event_bus = EventBus()
     event_log = EventLog()
     memory = EpisodicMemory()
@@ -51,12 +53,14 @@ def main():
     )
 
     state = anima.get()
+    identity_data = identity.get()
 
     print()
     print("=" * 40)
     print(f"{state['name']} {state['version']}")
     print("=" * 40)
     print(f"Status:           {state['status']}")
+    print(f"Instance ID:      {identity_data['instance_id']}")
     print(f"Session:          {state['session']}")
     print(f"Created:          {state['created_at']}")
     print(f"Last wake:        {state['last_wake']}")
