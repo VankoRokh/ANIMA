@@ -15,6 +15,8 @@ from urllib.parse import unquote, urlsplit
 
 
 ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
 MODULE_ID = r"(?:CORE|MEM|COG|SLP|IF|HW)-\d+"
 LINK = re.compile(r"!?\[[^\]\n]*\]\(([^\s)]+)(?:\s+\"[^\"]*\")?\)")
 
@@ -167,6 +169,48 @@ def run_session(destination, text):
 def read_jsonl(path):
     return [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines() if line.strip()]
 
+def check_state_write_safety():
+    from unittest.mock import patch
+
+    from anima.core.state import AnimaState
+
+    with tempfile.TemporaryDirectory(prefix="anima-state-check-") as temp_dir:
+        state_file = Path(temp_dir) / "data" / "state.json"
+
+        anima_state = AnimaState(state_file)
+        original_bytes = state_file.read_bytes()
+
+        anima_state.state["session"] = 42
+        anima_state.save()
+
+        saved = json.loads(state_file.read_text(encoding="utf-8"))
+        require(saved["session"] == 42, "State save did not persist changes")
+
+        temp_files = list(state_file.parent.glob(f".{state_file.name}.*.tmp"))
+        require(not temp_files, "Temporary state files remain after successful save")
+
+        stable_bytes = state_file.read_bytes()
+        anima_state.state["session"] = 99
+
+        with patch("anima.core.state.os.replace", side_effect=OSError("simulated replace failure")):
+            try:
+                anima_state.save()
+            except OSError:
+                pass
+            else:
+                raise RuntimeError("State save unexpectedly succeeded during simulated failure")
+
+        require(
+            state_file.read_bytes() == stable_bytes,
+            "Existing state was modified after failed atomic replacement",
+        )
+
+        temp_files = list(state_file.parent.glob(f".{state_file.name}.*.tmp"))
+        require(not temp_files, "Temporary state file remains after failed save")
+
+        require(original_bytes != stable_bytes, "State safety test did not actually modify state")
+
+    print("[OK] State writes: atomic replacement preserves previous state on failure.")
 
 def check_recovery():
     with tempfile.TemporaryDirectory(prefix="anima-check-") as temp_dir:
@@ -193,7 +237,7 @@ def check_recovery():
         require([event["type"] for event in events] == ["wake", "user_input", "sleep"] * 2, "Unexpected event order across recovery")
         require(len(memories) == 1 and memories[0]["content"]["text"] == "Проверка ANIMA", "Selected memory was lost or blank input was stored")
     print("[OK] Temporary backup/recovery: two sessions, six raw events, one selected memory.")
-    print("[NOTE] Current CLI reads raw events as memories; SW-01 remains open.")
+    print("[OK] Raw event history and selected memory remain separate across recovery.")
 
 
 def main():
@@ -201,6 +245,7 @@ def main():
     check_documentation()
     check_sources()
     check_tracked_data()
+    check_state_write_safety()
     check_recovery()
     print(f"Checks passed on Python {sys.version.split()[0]}.")
 

@@ -1,4 +1,6 @@
 import json
+import os
+import tempfile
 from datetime import datetime
 from pathlib import Path
 
@@ -25,27 +27,51 @@ class AnimaState:
             "events_processed": 0,
         }
 
+    def _write_state(self, state):
+        self.state_file.parent.mkdir(parents=True, exist_ok=True)
+
+        file_descriptor, temp_name = tempfile.mkstemp(
+            prefix=f".{self.state_file.name}.",
+            suffix=".tmp",
+            dir=self.state_file.parent,
+            text=True,
+        )
+
+        temp_path = Path(temp_name)
+
+        try:
+            with os.fdopen(
+                file_descriptor,
+                "w",
+                encoding="utf-8",
+            ) as file:
+                json.dump(
+                    state,
+                    file,
+                    indent=4,
+                    ensure_ascii=False,
+                )
+                file.write("\n")
+                file.flush()
+                os.fsync(file.fileno())
+
+            os.replace(temp_path, self.state_file)
+
+        except Exception:
+            temp_path.unlink(missing_ok=True)
+            raise
+
     def _load_or_create(self):
         if self.state_file.exists():
             with self.state_file.open("r", encoding="utf-8") as file:
                 return json.load(file)
 
         state = self._default_state()
-        self.state_file.parent.mkdir(parents=True, exist_ok=True)
-
-        with self.state_file.open("w", encoding="utf-8") as file:
-            json.dump(state, file, indent=4, ensure_ascii=False)
-
+        self._write_state(state)
         return state
 
     def save(self):
-        with self.state_file.open("w", encoding="utf-8") as file:
-            json.dump(
-                self.state,
-                file,
-                indent=4,
-                ensure_ascii=False,
-            )
+        self._write_state(self.state)
 
     def wake(self):
         self.state["status"] = "awake"
