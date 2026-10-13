@@ -413,6 +413,250 @@ def check_memory_validation():
         "damaged lines report their location."
     )
 
+def check_interrupted_sessions():
+    with tempfile.TemporaryDirectory(prefix="anima-interrupt-check-") as temp_dir:
+        temp = Path(temp_dir)
+
+        def run_with_input(destination, input_text):
+            copy_source(destination)
+
+            env = dict(
+                os.environ,
+                PYTHONDONTWRITEBYTECODE="1",
+            )
+
+            return subprocess.run(
+                [sys.executable, "-B", "main.py"],
+                cwd=destination,
+                input=input_text,
+                capture_output=True,
+                text=True,
+                env=env,
+                timeout=15,
+            )
+
+        # EOF before the first user input.
+        early_eof = temp / "early-eof"
+        result = run_with_input(early_eof, "")
+
+        require(
+            result.returncode == 0,
+            f"Early EOF session failed:\n{result.stderr}",
+        )
+
+        state = json.loads(
+            (early_eof / "data/state.json").read_text(
+                encoding="utf-8"
+            )
+        )
+        events = read_jsonl(
+            early_eof / "data/events.jsonl"
+        )
+
+        require(
+            state["status"] == "sleeping",
+            "Early EOF left ANIMA awake",
+        )
+        require(
+            [event["type"] for event in events]
+            == ["wake", "sleep"],
+            "Early EOF produced unexpected event history",
+        )
+        require(
+            state["events_processed"] == 2,
+            "Early EOF produced incorrect event count",
+        )
+        require(
+            "Session interrupted: EOFError." in result.stdout,
+            "Early EOF was not reported clearly",
+        )
+
+        # EOF after a valid user input.
+        late_eof = temp / "late-eof"
+        result = run_with_input(
+            late_eof,
+            "Interrupted session memory\n",
+        )
+
+        require(
+            result.returncode == 0,
+            f"Late EOF session failed:\n{result.stderr}",
+        )
+
+        state = json.loads(
+            (late_eof / "data/state.json").read_text(
+                encoding="utf-8"
+            )
+        )
+        events = read_jsonl(
+            late_eof / "data/events.jsonl"
+        )
+        memories = read_jsonl(
+            late_eof / "data/memories.jsonl"
+        )
+
+        require(
+            state["status"] == "sleeping",
+            "Late EOF left ANIMA awake",
+        )
+        require(
+            [event["type"] for event in events]
+            == ["wake", "user_input", "sleep"],
+            "Late EOF produced unexpected event history",
+        )
+        require(
+            state["events_processed"] == 3,
+            "Late EOF produced incorrect event count",
+        )
+        require(
+            len(memories) == 1
+            and memories[0]["content"]["text"]
+            == "Interrupted session memory",
+            "Late EOF lost processed user input",
+        )
+
+        # KeyboardInterrupt at the first input().
+        keyboard_interrupt = temp / "keyboard-interrupt"
+        copy_source(keyboard_interrupt)
+
+        env = dict(
+            os.environ,
+            PYTHONDONTWRITEBYTECODE="1",
+        )
+
+        interrupt_code = """
+from unittest.mock import patch
+
+import main
+
+with patch(
+    "builtins.input",
+    side_effect=KeyboardInterrupt,
+):
+    main.main()
+"""
+
+        result = subprocess.run(
+            [
+                sys.executable,
+                "-B",
+                "-c",
+                interrupt_code,
+            ],
+            cwd=keyboard_interrupt,
+            capture_output=True,
+            text=True,
+            env=env,
+            timeout=15,
+        )
+
+        require(
+            result.returncode == 0,
+            f"KeyboardInterrupt session failed:\n{result.stderr}",
+        )
+
+        state = json.loads(
+            (
+                keyboard_interrupt
+                / "data/state.json"
+            ).read_text(encoding="utf-8")
+        )
+        events = read_jsonl(
+            keyboard_interrupt / "data/events.jsonl"
+        )
+
+        require(
+            state["status"] == "sleeping",
+            "KeyboardInterrupt left ANIMA awake",
+        )
+        require(
+            [event["type"] for event in events]
+            == ["wake", "sleep"],
+            "KeyboardInterrupt produced unexpected event history",
+        )
+        require(
+            "Session interrupted: KeyboardInterrupt."
+            in result.stdout,
+            "KeyboardInterrupt was not reported clearly",
+        )
+
+        # KeyboardInterrupt after a valid user input.
+        late_keyboard_interrupt = temp / "late-keyboard-interrupt"
+        copy_source(late_keyboard_interrupt)
+
+        interrupt_code = """
+from unittest.mock import patch
+
+import main
+
+with patch(
+    "builtins.input",
+    side_effect=[
+        "Keyboard session memory",
+        KeyboardInterrupt,
+    ],
+):
+    main.main()
+"""
+
+        result = subprocess.run(
+            [
+                sys.executable,
+                "-B",
+                "-c",
+                interrupt_code,
+            ],
+            cwd=late_keyboard_interrupt,
+            capture_output=True,
+            text=True,
+            env=env,
+            timeout=15,
+        )
+
+        require(
+            result.returncode == 0,
+            f"Late KeyboardInterrupt session failed:\n{result.stderr}",
+        )
+
+        state = json.loads(
+            (
+                late_keyboard_interrupt
+                / "data/state.json"
+            ).read_text(encoding="utf-8")
+        )
+        events = read_jsonl(
+            late_keyboard_interrupt / "data/events.jsonl"
+        )
+        memories = read_jsonl(
+            late_keyboard_interrupt / "data/memories.jsonl"
+        )
+
+        require(
+            state["status"] == "sleeping",
+            "Late KeyboardInterrupt left ANIMA awake",
+        )
+        require(
+            [event["type"] for event in events]
+            == ["wake", "user_input", "sleep"],
+            "Late KeyboardInterrupt produced unexpected event history",
+        )
+        require(
+            len(memories) == 1
+            and memories[0]["content"]["text"]
+            == "Keyboard session memory",
+            "Late KeyboardInterrupt lost processed user input",
+        )
+        require(
+            "Session interrupted: KeyboardInterrupt."
+            in result.stdout,
+            "Late KeyboardInterrupt was not reported clearly",
+        )
+
+    print(
+        "[OK] Session interruption: EOF and KeyboardInterrupt "
+        "finish in sleeping state without losing processed input."
+    )
+
 def check_state_write_safety():
     from unittest.mock import patch
 
@@ -558,6 +802,7 @@ def main():
     check_event_log_validation()
     check_memory_validation()
     check_state_write_safety()
+    check_interrupted_sessions()
     check_recovery()
     print(f"Checks passed on Python {sys.version.split()[0]}.")
 

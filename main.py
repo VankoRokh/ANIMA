@@ -32,6 +32,29 @@ def process_events(
         anima.register_event()
 
 
+def put_to_sleep(
+    anima,
+    event_bus,
+    event_log,
+    memory_filter,
+    memory_store,
+):
+    if anima.get()["status"] == "sleeping":
+        return
+
+    event_bus.emit("sleep")
+
+    process_events(
+        anima,
+        event_bus,
+        event_log,
+        memory_filter,
+        memory_store,
+    )
+
+    anima.sleep()
+
+
 def main():
     anima = AnimaState()
     identity = Identity()
@@ -80,7 +103,25 @@ def main():
 
     print()
 
-    user_input = input("Say something to ANIMA: ")
+    try:
+        user_input = input("Say something to ANIMA: ")
+    except (KeyboardInterrupt, EOFError) as error:
+        print()
+        print(
+            f"Session interrupted: "
+            f"{type(error).__name__}."
+        )
+
+        put_to_sleep(
+            anima,
+            event_bus,
+            event_log,
+            memory_filter,
+            memory_store,
+        )
+
+        print("ANIMA is sleeping.")
+        return
 
     event_bus.emit(
         "user_input",
@@ -97,20 +138,22 @@ def main():
         memory_store,
     )
 
+    try:
+        input("Press Enter to put ANIMA to sleep...")
+    except (KeyboardInterrupt, EOFError) as error:
+        print()
+        print(
+            f"Session interrupted: "
+            f"{type(error).__name__}."
+        )
 
-    input("Press Enter to put ANIMA to sleep...")
-
-    event_bus.emit("sleep")
-    process_events(
+    put_to_sleep(
         anima,
         event_bus,
         event_log,
         memory_filter,
         memory_store,
     )
-
-
-    anima.sleep()
 
     print("ANIMA is sleeping.")
 
