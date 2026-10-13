@@ -1,13 +1,13 @@
 ---
 document_type: reference
 status: Reference
-updated: 2026-10-12
+updated: 2026-10-13
 tags: [anima]
 ---
 
 # События и форматы хранения
 
-Здесь описана фактическая схема 00.1-alpha. Строгий контракт, ID и версия схемы пока отсутствуют.
+Здесь описана фактическая схема 00.1-alpha. Базовый структурный контракт реализован; event_id и версия схемы пока отсутствуют.
 
 ## Event
 
@@ -17,7 +17,7 @@ tags: [anima]
 | payload | payload | Данные события; для служебных событий None/null |
 | timestamp | timestamp | datetime.now().isoformat(timespec="seconds") |
 
-Время локальное, без UTC offset. Event не проверяет типы и не назначает event_id.
+Время локальное, без UTC offset. Event проверяет допустимый type и payload, а сохранённая запись — наличие type, payload и непустого строкового timestamp. event_id пока не назначается.
 
 ## Текущие события
 
@@ -42,6 +42,8 @@ MemoryFilter создаёт другой формат:
 ```
 
 Записывается в memories.jsonl, только если payload.text после strip() не пуст. content сохраняет исходный payload, включая исходные пробелы.
+
+MemoryStore проверяет, что source равен user_input, timestamp является непустой строкой, content является объектом и content.text является строкой. EpisodicMemory применяет тот же контракт при чтении.
 
 ## Состояние
 
