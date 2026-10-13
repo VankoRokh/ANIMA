@@ -142,6 +142,66 @@ def check_sources():
     print(f"[OK] Python syntax ({len(sources)} files), VS Code JSON, Bash syntax.")
 
 
+def check_cli_extraction():
+    main_source = (ROOT / "main.py").read_text(
+        encoding="utf-8"
+    )
+    cli_source = (
+        ROOT / "anima/interfaces/cli.py"
+    ).read_text(encoding="utf-8")
+
+    main_tree = ast.parse(
+        main_source,
+        filename=str(ROOT / "main.py"),
+    )
+    cli_tree = ast.parse(
+        cli_source,
+        filename=str(
+            ROOT / "anima/interfaces/cli.py"
+        ),
+    )
+
+    main_calls = [
+        node
+        for node in ast.walk(main_tree)
+        if isinstance(node, ast.Call)
+    ]
+
+    require(
+        not any(
+            isinstance(call.func, ast.Name)
+            and call.func.id == "input"
+            for call in main_calls
+        ),
+        "main.py still owns terminal input",
+    )
+
+    require(
+        "from anima.interfaces.cli import run_cli"
+        in main_source,
+        "main.py does not import the extracted CLI",
+    )
+
+    require(
+        any(
+            isinstance(node, ast.FunctionDef)
+            and node.name == "run_cli"
+            for node in ast.walk(cli_tree)
+        ),
+        "anima/interfaces/cli.py has no run_cli()",
+    )
+
+    require(
+        "input(" in cli_source,
+        "CLI no longer owns terminal input",
+    )
+
+    print(
+        "[OK] CLI extraction: main assembles components "
+        "and terminal interaction lives in interfaces/cli.py."
+    )
+
+
 def check_tracked_data():
     if not shutil.which("git") or not (ROOT / ".git").exists():
         print("[SKIP] Tracked-data check: use a Git checkout to inspect tracked paths.")
@@ -1064,6 +1124,7 @@ def main():
     require(sys.version_info >= (3, 12), "Use Python 3.12 or newer; validated baseline: 3.12.14")
     check_documentation()
     check_sources()
+    check_cli_extraction()
     check_tracked_data()
     check_event_validation()
     check_event_log_validation()
