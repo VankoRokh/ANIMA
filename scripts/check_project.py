@@ -160,10 +160,45 @@ def copy_source(destination):
     shutil.copytree(ROOT / "anima", destination / "anima", ignore=shutil.ignore_patterns("__pycache__"))
 
 
-def run_session(destination, text):
-    env = dict(os.environ, PYTHONDONTWRITEBYTECODE="1")
-    result = subprocess.run([sys.executable, "-B", "main.py"], cwd=destination, input=text + "\n\n", capture_output=True, text=True, env=env, timeout=15)
-    require(result.returncode == 0, f"Temporary instance failed:\n{result.stderr}")
+def make_test_env(data_dir=None):
+    env = dict(
+        os.environ,
+        PYTHONDONTWRITEBYTECODE="1",
+    )
+
+    env.pop("ANIMA_DATA_DIR", None)
+
+    if data_dir is not None:
+        env["ANIMA_DATA_DIR"] = str(data_dir)
+
+    return env
+
+
+def run_session(
+    destination,
+    text,
+    *,
+    data_dir=None,
+    cwd=None,
+):
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-B",
+            str(destination / "main.py"),
+        ],
+        cwd=destination if cwd is None else cwd,
+        input=text + "\n\n",
+        capture_output=True,
+        text=True,
+        env=make_test_env(data_dir),
+        timeout=15,
+    )
+
+    require(
+        result.returncode == 0,
+        f"Temporary instance failed:\n{result.stderr}",
+    )
 
 
 def read_jsonl(path):
@@ -420,10 +455,7 @@ def check_interrupted_sessions():
         def run_with_input(destination, input_text):
             copy_source(destination)
 
-            env = dict(
-                os.environ,
-                PYTHONDONTWRITEBYTECODE="1",
-            )
+            env = make_test_env()
 
             return subprocess.run(
                 [sys.executable, "-B", "main.py"],
@@ -519,10 +551,7 @@ def check_interrupted_sessions():
         keyboard_interrupt = temp / "keyboard-interrupt"
         copy_source(keyboard_interrupt)
 
-        env = dict(
-            os.environ,
-            PYTHONDONTWRITEBYTECODE="1",
-        )
+        env = make_test_env()
 
         interrupt_code = """
 from unittest.mock import patch
@@ -765,6 +794,244 @@ def check_state_write_safety():
     "and incompatible state handled safely."
     )
 
+
+def check_data_directory_configuration():
+    from unittest.mock import patch
+
+    from anima.config.paths import PROJECT_ROOT, get_data_dir
+
+    # Без настройки используется data в корне проекта.
+    with patch.dict(os.environ, {}, clear=False):
+        os.environ.pop("ANIMA_DATA_DIR", None)
+
+        require(
+            get_data_dir() == PROJECT_ROOT / "data",
+            "Default data directory is not project-root/data",
+        )
+
+    # Относительный путь считается от корня проекта,
+    # а не от текущей рабочей директории.
+    with patch.dict(
+        os.environ,
+        {"ANIMA_DATA_DIR": "configured-data"},
+        clear=False,
+    ):
+        require(
+            get_data_dir()
+            == (PROJECT_ROOT / "configured-data").resolve(),
+            "Relative ANIMA_DATA_DIR is not resolved from project root",
+        )
+
+    # Пустая настройка считается ошибкой.
+    with patch.dict(
+        os.environ,
+        {"ANIMA_DATA_DIR": "   "},
+        clear=False,
+    ):
+        try:
+            get_data_dir()
+        except ValueError as error:
+            require(
+                "must not be empty" in str(error),
+                "Empty ANIMA_DATA_DIR produced an unclear error",
+            )
+        else:
+            raise RuntimeError(
+                "Empty ANIMA_DATA_DIR was unexpectedly accepted"
+            )
+
+    with tempfile.TemporaryDirectory(
+        prefix="anima-data-dir-check-"
+    ) as temp_dir:
+        temp = Path(temp_dir)
+
+        application = temp / "application"
+        first_cwd = temp / "cwd-one"
+        second_cwd = temp / "cwd-two"
+        data_dir = temp / "instance-data"
+        migrated_dir = temp / "migrated-data"
+
+        copy_source(application)
+
+        first_cwd.mkdir()
+        second_cwd.mkdir()
+
+        # Первая сессия использует внешний каталог данных.
+        run_session(
+            application,
+            "Configured session one",
+            data_dir=data_dir,
+            cwd=first_cwd,
+        )
+
+        expected_files = {
+            "state.json",
+            "identity.json",
+            "events.jsonl",
+            "memories.jsonl",
+        }
+
+        require(
+            {
+                path.name
+                for path in data_dir.iterdir()
+                if path.is_file()
+            }
+            == expected_files,
+            "Configured data directory has unexpected contents",
+        )
+
+        require(
+            not (application / "data").exists(),
+            "Application directory received unintended data",
+        )
+
+        require(
+            not (first_cwd / "data").exists(),
+            "Working directory received unintended data",
+        )
+
+        first_state = json.loads(
+            (data_dir / "state.json").read_text(
+                encoding="utf-8"
+            )
+        )
+
+        first_identity = json.loads(
+            (data_dir / "identity.json").read_text(
+                encoding="utf-8"
+            )
+        )
+
+        require(
+            first_state["session"] == 1
+            and first_state["events_processed"] == 3
+            and first_state["status"] == "sleeping",
+            "Configured first session has incorrect state",
+        )
+
+        instance_id = first_identity["instance_id"]
+
+        # Вторая сессия запускается из другой cwd,
+        # но использует тот же экземпляр.
+        run_session(
+            application,
+            "Configured session two",
+            data_dir=data_dir,
+            cwd=second_cwd,
+        )
+
+        second_state = json.loads(
+            (data_dir / "state.json").read_text(
+                encoding="utf-8"
+            )
+        )
+
+        second_identity = json.loads(
+            (data_dir / "identity.json").read_text(
+                encoding="utf-8"
+            )
+        )
+
+        events = read_jsonl(
+            data_dir / "events.jsonl"
+        )
+
+        memories = read_jsonl(
+            data_dir / "memories.jsonl"
+        )
+
+        require(
+            second_state["session"] == 2
+            and second_state["events_processed"] == 6
+            and second_state["status"] == "sleeping",
+            "Configured instance did not continue across cwd change",
+        )
+
+        require(
+            second_identity["instance_id"] == instance_id,
+            "Instance ID changed across cwd change",
+        )
+
+        require(
+            len(events) == 6,
+            "Event history was lost across cwd change",
+        )
+
+        require(
+            len(memories) == 2,
+            "Selected memory was lost across cwd change",
+        )
+
+        require(
+            not (second_cwd / "data").exists(),
+            "Second working directory received unintended data",
+        )
+
+        # Физически копируем каталог экземпляра.
+        shutil.copytree(
+            data_dir,
+            migrated_dir,
+        )
+
+        run_session(
+            application,
+            "Migrated session",
+            data_dir=migrated_dir,
+            cwd=first_cwd,
+        )
+
+        migrated_state = json.loads(
+            (migrated_dir / "state.json").read_text(
+                encoding="utf-8"
+            )
+        )
+
+        migrated_identity = json.loads(
+            (migrated_dir / "identity.json").read_text(
+                encoding="utf-8"
+            )
+        )
+
+        migrated_events = read_jsonl(
+            migrated_dir / "events.jsonl"
+        )
+
+        require(
+            migrated_state["session"] == 3
+            and migrated_state["events_processed"] == 9
+            and migrated_state["status"] == "sleeping",
+            "Migrated instance did not continue correctly",
+        )
+
+        require(
+            migrated_identity["instance_id"] == instance_id,
+            "Migrated instance lost its identity",
+        )
+
+        require(
+            len(migrated_events) == 9,
+            "Migrated instance lost event history",
+        )
+
+        # Продолжение копии не должно менять исходный каталог.
+        original_state = json.loads(
+            (data_dir / "state.json").read_text(
+                encoding="utf-8"
+            )
+        )
+
+        require(
+            original_state["session"] == 2,
+            "Running migrated data modified the original instance data",
+        )
+
+    print(
+        "[OK] Data directory: explicit path is cwd-independent "
+        "and copied data preserves instance continuity."
+    )
+
+
 def check_recovery():
     with tempfile.TemporaryDirectory(prefix="anima-check-") as temp_dir:
         temp = Path(temp_dir)
@@ -803,6 +1070,7 @@ def main():
     check_memory_validation()
     check_state_write_safety()
     check_interrupted_sessions()
+    check_data_directory_configuration()
     check_recovery()
     print(f"Checks passed on Python {sys.version.split()[0]}.")
 

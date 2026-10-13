@@ -1,3 +1,4 @@
+from anima.config.paths import get_data_dir
 from anima.core.identity import Identity
 from anima.memory.memory_store import MemoryStore
 from anima.memory.filter import MemoryFilter
@@ -56,12 +57,24 @@ def put_to_sleep(
 
 
 def main():
-    anima = AnimaState()
-    identity = Identity()
+    data_dir = get_data_dir()
+
+    anima = AnimaState(
+        data_dir / "state.json"
+    )
+    identity = Identity(
+        data_dir / "identity.json"
+    )
     event_bus = EventBus()
-    event_log = EventLog()
-    memory = EpisodicMemory()
-    memory_store = MemoryStore()
+    event_log = EventLog(
+        data_dir / "events.jsonl"
+    )
+    memory = EpisodicMemory(
+        data_dir / "memories.jsonl"
+    )
+    memory_store = MemoryStore(
+        data_dir / "memories.jsonl"
+    )
     memory_filter = MemoryFilter()
 
     anima.wake()
