@@ -4,6 +4,7 @@ import tempfile
 from datetime import datetime
 from pathlib import Path
 
+VALID_STATUSES = {"created", "awake", "sleeping"}
 
 class AnimaState:
     def __init__(self, state_file="data/state.json"):
@@ -26,6 +27,75 @@ class AnimaState:
             "last_sleep": None,
             "events_processed": 0,
         }
+
+    def _validate_state(self, state):
+        if not isinstance(state, dict):
+            raise ValueError(
+                f"Invalid state file {self.state_file}: "
+                "root value must be an object"
+            )
+
+        required_fields = {
+            "name",
+            "version",
+            "status",
+            "session",
+            "created_at",
+            "last_wake",
+            "last_sleep",
+            "events_processed",
+        }
+
+        missing_fields = required_fields - state.keys()
+
+        if missing_fields:
+            missing = ", ".join(sorted(missing_fields))
+            raise ValueError(
+                f"Invalid state file {self.state_file}: "
+                f"missing fields: {missing}"
+            )
+
+        if not isinstance(state["name"], str) or not state["name"]:
+            raise ValueError(
+                f"Invalid state file {self.state_file}: "
+                "'name' must be a non-empty string"
+            )
+
+        if not isinstance(state["version"], str) or not state["version"]:
+            raise ValueError(
+                f"Invalid state file {self.state_file}: "
+                "'version' must be a non-empty string"
+            )
+
+        if state["status"] not in VALID_STATUSES:
+            raise ValueError(
+                f"Invalid state file {self.state_file}: "
+                f"unknown status {state['status']!r}"
+            )
+
+        for field in ("session", "events_processed"):
+            value = state[field]
+
+            if (
+                not isinstance(value, int)
+                or isinstance(value, bool)
+                or value < 0
+            ):
+                raise ValueError(
+                    f"Invalid state file {self.state_file}: "
+                    f"'{field}' must be a non-negative integer"
+                )
+
+        for field in ("created_at", "last_wake", "last_sleep"):
+            value = state[field]
+
+            if value is not None and not isinstance(value, str):
+                raise ValueError(
+                    f"Invalid state file {self.state_file}: "
+                    f"'{field}' must be a string or null"
+                )
+
+        return state
 
     def _write_state(self, state):
         self.state_file.parent.mkdir(parents=True, exist_ok=True)
@@ -63,8 +133,15 @@ class AnimaState:
 
     def _load_or_create(self):
         if self.state_file.exists():
-            with self.state_file.open("r", encoding="utf-8") as file:
-                return json.load(file)
+            try:
+                with self.state_file.open("r", encoding="utf-8") as file:
+                    state = json.load(file)
+            except json.JSONDecodeError as error:
+                raise ValueError(
+                    f"Invalid state file {self.state_file}: malformed JSON"
+                ) from error
+
+            return self._validate_state(state)
 
         state = self._default_state()
         self._write_state(state)

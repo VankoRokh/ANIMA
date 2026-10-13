@@ -210,7 +210,72 @@ def check_state_write_safety():
 
         require(original_bytes != stable_bytes, "State safety test did not actually modify state")
 
-    print("[OK] State writes: atomic replacement preserves previous state on failure.")
+        malformed_file = Path(temp_dir) / "malformed" / "state.json"
+        malformed_file.parent.mkdir(parents=True, exist_ok=True)
+        malformed_file.write_text(
+            '{"name": "ANIMA", broken json',
+            encoding="utf-8",
+        )
+        malformed_bytes = malformed_file.read_bytes()
+
+        try:
+            AnimaState(malformed_file)
+        except ValueError as error:
+            require(
+                "malformed JSON" in str(error),
+                "Malformed state did not produce a clear error",
+            )
+        else:
+            raise RuntimeError("Malformed state was unexpectedly accepted")
+
+        require(
+            malformed_file.read_bytes() == malformed_bytes,
+            "Malformed state file was modified during failed load",
+        )
+
+        incompatible_file = Path(temp_dir) / "incompatible" / "state.json"
+        incompatible_file.parent.mkdir(parents=True, exist_ok=True)
+
+        incompatible_state = {
+            "name": "ANIMA",
+            "version": "00.1-alpha",
+            "status": "sleeping",
+            "session": "broken",
+            "created_at": "2026-10-13T00:00:00",
+            "last_wake": None,
+            "last_sleep": None,
+            "events_processed": 0,
+        }
+
+        incompatible_file.write_text(
+            json.dumps(
+                incompatible_state,
+                indent=4,
+                ensure_ascii=False,
+            ),
+            encoding="utf-8",
+        )
+        incompatible_bytes = incompatible_file.read_bytes()
+
+        try:
+            AnimaState(incompatible_file)
+        except ValueError as error:
+            require(
+                "'session' must be a non-negative integer" in str(error),
+                "Incompatible state did not produce a clear error",
+            )
+        else:
+            raise RuntimeError("Incompatible state was unexpectedly accepted")
+
+        require(
+            incompatible_file.read_bytes() == incompatible_bytes,
+            "Incompatible state file was modified during failed load",
+        )
+
+    print(
+    "[OK] State persistence: atomic save, malformed JSON "
+    "and incompatible state handled safely."
+    )
 
 def check_recovery():
     with tempfile.TemporaryDirectory(prefix="anima-check-") as temp_dir:
