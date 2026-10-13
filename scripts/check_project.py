@@ -169,6 +169,250 @@ def run_session(destination, text):
 def read_jsonl(path):
     return [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines() if line.strip()]
 
+def check_event_validation():
+    from anima.core.event_bus import Event
+
+    valid_events = [
+        ("wake", None),
+        ("sleep", None),
+        ("user_input", {"text": "hello"}),
+        ("user_input", {"text": "   "}),
+    ]
+
+    for event_type, payload in valid_events:
+        event = Event(event_type, payload)
+        require(
+            event.event_type == event_type,
+            f"Valid event {event_type!r} was not created correctly",
+        )
+
+    invalid_events = [
+        (
+            123,
+            None,
+            "Event type must be a string",
+        ),
+        (
+            "unknown",
+            None,
+            "Unknown event type",
+        ),
+        (
+            "wake",
+            {"unexpected": True},
+            "must have null payload",
+        ),
+        (
+            "sleep",
+            {},
+            "must have null payload",
+        ),
+        (
+            "user_input",
+            "hello",
+            "payload must be an object",
+        ),
+        (
+            "user_input",
+            {},
+            "must contain 'text'",
+        ),
+        (
+            "user_input",
+            {"text": 123},
+            "'text' must be a string",
+        ),
+    ]
+
+    for event_type, payload, expected_message in invalid_events:
+        try:
+            Event(event_type, payload)
+        except ValueError as error:
+            require(
+                expected_message in str(error),
+                f"Unexpected validation error for {event_type!r}: {error}",
+            )
+        else:
+            raise RuntimeError(
+                f"Invalid event {event_type!r} was unexpectedly accepted"
+            )
+
+    print("[OK] Event validation: valid events accepted and invalid events rejected.")
+
+def check_event_log_validation():
+    from anima.core.event_bus import Event
+    from anima.memory.event_log import EventLog
+
+    with tempfile.TemporaryDirectory(prefix="anima-event-log-check-") as temp_dir:
+        log_file = Path(temp_dir) / "events.jsonl"
+        event_log = EventLog(log_file)
+
+        event_log.write(Event("wake"))
+        event_log.write(Event("user_input", {"text": "hello"}))
+
+        loaded = event_log.load_events()
+
+        require(
+            len(loaded) == 2,
+            "Event log did not return expected records",
+        )
+
+        require(
+            loaded[0]["type"] == "wake"
+            and loaded[1]["type"] == "user_input",
+            "Event log returned unexpected event order",
+        )
+
+        malformed_file = Path(temp_dir) / "malformed.jsonl"
+        malformed_file.write_text(
+            '{"type":"wake","payload":null,"timestamp":"2026-10-13T12:00:00"}\n'
+            '{"type":\n',
+            encoding="utf-8",
+        )
+
+        malformed_log = EventLog(malformed_file)
+
+        try:
+            malformed_log.load_events()
+        except ValueError as error:
+            require(
+                "line 2: malformed JSON" in str(error),
+                f"Malformed event log produced unclear error: {error}",
+            )
+        else:
+            raise RuntimeError(
+                "Malformed event log was unexpectedly accepted"
+            )
+
+        incompatible_file = Path(temp_dir) / "incompatible.jsonl"
+        incompatible_file.write_text(
+            '{"type":"wake","payload":{"bad":true},'
+            '"timestamp":"2026-10-13T12:00:00"}\n',
+            encoding="utf-8",
+        )
+
+        incompatible_log = EventLog(incompatible_file)
+
+        try:
+            incompatible_log.load_events()
+        except ValueError as error:
+            require(
+                "line 1" in str(error)
+                and "must have null payload" in str(error),
+                f"Incompatible event log produced unclear error: {error}",
+            )
+        else:
+            raise RuntimeError(
+                "Incompatible event log was unexpectedly accepted"
+            )
+
+    print(
+        "[OK] Event log validation: valid records load and "
+        "damaged lines report their location."
+    )
+
+def check_memory_validation():
+    from anima.memory.episodic import EpisodicMemory
+    from anima.memory.memory_store import MemoryStore
+
+    with tempfile.TemporaryDirectory(prefix="anima-memory-check-") as temp_dir:
+        memory_file = Path(temp_dir) / "memories.jsonl"
+        memory_store = MemoryStore(memory_file)
+        episodic_memory = EpisodicMemory(memory_file)
+
+        valid_memory = {
+            "source": "user_input",
+            "timestamp": "2026-10-13T12:00:00",
+            "content": {
+                "text": "hello",
+            },
+        }
+
+        memory_store.write(valid_memory)
+
+        loaded = episodic_memory.load_memories()
+
+        require(
+            loaded == [valid_memory],
+            "Valid memory record was not stored and loaded correctly",
+        )
+
+        stable_bytes = memory_file.read_bytes()
+
+        invalid_memory = {
+            "source": "user_input",
+            "timestamp": "2026-10-13T12:01:00",
+            "content": {
+                "text": 123,
+            },
+        }
+
+        try:
+            memory_store.write(invalid_memory)
+        except ValueError as error:
+            require(
+                "'content.text' must be a string" in str(error),
+                f"Invalid memory produced unclear error: {error}",
+            )
+        else:
+            raise RuntimeError(
+                "Invalid memory was unexpectedly written"
+            )
+
+        require(
+            memory_file.read_bytes() == stable_bytes,
+            "Invalid memory changed the memory store",
+        )
+
+        malformed_file = Path(temp_dir) / "malformed.jsonl"
+        malformed_file.write_text(
+            '{"source":"user_input","timestamp":"2026-10-13T12:00:00",'
+            '"content":{"text":"valid"}}\n'
+            '{"source":\n',
+            encoding="utf-8",
+        )
+
+        malformed_memory = EpisodicMemory(malformed_file)
+
+        try:
+            malformed_memory.load_memories()
+        except ValueError as error:
+            require(
+                "line 2: malformed JSON" in str(error),
+                f"Malformed memory store produced unclear error: {error}",
+            )
+        else:
+            raise RuntimeError(
+                "Malformed memory store was unexpectedly accepted"
+            )
+
+        incompatible_file = Path(temp_dir) / "incompatible.jsonl"
+        incompatible_file.write_text(
+            '{"source":"user_input","timestamp":"2026-10-13T12:00:00",'
+            '"content":{"text":123}}\n',
+            encoding="utf-8",
+        )
+
+        incompatible_memory = EpisodicMemory(incompatible_file)
+
+        try:
+            incompatible_memory.load_memories()
+        except ValueError as error:
+            require(
+                "line 1" in str(error)
+                and "'content.text' must be a string" in str(error),
+                f"Incompatible memory store produced unclear error: {error}",
+            )
+        else:
+            raise RuntimeError(
+                "Incompatible memory store was unexpectedly accepted"
+            )
+
+    print(
+        "[OK] Memory validation: invalid writes are rejected and "
+        "damaged lines report their location."
+    )
+
 def check_state_write_safety():
     from unittest.mock import patch
 
@@ -310,6 +554,9 @@ def main():
     check_documentation()
     check_sources()
     check_tracked_data()
+    check_event_validation()
+    check_event_log_validation()
+    check_memory_validation()
     check_state_write_safety()
     check_recovery()
     print(f"Checks passed on Python {sys.version.split()[0]}.")
