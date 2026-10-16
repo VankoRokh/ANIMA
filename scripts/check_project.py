@@ -1127,6 +1127,8 @@ def check_runtime_headless():
     from anima.memory.filter import MemoryFilter
     from anima.memory.memory_store import MemoryStore
     from anima.runtime import Runtime
+    from anima.core.identity import Identity
+    from anima.memory.episodic import EpisodicMemory
 
     with tempfile.TemporaryDirectory(
         prefix="anima-runtime-check-"
@@ -1137,12 +1139,22 @@ def check_runtime_headless():
             data_dir / "state.json"
         )
 
+        identity = Identity(
+            data_dir / "identity.json"
+        )
+
+        memory = EpisodicMemory(
+            data_dir / "memories.jsonl"
+        )
+
         runtime = Runtime(
             anima=state,
+            identity=identity,
             event_bus=EventBus(),
             event_log=EventLog(
                 data_dir / "events.jsonl"
             ),
+            memory=memory,
             memory_filter=MemoryFilter(),
             memory_store=MemoryStore(
                 data_dir / "memories.jsonl"
@@ -1223,6 +1235,8 @@ def check_scenario_runner():
     from anima.memory.memory_store import MemoryStore
     from anima.runtime import Runtime
     from anima.scenario import ScenarioRunner
+    from anima.core.identity import Identity
+    from anima.memory.episodic import EpisodicMemory
 
     with tempfile.TemporaryDirectory(
         prefix="anima-scenario-check-"
@@ -1233,12 +1247,22 @@ def check_scenario_runner():
             data_dir / "state.json"
         )
 
+        identity = Identity(
+            data_dir / "identity.json"
+        )
+
+        memory = EpisodicMemory(
+            data_dir / "memories.jsonl"
+        )
+
         runtime = Runtime(
             anima=state,
+            identity=identity,
             event_bus=EventBus(),
             event_log=EventLog(
                 data_dir / "events.jsonl"
             ),
+            memory=memory,
             memory_filter=MemoryFilter(),
             memory_store=MemoryStore(
                 data_dir / "memories.jsonl"
@@ -1370,12 +1394,118 @@ def check_scenario_runner():
     )
 
 
+def check_runtime_snapshot():
+    from anima.core.event_bus import EventBus
+    from anima.core.identity import Identity
+    from anima.core.state import AnimaState
+    from anima.memory.episodic import EpisodicMemory
+    from anima.memory.event_log import EventLog
+    from anima.memory.filter import MemoryFilter
+    from anima.memory.memory_store import MemoryStore
+    from anima.runtime import Runtime
+
+    with tempfile.TemporaryDirectory(
+        prefix="anima-snapshot-check-"
+    ) as temp_dir:
+        data_dir = Path(temp_dir)
+
+        state = AnimaState(
+            data_dir / "state.json"
+        )
+
+        identity = Identity(
+            data_dir / "identity.json"
+        )
+
+        memory = EpisodicMemory(
+            data_dir / "memories.jsonl"
+        )
+
+        runtime = Runtime(
+            anima=state,
+            identity=identity,
+            event_bus=EventBus(),
+            event_log=EventLog(
+                data_dir / "events.jsonl"
+            ),
+            memory=memory,
+            memory_filter=MemoryFilter(),
+            memory_store=MemoryStore(
+                data_dir / "memories.jsonl"
+            ),
+        )
+
+        initial = runtime.snapshot()
+
+        require(
+            initial["state"]["status"] == "created",
+            "Initial snapshot has unexpected status",
+        )
+
+        require(
+            initial["state"]["session"] == 0,
+            "Initial snapshot has unexpected session count",
+        )
+
+        require(
+            initial["state"]["events_processed"] == 0,
+            "Initial snapshot has unexpected event count",
+        )
+
+        require(
+            initial["memory"]["count"] == 0,
+            "Initial snapshot has unexpected memory count",
+        )
+
+        instance_id = initial["identity"]["instance_id"]
+
+        runtime.wake()
+        runtime.user_input(
+            "snapshot regression check"
+        )
+        runtime.sleep()
+
+        final = runtime.snapshot()
+
+        require(
+            final["identity"]["instance_id"]
+            == instance_id,
+            "Snapshot instance identity changed unexpectedly",
+        )
+
+        require(
+            final["state"]["status"] == "sleeping",
+            "Final snapshot has unexpected status",
+        )
+
+        require(
+            final["state"]["session"] == 1,
+            "Final snapshot has unexpected session count",
+        )
+
+        require(
+            final["state"]["events_processed"] == 3,
+            "Final snapshot has unexpected event count",
+        )
+
+        require(
+            final["memory"]["count"] == 1,
+            "Final snapshot has unexpected memory count",
+        )
+
+    print(
+        "[OK] Runtime snapshot: diagnostic state "
+        "remains structured and consistent."
+    )
+
+
 def main():
     require(sys.version_info >= (3, 12), "Use Python 3.12 or newer; validated baseline: 3.12.14")
     check_documentation()
     check_sources()
     check_cli_extraction()
     check_runtime_headless()
+    check_runtime_snapshot()
     check_scenario_runner()
     check_tracked_data()
     check_event_validation()

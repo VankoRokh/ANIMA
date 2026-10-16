@@ -33,8 +33,10 @@ def main():
 
     runtime = Runtime(
         anima=anima,
+        identity=identity,
         event_bus=event_bus,
         event_log=event_log,
+        memory=memory,
         memory_filter=memory_filter,
         memory_store=memory_store,
     )

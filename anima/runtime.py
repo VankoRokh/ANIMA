@@ -5,14 +5,18 @@ class Runtime:
         self,
         *,
         anima,
+        identity,
         event_bus,
         event_log,
+        memory,
         memory_filter,
         memory_store,
     ):
         self.anima = anima
+        self.identity = identity
         self.event_bus = event_bus
         self.event_log = event_log
+        self.memory = memory
         self.memory_filter = memory_filter
         self.memory_store = memory_store
 
@@ -55,3 +59,27 @@ class Runtime:
         processed = self._process_events()
         self.anima.sleep()
         return processed
+
+    def snapshot(self):
+        identity = self.identity.get()
+        state = self.anima.get()
+
+        return {
+            "identity": {
+                "instance_id": identity["instance_id"],
+                "created_at": identity["created_at"],
+            },
+            "state": {
+                "name": state["name"],
+                "version": state["version"],
+                "status": state["status"],
+                "session": state["session"],
+                "created_at": state["created_at"],
+                "last_wake": state["last_wake"],
+                "last_sleep": state["last_sleep"],
+                "events_processed": state["events_processed"],
+            },
+            "memory": {
+                "count": self.memory.count(),
+            },
+        }
