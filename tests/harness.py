@@ -11,7 +11,7 @@ from anima.runtime import Runtime
 from anima.scenario import ScenarioRunner
 
 
-class TestAnima:
+class AnimaTestHarness:
     def __init__(self, data_dir):
         self.data_dir = Path(data_dir)
 
@@ -53,8 +53,8 @@ class TestAnima:
             self.runtime
         )
 
-def run_scenario(self, steps):
-    return self.scenario_runner.run(steps)
+    def run_scenario(self, steps):
+        return self.scenario_runner.run(steps)
 
-def snapshot(self):
-    return self.runtime.snapshot()    
+    def snapshot(self):
+        return self.runtime.snapshot()

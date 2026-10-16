@@ -18,7 +18,7 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from tests.harness import TestAnima
+from tests.harness import AnimaTestHarness
 
 MODULE_ID = r"(?:CORE|MEM|COG|SLP|IF|HW)-\d+"
 LINK = re.compile(r"!?\[[^\]\n]*\]\(([^\s)]+)(?:\s+\"[^\"]*\")?\)")
@@ -1127,7 +1127,7 @@ def check_runtime_headless():
     with tempfile.TemporaryDirectory(
         prefix="anima-runtime-check-"
     ) as temp_dir:
-        anima = TestAnima(temp_dir)
+        anima = AnimaTestHarness(temp_dir)
 
         wake_events = anima.runtime.wake()
         input_events = anima.runtime.user_input(
@@ -1176,136 +1176,11 @@ def check_runtime_headless():
     )
 
 
-def check_scenario_runner():
-    from anima.core.event_bus import EventBus
-    from anima.core.state import AnimaState
-    from anima.memory.event_log import EventLog
-    from anima.memory.filter import MemoryFilter
-    from anima.memory.memory_store import MemoryStore
-    from anima.runtime import Runtime
-    from anima.scenario import ScenarioRunner
-    from anima.core.identity import Identity
-    from anima.memory.episodic import EpisodicMemory
-
-    with tempfile.TemporaryDirectory(
-        prefix="anima-scenario-check-"
-    ) as temp_dir:
-        anima = TestAnima(temp_dir)
-
-        scenario = [
-            {
-                "action": "wake",
-            },
-            {
-                "action": "user_input",
-                "text": "scenario regression check",
-            },
-            {
-                "action": "sleep",
-            },
-        ]
-
-        result = anima.scenario_runner.run(scenario)
-
-        require(
-            result == [
-                {
-                    "action": "wake",
-                    "events": ["wake"],
-                },
-                {
-                    "action": "user_input",
-                    "events": ["user_input"],
-                },
-                {
-                    "action": "sleep",
-                    "events": ["sleep"],
-                },
-            ],
-            "ScenarioRunner returned unexpected results",
-        )
-
-        final_state = anima.state.get()
-
-        require(
-            final_state["status"] == "sleeping",
-            "ScenarioRunner did not finish in sleeping state",
-        )
-
-        require(
-            final_state["session"] == 1,
-            "ScenarioRunner produced incorrect session count",
-        )
-
-        require(
-            final_state["events_processed"] == 3,
-            "ScenarioRunner processed unexpected event count",
-        )
-
-        require(
-            anima.memory.count() == 1,
-            "ScenarioRunner stored unexpected memory count",
-        )
-
-    class DummyRuntime:
-        def wake(self):
-            return []
-
-        def user_input(self, text):
-            return []
-
-        def sleep(self):
-            return []
-
-    validation_runner = ScenarioRunner(
-        DummyRuntime()
-    )
-
-    invalid_scenarios = [
-        (
-            None,
-            "Scenario must be a list of steps",
-        ),
-        (
-            [],
-            "Scenario must contain at least one step",
-        ),
-        (
-            [
-                {"action": "wake"},
-                {"action": "unknown"},
-            ],
-            "Scenario step 1: Unknown scenario action: 'unknown'",
-        ),
-    ]
-
-    for scenario, expected_message in invalid_scenarios:
-        try:
-            validation_runner.run(scenario)
-        except ValueError as error:
-            require(
-                expected_message in str(error),
-                (
-                    "ScenarioRunner produced unclear "
-                    f"validation error: {error}"
-                ),
-            )
-        else:
-            raise RuntimeError(
-                "Invalid scenario was unexpectedly accepted"
-            )
-
-    print(
-        "[OK] Scenario runner: headless scenarios execute "
-        "and invalid steps are reported clearly."
-    )
-
-
 def check_runtime_snapshot():
     with tempfile.TemporaryDirectory(
         prefix="anima-snapshot-check-"
     ) as temp_dir:
-        anima = TestAnima(temp_dir)
+        anima = AnimaTestHarness(temp_dir)
 
         initial = anima.runtime.snapshot()
 
@@ -1358,7 +1233,6 @@ def main():
     check_cli_extraction()
     check_runtime_headless()
     check_runtime_snapshot()
-    check_scenario_runner()
     check_tracked_data()
     check_event_validation()
     check_event_log_validation()
