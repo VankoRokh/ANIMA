@@ -1215,12 +1215,168 @@ def check_runtime_headless():
     )
 
 
+def check_scenario_runner():
+    from anima.core.event_bus import EventBus
+    from anima.core.state import AnimaState
+    from anima.memory.event_log import EventLog
+    from anima.memory.filter import MemoryFilter
+    from anima.memory.memory_store import MemoryStore
+    from anima.runtime import Runtime
+    from anima.scenario import ScenarioRunner
+
+    with tempfile.TemporaryDirectory(
+        prefix="anima-scenario-check-"
+    ) as temp_dir:
+        data_dir = Path(temp_dir)
+
+        state = AnimaState(
+            data_dir / "state.json"
+        )
+
+        runtime = Runtime(
+            anima=state,
+            event_bus=EventBus(),
+            event_log=EventLog(
+                data_dir / "events.jsonl"
+            ),
+            memory_filter=MemoryFilter(),
+            memory_store=MemoryStore(
+                data_dir / "memories.jsonl"
+            ),
+        )
+
+        runner = ScenarioRunner(runtime)
+
+        scenario = [
+            {
+                "action": "wake",
+            },
+            {
+                "action": "user_input",
+                "text": "scenario regression check",
+            },
+            {
+                "action": "sleep",
+            },
+        ]
+
+        result = runner.run(scenario)
+
+        require(
+            result == [
+                {
+                    "action": "wake",
+                    "events": ["wake"],
+                },
+                {
+                    "action": "user_input",
+                    "events": ["user_input"],
+                },
+                {
+                    "action": "sleep",
+                    "events": ["sleep"],
+                },
+            ],
+            "ScenarioRunner returned unexpected results",
+        )
+
+        final_state = state.get()
+
+        require(
+            final_state["status"] == "sleeping",
+            "ScenarioRunner did not finish in sleeping state",
+        )
+
+        require(
+            final_state["session"] == 1,
+            "ScenarioRunner produced incorrect session count",
+        )
+
+        require(
+            final_state["events_processed"] == 3,
+            "ScenarioRunner processed unexpected event count",
+        )
+
+        events = read_jsonl(
+            data_dir / "events.jsonl"
+        )
+
+        memories = read_jsonl(
+            data_dir / "memories.jsonl"
+        )
+
+        require(
+            [event["type"] for event in events]
+            == ["wake", "user_input", "sleep"],
+            "ScenarioRunner persisted unexpected event history",
+        )
+
+        require(
+            len(memories) == 1,
+            "ScenarioRunner stored unexpected memory count",
+        )
+
+    class DummyRuntime:
+        def wake(self):
+            return []
+
+        def user_input(self, text):
+            return []
+
+        def sleep(self):
+            return []
+
+    validation_runner = ScenarioRunner(
+        DummyRuntime()
+    )
+
+    invalid_scenarios = [
+        (
+            None,
+            "Scenario must be a list of steps",
+        ),
+        (
+            [],
+            "Scenario must contain at least one step",
+        ),
+        (
+            [
+                {"action": "wake"},
+                {"action": "unknown"},
+            ],
+            "Scenario step 1: Unknown scenario action: 'unknown'",
+        ),
+    ]
+
+    for scenario, expected_message in invalid_scenarios:
+        try:
+            validation_runner.run(scenario)
+        except ValueError as error:
+            require(
+                expected_message in str(error),
+                (
+                    "ScenarioRunner produced unclear "
+                    f"validation error: {error}"
+                ),
+            )
+        else:
+            raise RuntimeError(
+                "Invalid scenario was unexpectedly accepted"
+            )
+
+    print(
+        "[OK] Scenario runner: headless scenarios execute "
+        "and invalid steps are reported clearly."
+    )
+
+
 def main():
     require(sys.version_info >= (3, 12), "Use Python 3.12 or newer; validated baseline: 3.12.14")
     check_documentation()
     check_sources()
     check_cli_extraction()
     check_runtime_headless()
+    check_scenario_runner()
     check_tracked_data()
     check_event_validation()
     check_event_log_validation()
