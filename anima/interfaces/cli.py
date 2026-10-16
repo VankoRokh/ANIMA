@@ -6,47 +6,9 @@ def _print_event(event):
     )
 
 
-def _process_events(
-    anima,
-    event_bus,
-    event_log,
-    memory_filter,
-    memory_store,
-):
-    while event_bus.has_events():
-        event = event_bus.next_event()
-
+def _print_events(events):
+    for event in events:
         _print_event(event)
-        event_log.write(event)
-
-        if memory_filter.is_meaningful(event):
-            memory = memory_filter.create_memory(event)
-            memory_store.write(memory)
-
-        anima.register_event()
-
-
-def _put_to_sleep(
-    anima,
-    event_bus,
-    event_log,
-    memory_filter,
-    memory_store,
-):
-    if anima.get()["status"] == "sleeping":
-        return
-
-    event_bus.emit("sleep")
-
-    _process_events(
-        anima,
-        event_bus,
-        event_log,
-        memory_filter,
-        memory_store,
-    )
-
-    anima.sleep()
 
 
 def _print_status(
@@ -85,24 +47,12 @@ def _print_status(
 
 def run_cli(
     *,
+    runtime,
     anima,
     identity,
-    event_bus,
-    event_log,
     memory,
-    memory_store,
-    memory_filter,
 ):
-    anima.wake()
-
-    event_bus.emit("wake")
-    _process_events(
-        anima,
-        event_bus,
-        event_log,
-        memory_filter,
-        memory_store,
-    )
+    _print_events(runtime.wake())
 
     _print_status(
         anima,
@@ -119,31 +69,12 @@ def run_cli(
             f"{type(error).__name__}."
         )
 
-        _put_to_sleep(
-            anima,
-            event_bus,
-            event_log,
-            memory_filter,
-            memory_store,
-        )
+        _print_events(runtime.sleep())
 
         print("ANIMA is sleeping.")
         return
 
-    event_bus.emit(
-        "user_input",
-        {
-            "text": user_input
-        }
-    )
-
-    _process_events(
-        anima,
-        event_bus,
-        event_log,
-        memory_filter,
-        memory_store,
-    )
+    _print_events(runtime.user_input(user_input))
 
     try:
         input("Press Enter to put ANIMA to sleep...")
@@ -154,12 +85,6 @@ def run_cli(
             f"{type(error).__name__}."
         )
 
-    _put_to_sleep(
-        anima,
-        event_bus,
-        event_log,
-        memory_filter,
-        memory_store,
-    )
+    _print_events(runtime.sleep())
 
     print("ANIMA is sleeping.")

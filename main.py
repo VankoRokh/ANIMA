@@ -7,6 +7,7 @@ from anima.memory.event_log import EventLog
 from anima.core.state import AnimaState
 from anima.core.event_bus import EventBus
 from anima.interfaces.cli import run_cli
+from anima.runtime import Runtime
 
 
 def main():
@@ -30,14 +31,19 @@ def main():
     )
     memory_filter = MemoryFilter()
 
-    run_cli(
+    runtime = Runtime(
         anima=anima,
-        identity=identity,
         event_bus=event_bus,
         event_log=event_log,
-        memory=memory,
-        memory_store=memory_store,
         memory_filter=memory_filter,
+        memory_store=memory_store,
+    )
+
+    run_cli(
+        runtime=runtime,
+        anima=anima,
+        identity=identity,
+        memory=memory,
     )
 
 

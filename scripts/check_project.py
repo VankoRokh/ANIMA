@@ -1120,11 +1120,107 @@ def check_recovery():
     print("[OK] Raw event history and selected memory remain separate across recovery.")
 
 
+def check_runtime_headless():
+    from anima.core.event_bus import EventBus
+    from anima.core.state import AnimaState
+    from anima.memory.event_log import EventLog
+    from anima.memory.filter import MemoryFilter
+    from anima.memory.memory_store import MemoryStore
+    from anima.runtime import Runtime
+
+    with tempfile.TemporaryDirectory(
+        prefix="anima-runtime-check-"
+    ) as temp_dir:
+        data_dir = Path(temp_dir)
+
+        state = AnimaState(
+            data_dir / "state.json"
+        )
+
+        runtime = Runtime(
+            anima=state,
+            event_bus=EventBus(),
+            event_log=EventLog(
+                data_dir / "events.jsonl"
+            ),
+            memory_filter=MemoryFilter(),
+            memory_store=MemoryStore(
+                data_dir / "memories.jsonl"
+            ),
+        )
+
+        wake_events = runtime.wake()
+        input_events = runtime.user_input(
+            "headless runtime check"
+        )
+        sleep_events = runtime.sleep()
+
+        require(
+            [event.event_type for event in wake_events]
+            == ["wake"],
+            "Runtime wake produced unexpected events",
+        )
+
+        require(
+            [event.event_type for event in input_events]
+            == ["user_input"],
+            "Runtime user_input produced unexpected events",
+        )
+
+        require(
+            [event.event_type for event in sleep_events]
+            == ["sleep"],
+            "Runtime sleep produced unexpected events",
+        )
+
+        final_state = state.get()
+
+        require(
+            final_state["status"] == "sleeping",
+            "Headless Runtime did not finish sleeping",
+        )
+
+        require(
+            final_state["session"] == 1,
+            "Headless Runtime session counter is incorrect",
+        )
+
+        require(
+            final_state["events_processed"] == 3,
+            "Headless Runtime processed unexpected event count",
+        )
+
+        events = read_jsonl(
+            data_dir / "events.jsonl"
+        )
+
+        memories = read_jsonl(
+            data_dir / "memories.jsonl"
+        )
+
+        require(
+            [event["type"] for event in events]
+            == ["wake", "user_input", "sleep"],
+            "Headless Runtime persisted unexpected event history",
+        )
+
+        require(
+            len(memories) == 1,
+            "Headless Runtime stored unexpected memory count",
+        )
+
+    print(
+        "[OK] Runtime headless: lifecycle works "
+        "without terminal input."
+    )
+
+
 def main():
     require(sys.version_info >= (3, 12), "Use Python 3.12 or newer; validated baseline: 3.12.14")
     check_documentation()
     check_sources()
     check_cli_extraction()
+    check_runtime_headless()
     check_tracked_data()
     check_event_validation()
     check_event_log_validation()
