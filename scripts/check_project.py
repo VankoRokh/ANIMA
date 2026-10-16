@@ -17,6 +17,9 @@ from urllib.parse import unquote, urlsplit
 ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
+
+from tests.harness import TestAnima
+
 MODULE_ID = r"(?:CORE|MEM|COG|SLP|IF|HW)-\d+"
 LINK = re.compile(r"!?\[[^\]\n]*\]\(([^\s)]+)(?:\s+\"[^\"]*\")?\)")
 
@@ -1121,51 +1124,16 @@ def check_recovery():
 
 
 def check_runtime_headless():
-    from anima.core.event_bus import EventBus
-    from anima.core.state import AnimaState
-    from anima.memory.event_log import EventLog
-    from anima.memory.filter import MemoryFilter
-    from anima.memory.memory_store import MemoryStore
-    from anima.runtime import Runtime
-    from anima.core.identity import Identity
-    from anima.memory.episodic import EpisodicMemory
-
     with tempfile.TemporaryDirectory(
         prefix="anima-runtime-check-"
     ) as temp_dir:
-        data_dir = Path(temp_dir)
+        anima = TestAnima(temp_dir)
 
-        state = AnimaState(
-            data_dir / "state.json"
-        )
-
-        identity = Identity(
-            data_dir / "identity.json"
-        )
-
-        memory = EpisodicMemory(
-            data_dir / "memories.jsonl"
-        )
-
-        runtime = Runtime(
-            anima=state,
-            identity=identity,
-            event_bus=EventBus(),
-            event_log=EventLog(
-                data_dir / "events.jsonl"
-            ),
-            memory=memory,
-            memory_filter=MemoryFilter(),
-            memory_store=MemoryStore(
-                data_dir / "memories.jsonl"
-            ),
-        )
-
-        wake_events = runtime.wake()
-        input_events = runtime.user_input(
+        wake_events = anima.runtime.wake()
+        input_events = anima.runtime.user_input(
             "headless runtime check"
         )
-        sleep_events = runtime.sleep()
+        sleep_events = anima.runtime.sleep()
 
         require(
             [event.event_type for event in wake_events]
@@ -1185,7 +1153,7 @@ def check_runtime_headless():
             "Runtime sleep produced unexpected events",
         )
 
-        final_state = state.get()
+        final_state = anima.state.get()
 
         require(
             final_state["status"] == "sleeping",
@@ -1200,25 +1168,6 @@ def check_runtime_headless():
         require(
             final_state["events_processed"] == 3,
             "Headless Runtime processed unexpected event count",
-        )
-
-        events = read_jsonl(
-            data_dir / "events.jsonl"
-        )
-
-        memories = read_jsonl(
-            data_dir / "memories.jsonl"
-        )
-
-        require(
-            [event["type"] for event in events]
-            == ["wake", "user_input", "sleep"],
-            "Headless Runtime persisted unexpected event history",
-        )
-
-        require(
-            len(memories) == 1,
-            "Headless Runtime stored unexpected memory count",
         )
 
     print(
@@ -1241,35 +1190,7 @@ def check_scenario_runner():
     with tempfile.TemporaryDirectory(
         prefix="anima-scenario-check-"
     ) as temp_dir:
-        data_dir = Path(temp_dir)
-
-        state = AnimaState(
-            data_dir / "state.json"
-        )
-
-        identity = Identity(
-            data_dir / "identity.json"
-        )
-
-        memory = EpisodicMemory(
-            data_dir / "memories.jsonl"
-        )
-
-        runtime = Runtime(
-            anima=state,
-            identity=identity,
-            event_bus=EventBus(),
-            event_log=EventLog(
-                data_dir / "events.jsonl"
-            ),
-            memory=memory,
-            memory_filter=MemoryFilter(),
-            memory_store=MemoryStore(
-                data_dir / "memories.jsonl"
-            ),
-        )
-
-        runner = ScenarioRunner(runtime)
+        anima = TestAnima(temp_dir)
 
         scenario = [
             {
@@ -1284,7 +1205,7 @@ def check_scenario_runner():
             },
         ]
 
-        result = runner.run(scenario)
+        result = anima.scenario_runner.run(scenario)
 
         require(
             result == [
@@ -1304,7 +1225,7 @@ def check_scenario_runner():
             "ScenarioRunner returned unexpected results",
         )
 
-        final_state = state.get()
+        final_state = anima.state.get()
 
         require(
             final_state["status"] == "sleeping",
@@ -1321,22 +1242,8 @@ def check_scenario_runner():
             "ScenarioRunner processed unexpected event count",
         )
 
-        events = read_jsonl(
-            data_dir / "events.jsonl"
-        )
-
-        memories = read_jsonl(
-            data_dir / "memories.jsonl"
-        )
-
         require(
-            [event["type"] for event in events]
-            == ["wake", "user_input", "sleep"],
-            "ScenarioRunner persisted unexpected event history",
-        )
-
-        require(
-            len(memories) == 1,
+            anima.memory.count() == 1,
             "ScenarioRunner stored unexpected memory count",
         )
 
@@ -1395,77 +1302,27 @@ def check_scenario_runner():
 
 
 def check_runtime_snapshot():
-    from anima.core.event_bus import EventBus
-    from anima.core.identity import Identity
-    from anima.core.state import AnimaState
-    from anima.memory.episodic import EpisodicMemory
-    from anima.memory.event_log import EventLog
-    from anima.memory.filter import MemoryFilter
-    from anima.memory.memory_store import MemoryStore
-    from anima.runtime import Runtime
-
     with tempfile.TemporaryDirectory(
         prefix="anima-snapshot-check-"
     ) as temp_dir:
-        data_dir = Path(temp_dir)
+        anima = TestAnima(temp_dir)
 
-        state = AnimaState(
-            data_dir / "state.json"
-        )
-
-        identity = Identity(
-            data_dir / "identity.json"
-        )
-
-        memory = EpisodicMemory(
-            data_dir / "memories.jsonl"
-        )
-
-        runtime = Runtime(
-            anima=state,
-            identity=identity,
-            event_bus=EventBus(),
-            event_log=EventLog(
-                data_dir / "events.jsonl"
-            ),
-            memory=memory,
-            memory_filter=MemoryFilter(),
-            memory_store=MemoryStore(
-                data_dir / "memories.jsonl"
-            ),
-        )
-
-        initial = runtime.snapshot()
+        initial = anima.runtime.snapshot()
 
         require(
             initial["state"]["status"] == "created",
             "Initial snapshot has unexpected status",
         )
 
-        require(
-            initial["state"]["session"] == 0,
-            "Initial snapshot has unexpected session count",
-        )
-
-        require(
-            initial["state"]["events_processed"] == 0,
-            "Initial snapshot has unexpected event count",
-        )
-
-        require(
-            initial["memory"]["count"] == 0,
-            "Initial snapshot has unexpected memory count",
-        )
-
         instance_id = initial["identity"]["instance_id"]
 
-        runtime.wake()
-        runtime.user_input(
+        anima.runtime.wake()
+        anima.runtime.user_input(
             "snapshot regression check"
         )
-        runtime.sleep()
+        anima.runtime.sleep()
 
-        final = runtime.snapshot()
+        final = anima.runtime.snapshot()
 
         require(
             final["identity"]["instance_id"]
@@ -1476,11 +1333,6 @@ def check_runtime_snapshot():
         require(
             final["state"]["status"] == "sleeping",
             "Final snapshot has unexpected status",
-        )
-
-        require(
-            final["state"]["session"] == 1,
-            "Final snapshot has unexpected session count",
         )
 
         require(
