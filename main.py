@@ -8,6 +8,8 @@ from anima.core.state import AnimaState
 from anima.core.event_bus import EventBus
 from anima.interfaces.cli import run_cli
 from anima.runtime import Runtime
+from anima.diagnostics.metrics import DiagnosticMetrics
+from anima.diagnostics.trace import DiagnosticTrace
 
 
 def main():
@@ -30,6 +32,8 @@ def main():
         data_dir / "memories.jsonl"
     )
     memory_filter = MemoryFilter()
+    trace = DiagnosticTrace()
+    metrics = DiagnosticMetrics()
 
     runtime = Runtime(
         anima=anima,
@@ -39,6 +43,8 @@ def main():
         memory=memory,
         memory_filter=memory_filter,
         memory_store=memory_store,
+        trace=trace,
+        metrics=metrics,
     )
 
     run_cli(

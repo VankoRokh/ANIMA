@@ -12,8 +12,10 @@ class Runtime:
         memory_filter,
         memory_store,
         trace=None,
+        metrics=None,
     ):
         self.trace = trace
+        self.metrics = metrics
         self.anima = anima
         self.identity = identity
         self.event_bus = event_bus
@@ -50,6 +52,13 @@ class Runtime:
 
     def wake(self):
         self._trace("runtime: wake requested")
+
+        return self._measure(
+            "runtime.wake",
+            self._wake,
+        )
+
+    def _wake(self):
         self.anima.wake()
         self.event_bus.emit("wake")
         return self._process_events()
@@ -57,6 +66,12 @@ class Runtime:
     def user_input(self, text):
         self._trace("runtime: user_input received")
 
+        return self._measure(
+            "runtime.user_input",
+            lambda: self._user_input(text),
+        )
+
+    def _user_input(self, text):
         self.event_bus.emit(
             "user_input",
             {
@@ -68,11 +83,19 @@ class Runtime:
 
     def sleep(self):
         if self.anima.get()["status"] == "sleeping":
-            self._trace("runtime: sleep skipped, already sleeping")
+            self._trace(
+                "runtime: sleep skipped, already sleeping"
+            )
             return []
 
         self._trace("runtime: sleep requested")
 
+        return self._measure(
+            "runtime.sleep",
+            self._sleep,
+        )
+
+    def _sleep(self):
         self.event_bus.emit("sleep")
         processed = self._process_events()
         self.anima.sleep()
@@ -103,8 +126,24 @@ class Runtime:
             "memory": {
                 "count": self.memory.count(),
             },
+            "diagnostics": {
+                "metrics": (
+                    self.metrics.snapshot()
+                    if self.metrics is not None
+                    else None
+                ),
+            },
         }
 
     def _trace(self, message):
         if self.trace is not None:
             self.trace.record(message)
+
+    def _measure(self, name, operation):
+        if self.metrics is None:
+            return operation()
+
+        return self.metrics.measure(
+            name,
+            operation,
+        )

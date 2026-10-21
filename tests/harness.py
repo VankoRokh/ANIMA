@@ -10,6 +10,7 @@ from anima.memory.memory_store import MemoryStore
 from anima.runtime import Runtime
 from anima.scenario import ScenarioRunner
 from anima.diagnostics.trace import DiagnosticTrace
+from anima.diagnostics.metrics import DiagnosticMetrics
 
 
 class AnimaTestHarness:
@@ -41,7 +42,7 @@ class AnimaTestHarness:
         )
 
         self.trace = DiagnosticTrace()
-
+        self.metrics = DiagnosticMetrics()
 
         self.runtime = Runtime(
             anima=self.state,
@@ -52,6 +53,7 @@ class AnimaTestHarness:
             memory_filter=self.memory_filter,
             memory_store=self.memory_store,
             trace=self.trace,
+            metrics=self.metrics,
         )
 
         self.scenario_runner = ScenarioRunner(
