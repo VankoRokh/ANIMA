@@ -1,7 +1,7 @@
 ---
 document_type: roadmap
 status: Draft
-updated: 2026-10-16
+updated: 2026-10-21
 tags: [anima, roadmap]
 ---
 
@@ -15,8 +15,8 @@ tags: [anima, roadmap]
 |---|---|---|
 | [D0 — Documentation](Stage_D0_Documentation.md) | Контекст проекта восстанавливается из репозитория | Complete |
 | [0 — Foundation](Stage_0_Foundation.md) | Экземпляр сохраняет идентичность, историю и восстанавливается после переноса | Complete |
-| [D1 — Runtime, Tests & Observability](Stage_D1_Runtime_Observability.md) | Поведение можно запускать headless, наблюдать структурированно и проверять воспроизводимыми сценариями | Planned — следующий |
-| [1 — Cognitive Memory](Stage_1_Memory.md) | Память извлекает нужный опыт с проверяемым происхождением и ограниченным контекстом | Planned |
+| [D1 — Runtime, Tests & Observability](Stage_D1_Runtime_Observability.md) | Поведение можно запускать headless, наблюдать структурированно и проверять воспроизводимыми сценариями | Complete |
+| [1 — Cognitive Memory](Stage_1_Memory.md) | Память извлекает нужный опыт с проверяемым происхождением и ограниченным контекстом | Planned — следующий |
 | [2 — Internal State](Stage_2_Internal_State.md) | Внутреннее состояние причинно и наблюдаемо влияет на выбор | Planned |
 | [3 — Sleep](Stage_3_Sleep.md) | Опыт консолидируется прерываемо, воспроизводимо и в измеренном бюджете | Planned |
 | [4 — Agent](Stage_4_Agent.md) | ANIMA выполняет ограниченную задачу через инструмент и проверяет результат | Planned |

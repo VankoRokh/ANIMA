@@ -1,7 +1,7 @@
 ---
 document_type: test-results
 status: Reference
-updated: 2026-10-16
+updated: 2026-10-21
 tags: [anima, tests, evidence]
 ---
 
@@ -44,6 +44,52 @@ tags: [anima, tests, evidence]
 
 ---
 
+## TV-0002 — D1 Runtime / Tests / Observability validation
+
+- Дата: 2026-10-21.
+- Связь: D1 — Runtime, Tests & Observability.
+- Цель: подтвердить, что ANIMA можно воспроизводимо запускать через headless и CLI, наблюдать её выполнение и автоматически проверять результат без использования рабочих пользовательских данных.
+
+### Условия
+
+Использован постоянный pytest regression suite и временные каталоги данных для независимых экземпляров CLI и headless.
+
+Среда финальной проверки:
+
+- Python 3.14.4;
+- pytest 9.1.1;
+- Linux;
+- изолированные временные данные.
+
+### Сценарий
+
+1. Headless-экземпляр выполняет `wake → user_input → sleep` через `ScenarioRunner`.
+2. Независимый экземпляр выполняет эквивалентную сессию через обычный CLI.
+3. Сравниваются итоговый статус, номер сессии, количество обработанных событий, последовательность событий и выбранная память.
+4. Для headless-запуска сохраняются diagnostic trace и runtime metrics.
+5. Выполняется полный regression suite и project check.
+
+### Фактический результат
+
+- полный regression suite: `49 passed in 0.19s`;
+- статус CLI и headless: `sleeping`;
+- обе сессии завершены как `session=1`;
+- обе обработали по 3 события;
+- последовательность событий совпала: `wake → user_input → sleep`;
+- в обоих случаях сохранено одно значимое воспоминание с текстом `D1 validation`;
+- project checks завершены без ошибок.
+
+Diagnostic trace:
+
+```text
+runtime: wake requested
+event: wake processed, memory=skipped
+runtime: user_input received
+event: user_input processed, memory=stored
+runtime: sleep requested
+event: sleep processed, memory=skipped
+runtime: sleeping
+
 ## Шаблон новой записи
 
 ```markdown
@@ -64,8 +110,20 @@ tags: [anima, tests, evidence]
 
 ### Метрики
 
+Показательный запуск:
+- runtime.wake: ~0.00031 s;
+- runtime.user_input: ~0.00019 s;
+- runtime.sleep: ~0.00023 s;
+- CPU user: ~0.171 s;
+- CPU system: ~0.025 s;
+- peak RSS: 38812 KB.
+Значения времени и ресурсов не считаются benchmark-базовой линией: они фиксируют работоспособность механизма измерений в конкретном запуске.
+
 ### Вывод
 
-Доказано:
-Не доказано:
-```
+Доказано: runtime отделён от CLI; базовый сценарий воспроизводимо выполняется headless; CLI и headless дают эквивалентный смысловой результат; Stage 0 свойства защищены постоянным regression suite; выполнение системы наблюдаемо через snapshot, trace и базовые metrics.
+Не доказано: долговременная производительность под нагрузкой, стабильность resource metrics между платформами, конкурентное выполнение нескольких экземпляров, необходимость GUI/TUI и поведение будущих когнитивных компонентов.
+
+---
+
+### 3. `docs/00_HOME/Project_Status.md`
