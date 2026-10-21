@@ -11,7 +11,9 @@ class Runtime:
         memory,
         memory_filter,
         memory_store,
+        trace=None,
     ):
+        self.trace = trace
         self.anima = anima
         self.identity = identity
         self.event_bus = event_bus
@@ -28,36 +30,55 @@ class Runtime:
 
             self.event_log.write(event)
 
+            memory_stored = False
+
             if self.memory_filter.is_meaningful(event):
                 memory = self.memory_filter.create_memory(event)
                 self.memory_store.write(memory)
+                memory_stored = True
 
             self.anima.register_event()
+
+            self._trace(
+                f"event: {event.event_type} processed, "
+                f"memory={'stored' if memory_stored else 'skipped'}"
+            )
+
             processed.append(event)
 
         return processed
 
     def wake(self):
+        self._trace("runtime: wake requested")
         self.anima.wake()
         self.event_bus.emit("wake")
         return self._process_events()
 
     def user_input(self, text):
+        self._trace("runtime: user_input received")
+
         self.event_bus.emit(
             "user_input",
             {
                 "text": text,
             },
         )
+
         return self._process_events()
 
     def sleep(self):
         if self.anima.get()["status"] == "sleeping":
+            self._trace("runtime: sleep skipped, already sleeping")
             return []
+
+        self._trace("runtime: sleep requested")
 
         self.event_bus.emit("sleep")
         processed = self._process_events()
         self.anima.sleep()
+
+        self._trace("runtime: sleeping")
+
         return processed
 
     def snapshot(self):
@@ -83,3 +104,7 @@ class Runtime:
                 "count": self.memory.count(),
             },
         }
+
+    def _trace(self, message):
+        if self.trace is not None:
+            self.trace.record(message)

@@ -9,6 +9,7 @@ from anima.memory.filter import MemoryFilter
 from anima.memory.memory_store import MemoryStore
 from anima.runtime import Runtime
 from anima.scenario import ScenarioRunner
+from anima.diagnostics.trace import DiagnosticTrace
 
 
 class AnimaTestHarness:
@@ -39,6 +40,9 @@ class AnimaTestHarness:
             self.data_dir / "memories.jsonl"
         )
 
+        self.trace = DiagnosticTrace()
+
+
         self.runtime = Runtime(
             anima=self.state,
             identity=self.identity,
@@ -47,6 +51,7 @@ class AnimaTestHarness:
             memory=self.memory,
             memory_filter=self.memory_filter,
             memory_store=self.memory_store,
+            trace=self.trace,
         )
 
         self.scenario_runner = ScenarioRunner(
