@@ -1,31 +1,21 @@
----
-document_type: reference
-status: Reference
-updated: 2026-10-16
-tags: [anima]
----
-
 # Документация ANIMA
 
-Основной вход: [START_HERE](00_HOME/START_HERE.md). Для ИИ-помощника: [AI_CONTEXT](00_HOME/AI_CONTEXT.md).
+[О проекте](../README.md) → [текущая работа и этапы](ROADMAP/README.md) →
+нужный раздел. Этот же вход используется после перерыва и новым помощником.
 
-| Раздел | Назначение |
+| Вопрос | Каноническое место |
 |---|---|
-| 00_HOME | вход, текущее состояние, карта и реестр модулей |
-| 01_CONCEPT | цели и принципы проекта |
-| 02_ARCHITECTURE | логическая архитектура |
-| 03_SOFTWARE | программная реализация |
-| 04_HARDWARE | аппаратная архитектура и направления |
-| 05_PROTOCOLS | форматы данных и контракты |
-| 06_ROADMAP | порядок развития и Stage |
-| 07_EXPERIMENTS | тестовая стратегия, показательные результаты и эксперименты |
-| 08_DECISIONS | ADR — причины важных решений |
-| 09_OPERATIONS | настройка, разработка, backup/recovery |
-| 99_ARCHIVE | устаревшие материалы |
+| Зачем создаётся ANIMA? | [О проекте](../README.md) |
+| Текущая работа и статусы этапов? | [project.json](project.json); представление в [Roadmap](ROADMAP/README.md) |
+| Что и как проверять дальше? | [Roadmap](ROADMAP/README.md); [идеи и эксперименты](ROADMAP/Research.md) |
+| Как работает подтверждённый код? | [Architecture](ARCHITECTURE/README.md) |
+| Почему принято решение? | [Decisions](DECISIONS/README.md) |
+| Как проверять и наблюдать процесс? | [Testing](TESTING/README.md) |
+| Что доказали показательные прогоны? | [Results](TESTING/Results/README.md) |
+| Как установить, обновить, резервировать и вести документацию? | [Operations](OPERATIONS/README.md) |
+| Куда переехали прежние документы? | [Archive](ARCHIVE/README.md) |
 
-Ключевое правило: **один факт — одно каноническое место**. Подробности: [Documentation Rules](09_OPERATIONS/Documentation_Rules.md).
-
-## Дополнительные разделы
-
-- [Архитектура программной части](03_SOFTWARE/Software_Architecture.md)
-- [Архив](99_ARCHIVE/README.md)
+Правится только изменившийся источник. Затем `python3 scripts/update_docs.py`
+обновляет сводки, а `bash scripts/check.sh` проверяет актуальность, ссылки,
+достижимость и синтаксис. AUTO-блоки вручную не редактируются.
+Схемы и команды — в [Operations](OPERATIONS/README.md#ведение-документации).

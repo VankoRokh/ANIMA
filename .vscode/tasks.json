@@ -28,6 +28,25 @@
       "options": {"cwd": "${workspaceFolder}"},
       "problemMatcher": [],
       "presentation": {"reveal": "always", "focus": true, "panel": "dedicated"}
+    },
+    {
+      "label": "ANIMA: Test",
+      "type": "process",
+      "command": "${workspaceFolder}/.venv/bin/python",
+      "args": ["-m", "pytest", "-v"],
+      "options": {"cwd": "${workspaceFolder}"},
+      "group": "test",
+      "problemMatcher": [],
+      "presentation": {"reveal": "always", "panel": "dedicated"}
+    },
+    {
+      "label": "ANIMA: Update Docs",
+      "type": "process",
+      "command": "${workspaceFolder}/.venv/bin/python",
+      "args": ["scripts/update_docs.py"],
+      "options": {"cwd": "${workspaceFolder}"},
+      "problemMatcher": [],
+      "presentation": {"reveal": "always", "panel": "dedicated"}
     }
   ]
 }
