@@ -1,0 +1,17 @@
+{
+  "schema_version": 1,
+  "current_stage": "1",
+  "focus": "Уточнить модель извлечения памяти, происхождение записей, бюджет контекста и baseline до начала реализации Stage 1.",
+  "stages": [
+    {"id": "D0", "title": "Documentation", "status": "Complete", "depends_on": [], "outcome": "Контекст и процедуры работы восстанавливаются из репозитория"},
+    {"id": "0", "title": "Foundation", "status": "Complete", "depends_on": ["D0"], "outcome": "Перенос сохраняет идентичность, историю и возможность продолжения"},
+    {"id": "D1", "title": "Runtime, Tests & Observability", "status": "Complete", "depends_on": ["0"], "outcome": "Один сценарий запускается headless, наблюдается и проверяется изолированно"},
+    {"id": "1", "title": "Cognitive Memory", "status": "Planned", "depends_on": ["0", "D1"], "outcome": "Релевантный опыт извлекается с происхождением и ограниченным контекстом"},
+    {"id": "2", "title": "Internal State", "status": "Planned", "depends_on": ["1"], "outcome": "Влияние внутреннего состояния на выбор причинно прослеживается"},
+    {"id": "3", "title": "Sleep", "status": "Planned", "depends_on": ["2"], "outcome": "Консолидация прерывается и возобновляется без потери источников"},
+    {"id": "4", "title": "Agent", "status": "Planned", "depends_on": ["3"], "outcome": "Ограниченная задача выполняется инструментом и проверяется наблюдением"},
+    {"id": "5", "title": "Virtual ANIMA", "status": "Planned", "depends_on": ["4"], "outcome": "Длительная работа на ПК/VM имеет измеренный ресурсный профиль"},
+    {"id": "6", "title": "Cyberdeck", "status": "Planned", "depends_on": ["5"], "outcome": "Измеренная нагрузка переносится на автономное устройство"},
+    {"id": "7", "title": "Modular embodiment", "status": "Planned", "depends_on": ["6"], "outcome": "Узлы диагностируются и заменяются без потери данных экземпляра"}
+  ]
+}

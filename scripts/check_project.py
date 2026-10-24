@@ -1,27 +1,22 @@
-"""Check documentation and recovery using temporary, synthetic instance data."""
+"""Check project integrity without creating or changing an ANIMA instance."""
 
 import ast
+from collections import Counter
 import json
-import os
+from pathlib import Path
 import re
 import shutil
 import subprocess
 import sys
-import tarfile
-import tempfile
-from collections import Counter
-from pathlib import Path
 from urllib.parse import unquote, urlsplit
-
 
 ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from tests.harness import AnimaTestHarness
+from scripts.update_docs import update
 
-MODULE_ID = r"(?:CORE|MEM|COG|SLP|IF|HW)-\d+"
-LINK = re.compile(r"!?\[[^\]\n]*\]\(([^\s)]+)(?:\s+\"[^\"]*\")?\)")
+LINK = re.compile(r'!?\[[^\]\n]*\]\(([^\s)]+)(?:\s+"[^\"]*")?\)')
 
 
 def require(condition, message):
@@ -30,7 +25,7 @@ def require(condition, message):
 
 
 def visible_markdown(text):
-    """Ignore frontmatter and fenced examples when checking links/headings."""
+    """Ignore metadata and fenced examples, rejecting unclosed fences."""
     lines = text.splitlines()
     result = []
     fence = None
@@ -50,13 +45,13 @@ def visible_markdown(text):
             continue
         if fence is None:
             result.append(line)
+    require(not frontmatter, "Unclosed Markdown metadata")
     require(fence is None, "Unclosed Markdown fence")
     return "\n".join(result)
 
 
 def heading_anchors(text):
-    anchors = set()
-    counts = Counter()
+    anchors, counts = set(), Counter()
     for heading in re.findall(r"^#{1,6}\s+(.+?)\s*#*\s*$", text, re.MULTILINE):
         heading = re.sub(r"[`*_]", "", heading).lower().strip()
         slug = re.sub(r"[^\w\-\s]", "", heading).replace(" ", "-")
@@ -66,13 +61,19 @@ def heading_anchors(text):
     return anchors
 
 
-def check_documentation():
-    docs = sorted((ROOT / "docs").rglob("*.md"))
+def check_documentation(root=ROOT):
+    update(root, check=True)
+    docs = sorted((root / "docs").rglob("*.md"))
     require(docs, "docs is empty")
-    pages = [ROOT / "README.md", *docs]
-    visible = {page: visible_markdown(page.read_text(encoding="utf-8")) for page in pages}
-    anchors = {page: heading_anchors(content) for page, content in visible.items()}
-    edges = {page: set() for page in pages}
+    pages = [root / "README.md", *docs]
+    visible = {}
+    for page in pages:
+        try:
+            visible[page] = visible_markdown(page.read_text(encoding="utf-8"))
+        except RuntimeError as error:
+            raise RuntimeError(f"{page.relative_to(root)}: {error}") from error
+    anchors = {p: heading_anchors(t) for p, t in visible.items()}
+    edges = {p: set() for p in pages}
     links = 0
     for page, content in visible.items():
         require(not re.search(r"\[\[[^\]\n]+\]\]", content), f"Use portable links: {page}")
@@ -82,69 +83,46 @@ def check_documentation():
                 continue
             require(not url.path.startswith("/"), f"Use relative link: {page}: {target}")
             destination = (page.parent / unquote(url.path)).resolve() if url.path else page
-            require(destination.is_relative_to(ROOT), f"Link leaves repository: {target}")
-            require(destination.exists(), f"Broken link: {page.relative_to(ROOT)} -> {target}")
+            require(destination.is_relative_to(root), f"Link leaves repository: {target}")
+            require(destination.exists(), f"Broken link: {page.relative_to(root)} -> {target}")
             if url.fragment:
                 require(destination in anchors, f"Anchor target is not Markdown: {target}")
-                require(unquote(url.fragment).lower() in anchors[destination], f"Missing anchor: {page.relative_to(ROOT)} -> {target}")
+                require(unquote(url.fragment).lower() in anchors[destination], f"Missing anchor: {page.relative_to(root)} -> {target}")
             if destination in edges:
                 edges[page].add(destination)
             links += 1
-    for page in docs:
-        raw = page.read_text(encoding="utf-8")
-        require(raw.startswith("---\n"), f"Missing metadata: {page}")
-        for key in ("document_type", "status", "updated"):
-            require(re.search(rf"^{key}: .+$", raw, re.MULTILINE), f"Missing {key}: {page}")
-    start = ROOT / "docs/00_HOME/START_HERE.md"
-    require(start in visible, "Missing START_HERE")
-    visited = set()
-    pending = [start]
+    start = root / "docs/README.md"
+    require(start in visible, "Missing docs/README.md")
+    visited, pending = set(), [start]
     while pending:
         page = pending.pop()
         if page not in visited:
             visited.add(page)
             pending.extend(edges[page] - visited)
-    require(set(docs) <= visited, "Unreachable documentation: " + ", ".join(str(p.relative_to(ROOT)) for p in set(docs) - visited))
-
-    index = visible[ROOT / "docs/00_HOME/Module_Index.md"]
-    registry = {}
-    for line in index.splitlines():
-        cells = [cell.strip() for cell in line.strip().strip("|").split("|")]
-        if cells and re.fullmatch(MODULE_ID, cells[0]):
-            require(len(cells) == 5, f"Invalid registry row: {line}")
-            require(cells[0] not in registry, f"Duplicate module ID: {cells[0]}")
-            registry[cells[0]] = cells
-    declared = {}
-    for page, content in visible.items():
-        for match in re.finditer(rf"^## ({MODULE_ID})\s*$", content, re.MULTILINE):
-            module_id = match.group(1)
-            require(module_id not in declared, f"Duplicate module section: {module_id}")
-            section = content[match.end():].split("\n## ", 1)[0]
-            declared[module_id] = (page, section)
-    require(registry.keys() == declared.keys(), "Module registry and descriptions differ")
-    for module_id, cells in registry.items():
-        require(cells[2] in {"Accepted", "Draft", "Experiment"}, f"Invalid decision: {module_id}")
-        require(cells[3] in {"Planned", "Prototype", "Implemented", "Tested", "Stable", "Deprecated"}, f"Invalid implementation: {module_id}")
-        page, section = declared[module_id]
-        target = LINK.findall(cells[4])
-        require(len(target) == 1, f"Missing module link: {module_id}")
-        url = urlsplit(target[0])
-        require((ROOT / "docs/00_HOME" / url.path).resolve() == page and url.fragment == module_id.lower(), f"Wrong module destination: {module_id}")
-        require(f"Решение: **{cells[2]}**" in section and f"Реализация: **{cells[3]}**" in section, f"Module status mismatch: {module_id}")
-    print(f"[OK] Documentation: {len(docs)} pages, {links} local links, {len(registry)} modules; all pages reachable.")
+    require(set(pages) <= visited, "Unreachable documentation: " + ", ".join(str(p.relative_to(root)) for p in set(pages) - visited))
+    arch = visible[root / "docs/ARCHITECTURE/README.md"]
+    table = arch.split("## Компоненты и подтверждение\n", 1)
+    require(len(table) == 2, "Missing implemented architecture table")
+    rows = [line for line in table[1].split("\n## ", 1)[0].splitlines() if line.startswith("| ")][1:]
+    require(rows, "Empty architecture table")
+    for row in rows:
+        paths = [unquote(urlsplit(t).path) for t in LINK.findall(row)]
+        require(any(p.endswith(".py") and (p.startswith("../../anima/") or p in {"../../main.py", "../../tests/harness.py"}) for p in paths), f"Missing architecture code reference: {row}")
+        require(any(p.startswith("../../tests/test_") and p.endswith(".py") for p in paths), f"Missing architecture test reference: {row}")
+    print(f"[OK] Documentation: {len(docs)} pages, {links} local links; all pages reachable; generated blocks current; architecture references valid.")
 
 
-def check_sources():
-    sources = [
-        ROOT / "main.py",
-        *(ROOT / "anima").rglob("*.py"),
-        *(ROOT / "scripts").glob("*.py"),
-        *(ROOT / "tests").rglob("*.py"),
-    ]
-    print(
-    f"[OK] Python syntax ({len(sources)} files), "
-    "VS Code JSON, Bash syntax."
-)
+def check_sources(root=ROOT):
+    sources = [root / "main.py", *(root / "anima").rglob("*.py"), *(root / "scripts").glob("*.py"), *(root / "tests").rglob("*.py")]
+    for path in sources:
+        ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+    configs = sorted((root / ".vscode").glob("*.json"))
+    for path in configs:
+        json.loads(path.read_text(encoding="utf-8"))
+    scripts = sorted((root / "scripts").glob("*.sh"))
+    for path in scripts:
+        subprocess.run(["bash", "-n", str(path)], check=True, capture_output=True, text=True, timeout=10)
+    print(f"[OK] Python syntax ({len(sources)} files), VS Code JSON ({len(configs)} files), Bash syntax ({len(scripts)} files).")
 
 
 def check_cli_extraction():
@@ -219,61 +197,9 @@ def check_tracked_data():
     print("[OK] No instance data or personal settings in tracked paths.")
 
 
-def copy_source(destination):
-    destination.mkdir()
-    shutil.copy2(ROOT / "main.py", destination / "main.py")
-    shutil.copytree(ROOT / "anima", destination / "anima", ignore=shutil.ignore_patterns("__pycache__"))
-
-
-def make_test_env(data_dir=None):
-    env = dict(
-        os.environ,
-        PYTHONDONTWRITEBYTECODE="1",
-    )
-
-    env.pop("ANIMA_DATA_DIR", None)
-
-    if data_dir is not None:
-        env["ANIMA_DATA_DIR"] = str(data_dir)
-
-    return env
-
-
-def run_session(
-    destination,
-    text,
-    *,
-    data_dir=None,
-    cwd=None,
-):
-    result = subprocess.run(
-        [
-            sys.executable,
-            "-B",
-            str(destination / "main.py"),
-        ],
-        cwd=destination if cwd is None else cwd,
-        input=text + "\n\n",
-        capture_output=True,
-        text=True,
-        env=make_test_env(data_dir),
-        timeout=15,
-    )
-
-    require(
-        result.returncode == 0,
-        f"Temporary instance failed:\n{result.stderr}",
-    )
-
-
-def read_jsonl(path):
-    return [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines() if line.strip()]
-
-
-
 
 def main():
-    require(sys.version_info >= (3, 12), "Use Python 3.12 or newer; validated baseline: 3.12.14")
+    require(sys.version_info >= (3, 12), "Use Python 3.12 or newer")
     check_documentation()
     check_sources()
     check_cli_extraction()
@@ -284,6 +210,6 @@ def main():
 if __name__ == "__main__":
     try:
         main()
-    except (RuntimeError, OSError, ValueError, subprocess.SubprocessError) as error:
+    except (RuntimeError, OSError, ValueError, SyntaxError, subprocess.SubprocessError) as error:
         print(f"[FAIL] {error}", file=sys.stderr)
         sys.exit(1)

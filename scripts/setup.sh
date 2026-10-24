@@ -12,5 +12,6 @@ if [[ ! -x .venv/bin/python ]]; then
     exit 1
 fi
 .venv/bin/python -c 'import sys; assert sys.version_info >= (3, 12), "Existing .venv requires Python 3.12 or newer"; print("ANIMA environment:", sys.version.split()[0])'
-echo 'No third-party Python packages are required by the current prototype.'
+.venv/bin/python -m pip install -r requirements-dev.txt
+echo 'Runtime uses the standard library; development dependencies are installed.'
 echo 'Next: bash scripts/check.sh'
