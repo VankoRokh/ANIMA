@@ -17,9 +17,9 @@ ANIMA — исследовательский проект модульного �
 <!-- AUTO:summary:START -->
 Версия прототипа: **00.1-alpha** (из кода).
 
-Текущий фокус: **1 — Cognitive Memory** (Planned).
+Текущий фокус: **1 — Cognitive Memory** (InProgress).
 
-Уточнить модель извлечения памяти, происхождение записей, бюджет контекста и baseline до начала реализации Stage 1.
+Stage 1.1 — Event Foundation: расширить Event schema, стабильные IDs, references и валидацию до перехода к SQLite memory store.
 
 [Этапы и критерии](docs/ROADMAP/README.md).
 <!-- AUTO:summary:END -->
