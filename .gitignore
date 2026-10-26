@@ -5,6 +5,7 @@ __pycache__/
 
 logs/
 snapshots/
+.benchmarks/
 
 # Instance data and local model files are backed up separately from source.
 /data/
