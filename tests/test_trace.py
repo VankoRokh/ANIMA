@@ -1,6 +1,7 @@
 import pytest
 
 from anima.diagnostics.trace import DiagnosticTrace
+from tests.harness import AnimaTestHarness
 
 
 def test_trace_records_messages():
@@ -57,9 +58,6 @@ def test_trace_can_be_cleared():
     assert trace.entries() == []
 
 
-from tests.harness import AnimaTestHarness
-
-
 def test_runtime_produces_human_readable_trace(
     tmp_path,
 ):
@@ -74,15 +72,26 @@ def test_runtime_produces_human_readable_trace(
         for entry in anima.trace.entries()
     ]
 
-    assert messages == [
-        "runtime: wake requested",
-        "event: system.wake processed, memory=skipped",
-        "runtime: user_input received",
-        "event: conversation.user processed, memory=stored",
-        "runtime: sleep requested",
-        "event: system.sleep processed, memory=skipped",
-        "runtime: sleeping",
-    ]
+    assert len(messages) == 10
+
+    assert messages[0] == "runtime: wake requested"
+    assert messages[1].startswith("memory_processor: event=ev_")
+    assert "action=skip" in messages[1]
+    assert "reasons=selection:event_type" in messages[1]
+    assert messages[2] == "event: system.wake processed, memory=skip"
+
+    assert messages[3] == "runtime: user_input received"
+    assert messages[4].startswith("memory_processor: event=ev_")
+    assert "action=create" in messages[4]
+    assert "reasons=association:no_candidate" in messages[4]
+    assert messages[5] == "event: conversation.user processed, memory=create"
+
+    assert messages[6] == "runtime: sleep requested"
+    assert messages[7].startswith("memory_processor: event=ev_")
+    assert "action=skip" in messages[7]
+    assert "reasons=selection:event_type" in messages[7]
+    assert messages[8] == "event: system.sleep processed, memory=skip"
+    assert messages[9] == "runtime: sleeping"
 
 
 def test_trace_reports_skipped_sleep(tmp_path):
