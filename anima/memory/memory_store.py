@@ -2,6 +2,9 @@ import json
 from pathlib import Path
 
 
+MEMORY_SOURCE = "conversation.user"
+
+
 def validate_memory_record(memory):
     if not isinstance(memory, dict):
         raise ValueError("Memory record must be an object")
@@ -20,9 +23,9 @@ def validate_memory_record(memory):
             f"Memory record missing fields: {missing}"
         )
 
-    if memory["source"] != "user_input":
+    if memory["source"] != MEMORY_SOURCE:
         raise ValueError(
-            "Memory record 'source' must be 'user_input'"
+            f"Memory record 'source' must be {MEMORY_SOURCE!r}"
         )
 
     if (
