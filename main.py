@@ -25,11 +25,11 @@ def main():
     event_log = EventLog(
         data_dir / "events.jsonl"
     )
-    memory = EpisodicMemory(
-        data_dir / "memories.jsonl"
-    )
     memory_store = MemoryStore(
-        data_dir / "memories.jsonl"
+        data_dir / "memory.db"
+    )
+    memory = EpisodicMemory(
+        memory_store
     )
     memory_filter = MemoryFilter()
     trace = DiagnosticTrace()
