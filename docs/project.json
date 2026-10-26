@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "current_stage": "1",
-  "focus": "Stage 1.8 — Retrieval: реализовать deterministic поиск по exact ID, structured filters, Entities, FTS и 1-hop Relations с объяснимым ranking и ожидаемыми top-k IDs.",
+  "focus": "Stage 1.9 — Context Builder: собрать bounded ContextBundle из Retrieval/Provenance с отдельными FAST/DEEP policies, Knowledge-first selection и явными max_items/max_chars budgets.",
   "stages": [
     {"id": "D0", "title": "Documentation", "status": "Complete", "depends_on": [], "outcome": "Контекст и процедуры работы восстанавливаются из репозитория"},
     {"id": "0", "title": "Foundation", "status": "Complete", "depends_on": ["D0"], "outcome": "Перенос сохраняет идентичность, историю и возможность продолжения"},
