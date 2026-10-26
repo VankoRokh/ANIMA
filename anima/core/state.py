@@ -6,6 +6,7 @@ from pathlib import Path
 
 VALID_STATUSES = {"created", "awake", "sleeping"}
 
+
 class AnimaState:
     def __init__(self, state_file="data/state.json"):
         self.state_file = Path(state_file)
@@ -164,6 +165,26 @@ class AnimaState:
     def register_event(self):
         self.state["events_processed"] += 1
         self.save()
+
+    def reconcile_events_processed(self, expected):
+        if (
+            not isinstance(expected, int)
+            or isinstance(expected, bool)
+            or expected < 0
+        ):
+            raise ValueError(
+                "Expected processed event count must be a non-negative integer"
+            )
+
+        current = self.state["events_processed"]
+        if expected < current:
+            raise ValueError(
+                "Processed event ledger is behind state.json: "
+                f"ledger={expected}, state={current}"
+            )
+        if expected != current:
+            self.state["events_processed"] = expected
+            self.save()
 
     def get(self):
         return self.state
