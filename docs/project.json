@@ -1,13 +1,13 @@
 {
   "schema_version": 1,
-  "current_stage": "1",
-  "focus": "Stage 1.12 — Performance Baseline: измерить Event append, Memory create/update, Entity/Knowledge lookup, FTS, 1-hop Relations, FAST/DEEP Context, batch processing, CPU, peak RAM и storage scaling на синтетических 1k/10k/100k данных без преждевременных SLA.",
+  "current_stage": "2",
+  "focus": "Stage 2.0 — Internal State specification: определить минимальный набор целей и внутренних переменных, их диапазоны, источники изменений, decay/recovery и объяснимое влияние на выбор до реализации runtime-механики.",
   "stages": [
     {"id": "D0", "title": "Documentation", "status": "Complete", "depends_on": [], "outcome": "Контекст и процедуры работы восстанавливаются из репозитория"},
     {"id": "0", "title": "Foundation", "status": "Complete", "depends_on": ["D0"], "outcome": "Перенос сохраняет идентичность, историю и возможность продолжения"},
     {"id": "D1", "title": "Runtime, Tests & Observability", "status": "Complete", "depends_on": ["0"], "outcome": "Один сценарий запускается headless, наблюдается и проверяется изолированно"},
-    {"id": "1", "title": "Cognitive Memory", "status": "InProgress", "depends_on": ["0", "D1"], "outcome": "Релевантный опыт извлекается с происхождением и ограниченным контекстом"},
-    {"id": "2", "title": "Internal State", "status": "Planned", "depends_on": ["1"], "outcome": "Влияние внутреннего состояния на выбор причинно прослеживается"},
+    {"id": "1", "title": "Cognitive Memory", "status": "Complete", "depends_on": ["0", "D1"], "outcome": "Релевантный опыт извлекается с происхождением и ограниченным контекстом"},
+    {"id": "2", "title": "Internal State", "status": "InProgress", "depends_on": ["1"], "outcome": "Влияние внутреннего состояния на выбор причинно прослеживается"},
     {"id": "3", "title": "Sleep", "status": "Planned", "depends_on": ["2"], "outcome": "Консолидация прерывается и возобновляется без потери источников"},
     {"id": "4", "title": "Agent", "status": "Planned", "depends_on": ["3"], "outcome": "Ограниченная задача выполняется инструментом и проверяется наблюдением"},
     {"id": "5", "title": "Virtual ANIMA", "status": "Planned", "depends_on": ["4"], "outcome": "Длительная работа на ПК/VM имеет измеренный ресурсный профиль"},
