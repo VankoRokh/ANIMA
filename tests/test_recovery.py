@@ -123,20 +123,34 @@ def test_backup_recovery_preserves_history_and_memory(
         event["type"]
         for event in events
     ] == [
-        "wake",
-        "user_input",
-        "sleep",
-        "wake",
-        "user_input",
-        "sleep",
+        "system.wake",
+        "conversation.user",
+        "system.sleep",
+        "system.wake",
+        "conversation.user",
+        "system.sleep",
     ]
 
+    assert [
+        event["session_id"]
+        for event in events
+    ] == [
+        "session_00000001",
+        "session_00000001",
+        "session_00000001",
+        "session_00000002",
+        "session_00000002",
+        "session_00000002",
+    ]
+
+    assert len({event["id"] for event in events}) == 6
+
     # В raw event history сохраняются обе сессии,
-    # включая второй пустой user_input.
+    # включая второй пустой conversation.user.
     user_inputs = [
         event
         for event in events
-        if event["type"] == "user_input"
+        if event["type"] == "conversation.user"
     ]
 
     assert len(user_inputs) == 2
