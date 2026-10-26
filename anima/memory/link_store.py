@@ -37,9 +37,7 @@ RELATION_RULES = {
         ("knowledge", "knowledge"),
         ("entity", "entity"),
     },
-    "continues": {
-        ("memory", "memory"),
-    },
+    "continues": {("memory", "memory")},
     "derived_from": {
         ("memory", "memory"),
         ("knowledge", "memory"),
@@ -52,18 +50,8 @@ RELATION_RULES = {
         ("memory", "knowledge"),
         ("knowledge", "knowledge"),
     },
-    "investigates": {
-        ("memory", "knowledge"),
-    },
-    "supersedes": {
-        ("knowledge", "knowledge"),
-    },
-}
-
-KIND_PREFIXES = {
-    "memory": "mem_",
-    "knowledge": KNOWLEDGE_ID_PREFIX,
-    "entity": ENTITY_ID_PREFIX,
+    "investigates": {("memory", "knowledge")},
+    "supersedes": {("knowledge", "knowledge")},
 }
 
 
@@ -189,7 +177,6 @@ class LinkStore:
 
         public_id = public_id or f"{KNOWLEDGE_ID_PREFIX}{uuid4()}"
         created_at = created_at or _now()
-
         _validate_public_id(
             public_id,
             KNOWLEDGE_ID_PREFIX,
@@ -265,7 +252,6 @@ class LinkStore:
 
         if aliases is None:
             aliases = []
-
         if not isinstance(aliases, (list, tuple, set)):
             raise ValueError("Entity aliases must be a list-like collection")
 
@@ -276,10 +262,8 @@ class LinkStore:
         for alias in aliases:
             cleaned = _clean_name(alias, "Entity alias")
             key = _normalize_name(cleaned)
-
             if key == canonical_key or key in seen:
                 continue
-
             seen.add(key)
             cleaned_aliases.append(cleaned)
 
@@ -298,7 +282,6 @@ class LinkStore:
                         status,
                     ),
                 )
-
                 for alias in cleaned_aliases:
                     connection.execute(
                         """
@@ -315,9 +298,8 @@ class LinkStore:
         return self.get_entity(public_id)
 
     def add_entity_alias(self, entity_id, alias):
-        self._require_entity(entity_id)
+        entity = self._require_entity(entity_id)
         alias = _clean_name(alias, "Entity alias")
-        entity = self.get_entity(entity_id)
 
         if _normalize_name(alias) == _normalize_name(
             entity["canonical_name"]
@@ -352,7 +334,6 @@ class LinkStore:
                 "SELECT * FROM entities WHERE public_id = ?",
                 (public_id,),
             ).fetchone()
-
             if row is None:
                 return None
 
@@ -372,55 +353,56 @@ class LinkStore:
 
     def resolve_entity(self, name):
         name = _clean_name(name, "Entity name")
+        resolved_id = None
 
         with self.memory_store.transaction() as connection:
             exact_canonical = connection.execute(
                 """
-                SELECT * FROM entities
+                SELECT public_id FROM entities
                 WHERE canonical_name = ? AND status = 'active'
                 ORDER BY row_id
                 """,
                 (name,),
             ).fetchall()
-
-            resolved = self._resolve_unique_rows(
+            resolved_id = self._resolve_unique_ids(
                 exact_canonical,
                 name,
             )
-            if resolved is not None:
-                return self.get_entity(resolved["public_id"])
 
-            exact_alias = connection.execute(
-                """
-                SELECT e.*
-                FROM entity_aliases a
-                JOIN entities e ON e.public_id = a.entity_id
-                WHERE a.alias = ? AND e.status = 'active'
-                ORDER BY e.row_id
-                """,
-                (name,),
-            ).fetchall()
+            if resolved_id is None:
+                exact_alias = connection.execute(
+                    """
+                    SELECT e.public_id
+                    FROM entity_aliases a
+                    JOIN entities e ON e.public_id = a.entity_id
+                    WHERE a.alias = ? AND e.status = 'active'
+                    ORDER BY e.row_id
+                    """,
+                    (name,),
+                ).fetchall()
+                resolved_id = self._resolve_unique_ids(
+                    exact_alias,
+                    name,
+                )
 
-            resolved = self._resolve_unique_rows(
-                exact_alias,
-                name,
-            )
-            if resolved is not None:
-                return self.get_entity(resolved["public_id"])
+            if resolved_id is None:
+                rows = connection.execute(
+                    """
+                    SELECT e.public_id, e.canonical_name, a.alias
+                    FROM entities e
+                    LEFT JOIN entity_aliases a ON a.entity_id = e.public_id
+                    WHERE e.status = 'active'
+                    ORDER BY e.row_id
+                    """
+                ).fetchall()
+            else:
+                rows = []
 
-            rows = connection.execute(
-                """
-                SELECT e.public_id, e.canonical_name, e.status, a.alias
-                FROM entities e
-                LEFT JOIN entity_aliases a ON a.entity_id = e.public_id
-                WHERE e.status = 'active'
-                ORDER BY e.row_id
-                """
-            ).fetchall()
+        if resolved_id is not None:
+            return self.get_entity(resolved_id)
 
         key = _normalize_name(name)
         matches = set()
-
         for row in rows:
             if _normalize_name(row["canonical_name"]) == key:
                 matches.add(row["public_id"])
@@ -432,23 +414,19 @@ class LinkStore:
 
         if not matches:
             return None
-
         if len(matches) > 1:
             raise ValueError(f"Ambiguous entity name: {name!r}")
 
         return self.get_entity(next(iter(matches)))
 
     @staticmethod
-    def _resolve_unique_rows(rows, name):
+    def _resolve_unique_ids(rows, name):
         ids = {row["public_id"] for row in rows}
-
         if not ids:
             return None
-
         if len(ids) > 1:
             raise ValueError(f"Ambiguous entity name: {name!r}")
-
-        return rows[0]
+        return next(iter(ids))
 
     def create_relation(
         self,
@@ -476,47 +454,63 @@ class LinkStore:
 
         if source_memory_id is None and source_kind == "memory":
             source_memory_id = source_id
-
         if source_memory_id is None:
             raise ValueError(
                 "Relation source_memory_id is required for provenance"
             )
-
         self._require_memory(source_memory_id)
 
         public_id = public_id or f"{RELATION_ID_PREFIX}{uuid4()}"
         created_at = created_at or _now()
-
         _validate_public_id(
             public_id,
             RELATION_ID_PREFIX,
             "Relation public_id",
         )
         _validate_timestamp(created_at, "Relation created_at")
-
         if valid_until is not None:
             _validate_timestamp(valid_until, "Relation valid_until")
 
         with self.memory_store.transaction() as connection:
-            duplicate = connection.execute(
-                """
-                SELECT public_id FROM relations
-                WHERE source_kind = ? AND source_id = ?
-                  AND relation_type = ?
-                  AND target_kind = ? AND target_id = ?
-                  AND source_memory_id = ?
-                  AND valid_until IS ?
-                """,
-                (
-                    source_kind,
-                    source_id,
-                    relation_type,
-                    target_kind,
-                    target_id,
-                    source_memory_id,
-                    valid_until,
-                ),
-            ).fetchone()
+            if valid_until is None:
+                duplicate = connection.execute(
+                    """
+                    SELECT public_id FROM relations
+                    WHERE source_kind = ? AND source_id = ?
+                      AND relation_type = ?
+                      AND target_kind = ? AND target_id = ?
+                      AND source_memory_id = ?
+                      AND valid_until IS NULL
+                    """,
+                    (
+                        source_kind,
+                        source_id,
+                        relation_type,
+                        target_kind,
+                        target_id,
+                        source_memory_id,
+                    ),
+                ).fetchone()
+            else:
+                duplicate = connection.execute(
+                    """
+                    SELECT public_id FROM relations
+                    WHERE source_kind = ? AND source_id = ?
+                      AND relation_type = ?
+                      AND target_kind = ? AND target_id = ?
+                      AND source_memory_id = ?
+                      AND valid_until = ?
+                    """,
+                    (
+                        source_kind,
+                        source_id,
+                        relation_type,
+                        target_kind,
+                        target_id,
+                        source_memory_id,
+                        valid_until,
+                    ),
+                ).fetchone()
 
             if duplicate is not None:
                 raise ValueError(
@@ -528,14 +522,8 @@ class LinkStore:
                 connection.execute(
                     """
                     INSERT INTO relations(
-                        public_id,
-                        source_kind,
-                        source_id,
-                        relation_type,
-                        target_kind,
-                        target_id,
-                        created_at,
-                        valid_until,
+                        public_id, source_kind, source_id, relation_type,
+                        target_kind, target_id, created_at, valid_until,
                         source_memory_id
                     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
                     """,
@@ -564,13 +552,11 @@ class LinkStore:
             RELATION_ID_PREFIX,
             "Relation public_id",
         )
-
         with self.memory_store.transaction() as connection:
             row = connection.execute(
                 "SELECT * FROM relations WHERE public_id = ?",
                 (public_id,),
             ).fetchone()
-
         return self._row_to_relation(row)
 
     def relations_for(
@@ -599,22 +585,18 @@ class LinkStore:
 
         clauses = []
         values = []
-
         if direction in {"outgoing", "both"}:
             clauses.append("(source_kind = ? AND source_id = ?)")
             values.extend([object_kind, object_id])
-
         if direction in {"incoming", "both"}:
             clauses.append("(target_kind = ? AND target_id = ?)")
             values.extend([object_kind, object_id])
 
         sql = "SELECT * FROM relations WHERE (" + " OR ".join(clauses) + ")"
-
         if relation_types:
             placeholders = ", ".join("?" for _ in relation_types)
             sql += f" AND relation_type IN ({placeholders})"
             values.extend(sorted(relation_types))
-
         sql += " ORDER BY row_id"
 
         with self.memory_store.transaction() as connection:
@@ -630,13 +612,10 @@ class LinkStore:
     ):
         if source_kind not in OBJECT_KINDS:
             raise ValueError(f"Unknown relation source kind: {source_kind!r}")
-
         if target_kind not in OBJECT_KINDS:
             raise ValueError(f"Unknown relation target kind: {target_kind!r}")
-
         if relation_type not in RELATION_RULES:
             raise ValueError(f"Unknown relation type: {relation_type!r}")
-
         if (
             source_kind,
             target_kind,
@@ -649,19 +628,23 @@ class LinkStore:
     def _require_object(self, kind, public_id):
         if kind not in OBJECT_KINDS:
             raise ValueError(f"Unknown object kind: {kind!r}")
-
         if kind == "memory":
             self._require_memory(public_id)
             return
-
         if kind == "knowledge":
             if self.get_knowledge(public_id) is None:
                 raise ValueError(f"Unknown knowledge: {public_id}")
             return
-
-        if self.get_entity(public_id) is None:
-            raise ValueError(f"Unknown entity: {public_id}")
+        self._require_entity(public_id)
 
     def _require_memory(self, public_id):
-        if self.memory_store.get_memory(public_id) is None:
+        memory = self.memory_store.get_memory(public_id)
+        if memory is None:
             raise ValueError(f"Unknown memory: {public_id}")
+        return memory
+
+    def _require_entity(self, public_id):
+        entity = self.get_entity(public_id)
+        if entity is None:
+            raise ValueError(f"Unknown entity: {public_id}")
+        return entity
