@@ -1,7 +1,8 @@
 from anima.config.paths import get_data_dir
 from anima.core.identity import Identity
 from anima.memory.memory_store import MemoryStore
-from anima.memory.filter import MemoryFilter
+from anima.memory.link_store import LinkStore
+from anima.memory.processor import MemoryProcessor
 from anima.memory.episodic import EpisodicMemory
 from anima.memory.event_log import EventLog
 from anima.core.state import AnimaState
@@ -28,11 +29,19 @@ def main():
     memory_store = MemoryStore(
         data_dir / "memory.db"
     )
+    link_store = LinkStore(
+        memory_store
+    )
     memory = EpisodicMemory(
         memory_store
     )
-    memory_filter = MemoryFilter()
     trace = DiagnosticTrace()
+    memory_processor = MemoryProcessor(
+        memory_store=memory_store,
+        event_log=event_log,
+        link_store=link_store,
+        trace=trace,
+    )
     metrics = DiagnosticMetrics()
 
     runtime = Runtime(
@@ -41,8 +50,7 @@ def main():
         event_bus=event_bus,
         event_log=event_log,
         memory=memory,
-        memory_filter=memory_filter,
-        memory_store=memory_store,
+        memory_processor=memory_processor,
         trace=trace,
         metrics=metrics,
     )
