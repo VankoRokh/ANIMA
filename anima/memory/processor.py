@@ -2,6 +2,7 @@ import re
 from datetime import datetime
 
 from anima.core.event_bus import Event
+from anima.memory.composer import RuleBasedComposer
 
 
 TOKEN_PATTERN = re.compile(r"[^\W_]+", re.UNICODE)
@@ -14,7 +15,7 @@ FTS_CANDIDATE_LIMIT = 10
 
 
 class MemoryProcessor:
-    """Deterministic Stage 1.4 selection and episodic association baseline."""
+    """Deterministic selection and episodic association baseline."""
 
     def __init__(
         self,
@@ -22,11 +23,13 @@ class MemoryProcessor:
         memory_store,
         event_log,
         link_store,
+        composer=None,
         trace=None,
     ):
         self.memory_store = memory_store
         self.event_log = event_log
         self.link_store = link_store
+        self.composer = composer or RuleBasedComposer()
         self.trace = trace
 
     def process_event(self, event):
@@ -44,11 +47,7 @@ class MemoryProcessor:
             return result
 
         entity_ids = self._event_entity_ids(event)
-        candidate = self._best_candidate(
-            event,
-            text,
-            entity_ids,
-        )
+        candidate = self._best_candidate(event, text, entity_ids)
 
         if candidate is None:
             memory = self._create_memory(event, text)
@@ -334,10 +333,11 @@ class MemoryProcessor:
             )
 
     def _create_memory(self, event, text):
+        composition = self.composer.compose_create(text)
         return self.memory_store.create_memory(
             memory_type="episodic",
             domain="user",
-            content=text,
+            content=composition["content"],
             status="open",
             importance=1,
             created_at=event.timestamp,
@@ -345,7 +345,10 @@ class MemoryProcessor:
         )
 
     def _update_memory(self, memory, event, text):
-        content = self._append_content(memory["content"], text)
+        composition = self.composer.compose_update(
+            memory["content"],
+            text,
+        )
 
         with self.memory_store.transaction() as connection:
             connection.execute(
@@ -354,7 +357,11 @@ class MemoryProcessor:
                 SET content = ?, updated_at = ?
                 WHERE public_id = ?
                 """,
-                (content, event.timestamp, memory["id"]),
+                (
+                    composition["content"],
+                    event.timestamp,
+                    memory["id"],
+                ),
             )
             connection.execute(
                 """
@@ -365,18 +372,6 @@ class MemoryProcessor:
             )
 
         return self.memory_store.get_memory(memory["id"])
-
-    @staticmethod
-    def _append_content(existing, text):
-        normalized = text.casefold().strip()
-        existing_parts = [
-            part.casefold().strip()
-            for part in existing.splitlines()
-            if part.strip()
-        ]
-        if normalized in existing_parts:
-            return existing
-        return existing.rstrip() + "\n" + text
 
     @staticmethod
     def _tokens(text):
