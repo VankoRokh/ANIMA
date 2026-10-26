@@ -134,16 +134,52 @@ Goals, Internal State и независимую проверку результ�
 
 ## Когнитивный сон
 
-Прежние SLP-01/02/03: оркестратор распределяет jobs по накопленному опыту,
-энергобюджету и требованию пробуждения; выдаёт checkpoints/отчёт и возвращает
-активный режим. Отказ Deep не препятствует восстановлению. Первое задание
-прерываемо и безопасно сохраняет результат.
+**Accepted для Stage 3:** Sleep является persistent orchestration для bounded,
+прерываемой и воспроизводимой переработки опыта; причины и границы решения —
+[ADR-007](../DECISIONS/README.md#adr-007), порядок реализации —
+[Stage 3](README.md#stage-3). Оркестратор работает с `SourceRef`/`WorkItem`, а
+конкретный текстовый, аудио-, видео- или telemetry payload остаётся у источника и
+читается заменяемым processor adapter по chunks.
 
-Консолидация связывает эпизоды и выводы с версиями/источниками. Начать с отчёта
-по фиксированным данным без удаления исходников. Первичная реакция и последующая
-переоценка — связанные записи, а не незаметная перезапись прошлого. Повтор
-обработки не создаёт неконтролируемые дубликаты. Расписания 16/8 и 12/12 не
-утверждены; режим определяется нагрузкой/питанием. Адаптация Fast — [EXP-002](#exp-002).
+Обязательный baseline реализует только cognitive work `CONSOLIDATE`: raw
+Events/observations, CLOSED Memories с provenance и CONFIRMED Knowledge с evidence
+отбираются deterministic scheduler в bounded workload. Первый processor текстовый:
+фильтрация, grouping/sorting/deduplication и bounded derived report/result. Исходные
+записи не удаляются и не получают новый authority только потому, что прошли Sleep.
+Derived output хранит processor/version и полное происхождение.
+
+Persistent SleepJob/WorkItems/checkpoints планируются в отдельном `sleep.db`.
+Lifecycle Job: `queued/running/checkpointed/interrupted/completed/failed`.
+Большие sources никогда не обязаны помещаться в RAM целиком: checkpoint cursor
+фиксирует уже committed chunk, restart продолжает следующий. Реальный media pipeline
+на Stage 3 не нужен; synthetic large source проверяет тот же контракт на логическом
+многогигабайтном объёме и тысячах chunks.
+
+Фиксированное расписание сна не утверждено. Scheduler использует явные eligibility,
+priority, cost/resource budget и deterministic tie-break. Запрос wake имеет
+приоритет и останавливает batch work на безопасной checkpoint-границе. Отказ одного
+processor/WorkItem не должен уничтожать уже committed результаты или препятствовать
+диагностике и восстановлению.
+
+### Отложенные cognitive механизмы Sleep
+
+| Механизм | Когда возвращаться |
+|---|---|
+| Retrospective `REFLECT` | После накопления многодневной истории и размеченных случаев, где новая информация действительно меняет интерпретацию старого опыта |
+| Replay прошлых решений | После Agent, когда появится достаточно реальных `Goal → Candidates → Choice → observation/result` цепочек для объективной проверки пользы |
+| Counterfactual `SIMULATE` | После replay baseline и способа сравнивать predicted outcome с последующими реальными observations; simulation никогда не является фактом сама по себе |
+| Generative `GENERATE` / dreaming | После строгого разделения real/derived/hypothetical и метрики полезности; свободная генерация не должна загрязнять Memory/Knowledge |
+| Deep/LLM Sleep Processor | Только как сравниваемый adapter против deterministic consolidation на одинаковом corpus и resource budget |
+| Реальные Audio/Video processors | После появления Asset/perception pipeline; Scheduler/WorkItem/checkpoint contract при этом не меняется |
+| Анализ дневных internal reports/telemetry | Когда такие источники появятся и будут иметь стабильный schema/source ownership |
+| Автоматическое удаление/архивирование originals | Только после отдельной retention/recovery политики; consolidation сама по себе ничего необратимо не удаляет |
+| Адаптация/обучение Fast во сне | Отдельный [EXP-002](#exp-002) после стабильной консолидации и независимого evaluation set |
+
+Ключевое правило будущих reflection/simulation/dreaming: новая интерпретация или
+гипотеза хранится как derived/hypothetical record со ссылками на реальные sources,
+а не переписывает прошлое и не становится `CONFIRMED Knowledge` без отдельного
+реального evidence path. Это позволяет в будущем «извлекать опыт из опыта», не
+смешивая воспоминание о произошедшем с тем, что система только предположила.
 
 ## Интерфейсы и действия
 

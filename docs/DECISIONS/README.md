@@ -170,3 +170,62 @@ Fatigue штрафует стоимость/усилие, uncertainty повыш
 настраиваются по тестам. Польза — воспроизводимый baseline мотивационного слоя,
 который можно измерять и расширять без привязки к LLM. Порядок реализации,
 сценарии и Definition of Done — [Stage 2](../ROADMAP/README.md#stage-2).
+
+## ADR-007
+
+**Accepted.** 2026-10-26, архитектура Sleep orchestration и консолидации для Stage 3.
+Причина: после Cognitive Memory и Internal State системе нужен отдельный режим,
+который перерабатывает накопленный опыт пакетно и прерываемо. Сегодня основной
+материал — текстовые Events/Memories/Knowledge, но в будущем Sleep должен работать
+с дневными отчётами, аудио, видео, internal telemetry и другими тяжёлыми источниками.
+Привязка оркестратора к тексту заставила бы переписывать Stage 3 при появлении media.
+
+Sleep поэтому работает не с конкретным payload, а с `SourceRef` и bounded `WorkItem`.
+Исходные Event/Memory/Knowledge/Asset остаются владельцами данных; Sleep хранит
+ссылку, тип работы, processor/version, priority/cost hint, status и checkpoint.
+Большой payload не помещается в Job или `sleep.db`; media/assets хранятся отдельно
+и читаются processor-адаптером по chunks. Первый large-data proof выполняется на
+synthetic source без реального многогигабайтного файла.
+
+Persistent orchestration хранится отдельно в transactional `sleep.db`. SleepJob
+имеет lifecycle `queued/running/checkpointed/interrupted/completed/failed`;
+WorkItems и checkpoints переживают restart. Chunk считается завершённым только
+после фиксации checkpoint и соответствующего локального результата. Если работа
+создаёт effect в `memory.db`, две БД не объявляются одной физической транзакцией:
+согласованность достигается stable operation/output IDs, idempotency и recovery.
+
+Sleep scheduler формирует deterministic bounded workload по явным eligibility,
+priority, cost и resource budget. Фиксированное расписание 16/8 или 12/12 не
+является архитектурой. Первый cost model может быть категориальным; CPU/RAM/time
+метрики уточняют его после измерений. Запрос wake имеет приоритет над продолжением
+batch work и останавливает Sleep на безопасной checkpoint-границе, а не посреди
+неатомарного изменения.
+
+Processor является заменяемым адаптером и отделён от orchestration. Общий контракт
+должен допускать разные source/work kinds, chunk processing, checkpoint state и
+finalize. Первый обязательный processor — deterministic text `CONSOLIDATE`:
+фильтрация eligible источников, детерминированные grouping/sorting/deduplication и
+bounded derived result/report. Он не удаляет raw Events, не переписывает CLOSED
+Memory и не подтверждает Knowledge сам по себе; изменения Memory/Knowledge проходят
+через уже существующие lifecycle/evidence rules.
+
+Приоритетный baseline использует raw Events/observations, CLOSED Memories с валидным
+provenance и CONFIRMED Knowledge с evidence. Derived Sleep output имеет явное
+происхождение и processor/version и не получает authority исходного наблюдения или
+подтверждённого Knowledge автоматически. Каждый существенный результат должен быть
+прослеживаем к фактическим источникам; missing provenance является ошибкой, а не
+поводом создать непроверяемую «истину».
+
+Reflection старого опыта, replay/counterfactual simulation и generative dreaming
+считаются совместимыми будущими типами Sleep-work, но не входят в обязательный
+Stage 3. Сейчас недостаточно длительной истории и контрольных данных, чтобы честно
+проверить их полезность и точность. Любой будущий hypothetical result обязан быть
+явно отделён от observation/verified knowledge. Deep/LLM также вводится только как
+сравниваемый processor после deterministic baseline, а не как условие Sleep.
+
+Цена решения — отдельное orchestration storage, processor contracts, checkpoints,
+recovery protocol и дополнительные тесты large-data readiness. Польза — Sleep можно
+расширять новыми data types и cognitive processors без замены scheduler/lifecycle;
+длинная работа становится прерываемой, а история преобразований остаётся проверяемой.
+Порядок реализации, проверки и Definition of Done — [Stage 3](../ROADMAP/README.md#stage-3);
+отложенные cognitive механизмы — [Research](../ROADMAP/Research.md#когнитивный-сон).

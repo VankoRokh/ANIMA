@@ -6,7 +6,7 @@
 показывают этот порядок, а не требуют отдельной платы или модели на каждом шаге.
 
 <!-- AUTO:roadmap:START -->
-**Текущая работа:** Stage 3.0 — Sleep Specification: уточнить контракт Sleep job, lifecycle и checkpoints, deterministic consolidation baseline, provenance/recovery/idempotency и критерии validation до реализации механики.
+**Текущая работа:** Stage 3.1 — Sleep Storage / Lifecycle: реализовать persistent SleepJob storage и lifecycle queued/running/checkpointed/interrupted/completed/failed как основу resumable bounded consolidation.
 
 **Фокус:** 3 — Sleep (InProgress).
 
@@ -124,7 +124,7 @@ Knowledge создаётся из закрытого подтверждённо�
   проблемы скорости или целостности.
 - Internal SQLite key — integer; public ID — UUIDv4 с type-prefix (`ev_`, `mem_`,
   `kn_`, `ent_`, `rel_`, `asset_`). UUIDv4 выбран для совместимости с Python 3.12+;
-  временная сортировка хранится отдельными timestamp-полями.
+  временная сортировка хранится отдельными timestamp-полями, а не структурой ID.
 - `importance`: `0=low`, `1=normal`, `2=high`, `3=critical`; relevance всегда
   важнее importance при retrieval.
 - `event_processing`: `pending/processing/done/failed/skipped`, processor/version,
@@ -297,22 +297,122 @@ base ranking, 0.0993 ms на state modifiers и 2.0092 ms на production Choice
 
 ## Stage 3
 
-**Цель и наблюдение.** Sleep job запускается, прерывается, продолжается и
-повторяется; итог валиден, происхождение сохранено, стоимость измерена.
+**Цель и наблюдение.** Доказать, что Sleep способен детерминированно отбирать
+ограниченный объём накопленного опыта, обрабатывать его заменяемым processor,
+сохранять derived result с полным provenance и после interruption/restart продолжать
+с безопасного checkpoint без повторных эффектов. Текст — первый тип данных, но
+оркестрация не должна зависеть от текстового payload. Архитектурный выбор зафиксирован
+в [ADR-007](../DECISIONS/README.md#adr-007).
 
-**Работа.** Жизненный цикл queued/running/checkpointed/interrupted/complete/failed,
-checkpoint/resume, deterministic consolidation, история преобразований,
-idempotency/deduplication и resource metrics. Deep/LLM — сравниваемый адаптер после baseline;
-адаптация Fast остаётся отдельным [EXP-002](Research.md#exp-002).
+**Ключевой invariant.** Sleep работает с ссылками на источники и ограниченными
+WorkItems, а не владеет исходными данными. Raw Event/observation, Memory, Knowledge
+или будущий Asset не переписываются ради консолидации. Каждый derived result хранит
+происхождение и processor/version; chunk считается завершённым только после
+атомарной фиксации checkpoint и его локального результата. Большой источник никогда
+не требуется загружать целиком, а повторный запуск не должен создавать второй
+логический результат той же работы.
 
-**Сценарии и приёмка.** Полный запуск и прерывания на каждом контрольном checkpoint
-дают эквивалентный допустимый итог; повтор не размножает дубликаты. Каждый derived
-record ведёт к эпизодам. Ошибка не повреждает валидные данные. Измеряются elapsed
-time/RAM, а при модели — load/inference cost. Resume, provenance и ограниченная
-идемпотентность подтверждены; ресурсный профиль записан.
+Первый обязательный cognitive work type — только `CONSOLIDATE`. Приоритетные
+источники baseline: raw Events/observations, CLOSED Memories с валидным provenance
+и CONFIRMED Knowledge с evidence. `REFLECT`, replay/counterfactual `SIMULATE` и
+генеративный `GENERATE` признаны совместимыми будущими направлениями, но не входят
+в Stage 3 baseline: сейчас недостаточно данных и контрольных критериев, чтобы
+объективно проверить качество таких выводов.
 
-**Регрессия и доказательства.** В частности retrieval Stage 1 после консолидации;
-interrupted/resumed trace, сравнение повторов и baseline/Deep resource profile, если адаптер введён.
+### Порядок реализации Stage 3
+
+| Шаг | Результат | Проверка завершения |
+|---|---|---|
+| **3.0 Specification — Complete** | Зафиксированы SleepJob, WorkItem/SourceRef, processor contract, chunk/checkpoint model, provenance, resource budget, large-data readiness и границы cognitive work; принят ADR-007 | Документация однозначно отделяет orchestration от конкретного формата данных и задаёт критерии каждого последующего шага |
+| **3.1 Sleep Storage / Lifecycle** | Transactional `sleep.db` с persistent SleepJob и lifecycle `queued/running/checkpointed/interrupted/completed/failed` | Schema/reopen/constraints/rollback проходят; invalid transitions определены; restart сохраняет job identity и последнее допустимое состояние |
+| **3.2 Source / WorkItem Contract** | Универсальные `SourceRef` и `WorkItem` с source kind/id, work kind, processor/version, priority, cost hint, status и checkpoint reference без embedding тяжёлого payload | Event/Memory/Knowledge и synthetic Asset refs валидируются одинаковым контрактом; dangling/unsupported source дают явную ошибку; payload большого источника не попадает в `sleep.db` |
+| **3.3 Selection / Scheduling** | Deterministic selector формирует bounded queue из eligible sources по priority/cost/budget и фиксированному tie-break | Один вход даёт один порядок WorkItems; max items/cost соблюдаются; неeligible/terminal sources не попадают в работу; повтор selection не размножает queue |
+| **3.4 Processor Interface** | Заменяемый processor contract для source/work kind, chunk processing, checkpoint state и finalize; Sleep orchestration не знает семантику текста/медиа | Deterministic test processor заменяется вторым adapter без изменения scheduler; unsupported kind не получает silent fallback; processor/version сохраняются в trace/result |
+| **3.5 Deterministic Text Consolidation** | Первый `CONSOLIDATE` processor фильтрует/группирует/сортирует текстовые eligible sources и выдаёт bounded derived consolidation result без удаления исходников | Canonical text corpus даёт ожидаемые группы/порядок/дедупликацию; исходные Event/Memory/Knowledge неизменны; CONFIRMED Knowledge не переписывается без существующих evidence rules |
+| **3.6 Chunk / Checkpoint / Resume** | Work выполняется ограниченными chunks; после каждого committed chunk хранится cursor/checkpoint, interruption возобновляет следующий незавершённый chunk | Прерывание на каждом контрольном checkpoint и последующий resume дают тот же допустимый final result, что uninterrupted run; уже committed chunk не выполняется повторно |
+| **3.7 Derived Results / Provenance** | Derived result хранит source refs, processor/version, transformation history и output refs; authority результата отделена от raw/verified source | Каждый результат проходит до фактических source Events/Memories/Knowledge; missing source блокирует завершение; derived output не становится raw observation или CONFIRMED Knowledge автоматически |
+| **3.8 Recovery / Idempotency** | Persistent operation keys и recovery protocol согласуют `sleep.db` с эффектами в Memory/Knowledge storage после crash/replay | Crash до/после checkpoint/output commit восстанавливается без дубликатов; повтор Job/WorkItem не применяет один эффект дважды; partial operation остаётся диагностируемой |
+| **3.9 Runtime Integration** | Lifecycle Runtime различает inactive sleep, active SleepJob, safe interruption и возврат к wake без смешивания обычного `sleep()` с незавершённой консолидацией | Headless scenario проходит `wake → sleep processing → checkpoint/interruption → resume/complete → wake`; запрос wake прерывает работу на безопасной границе и не повреждает данные |
+| **3.10 Observability / Resource Budget** | Snapshot/trace показывает job, queue, текущий WorkItem/chunk, processed/skipped/failed counts, budget и elapsed/CPU/RAM/storage metrics | По snapshot можно восстановить причину выбора и текущий progress; budget exhaustion завершает/приостанавливает работу определённо; метрики не требуют GUI |
+| **3.11 Large-data Readiness** | Synthetic large-source adapter имитирует многогигабайтный Asset и тысячи chunks без реального media-файла; payload читается лениво через тот же processor contract | Источник логического размера ≥10 GB проходит bounded chunk iteration; interruption на произвольном chunk возобновляется с следующего; DB хранит refs/checkpoints, а не полный payload; память не зависит линейно от общего размера источника |
+| **3.12 Performance Baseline** | Измерены orchestration/selection/checkpoint/provenance latency, CPU/RAM/storage на 1k/10k/100k WorkItems и large-source chunk workload | Baseline зафиксирован без SLA; отдельно видна стоимость scheduler, checkpoint/history и processor; найденные bottlenecks записаны до оптимизации |
+| **3.13 Stage Validation** | End-to-end canonical Sleep scenarios объединяют raw/Memory/Knowledge sources, bounded selection, consolidation, interruption/restart, provenance и large-source contract | Uninterrupted и interrupted/resumed runs дают эквивалентный допустимый итог; replay не создаёт дублей; provenance полный; Stage 0–2 regression suite зелёный |
+
+### Storage, WorkItem и resource boundary
+
+Sleep orchestration хранится отдельно от Cognitive Memory в локальном transactional
+`sleep.db`: jobs, work items, checkpoints и metadata derived results. Большие данные
+туда не помещаются. `SourceRef` указывает на Event/Memory/Knowledge или будущий Asset;
+для тяжёлого Asset сохраняются только stable ID, descriptor/location/checksum/size
+там, где они доступны. Реальные binary assets остаются внешним storage и читаются
+processor-адаптером по chunks.
+
+Базовый WorkItem содержит как минимум stable ID, Job ID, `work_kind`, source kind/id,
+processor/version, priority, estimated cost, status, attempts и checkpoint/cursor.
+Первый cost model может быть категориальным (`cheap/normal/expensive`) и нужен не
+для «интеллекта», а чтобы scheduler мог сформировать bounded workload. Фиксированное
+расписание 16/8 или 12/12 не является частью архитектуры: Sleep запускается и
+ограничивается явными runtime/resource условиями.
+
+`sleep.db` и `memory.db` не объявляются одной физической транзакцией. Если processor
+создаёт внешний effect через существующий Memory/Knowledge API, согласованность
+обеспечивается stable operation/output ID, idempotency и recovery protocol. Это
+аналогично уже принятому принципу восстановления между разными хранилищами, а не
+попытка скрыть cross-store failure.
+
+### Consolidation baseline
+
+Первый processor работает только с текстовым опытом, но получает его через общий
+SourceRef/WorkItem contract. Он может фильтровать неeligible записи, детерминированно
+сортировать и группировать источники, убирать точные повторы из derived output и
+создавать bounded `ConsolidationResult`/report со ссылками на все источники.
+Консолидация не удаляет raw Event, не переписывает CLOSED Memory и не повышает
+Knowledge authority сама по себе. Любое изменение Memory/Knowledge проходит через
+их существующие lifecycle/evidence rules.
+
+Stage 3 therefore проверяет прежде всего механизм безопасной переработки накопленного
+опыта, а не качество свободного reasoning. Reflection старых событий, replay ошибок,
+counterfactual simulation и generative dreaming оставляются extension points для
+будущих processors. Их outputs должны быть явно hypothetical/derived и никогда не
+маскироваться под наблюдение или подтверждённый факт.
+
+### Large-data readiness
+
+Будущие дневные отчёты, видео, аудио и internal telemetry рассматриваются как
+источники того же общего типа работы, но со своими processor adapters и chunk
+strategies. Stage 3 не требует настоящего видео pipeline: вместо этого synthetic
+large-source доказывает, что scheduler/checkpoints/provenance не зависят от загрузки
+всего payload в RAM. Это архитектурный тест против будущего полного переписывания,
+а не заявление о готовом media understanding.
+
+### Валидация и доказательства
+
+Canonical corpus Stage 3 должен включать raw observations, CLOSED Memories с
+provenance, CONFIRMED Knowledge, duplicates, неeligible/terminal records, несколько
+priority/cost классов и минимум один synthetic large source. Контрольные сценарии:
+обычный complete run; budget exhaustion; interruption на разных checkpoints;
+crash до и после output commit; reopen/resume; replay того же Job; processor failure;
+unsupported source; wake request; missing provenance; large-source resume.
+
+Обязательные свойства: deterministic selection/order; bounded queue и chunk size;
+исходники не изменяются скрыто; every derived result имеет processor/version и
+полный provenance; completed chunk/job не применяется повторно; failed/pending
+работа видима; uninterrupted и resumed results эквивалентны по содержательному
+результату; full regression предыдущих стадий остаётся зелёным.
+
+Performance baseline измеряет orchestration отдельно от содержательной стоимости
+processor. Для 1k/10k/100k WorkItems фиксируются selection/scheduling/checkpoint/
+provenance latency, throughput, CPU, peak RSS и storage; synthetic large-source
+отдельно показывает стоимость chunk/resume. SLA заранее не задаётся.
+
+**Definition of Done.** Sleep имеет persistent lifecycle и bounded deterministic
+queue; source/work contracts не привязаны к тексту; deterministic text consolidation
+создаёт derived result без потери/перезаписи источников; chunk/checkpoint/resume и
+recovery/replay не создают повторных эффектов; provenance проходит до исходного
+опыта; runtime безопасно прерывает работу для wake; large-source contract доказан
+synthetic test; resource/performance baseline записан; canonical end-to-end scenarios
+и полный regression suite проходят. Reflection/Simulation/Dreaming не требуются
+для завершения Stage 3 и остаются в [Research](Research.md#когнитивный-сон).
 
 ## Stage 4
 

@@ -19,7 +19,7 @@ ANIMA — исследовательский проект модульного �
 
 Текущий фокус: **3 — Sleep** (InProgress).
 
-Stage 3.0 — Sleep Specification: уточнить контракт Sleep job, lifecycle и checkpoints, deterministic consolidation baseline, provenance/recovery/idempotency и критерии validation до реализации механики.
+Stage 3.1 — Sleep Storage / Lifecycle: реализовать persistent SleepJob storage и lifecycle queued/running/checkpointed/interrupted/completed/failed как основу resumable bounded consolidation.
 
 [Этапы и критерии](docs/ROADMAP/README.md).
 <!-- AUTO:summary:END -->
