@@ -42,12 +42,16 @@ class Event:
         self.source = source
         self.session_id = session_id
         self.references = (
-            list(references)
-            if references is not None
-            else []
+            []
+            if references is None
+            else references
         )
 
         self.validate_record(self.to_dict())
+        self.references = [
+            dict(reference)
+            for reference in self.references
+        ]
 
     @staticmethod
     def _new_id():
