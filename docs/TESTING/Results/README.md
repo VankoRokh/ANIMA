@@ -17,4 +17,5 @@
 | [TV-0008 — Stage 1.5 Memory Composer](TV-0008.md) | 2026-10-26 | [1](../../ROADMAP/README.md#stage-1) | Passed | [81c822c](https://github.com/VankoRokh/ANIMA/commit/81c822c13ff460a7a9befff24b7a1dba6e2a6d68) |
 | [TV-0009 — Stage 1.6 Merge and History](TV-0009.md) | 2026-10-26 | [1](../../ROADMAP/README.md#stage-1) | Passed | [e719738](https://github.com/VankoRokh/ANIMA/commit/e71973863fb41204bdf2a547b710d69cbef234cb) |
 | [TV-0010 — Stage 1.7 Knowledge Layer](TV-0010.md) | 2026-10-26 | [1](../../ROADMAP/README.md#stage-1) | Passed | [c4f75fa](https://github.com/VankoRokh/ANIMA/commit/c4f75fae94c6259cf7e59209c06df04191448949) |
+| [TV-0011 — Stage 1.8 Retrieval](TV-0011.md) | 2026-10-26 | [1](../../ROADMAP/README.md#stage-1) | Passed | [ac2be3d](https://github.com/VankoRokh/ANIMA/commit/ac2be3d46ea095f59893fb22a900606dbdd52a34) |
 <!-- AUTO:results:END -->
