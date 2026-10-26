@@ -6,9 +6,9 @@
 показывают этот порядок, а не требуют отдельной платы или модели на каждом шаге.
 
 <!-- AUTO:roadmap:START -->
-**Текущая работа:** Stage 2.13 — Stage Validation: пройти canonical end-to-end scenarios для Goals, четырёх Internal State, Choice, time dynamics, Expression и restart/replay, подтвердить полную causal traceability и регрессию предыдущих этапов.
+**Текущая работа:** Stage 3.0 — Sleep Specification: уточнить контракт Sleep job, lifecycle и checkpoints, deterministic consolidation baseline, provenance/recovery/idempotency и критерии validation до реализации механики.
 
-**Фокус:** 2 — Internal State (InProgress).
+**Фокус:** 3 — Sleep (InProgress).
 
 | Этап | Проверяемый результат | Статус | Зависимости |
 |---|---|---|---|
@@ -16,8 +16,8 @@
 | [0 — Foundation](#stage-0) | Перенос сохраняет идентичность, историю и возможность продолжения | Complete | [D0](#d0) |
 | [D1 — Runtime, Tests & Observability](#d1) | Один сценарий запускается headless, наблюдается и проверяется изолированно | Complete | [0](#stage-0) |
 | [1 — Cognitive Memory](#stage-1) | Релевантный опыт извлекается с происхождением и ограниченным контекстом | Complete | [0](#stage-0), [D1](#d1) |
-| [2 — Internal State](#stage-2) | Влияние внутреннего состояния на выбор причинно прослеживается | InProgress | [1](#stage-1) |
-| [3 — Sleep](#stage-3) | Консолидация прерывается и возобновляется без потери источников | Planned | [2](#stage-2) |
+| [2 — Internal State](#stage-2) | Влияние внутреннего состояния на выбор причинно прослеживается | Complete | [1](#stage-1) |
+| [3 — Sleep](#stage-3) | Консолидация прерывается и возобновляется без потери источников | InProgress | [2](#stage-2) |
 | [4 — Agent](#stage-4) | Ограниченная задача выполняется инструментом и проверяется наблюдением | Planned | [3](#stage-3) |
 | [5 — Virtual ANIMA](#stage-5) | Длительная работа на ПК/VM имеет измеренный ресурсный профиль | Planned | [4](#stage-4) |
 | [6 — Cyberdeck](#stage-6) | Измеренная нагрузка переносится на автономное устройство | Planned | [5](#stage-5) |
@@ -85,7 +85,7 @@ Memories/Knowledge/Entities/Relations/History и состояние обрабо
 | **1.3 Entities / Relations / Provenance — Complete** | Entity aliases, универсальные relations и цепочка `Knowledge → Memory → Event` | Для каждого контрольного объекта происхождение восстанавливается до source Events; [TV-0006](../TESTING/Results/TV-0006.md) |
 | **1.4 Memory Processor — Complete** | Selection и объяснимый Association; `HIGH → UPDATE`, `MEDIUM → CREATE + related_to`, `LOW → CREATE` | На canonical corpus каждый Event попадает в ожидаемый эпизод, причины решения видны в trace; [TV-0007](../TESTING/Results/TV-0007.md) |
 | **1.5 Memory Composer — Complete** | Заменяемый deterministic `RuleBasedComposer`, ограниченный `content` | CREATE/UPDATE сохраняют решения, результаты, причины, ограничения и открытые вопросы без копирования шума; [TV-0008](../TESTING/Results/TV-0008.md) |
-| **1.6 Merge / History — Complete** | `OPEN/CLOSED/MERGED`, безопасный Merge и компактная история изменений | Merge не теряет provenance; исходная запись остаётся прослеживаемой; SPLIT не требуется; [TV-0009](../TESTING/Results/TV-0009.md) |
+| **1.6 Merge / History — Complete** | `OPEN/CLOSED/MERGED`, безопасный Merge и компактная история изменений | Merge не теряет provenance; исходная запись остаётся прослеживаемой; [TV-0009](../TESTING/Results/TV-0009.md) |
 | **1.7 Knowledge Layer — Complete** | Knowledge из закрытого подтверждённого опыта; lifecycle `provisional/confirmed/challenged/superseded/rejected` | Противоречие переводит `confirmed → challenged`, но не заменяет знание до закрытия проверки; [TV-0010](../TESTING/Results/TV-0010.md) |
 | **1.8 Retrieval — Complete** | ID/filters/entities/FTS/relations/ranking, сначала дешёвые и объяснимые методы | Заранее размеченные query возвращают обязательные IDs в заданном top-k; [TV-0011](../TESTING/Results/TV-0011.md) |
 | **1.9 Context Builder — Complete** | Структурированный `ContextBundle` с `knowledge[]/memories[]/events[]`, reason и budget | `max_items/max_chars` соблюдаются; разные consumer policies дают воспроизводимый ограниченный контекст; [TV-0012](../TESTING/Results/TV-0012.md) |
@@ -203,7 +203,7 @@ performance baseline зафиксирован. Stage 1 завершён; док�
 | **2.10 Runtime Integration — Complete** | Полная цепочка `Event/Result → State/Goal → Candidates → Choice → Trace` в headless Runtime | Scenario snapshot показывает Goals, state, transitions, component scores и выбранный Candidate |
 | **2.11 Recovery / Idempotency — Complete** | Crash/restart/replay не дублируют transitions и не создают скрытый time drift | Повтор одного source не применяет эффект дважды; recovery сохраняет state/history/goals согласованными |
 | **2.12 Decision Performance — Complete** | Baseline latency/CPU/RAM для Choice с ростом Candidates и диагностикой | Измерены 2/10/100 Candidates: base, state modifiers и modifiers+trace/history; baseline [TV-0016](../TESTING/Results/TV-0016.md), SLA не задаётся |
-| **2.13 Stage Validation** | End-to-end canonical scenarios для четырёх states, Goals, Choice, time, restart и Expression | Все ожидаемые направления изменений/выбора воспроизводимы, causal history полна и регрессия предыдущих этапов зелёная |
+| **2.13 Stage Validation — Complete** | End-to-end canonical scenarios для четырёх states, Goals, Choice, time, restart и Expression | 13 canonical tests и полный regression suite 306 tests прошли на snapshot `36c8d65`; [TV-0017](../TESTING/Results/TV-0017.md) |
 
 ### Goal и регулирующий слой
 
@@ -272,34 +272,27 @@ Expression является зависимым отображением Internal
 
 ### Валидация и доказательства
 
-Canonical scenarios должны включать: neutral baseline; high fatigue; low/high
+Canonical scenarios включили neutral/altered Choice; high fatigue; low/high
 importance uncertainty; отсутствие passive uncertainty decay; прямое и косвенное
 подтверждение; escalating repeated failure frustration; прекращение серии после
-смены стратегии; diminishing repeated-success satisfaction; разные importance
-успеха; fatigue в начале/конце/после рабочего периода и дополнительный workload;
-Sleep/recovery; конкурирующие Goals; blocked/reactivated/completed/cancelled Goal;
-Expression dependency; restart/replay/idempotency и одинаковый injected time.
+смены стратегии; diminishing repeated-success satisfaction; fatigue time/recovery;
+конкурирующие и terminal Goals; Expression dependency; ScenarioRunner и
+restart/replay/idempotency с одинаковым injected time.
 
-Для каждого контрольного state transition причина должна восстанавливаться из
-history. Для каждого контрольного Choice trace показывает base evaluation и все
-применённые modifiers. Проверяется, что state не создаёт Goal/Candidate, завершённая
-или отменённая цель не влияет на выбор, modifier не получает неограниченного веса,
-а одинаковые исходные данные и время дают одинаковый итог.
+Для контрольных state transitions причина восстанавливается из history, а Choice
+trace показывает base evaluation и применённые modifiers. Decision performance
+[TV-0016](../TESTING/Results/TV-0016.md) для 100 Candidates дал p95 0.0211 ms на
+base ranking, 0.0993 ms на state modifiers и 2.0092 ms на production Choice с
+полным trace/history; SLA не задавался.
 
-Decision performance измеряется отдельно от общей Runtime latency минимум для
-2/10/100 Candidates в трёх режимах: base evaluation, state modifiers и modifiers
-с trace/history. Baseline [TV-0016](../TESTING/Results/TV-0016.md) показал для 100
-Candidates p95 0.0211 ms на base ranking, 0.0993 ms на state modifiers и 2.0092 ms
-на production Choice с полным trace/history. Значения сохранены без SLA для будущего
-Fast, Agent и аппаратного переноса.
-
-**Definition of Done.** На фиксированных end-to-end scenarios Goals имеют корректный
-lifecycle и проверяемые результаты; четыре baseline state изменяются только через
-причинные transitions, соблюдают диапазон и временные правила; neutral/altered state
-предсказуемо меняет оценку Candidates, но не подменяет Goal; trace объясняет итоговый
-Choice; restart/replay не создают дублирования или time drift; Expression остаётся
-зависимым слоем; decision-performance baseline записан; регрессия Foundation, D1 и
-Stage 1 проходит. Отложенные расширения перечислены в
+**Definition of Done.** Goals имеют корректный lifecycle и проверяемые результаты;
+четыре baseline state изменяются через причинные transitions, соблюдают диапазон и
+временные правила; neutral/altered state предсказуемо меняет оценку Candidates, но
+не подменяет Goal; trace объясняет Choice; restart/replay не создают дублирования
+или time drift; Expression остаётся зависимым слоем; decision-performance baseline
+записан. Финальный targeted validation дал 13 passed, полный regression suite —
+306 passed. Stage 2 завершён; доказательства: [TV-0016](../TESTING/Results/TV-0016.md)
+и [TV-0017](../TESTING/Results/TV-0017.md). Отложенные расширения перечислены в
 [Research](Research.md#отложенные-механизмы-internal-state).
 
 ## Stage 3

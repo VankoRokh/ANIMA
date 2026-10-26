@@ -26,6 +26,13 @@
 | Knowledge Layer | [KnowledgeLayer](../../anima/memory/knowledge.py): CLOSED evidence, provisional/confirmed/challenged/superseded/rejected lifecycle и history | [knowledge lifecycle](../../tests/test_knowledge.py), [evidence/state machine](../../tests/test_knowledge_evidence.py) |
 | Retrieval | [RetrievalEngine](../../anima/memory/retrieval.py): exact ID, structured filters, Entity anchors, FTS5, 1-hop Relations и explainable ranking | [retrieval corpus](../../tests/test_retrieval.py) |
 | Context Builder | [ContextBuilder](../../anima/memory/context_builder.py): FAST/DEEP read policies, exact/Knowledge/Memory priority, provenance Events и strict item/character budget | [context corpus](../../tests/test_context_builder.py) |
+| Internal State Store / History | [InternalStateStore](../../anima/internal_state/store.py): `internal_state.db`, current values, causal transitions, Goals и source-operation ledger | [storage](../../tests/test_internal_state_storage.py), [history](../../tests/test_state_history.py) |
+| State Variables / Transitions | [TransitionEngine](../../anima/internal_state/transition_engine.py) применяет bounded event/result rules к fatigue/uncertainty/frustration/satisfaction | [variables](../../tests/test_state_variables.py), [transition engine](../../tests/test_transition_engine.py) |
+| Goals / Progress / Arbitration | [GoalStore](../../anima/internal_state/goals.py) хранит lifecycle; progress и arbitration отделяют verified result от порядка активных Goals | [goal model](../../tests/test_goal_model.py), [progress/arbitration](../../tests/test_goal_progress_arbitration.py) |
+| Time Dynamics | [TimeDynamics](../../anima/internal_state/time_dynamics.py): lazy injected-time growth/recovery/decay без фонового tick | [time dynamics](../../tests/test_time_dynamics.py) |
+| Choice Engine | [ChoiceEngine](../../anima/internal_state/choice_engine.py): read-only Candidate evaluation с bounded state modifiers и score trace | [choice](../../tests/test_choice_engine.py), [performance](../../tests/test_decision_performance.py) |
+| Expression Adapter | [ExpressionAdapter](../../anima/internal_state/expression_adapter.py): read-only state → normalized ExpressionProfile | [expression](../../tests/test_expression_adapter.py) |
+| Stage 2 Runtime / Recovery | [InternalStateRuntime](../../anima/internal_state/runtime_integration.py) собирает Goals/State/Choice/Expression; recovery journal завершает pending source operations | [runtime integration](../../tests/test_runtime_internal_state_integration.py), [recovery](../../tests/test_internal_state_recovery.py), [stage validation](../../tests/test_stage2_validation.py) |
 | Наблюдаемость | [DiagnosticTrace](../../anima/diagnostics/trace.py) и [DiagnosticMetrics](../../anima/diagnostics/metrics.py) | [trace](../../tests/test_trace.py), [metrics](../../tests/test_metrics.py) |
 | Изоляция тестов | [AnimaTestHarness](../../tests/harness.py) собирает Runtime во временном каталоге | [CLI/headless](../../tests/test_d1_validation.py) |
 
@@ -40,7 +47,9 @@
 [TV-0012](../TESTING/Results/TV-0012.md),
 [TV-0013](../TESTING/Results/TV-0013.md),
 [TV-0014](../TESTING/Results/TV-0014.md),
-[TV-0015](../TESTING/Results/TV-0015.md).
+[TV-0015](../TESTING/Results/TV-0015.md),
+[TV-0016](../TESTING/Results/TV-0016.md),
+[TV-0017](../TESTING/Results/TV-0017.md).
 
 ## Рабочий путь записи
 
@@ -277,6 +286,54 @@ FAST использует узкую выборку без raw Events; DEEP ра
 целиком, не обрезается, а пропускается с `truncated=true`. Token-aware budgets и
 model-specific policies отложены до появления конкретного model consumer.
 
+## Internal State, Goals и Choice
+
+Stage 2 добавляет отдельный регулирующий контур в `internal_state.db`. Он не заменяет
+lifecycle `state.json` и не смешивается с `memory.db`. Основные данные: `state_values`,
+`state_transitions`, `goals`, `goal_transitions` и `source_operations` для replay-safe
+мутаций.
+
+Четыре baseline state — `fatigue`, `uncertainty`, `frustration`, `satisfaction` —
+ограничены диапазоном `0.0..1.0`. Любое содержательное изменение проходит через
+причинный transition `before + delta → after` с source/rule/reason и optional
+Goal/Candidate context. Arbitrary public setter отсутствует.
+
+Goal имеет lifecycle `active/blocked/completed/cancelled`. Progress и success
+принимаются только через явный `GoalObservation`; success требует проверенного
+результата и выполненного criterion. Arbitration выбирает только среди active Goals
+по внешнему priority и не разрешает Internal State менять authority цели.
+
+Choice получает уже существующий active Goal и список Candidates:
+
+```text
+Goal + Candidates
+       ↓
+base score
+       +
+bounded Internal State modifiers
+       ↓
+ranked Choice + score trace
+```
+
+`fatigue` штрафует effort, `uncertainty` повышает information gain и штрафует
+irreversible risk, `frustration` штрафует repeated failure и поддерживает alternative,
+`satisfaction` даёт меньший бонус verified continuation. Choice read-only и не создаёт
+Goal/Candidate.
+
+Time dynamics вычисляется лениво по injected elapsed time. Fatigue растёт по awake
+period и workload, recovery снижает fatigue; frustration возвращается к baseline,
+satisfaction decay к baseline, uncertainty не меняется только из-за времени. Это
+исключает зависимость результата от частоты фонового tick.
+
+Expression Adapter является односторонним read-only отображением state в
+`energy/caution/tension/positive_affect`; скрытого feedback `Expression → State` нет.
+Raw Event не получает автоматической эмоциональной интерпретации: Runtime принимает
+явные `StateSignal`/`GoalObservation`, чтобы семантическая причина оставалась видимой.
+
+Persistent `source_operations` journal делает state signals, goal observations и
+source-backed Goal creation идемпотентными. После crash Runtime достраивает pending
+операцию, не начисляя уже существующий `source_id + rule_id` effect повторно.
+
 ## Stage 1 validation и performance baseline
 
 Финальный Stage 1 corpus содержит 37 raw Events в 11 сессиях и проходит через
@@ -297,6 +354,20 @@ check; provenance при каждом выбранном объекте зано
 Baseline сохранён до оптимизации, чтобы последующие изменения сравнивались с
 фактическими исходными числами.
 
+## Stage 2 validation и performance baseline
+
+Stage 2 завершён на snapshot `36c8d65`: 13 canonical validation tests прошли вместе
+с полным regression suite `306 passed`; результат зафиксирован в
+[TV-0017](../TESTING/Results/TV-0017.md). Проверка связывает Goals, четыре state,
+Choice, time, Expression, ScenarioRunner и restart/replay через существующие Runtime
+границы.
+
+Decision baseline [TV-0016](../TESTING/Results/TV-0016.md) показывает для 100
+Candidates p95 0.0211 ms на base ranking, 0.0993 ms на state modifiers и 2.0092 ms
+на production Choice с полным trace/history. Python allocation peak полного режима
+составил 273.101 KiB. Process peak RSS сохраняется только как high-water mark worker
+и не трактуется как per-choice allocation.
+
 ## Каталог и контракты данных
 
 По умолчанию данные находятся в `<project>/data`; `ANIMA_DATA_DIR` задаёт другой
@@ -308,10 +379,11 @@ Baseline сохранён до оптимизации, чтобы последу
 | `state.json` | lifecycle/status/session/timestamps/events_processed |
 | `events.jsonl` | append-only raw Events |
 | `memory.db` | SQLite Cognitive Memory storage |
+| `internal_state.db` | SQLite Internal State, Goals, causal history и source recovery ledger |
 
 Backup/restore копирует весь data-каталог. После восстановления продолжаются
-identity, session/event history и SQLite Memory Store. Старый `memories.jsonl`
-больше не является рабочим форматом и не мигрируется.
+identity, session/event history, Cognitive Memory и Internal State/Goal history.
+Старый `memories.jsonl` больше не является рабочим форматом и не мигрируется.
 
 ## Подтверждённые ограничения
 
@@ -325,5 +397,11 @@ identity, session/event history и SQLite Memory Store. Старый `memories.j
 - EventProcessing raw identity check и DEEP provenance используют повторные полные
   сканирования `events.jsonl`; на 100k это даёт 0.41 batch events/s и около 23.4 s
   p95 DEEP Context. Оптимизация отложена после фиксации baseline.
-- LLM/Deep Composer, embeddings, vector/graph DB, Sleep consolidation и
-  distributed memory остаются отложенными механизмами.
+- Raw Events не преобразуются автоматически в StateSignal/GoalObservation; смысл
+  должен быть задан явным consumer до Stage 4 Agent semantics.
+- Internal State не создаёт Goals/Candidates. Planner, self-generated goals и
+  authority policy отсутствуют; Candidates задаёт внешний consumer/scenario.
+- ExpressionProfile пока не привязан к конкретному text/voice/UI renderer, а fatigue
+  не использует реальные CPU/GPU/power signals.
+- Sleep consolidation, Deep/LLM Composer, embeddings, vector/graph DB и distributed
+  memory не реализованы; Sleep consolidation является текущей задачей Stage 3.

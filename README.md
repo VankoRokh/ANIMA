@@ -17,9 +17,9 @@ ANIMA — исследовательский проект модульного �
 <!-- AUTO:summary:START -->
 Версия прототипа: **00.1-alpha** (из кода).
 
-Текущий фокус: **2 — Internal State** (InProgress).
+Текущий фокус: **3 — Sleep** (InProgress).
 
-Stage 2.13 — Stage Validation: пройти canonical end-to-end scenarios для Goals, четырёх Internal State, Choice, time dynamics, Expression и restart/replay, подтвердить полную causal traceability и регрессию предыдущих этапов.
+Stage 3.0 — Sleep Specification: уточнить контракт Sleep job, lifecycle и checkpoints, deterministic consolidation baseline, provenance/recovery/idempotency и критерии validation до реализации механики.
 
 [Этапы и критерии](docs/ROADMAP/README.md).
 <!-- AUTO:summary:END -->
