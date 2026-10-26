@@ -23,6 +23,7 @@
 | Memory Composer | [RuleBasedComposer](../../anima/memory/composer.py): deterministic bounded `content`, deduplication и conservative revision | [composer](../../tests/test_memory_composer.py), [revision](../../tests/test_memory_composer_revision.py) |
 | Memory Lifecycle / History | [MemoryLifecycle](../../anima/memory/lifecycle.py): OPEN→CLOSED, Merge→MERGED и compact history | [lifecycle/merge/provenance](../../tests/test_memory_lifecycle.py) |
 | Knowledge Layer | [KnowledgeLayer](../../anima/memory/knowledge.py): CLOSED evidence, provisional/confirmed/challenged/superseded/rejected lifecycle и history | [knowledge lifecycle](../../tests/test_knowledge.py), [evidence/state machine](../../tests/test_knowledge_evidence.py) |
+| Retrieval | [RetrievalEngine](../../anima/memory/retrieval.py): exact ID, structured filters, Entity anchors, FTS5, 1-hop Relations и explainable ranking | [retrieval corpus](../../tests/test_retrieval.py) |
 | Наблюдаемость | [DiagnosticTrace](../../anima/diagnostics/trace.py) и [DiagnosticMetrics](../../anima/diagnostics/metrics.py) | [trace](../../tests/test_trace.py), [metrics](../../tests/test_metrics.py) |
 | Изоляция тестов | [AnimaTestHarness](../../tests/harness.py) собирает Runtime во временном каталоге | [CLI/headless](../../tests/test_d1_validation.py) |
 
@@ -32,7 +33,8 @@
 [TV-0007](../TESTING/Results/TV-0007.md),
 [TV-0008](../TESTING/Results/TV-0008.md),
 [TV-0009](../TESTING/Results/TV-0009.md),
-[TV-0010](../TESTING/Results/TV-0010.md).
+[TV-0010](../TESTING/Results/TV-0010.md),
+[TV-0011](../TESTING/Results/TV-0011.md).
 
 ## Рабочий путь записи
 
@@ -202,6 +204,27 @@ Knowledge, старая становится `superseded`, а между ним�
 новых investigation branches. Переходы и существенные evidence changes пишутся в
 `history`; provenance продолжает проходить до raw Events.
 
+## Retrieval
+
+`RetrievalEngine` является read-only слоем поверх MemoryStore/LinkStore. Он
+объединяет дешёвые и объяснимые сигналы в фиксированном baseline:
+
+1. exact `mem_` / `kn_` ID;
+2. structured filters по domain/type/status;
+3. Entity ID/alias через `about`;
+4. FTS5 по `Memory.content` и `Knowledge.statement`;
+5. максимум один hop по Relations;
+6. deterministic ranking и `top_k`.
+
+Каждый результат содержит `kind`, `id`, `score`, `reasons`, `record`. Exact ID
+имеет наибольший вес; current Knowledge status и Memory importance дают только
+ограниченные bonuses. `importance` не заменяет relevance.
+
+Обычный current-search по умолчанию исключает `merged` Memories и
+`superseded/rejected` Knowledge. История не удаляется: terminal records доступны
+через exact ID или явный status filter. Deep traversal, embeddings, semantic/LLM
+rerank и query expansion в этот baseline не входят.
+
 ## Каталог и контракты данных
 
 По умолчанию данные находятся в `<project>/data`; `ANIMA_DATA_DIR` задаёт другой
@@ -227,8 +250,8 @@ identity, session/event history и SQLite Memory Store. Старый `memories.j
   вызывается явно.
 - Автоматическое создание/принятие Knowledge моделью не реализовано; lifecycle
   вызывается явно на подтверждённом evidence.
-- Общий Retrieval/ranking относится к текущему Stage 1.8 и не считается
-  реализованным до отдельной зелёной проверки; Context Builder — Stage 1.9.
+- Context Builder относится к текущему Stage 1.9 и не считается реализованным до
+  отдельной зелёной проверки.
 - Производительность 1k/10k/100k ещё не измерялась; оптимизация не выполнялась.
 - LLM/Deep Composer, embeddings, vector/graph DB, Sleep consolidation и
   distributed memory остаются отложенными механизмами.
