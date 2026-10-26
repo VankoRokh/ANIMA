@@ -19,7 +19,7 @@ ANIMA — исследовательский проект модульного �
 
 Текущий фокус: **1 — Cognitive Memory** (InProgress).
 
-Stage 1.8 — Retrieval: реализовать deterministic поиск по exact ID, structured filters, Entities, FTS и 1-hop Relations с объяснимым ranking и ожидаемыми top-k IDs.
+Stage 1.9 — Context Builder: собрать bounded ContextBundle из Retrieval/Provenance с отдельными FAST/DEEP policies, Knowledge-first selection и явными max_items/max_chars budgets.
 
 [Этапы и критерии](docs/ROADMAP/README.md).
 <!-- AUTO:summary:END -->
