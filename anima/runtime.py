@@ -24,6 +24,14 @@ class Runtime:
         self.memory_filter = memory_filter
         self.memory_store = memory_store
 
+    def _session_id(self):
+        session = self.anima.get()["session"]
+
+        if session <= 0:
+            return None
+
+        return f"session_{session:08d}"
+
     def _process_events(self):
         processed = []
 
@@ -60,7 +68,11 @@ class Runtime:
 
     def _wake(self):
         self.anima.wake()
-        self.event_bus.emit("wake")
+        self.event_bus.emit(
+            "system.wake",
+            source="runtime",
+            session_id=self._session_id(),
+        )
         return self._process_events()
 
     def user_input(self, text):
@@ -73,10 +85,12 @@ class Runtime:
 
     def _user_input(self, text):
         self.event_bus.emit(
-            "user_input",
+            "conversation.user",
             {
                 "text": text,
             },
+            source="user",
+            session_id=self._session_id(),
         )
 
         return self._process_events()
@@ -96,7 +110,11 @@ class Runtime:
         )
 
     def _sleep(self):
-        self.event_bus.emit("sleep")
+        self.event_bus.emit(
+            "system.sleep",
+            source="runtime",
+            session_id=self._session_id(),
+        )
         processed = self._process_events()
         self.anima.sleep()
 
