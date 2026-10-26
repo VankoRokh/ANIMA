@@ -6,7 +6,7 @@
 показывают этот порядок, а не требуют отдельной платы или модели на каждом шаге.
 
 <!-- AUTO:roadmap:START -->
-**Текущая работа:** Stage 1.8 — Retrieval: реализовать deterministic поиск по exact ID, structured filters, Entities, FTS и 1-hop Relations с объяснимым ranking и ожидаемыми top-k IDs.
+**Текущая работа:** Stage 1.9 — Context Builder: собрать bounded ContextBundle из Retrieval/Provenance с отдельными FAST/DEEP policies, Knowledge-first selection и явными max_items/max_chars budgets.
 
 **Фокус:** 1 — Cognitive Memory (InProgress).
 
@@ -87,7 +87,7 @@ Memories/Knowledge/Entities/Relations/History и состояние обрабо
 | **1.5 Memory Composer — Complete** | Заменяемый deterministic `RuleBasedComposer`, ограниченный `content` | CREATE/UPDATE сохраняют решения, результаты, причины, ограничения и открытые вопросы без копирования шума; [TV-0008](../TESTING/Results/TV-0008.md) |
 | **1.6 Merge / History — Complete** | `OPEN/CLOSED/MERGED`, безопасный Merge и компактная история изменений | Merge не теряет provenance; исходная запись остаётся прослеживаемой; SPLIT не требуется; [TV-0009](../TESTING/Results/TV-0009.md) |
 | **1.7 Knowledge Layer — Complete** | Knowledge из закрытого подтверждённого опыта; lifecycle `provisional/confirmed/challenged/superseded/rejected` | Противоречие переводит `confirmed → challenged`, но не заменяет знание до закрытия проверки; [TV-0010](../TESTING/Results/TV-0010.md) |
-| **1.8 Retrieval** | ID/filters/entities/FTS/relations/ranking, сначала дешёвые и объяснимые методы | Заранее размеченные query возвращают обязательные IDs в заданном top-k |
+| **1.8 Retrieval — Complete** | ID/filters/entities/FTS/relations/ranking, сначала дешёвые и объяснимые методы | Заранее размеченные query возвращают обязательные IDs в заданном top-k; [TV-0011](../TESTING/Results/TV-0011.md) |
 | **1.9 Context Builder** | Структурированный `ContextBundle` с `knowledge[]/memories[]/events[]`, reason и budget | `max_items/max_chars` соблюдаются; разные consumer policies дают воспроизводимый ограниченный контекст |
 | **1.10 Recovery / Idempotency** | `event_processing` и безопасное повторение операций после crash | Повтор одного Event не создаёт дубликаты; зависшая обработка обнаруживается и восстанавливается |
 | **1.11 Stage Validation** | End-to-end corpus примерно 30–100 Events с ожидаемыми Memories/Knowledge/Relations/Context | Полный сценарий проходит после restart и сохраняет provenance, статусы и retrieval |
