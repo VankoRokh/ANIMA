@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "current_stage": "1",
-  "focus": "Stage 1.1 — Event Foundation: расширить Event schema, стабильные IDs, references и валидацию до перехода к SQLite memory store.",
+  "focus": "Stage 1.2 — Memory Store: заменить временный memories.jsonl на SQLite memory.db со схемой, транзакциями, индексами и FTS5 baseline.",
   "stages": [
     {"id": "D0", "title": "Documentation", "status": "Complete", "depends_on": [], "outcome": "Контекст и процедуры работы восстанавливаются из репозитория"},
     {"id": "0", "title": "Foundation", "status": "Complete", "depends_on": ["D0"], "outcome": "Перенос сохраняет идентичность, историю и возможность продолжения"},
