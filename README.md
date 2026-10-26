@@ -19,7 +19,7 @@ ANIMA — исследовательский проект модульного �
 
 Текущий фокус: **1 — Cognitive Memory** (InProgress).
 
-Stage 1.6 — Merge / History: реализовать OPEN/CLOSED/MERGED lifecycle, безопасный Merge с сохранением provenance и компактную историю изменений.
+Stage 1.7 — Knowledge Layer: реализовать Knowledge lifecycle с подтверждёнными source Memories, challenge/reconfirm/supersede/reject transitions и полным provenance.
 
 [Этапы и критерии](docs/ROADMAP/README.md).
 <!-- AUTO:summary:END -->
