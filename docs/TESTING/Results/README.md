@@ -12,4 +12,5 @@
 | [TV-0003 — Миграция документационной системы](TV-0003.md) | 2026-10-24 | [D0](../../ROADMAP/README.md#d0) | Passed | [c276ef4](https://github.com/VankoRokh/ANIMA/commit/c276ef44bf3a434a8ed8d64d0603c6170ebfb940) |
 | [TV-0004 — Stage 1.1 Event Foundation](TV-0004.md) | 2026-10-26 | [1](../../ROADMAP/README.md#stage-1) | Passed | [f811bba](https://github.com/VankoRokh/ANIMA/commit/f811bba737ea11975fedc6e76b0f7b754256b368) |
 | [TV-0005 — Stage 1.2 SQLite Memory Store](TV-0005.md) | 2026-10-26 | [1](../../ROADMAP/README.md#stage-1) | Passed | [057f830](https://github.com/VankoRokh/ANIMA/commit/057f830f89ef2afe9322e4ab425a6b335a2c6da5) |
+| [TV-0006 — Stage 1.3 Entities Relations Provenance](TV-0006.md) | 2026-10-26 | [1](../../ROADMAP/README.md#stage-1) | Passed | [b24fbab](https://github.com/VankoRokh/ANIMA/commit/b24fbab9059ac95300c59c0c4866e9d966d85f12) |
 <!-- AUTO:results:END -->
