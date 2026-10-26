@@ -171,6 +171,29 @@ class KnowledgeLayer:
         ).fetchone()
 
     @classmethod
+    def _require_no_opposite_evidence(
+        cls,
+        connection,
+        *,
+        memory_id,
+        knowledge_id,
+        relation_type,
+    ):
+        opposite = "contradicts" if relation_type == "supports" else "supports"
+        if cls._relation_exists(
+            connection,
+            source_kind="memory",
+            source_id=memory_id,
+            relation_type=opposite,
+            target_kind="knowledge",
+            target_id=knowledge_id,
+            source_memory_id=memory_id,
+        ) is not None:
+            raise ValueError(
+                "Memory cannot both support and contradict the same knowledge"
+            )
+
+    @classmethod
     def _insert_relation(
         cls,
         connection,
@@ -333,6 +356,11 @@ class KnowledgeLayer:
 
         with self.memory_store.transaction() as connection:
             knowledge = self._require_knowledge(connection, knowledge_id)
+            if knowledge["status"] in {"superseded", "rejected"}:
+                raise ValueError(
+                    "Terminal knowledge cannot open a new investigation: "
+                    f"{knowledge_id} is {knowledge['status']}"
+                )
             memory = self._require_memory(connection, memory_id)
             if memory["status"] == "merged":
                 raise ValueError("MERGED memory cannot open a new investigation")
@@ -397,6 +425,12 @@ class KnowledgeLayer:
                     confirmed_at,
                     memory["updated_at"],
                     "Knowledge confirmed_at",
+                )
+                self._require_no_opposite_evidence(
+                    connection,
+                    memory_id=source_memory_id,
+                    knowledge_id=knowledge_id,
+                    relation_type="supports",
                 )
                 if (
                     knowledge["status"] == "challenged"
@@ -504,6 +538,12 @@ class KnowledgeLayer:
                 memory["updated_at"],
                 "Knowledge challenged_at",
             )
+            self._require_no_opposite_evidence(
+                connection,
+                memory_id=contradiction_memory_id,
+                knowledge_id=knowledge_id,
+                relation_type="contradicts",
+            )
             contradiction, _ = self._insert_relation(
                 connection,
                 source_kind="memory",
@@ -575,6 +615,12 @@ class KnowledgeLayer:
                     rejected_at,
                     memory["updated_at"],
                     "Knowledge rejected_at",
+                )
+                self._require_no_opposite_evidence(
+                    connection,
+                    memory_id=contradiction_memory_id,
+                    knowledge_id=knowledge_id,
+                    relation_type="contradicts",
                 )
                 added, _ = self._insert_relation(
                     connection,
