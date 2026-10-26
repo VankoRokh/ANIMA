@@ -9,8 +9,7 @@ class Runtime:
         event_bus,
         event_log,
         memory,
-        memory_filter,
-        memory_store,
+        memory_processor,
         trace=None,
         metrics=None,
     ):
@@ -21,8 +20,7 @@ class Runtime:
         self.event_bus = event_bus
         self.event_log = event_log
         self.memory = memory
-        self.memory_filter = memory_filter
-        self.memory_store = memory_store
+        self.memory_processor = memory_processor
 
     def _session_id(self):
         session = self.anima.get()["session"]
@@ -39,19 +37,12 @@ class Runtime:
             event = self.event_bus.next_event()
 
             self.event_log.write(event)
-
-            memory_stored = False
-
-            if self.memory_filter.is_meaningful(event):
-                memory = self.memory_filter.create_memory(event)
-                self.memory_store.write(memory)
-                memory_stored = True
-
+            memory_result = self.memory_processor.process_event(event)
             self.anima.register_event()
 
             self._trace(
                 f"event: {event.event_type} processed, "
-                f"memory={'stored' if memory_stored else 'skipped'}"
+                f"memory={memory_result['action']}"
             )
 
             processed.append(event)
