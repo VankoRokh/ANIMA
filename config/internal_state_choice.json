@@ -1,0 +1,14 @@
+{
+  "schema_version": 1,
+  "ruleset_version": 1,
+  "score_minimum": 0.0,
+  "score_maximum": 1.0,
+  "weights": {
+    "fatigue_effort": 0.25,
+    "uncertainty_information_gain": 0.20,
+    "uncertainty_irreversible_risk": 0.20,
+    "frustration_repeated_failure": 0.25,
+    "frustration_alternative": 0.15,
+    "satisfaction_verified_continuation": 0.06
+  }
+}
