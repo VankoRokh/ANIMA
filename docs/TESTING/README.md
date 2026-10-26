@@ -32,6 +32,27 @@ Harness создаёт данные в tmp_path; subprocess-тесты явно 
 представления над этим слоем и пока не обязательны. При росте параллельных
 состояний потребность в визуальном интерфейсе оценивается отдельно.
 
+## Performance baseline
+
+Stage 1.12 использует отдельный runner, чтобы 100k-набор не входил в обычный
+regression suite:
+
+```bash
+.venv/bin/python scripts/benchmark_stage1.py
+```
+
+По умолчанию каждый размер `1000`, `10000`, `100000` запускается в отдельном
+subprocess. Это позволяет независимо измерить peak RSS. Runner фиксирует Event
+append throughput, synthetic SQLite seed throughput, Memory create/update,
+Entity/Knowledge lookup, FTS, 1-hop Relations, Retrieval, FAST/DEEP Context,
+полный EventProcessing batch, CPU, RAM и размеры файлов.
+
+Synthetic SQLite seed нужен только для воспроизводимого наполнения базы и явно
+отделён от production `MemoryStore.create_memory()` latency. Результат сохраняется
+в `.benchmarks/stage1-performance.json`; каталог локальный и не отслеживается Git.
+Для проверки самого benchmark-контура в обычном pytest используется маленький
+`tests/test_performance_baseline.py`, а не полный 1k/10k/100k прогон.
+
 ## Уровни и критерии
 
 | Уровень | Что проверяет | Когда сохранять результат |
