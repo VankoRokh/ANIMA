@@ -25,6 +25,13 @@ NOISE_UNITS = {
     "thank you",
 }
 
+SUPERSESSION_MARKERS = (
+    "вместо",
+    "заменили",
+    "instead",
+    "replaced",
+)
+
 PRIORITY_RULES = (
     (
         5,
@@ -152,7 +159,7 @@ class RuleBasedComposer:
         return self._compose(existing, new)
 
     def _compose(self, existing_units, new_units):
-        units = self._deduplicate(existing_units + new_units)
+        units = self._revise(existing_units, new_units)
         meaningful = [unit for unit in units if not unit["noise"]]
 
         if meaningful:
@@ -229,20 +236,69 @@ class RuleBasedComposer:
 
         return units
 
-    def _deduplicate(self, units):
+    def _revise(self, existing_units, new_units):
         result = []
-        seen = set()
 
-        for global_index, unit in enumerate(units):
+        for unit in existing_units:
+            self._append_unique(result, unit)
+
+        for unit in new_units:
             key = self._normalize(unit["text"])
-            if key in seen:
+
+            if any(marker in key for marker in SUPERSESSION_MARKERS):
+                result = [
+                    current
+                    for current in result
+                    if not (
+                        current["origin"] == "existing"
+                        and current["category"] == "decision"
+                    )
+                ]
+
+            replacement_indexes = []
+            adds_information = True
+
+            for index, current in enumerate(result):
+                current_key = self._normalize(current["text"])
+
+                if current_key == key:
+                    adds_information = False
+                    break
+
+                if (
+                    current["origin"] == "existing"
+                    and len(current_key) >= 12
+                    and current_key in key
+                ):
+                    replacement_indexes.append(index)
+                    continue
+
+                if (
+                    current["origin"] == "existing"
+                    and len(key) >= 12
+                    and key in current_key
+                ):
+                    adds_information = False
+                    break
+
+            if not adds_information:
                 continue
-            seen.add(key)
-            copy = dict(unit)
-            copy["index"] = global_index
-            result.append(copy)
+
+            for index in reversed(replacement_indexes):
+                result.pop(index)
+
+            self._append_unique(result, unit)
+
+        for global_index, unit in enumerate(result):
+            unit["index"] = global_index
 
         return result
+
+    def _append_unique(self, result, unit):
+        key = self._normalize(unit["text"])
+        if any(self._normalize(item["text"]) == key for item in result):
+            return
+        result.append(dict(unit))
 
     @staticmethod
     def _normalize(text):
@@ -255,10 +311,6 @@ class RuleBasedComposer:
     def _truncate_unit(self, text):
         if len(text) <= self.max_chars:
             return text
-
-        if self.max_chars == 1:
-            return text[:1]
-
         return text[: self.max_chars - 1].rstrip() + "…"
 
     @classmethod
