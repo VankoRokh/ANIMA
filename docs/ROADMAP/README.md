@@ -6,7 +6,7 @@
 показывают этот порядок, а не требуют отдельной платы или модели на каждом шаге.
 
 <!-- AUTO:roadmap:START -->
-**Текущая работа:** Stage 2.1 — Internal State Storage: реализовать отдельную конфигурацию и transactional internal_state.db для текущих значений, причинной истории и lifecycle целей до механики выбора.
+**Текущая работа:** Stage 2.8 — Choice Engine: реализовать deterministic Candidate evaluation с bounded Internal State modifiers и полным score trace, не создавая новые Goal или Candidate.
 
 **Фокус:** 2 — Internal State (InProgress).
 
@@ -191,13 +191,13 @@ performance baseline зафиксирован. Stage 1 завершён; док�
 | Шаг | Результат | Проверка завершения |
 |---|---|---|
 | **2.0 Specification — Complete** | Зафиксированы Goal, четыре baseline state, causal transitions, time dynamics, Choice и Expression; принят ADR-006 | Документация однозначно задаёт границы Stage 2, invariants и отложенные механизмы |
-| **2.1 Internal State Storage** | Версионируемая конфигурация правил и transactional `internal_state.db` для state/goals/history | Schema создаётся/переоткрывается; constraints и transaction rollback защищают текущие значения и историю |
-| **2.2 State History** | Причинный `StateTransition` с `before/delta/after`, source, rule, reason и optional context | Любое контрольное изменение восстанавливается до причины; прямой обход history/state transaction не допускается |
-| **2.3 Goal Model** | Stable Goal с source, priority, status, success criterion, timestamps и resolution reason; `ACTIVE/BLOCKED/COMPLETED/CANCELLED` | Lifecycle и invalid transitions детерминированы; completed/cancelled Goal больше не участвует в выборе |
-| **2.4 State Variables** | `fatigue/uncertainty/frustration/satisfaction`, range/baseline и правила влияния | Clamp/validation работают; каждое состояние имеет отдельную семантику и не дублирует Goal |
-| **2.5 Transition Engine** | Event/result-driven правила с importance и repetition factors там, где они нужны | Одинаковый вход даёт одинаковый delta; high/low importance и repeated success/failure дают ожидаемо различный эффект |
-| **2.6 Time Dynamics** | Инъецируемое время и lazy elapsed-time evaluation для growth/decay/recovery | Частота цикла и restart не меняют итог; uncertainty не decay; остальные временные правила воспроизводимы |
-| **2.7 Goal Progress / Arbitration** | Проверяемый progress/result и объяснимый порядок нескольких активных Goals | Успех требует observation/criterion; blocked/reactivated и конкурирующие Goals дают определённый порядок без self-goal override |
+| **2.1 Internal State Storage — Complete** | Версионируемая конфигурация правил и transactional `internal_state.db` для state/goals/history | Schema создаётся/переоткрывается; constraints и transaction rollback защищают текущие значения и историю |
+| **2.2 State History — Complete** | Причинный `StateTransition` с `before/delta/after`, source, rule, reason и optional context | Любое контрольное изменение восстанавливается до причины; прямой обход history/state transaction не допускается |
+| **2.3 Goal Model — Complete** | Stable Goal с source, priority, status, success criterion, timestamps и resolution reason; `ACTIVE/BLOCKED/COMPLETED/CANCELLED` | Lifecycle и invalid transitions детерминированы; completed/cancelled Goal больше не участвует в выборе |
+| **2.4 State Variables — Complete** | `fatigue/uncertainty/frustration/satisfaction`, range/baseline и правила влияния | Clamp/validation работают; каждое состояние имеет отдельную семантику и не дублирует Goal |
+| **2.5 Transition Engine — Complete** | Event/result-driven правила с importance и repetition factors там, где они нужны | Одинаковый вход даёт одинаковый delta; high/low importance и repeated success/failure дают ожидаемо различный эффект |
+| **2.6 Time Dynamics — Complete** | Инъецируемое время и lazy elapsed-time evaluation для growth/decay/recovery | Частота цикла и restart не меняют итог; uncertainty не decay; остальные временные правила воспроизводимы |
+| **2.7 Goal Progress / Arbitration — Complete** | Проверяемый progress/result и объяснимый порядок нескольких активных Goals | Успех требует observation/criterion; blocked/reactivated и конкурирующие Goals дают определённый порядок без self-goal override |
 | **2.8 Choice Engine** | Candidates получают base evaluation и ограниченные state modifiers с score trace | Neutral/altered state меняет ожидаемый выбор; ни один modifier не имеет неограниченного веса и не создаёт новый Candidate |
 | **2.9 Expression Adapter** | Internal State → зависимый ExpressionProfile | Tone/voice/visual profile меняется от state, но Expression сам не меняет Internal State без отдельного правила |
 | **2.10 Runtime Integration** | Полная цепочка `Event/Result → State/Goal → Candidates → Choice → Trace` в headless Runtime | Scenario snapshot показывает Goals, state, transitions, component scores и выбранный Candidate |

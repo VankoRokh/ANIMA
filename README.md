@@ -19,7 +19,7 @@ ANIMA — исследовательский проект модульного �
 
 Текущий фокус: **2 — Internal State** (InProgress).
 
-Stage 2.1 — Internal State Storage: реализовать отдельную конфигурацию и transactional internal_state.db для текущих значений, причинной истории и lifecycle целей до механики выбора.
+Stage 2.8 — Choice Engine: реализовать deterministic Candidate evaluation с bounded Internal State modifiers и полным score trace, не создавая новые Goal или Candidate.
 
 [Этапы и критерии](docs/ROADMAP/README.md).
 <!-- AUTO:summary:END -->
