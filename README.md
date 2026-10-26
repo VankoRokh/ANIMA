@@ -19,7 +19,7 @@ ANIMA — исследовательский проект модульного �
 
 Текущий фокус: **1 — Cognitive Memory** (InProgress).
 
-Stage 1.1 — Event Foundation: расширить Event schema, стабильные IDs, references и валидацию до перехода к SQLite memory store.
+Stage 1.2 — Memory Store: заменить временный memories.jsonl на SQLite memory.db со схемой, транзакциями, индексами и FTS5 baseline.
 
 [Этапы и критерии](docs/ROADMAP/README.md).
 <!-- AUTO:summary:END -->
