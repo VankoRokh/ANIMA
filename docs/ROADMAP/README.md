@@ -6,7 +6,7 @@
 показывают этот порядок, а не требуют отдельной платы или модели на каждом шаге.
 
 <!-- AUTO:roadmap:START -->
-**Текущая работа:** Stage 1.11 — Stage Validation: прогнать единый canonical corpus из 30–100 Events через Memory, Knowledge, Retrieval, Context, provenance и restart/replay с заранее заданными проверяемыми результатами.
+**Текущая работа:** Stage 1.12 — Performance Baseline: измерить Event append, Memory create/update, Entity/Knowledge lookup, FTS, 1-hop Relations, FAST/DEEP Context, batch processing, CPU, peak RAM и storage scaling на синтетических 1k/10k/100k данных без преждевременных SLA.
 
 **Фокус:** 1 — Cognitive Memory (InProgress).
 
@@ -90,7 +90,7 @@ Memories/Knowledge/Entities/Relations/History и состояние обрабо
 | **1.8 Retrieval — Complete** | ID/filters/entities/FTS/relations/ranking, сначала дешёвые и объяснимые методы | Заранее размеченные query возвращают обязательные IDs в заданном top-k; [TV-0011](../TESTING/Results/TV-0011.md) |
 | **1.9 Context Builder — Complete** | Структурированный `ContextBundle` с `knowledge[]/memories[]/events[]`, reason и budget | `max_items/max_chars` соблюдаются; разные consumer policies дают воспроизводимый ограниченный контекст; [TV-0012](../TESTING/Results/TV-0012.md) |
 | **1.10 Recovery / Idempotency — Complete** | `event_processing` и безопасное повторение операций после crash | Повтор одного Event не создаёт дубликаты; зависшая обработка обнаруживается и восстанавливается; [TV-0013](../TESTING/Results/TV-0013.md) |
-| **1.11 Stage Validation** | End-to-end corpus примерно 30–100 Events с ожидаемыми Memories/Knowledge/Relations/Context | Полный сценарий проходит после restart и сохраняет provenance, статусы и retrieval |
+| **1.11 Stage Validation — Complete** | End-to-end corpus примерно 30–100 Events с ожидаемыми Memories/Knowledge/Relations/Context | 37-Event corpus проходит после restart/replay и сохраняет provenance, статусы, Retrieval и bounded Context; [TV-0014](../TESTING/Results/TV-0014.md) |
 | **1.12 Performance Baseline** | Измерены latency/CPU/RAM/storage на синтетических 1k/10k/100k данных | Результаты записаны без преждевременных SLA и оптимизаций |
 
 ### Правила Memory Processor
@@ -140,18 +140,17 @@ Knowledge создаётся из закрытого подтверждённо�
 
 ### Валидация и доказательства
 
-Начальный canonical corpus для разработки — примерно 10–20 Events; к финальной
-валидации расширяется до 30–100. Он включает продолжение одного эпизода,
-независимые эпизоды, шум, повтор, procedural memory, связанные Entities,
-решение, противоречие, Knowledge challenge/confirmation или supersession,
-restart и failed processing. Для corpus заранее задаются ожидаемые Memories,
-Knowledge, Relations и query → expected IDs.
+Начальный canonical corpus для разработки — примерно 10–20 Events; финальная
+валидация Stage 1.11 использует 37 raw Events в 11 сессиях. Corpus включает
+продолжение эпизодов, независимые темы, tool Event и procedural Memory, связанные
+Entities, решение, противоречие, Knowledge challenge/supersession, restart/replay,
+Retrieval и FAST/DEEP Context с provenance до raw Events.
 
 Обязательные свойства: 100% обязательных expected IDs находятся в заданном top-k;
 у 100% возвращаемых контрольных записей валидный provenance; budget соблюдается;
 повторная обработка не размножает данные; restart/recovery сохраняют IDs и выборку;
 invalid transition, dangling/missing source и transaction failure дают определённую
-ошибку. Показательный итог Stage сохраняется по правилам [Testing](../TESTING/README.md).
+ошибку. Функциональный end-to-end baseline подтверждён [TV-0014](../TESTING/Results/TV-0014.md).
 
 Performance на Stage 1 только измеряется: Event append, Memory create/update,
 Entity/Knowledge lookup, FTS, 1-hop relation, Context Builder, batch processing,
