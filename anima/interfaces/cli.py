@@ -37,8 +37,8 @@ def _print_status(
 
     for stored_memory in memory.last(3):
         print(
-            f"- [{stored_memory['timestamp']}] "
-            f"{stored_memory['source']}: "
+            f"- [{stored_memory['created_at']}] "
+            f"{stored_memory['type']}/{stored_memory['domain']}: "
             f"{stored_memory['content']}"
         )
 
