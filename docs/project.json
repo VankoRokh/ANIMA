@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "current_stage": "2",
-  "focus": "Stage 2.8 — Choice Engine: реализовать deterministic Candidate evaluation с bounded Internal State modifiers и полным score trace, не создавая новые Goal или Candidate.",
+  "focus": "Stage 2.13 — Stage Validation: пройти canonical end-to-end scenarios для Goals, четырёх Internal State, Choice, time dynamics, Expression и restart/replay, подтвердить полную causal traceability и регрессию предыдущих этапов.",
   "stages": [
     {"id": "D0", "title": "Documentation", "status": "Complete", "depends_on": [], "outcome": "Контекст и процедуры работы восстанавливаются из репозитория"},
     {"id": "0", "title": "Foundation", "status": "Complete", "depends_on": ["D0"], "outcome": "Перенос сохраняет идентичность, историю и возможность продолжения"},

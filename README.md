@@ -19,7 +19,7 @@ ANIMA — исследовательский проект модульного �
 
 Текущий фокус: **2 — Internal State** (InProgress).
 
-Stage 2.8 — Choice Engine: реализовать deterministic Candidate evaluation с bounded Internal State modifiers и полным score trace, не создавая новые Goal или Candidate.
+Stage 2.13 — Stage Validation: пройти canonical end-to-end scenarios для Goals, четырёх Internal State, Choice, time dynamics, Expression и restart/replay, подтвердить полную causal traceability и регрессию предыдущих этапов.
 
 [Этапы и критерии](docs/ROADMAP/README.md).
 <!-- AUTO:summary:END -->

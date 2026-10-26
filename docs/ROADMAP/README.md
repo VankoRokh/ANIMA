@@ -6,7 +6,7 @@
 показывают этот порядок, а не требуют отдельной платы или модели на каждом шаге.
 
 <!-- AUTO:roadmap:START -->
-**Текущая работа:** Stage 2.8 — Choice Engine: реализовать deterministic Candidate evaluation с bounded Internal State modifiers и полным score trace, не создавая новые Goal или Candidate.
+**Текущая работа:** Stage 2.13 — Stage Validation: пройти canonical end-to-end scenarios для Goals, четырёх Internal State, Choice, time dynamics, Expression и restart/replay, подтвердить полную causal traceability и регрессию предыдущих этапов.
 
 **Фокус:** 2 — Internal State (InProgress).
 
@@ -198,11 +198,11 @@ performance baseline зафиксирован. Stage 1 завершён; док�
 | **2.5 Transition Engine — Complete** | Event/result-driven правила с importance и repetition factors там, где они нужны | Одинаковый вход даёт одинаковый delta; high/low importance и repeated success/failure дают ожидаемо различный эффект |
 | **2.6 Time Dynamics — Complete** | Инъецируемое время и lazy elapsed-time evaluation для growth/decay/recovery | Частота цикла и restart не меняют итог; uncertainty не decay; остальные временные правила воспроизводимы |
 | **2.7 Goal Progress / Arbitration — Complete** | Проверяемый progress/result и объяснимый порядок нескольких активных Goals | Успех требует observation/criterion; blocked/reactivated и конкурирующие Goals дают определённый порядок без self-goal override |
-| **2.8 Choice Engine** | Candidates получают base evaluation и ограниченные state modifiers с score trace | Neutral/altered state меняет ожидаемый выбор; ни один modifier не имеет неограниченного веса и не создаёт новый Candidate |
-| **2.9 Expression Adapter** | Internal State → зависимый ExpressionProfile | Tone/voice/visual profile меняется от state, но Expression сам не меняет Internal State без отдельного правила |
-| **2.10 Runtime Integration** | Полная цепочка `Event/Result → State/Goal → Candidates → Choice → Trace` в headless Runtime | Scenario snapshot показывает Goals, state, transitions, component scores и выбранный Candidate |
-| **2.11 Recovery / Idempotency** | Crash/restart/replay не дублируют transitions и не создают скрытый time drift | Повтор одного source не применяет эффект дважды; recovery сохраняет state/history/goals согласованными |
-| **2.12 Decision Performance** | Baseline latency/CPU/RAM для Choice с ростом Candidates и диагностикой | Измерены 2/10/100 Candidates: base, state modifiers и modifiers+trace/history; SLA пока не задаётся |
+| **2.8 Choice Engine — Complete** | Candidates получают base evaluation и ограниченные state modifiers с score trace | Neutral/altered state меняет ожидаемый выбор; ни один modifier не имеет неограниченного веса и не создаёт новый Candidate |
+| **2.9 Expression Adapter — Complete** | Internal State → зависимый ExpressionProfile | Tone/voice/visual profile меняется от state, но Expression сам не меняет Internal State без отдельного правила |
+| **2.10 Runtime Integration — Complete** | Полная цепочка `Event/Result → State/Goal → Candidates → Choice → Trace` в headless Runtime | Scenario snapshot показывает Goals, state, transitions, component scores и выбранный Candidate |
+| **2.11 Recovery / Idempotency — Complete** | Crash/restart/replay не дублируют transitions и не создают скрытый time drift | Повтор одного source не применяет эффект дважды; recovery сохраняет state/history/goals согласованными |
+| **2.12 Decision Performance — Complete** | Baseline latency/CPU/RAM для Choice с ростом Candidates и диагностикой | Измерены 2/10/100 Candidates: base, state modifiers и modifiers+trace/history; baseline [TV-0016](../TESTING/Results/TV-0016.md), SLA не задаётся |
 | **2.13 Stage Validation** | End-to-end canonical scenarios для четырёх states, Goals, Choice, time, restart и Expression | Все ожидаемые направления изменений/выбора воспроизводимы, causal history полна и регрессия предыдущих этапов зелёная |
 
 ### Goal и регулирующий слой
@@ -288,8 +288,10 @@ history. Для каждого контрольного Choice trace показ�
 
 Decision performance измеряется отдельно от общей Runtime latency минимум для
 2/10/100 Candidates в трёх режимах: base evaluation, state modifiers и modifiers
-с trace/history. Значение фиксируется как baseline без SLA для будущего Fast,
-Agent и аппаратного переноса.
+с trace/history. Baseline [TV-0016](../TESTING/Results/TV-0016.md) показал для 100
+Candidates p95 0.0211 ms на base ranking, 0.0993 ms на state modifiers и 2.0092 ms
+на production Choice с полным trace/history. Значения сохранены без SLA для будущего
+Fast, Agent и аппаратного переноса.
 
 **Definition of Done.** На фиксированных end-to-end scenarios Goals имеют корректный
 lifecycle и проверяемые результаты; четыре baseline state изменяются только через
