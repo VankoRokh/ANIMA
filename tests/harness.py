@@ -6,6 +6,7 @@ from anima.core.state import AnimaState
 from anima.memory.composer import RuleBasedComposer
 from anima.memory.episodic import EpisodicMemory
 from anima.memory.event_log import EventLog
+from anima.memory.event_processing import EventProcessingCoordinator
 from anima.memory.link_store import LinkStore
 from anima.memory.memory_store import MemoryStore
 from anima.memory.processor import MemoryProcessor
@@ -54,6 +55,12 @@ class AnimaTestHarness:
             composer=self.memory_composer,
             trace=self.trace,
         )
+        self.event_processing = EventProcessingCoordinator(
+            memory_store=self.memory_store,
+            memory_processor=self.memory_processor,
+            event_log=self.event_log,
+            trace=self.trace,
+        )
         self.metrics = DiagnosticMetrics()
 
         self.runtime = Runtime(
@@ -63,6 +70,7 @@ class AnimaTestHarness:
             event_log=self.event_log,
             memory=self.memory,
             memory_processor=self.memory_processor,
+            event_processing=self.event_processing,
             trace=self.trace,
             metrics=self.metrics,
         )
