@@ -1,8 +1,11 @@
 import re
 from datetime import datetime
+from uuid import uuid4
 
 from anima.core.event_bus import Event
 from anima.memory.composer import RuleBasedComposer
+from anima.memory.link_store import RELATION_ID_PREFIX
+from anima.memory.memory_store import MEMORY_ID_PREFIX
 
 
 TOKEN_PATTERN = re.compile(r"[^\W_]+", re.UNICODE)
@@ -32,7 +35,13 @@ class MemoryProcessor:
         self.composer = composer or RuleBasedComposer()
         self.trace = trace
 
-    def process_event(self, event):
+    def process_event(
+        self,
+        event,
+        *,
+        connection=None,
+        trace_result=True,
+    ):
         if not isinstance(event, Event):
             raise ValueError("MemoryProcessor requires an Event")
 
@@ -43,22 +52,26 @@ class MemoryProcessor:
                 action="skip",
                 reasons=[selection_reason],
             )
-            self._trace_result(result)
+            if trace_result:
+                self._trace_result(result)
             return result
 
         entity_ids = self._event_entity_ids(event)
         candidate = self._best_candidate(event, text, entity_ids)
 
         if candidate is None:
-            memory = self._create_memory(event, text)
-            self._link_entities(memory["id"], entity_ids)
-            result = self._result(
-                event,
-                action="create",
-                memory_id=memory["id"],
-                reasons=["association:no_candidate"],
+            result = self._apply_with_connection(
+                connection,
+                lambda active: self._apply_create(
+                    active,
+                    event,
+                    text,
+                    entity_ids,
+                    candidate=None,
+                ),
             )
-            self._trace_result(result)
+            if trace_result:
+                self._trace_result(result)
             return result
 
         semantic_signal = (
@@ -72,63 +85,158 @@ class MemoryProcessor:
         )
 
         if update_allowed:
-            memory = self._update_memory(
-                candidate["memory"],
-                event,
-                text,
+            result = self._apply_with_connection(
+                connection,
+                lambda active: self._apply_update(
+                    active,
+                    event,
+                    text,
+                    entity_ids,
+                    candidate,
+                ),
             )
-            self._link_entities(memory["id"], entity_ids)
-            result = self._result(
-                event,
-                action="update",
-                memory_id=memory["id"],
-                candidate_id=candidate["memory"]["id"],
-                score=candidate["score"],
-                reasons=candidate["reasons"],
-            )
-            self._trace_result(result)
+            if trace_result:
+                self._trace_result(result)
             return result
 
         if (
             semantic_signal
             and candidate["score"] >= MEDIUM_ASSOCIATION_SCORE
         ):
-            memory = self._create_memory(event, text)
-            self._link_entities(memory["id"], entity_ids)
-            relation = self.link_store.create_relation(
-                source_kind="memory",
-                source_id=memory["id"],
-                relation_type="related_to",
-                target_kind="memory",
-                target_id=candidate["memory"]["id"],
-                created_at=event.timestamp,
+            result = self._apply_with_connection(
+                connection,
+                lambda active: self._apply_create_related(
+                    active,
+                    event,
+                    text,
+                    entity_ids,
+                    candidate,
+                ),
             )
-            result = self._result(
-                event,
-                action="create_related",
-                memory_id=memory["id"],
-                candidate_id=candidate["memory"]["id"],
-                relation_id=relation["id"],
-                score=candidate["score"],
-                reasons=candidate["reasons"],
-            )
-            self._trace_result(result)
+            if trace_result:
+                self._trace_result(result)
             return result
 
-        memory = self._create_memory(event, text)
-        self._link_entities(memory["id"], entity_ids)
-        result = self._result(
+        result = self._apply_with_connection(
+            connection,
+            lambda active: self._apply_create(
+                active,
+                event,
+                text,
+                entity_ids,
+                candidate=candidate,
+            ),
+        )
+        if trace_result:
+            self._trace_result(result)
+        return result
+
+    def _apply_with_connection(self, connection, operation):
+        if connection is not None:
+            return operation(connection)
+
+        with self.memory_store.transaction() as active:
+            return operation(active)
+
+    def _apply_create(
+        self,
+        connection,
+        event,
+        text,
+        entity_ids,
+        *,
+        candidate,
+    ):
+        memory = self._create_memory_tx(connection, event, text)
+        self._link_entities_tx(
+            connection,
+            memory["id"],
+            entity_ids,
+            event.timestamp,
+        )
+
+        reasons = ["association:no_candidate"]
+        candidate_id = None
+        score = 0
+        if candidate is not None:
+            candidate_id = candidate["memory"]["id"]
+            score = candidate["score"]
+            reasons = candidate["reasons"] + [
+                "association:insufficient_semantic_signal"
+            ]
+
+        return self._result(
             event,
             action="create",
             memory_id=memory["id"],
+            candidate_id=candidate_id,
+            score=score,
+            reasons=reasons,
+        )
+
+    def _apply_update(
+        self,
+        connection,
+        event,
+        text,
+        entity_ids,
+        candidate,
+    ):
+        memory = self._update_memory_tx(
+            connection,
+            candidate["memory"],
+            event,
+            text,
+        )
+        self._link_entities_tx(
+            connection,
+            memory["id"],
+            entity_ids,
+            event.timestamp,
+        )
+        return self._result(
+            event,
+            action="update",
+            memory_id=memory["id"],
             candidate_id=candidate["memory"]["id"],
             score=candidate["score"],
-            reasons=candidate["reasons"] + [
-                "association:insufficient_semantic_signal"
-            ],
+            reasons=candidate["reasons"],
         )
-        self._trace_result(result)
-        return result
+
+    def _apply_create_related(
+        self,
+        connection,
+        event,
+        text,
+        entity_ids,
+        candidate,
+    ):
+        memory = self._create_memory_tx(connection, event, text)
+        self._link_entities_tx(
+            connection,
+            memory["id"],
+            entity_ids,
+            event.timestamp,
+        )
+        relation = self._insert_relation_tx(
+            connection,
+            source_kind="memory",
+            source_id=memory["id"],
+            relation_type="related_to",
+            target_kind="memory",
+            target_id=candidate["memory"]["id"],
+            source_memory_id=memory["id"],
+            created_at=event.timestamp,
+        )
+        return self._result(
+            event,
+            action="create_related",
+            memory_id=memory["id"],
+            candidate_id=candidate["memory"]["id"],
+            relation_id=relation["id"],
+            score=candidate["score"],
+            reasons=candidate["reasons"],
+        )
 
     @staticmethod
     def _select(event):
@@ -316,62 +424,176 @@ class MemoryProcessor:
 
         return entity_ids
 
-    def _link_entities(self, memory_id, entity_ids):
+    def _create_memory_tx(self, connection, event, text):
+        public_id = f"{MEMORY_ID_PREFIX}{uuid4()}"
+        composition = self.composer.compose_create(text)
+        connection.execute(
+            """
+            INSERT INTO memories(
+                public_id, type, domain, status, content, importance,
+                created_at, updated_at, closed_at, merged_into
+            ) VALUES (?, 'episodic', 'user', 'open', ?, 1, ?, ?, NULL, NULL)
+            """,
+            (
+                public_id,
+                composition["content"],
+                event.timestamp,
+                event.timestamp,
+            ),
+        )
+        connection.execute(
+            """
+            INSERT INTO memory_sources(memory_id, event_id)
+            VALUES (?, ?)
+            """,
+            (public_id, event.event_id),
+        )
+        row = connection.execute(
+            "SELECT * FROM memories WHERE public_id = ?",
+            (public_id,),
+        ).fetchone()
+        return self.memory_store._row_to_memory(row)
+
+    def _update_memory_tx(self, connection, memory, event, text):
+        composition = self.composer.compose_update(
+            memory["content"],
+            text,
+        )
+        connection.execute(
+            """
+            UPDATE memories
+            SET content = ?, updated_at = ?
+            WHERE public_id = ?
+            """,
+            (
+                composition["content"],
+                event.timestamp,
+                memory["id"],
+            ),
+        )
+        connection.execute(
+            """
+            INSERT INTO memory_sources(memory_id, event_id)
+            VALUES (?, ?)
+            """,
+            (memory["id"], event.event_id),
+        )
+        row = connection.execute(
+            "SELECT * FROM memories WHERE public_id = ?",
+            (memory["id"],),
+        ).fetchone()
+        return self.memory_store._row_to_memory(row)
+
+    def _link_entities_tx(
+        self,
+        connection,
+        memory_id,
+        entity_ids,
+        created_at,
+    ):
         if not entity_ids:
             return
 
-        existing = self._memory_entities(memory_id)
+        rows = connection.execute(
+            """
+            SELECT target_id FROM relations
+            WHERE source_kind = 'memory' AND source_id = ?
+              AND relation_type = 'about' AND target_kind = 'entity'
+              AND valid_until IS NULL
+            """,
+            (memory_id,),
+        ).fetchall()
+        existing = {row["target_id"] for row in rows}
+
         for entity_id in entity_ids:
             if entity_id in existing:
                 continue
-            self.link_store.create_relation(
+            self._insert_relation_tx(
+                connection,
                 source_kind="memory",
                 source_id=memory_id,
                 relation_type="about",
                 target_kind="entity",
                 target_id=entity_id,
+                source_memory_id=memory_id,
+                created_at=created_at,
             )
+            existing.add(entity_id)
 
-    def _create_memory(self, event, text):
-        composition = self.composer.compose_create(text)
-        return self.memory_store.create_memory(
-            memory_type="episodic",
-            domain="user",
-            content=composition["content"],
-            status="open",
-            importance=1,
-            created_at=event.timestamp,
-            source_event_id=event.event_id,
+    @staticmethod
+    def _insert_relation_tx(
+        connection,
+        *,
+        source_kind,
+        source_id,
+        relation_type,
+        target_kind,
+        target_id,
+        source_memory_id,
+        created_at,
+    ):
+        duplicate = connection.execute(
+            """
+            SELECT * FROM relations
+            WHERE source_kind = ? AND source_id = ?
+              AND relation_type = ?
+              AND target_kind = ? AND target_id = ?
+              AND source_memory_id = ?
+              AND valid_until IS NULL
+            """,
+            (
+                source_kind,
+                source_id,
+                relation_type,
+                target_kind,
+                target_id,
+                source_memory_id,
+            ),
+        ).fetchone()
+        if duplicate is not None:
+            return {
+                "id": duplicate["public_id"],
+                "source_kind": duplicate["source_kind"],
+                "source_id": duplicate["source_id"],
+                "type": duplicate["relation_type"],
+                "target_kind": duplicate["target_kind"],
+                "target_id": duplicate["target_id"],
+                "created_at": duplicate["created_at"],
+                "valid_until": duplicate["valid_until"],
+                "source_memory_id": duplicate["source_memory_id"],
+            }
+
+        public_id = f"{RELATION_ID_PREFIX}{uuid4()}"
+        connection.execute(
+            """
+            INSERT INTO relations(
+                public_id, source_kind, source_id, relation_type,
+                target_kind, target_id, created_at, valid_until,
+                source_memory_id
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, NULL, ?)
+            """,
+            (
+                public_id,
+                source_kind,
+                source_id,
+                relation_type,
+                target_kind,
+                target_id,
+                created_at,
+                source_memory_id,
+            ),
         )
-
-    def _update_memory(self, memory, event, text):
-        composition = self.composer.compose_update(
-            memory["content"],
-            text,
-        )
-
-        with self.memory_store.transaction() as connection:
-            connection.execute(
-                """
-                UPDATE memories
-                SET content = ?, updated_at = ?
-                WHERE public_id = ?
-                """,
-                (
-                    composition["content"],
-                    event.timestamp,
-                    memory["id"],
-                ),
-            )
-            connection.execute(
-                """
-                INSERT INTO memory_sources(memory_id, event_id)
-                VALUES (?, ?)
-                """,
-                (memory["id"], event.event_id),
-            )
-
-        return self.memory_store.get_memory(memory["id"])
+        return {
+            "id": public_id,
+            "source_kind": source_kind,
+            "source_id": source_id,
+            "type": relation_type,
+            "target_kind": target_kind,
+            "target_id": target_id,
+            "created_at": created_at,
+            "valid_until": None,
+            "source_memory_id": source_memory_id,
+        }
 
     @staticmethod
     def _tokens(text):
