@@ -5,6 +5,8 @@ import sys
 import tarfile
 from pathlib import Path
 
+from anima.memory.memory_store import MemoryStore
+
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 
@@ -65,6 +67,13 @@ def test_backup_recovery_preserves_history_and_memory(
     assert first_state["session"] == 1
     assert first_state["status"] == "sleeping"
     assert first_state["events_processed"] == 3
+    assert (original / "memory.db").exists()
+    assert not (original / "memories.jsonl").exists()
+
+    first_store = MemoryStore(original / "memory.db")
+    first_memories = first_store.list_memories()
+    assert len(first_memories) == 1
+    assert first_memories[0]["content"] == "Проверка ANIMA"
 
     # Создаём резервную копию каталога данных.
     backup = tmp_path / "instance.tar.gz"
@@ -109,9 +118,8 @@ def test_backup_recovery_preserves_history_and_memory(
         restored / "events.jsonl"
     )
 
-    memories = read_jsonl(
-        restored / "memories.jsonl"
-    )
+    restored_store = MemoryStore(restored / "memory.db")
+    memories = restored_store.list_memories()
 
     assert final_state["session"] == 2
     assert final_state["status"] == "sleeping"
@@ -155,10 +163,11 @@ def test_backup_recovery_preserves_history_and_memory(
 
     assert len(user_inputs) == 2
 
-    # А долговременная selected memory содержит
-    # только содержательный ввод первой сессии.
+    # А SQLite memory содержит только содержательный ввод первой сессии.
     assert len(memories) == 1
-    assert (
-        memories[0]["content"]["text"]
-        == "Проверка ANIMA"
-    )
+    assert memories[0]["content"] == "Проверка ANIMA"
+    assert memories[0]["type"] == "episodic"
+    assert memories[0]["domain"] == "user"
+    assert restored_store.source_events(
+        memories[0]["id"]
+    ) == [user_inputs[0]["id"]]
