@@ -15,4 +15,5 @@
 | [TV-0006 — Stage 1.3 Entities Relations Provenance](TV-0006.md) | 2026-10-26 | [1](../../ROADMAP/README.md#stage-1) | Passed | [b24fbab](https://github.com/VankoRokh/ANIMA/commit/b24fbab9059ac95300c59c0c4866e9d966d85f12) |
 | [TV-0007 — Stage 1.4 Memory Processor](TV-0007.md) | 2026-10-26 | [1](../../ROADMAP/README.md#stage-1) | Passed | [6d580c8](https://github.com/VankoRokh/ANIMA/commit/6d580c810d9c69e43f130e78636920567397b175) |
 | [TV-0008 — Stage 1.5 Memory Composer](TV-0008.md) | 2026-10-26 | [1](../../ROADMAP/README.md#stage-1) | Passed | [81c822c](https://github.com/VankoRokh/ANIMA/commit/81c822c13ff460a7a9befff24b7a1dba6e2a6d68) |
+| [TV-0009 — Stage 1.6 Merge and History](TV-0009.md) | 2026-10-26 | [1](../../ROADMAP/README.md#stage-1) | Passed | [e719738](https://github.com/VankoRokh/ANIMA/commit/e71973863fb41204bdf2a547b710d69cbef234cb) |
 <!-- AUTO:results:END -->
