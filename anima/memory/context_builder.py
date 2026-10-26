@@ -109,25 +109,20 @@ class ContextBuilder:
         if retrieval_response["stats"]["candidates"] > len(candidates):
             bundle["truncated"] = True
 
-        for candidate in knowledge_candidates:
+        for candidate in self._selection_order(candidates):
+            kind = candidate["kind"]
+            bucket = "knowledge" if kind == "knowledge" else "memories"
             entry = self._context_entry(candidate)
             if self._try_add(
                 bundle,
-                "knowledge",
+                bucket,
                 entry,
-                self._record_text("knowledge", candidate["record"]),
+                self._record_text(kind, candidate["record"]),
             ):
-                bundle["selection_stats"]["selected_knowledge"] += 1
-
-        for candidate in memory_candidates:
-            entry = self._context_entry(candidate)
-            if self._try_add(
-                bundle,
-                "memories",
-                entry,
-                self._record_text("memory", candidate["record"]),
-            ):
-                bundle["selection_stats"]["selected_memories"] += 1
+                if kind == "knowledge":
+                    bundle["selection_stats"]["selected_knowledge"] += 1
+                else:
+                    bundle["selection_stats"]["selected_memories"] += 1
 
         if policy["include_events"]:
             event_candidates = self._events_for_selected(bundle)
@@ -182,6 +177,28 @@ class ContextBuilder:
                 "Context Builder owns retrieval policy fields: " + names
             )
         return dict(options)
+
+    @staticmethod
+    def _selection_order(candidates):
+        exact = [
+            item
+            for item in candidates
+            if "exact_id:+100" in item["reasons"]
+        ]
+        exact_keys = {(item["kind"], item["id"]) for item in exact}
+        knowledge = [
+            item
+            for item in candidates
+            if item["kind"] == "knowledge"
+            and (item["kind"], item["id"]) not in exact_keys
+        ]
+        memories = [
+            item
+            for item in candidates
+            if item["kind"] == "memory"
+            and (item["kind"], item["id"]) not in exact_keys
+        ]
+        return exact + knowledge + memories
 
     @staticmethod
     def _context_entry(candidate):
@@ -254,12 +271,16 @@ class ContextBuilder:
                     f"provenance:memory:{memory_id}"
                 )
 
+        ordered = sorted(
+            event_map.values(),
+            key=lambda item: (
+                item["record"]["timestamp"],
+                item["record"]["id"],
+            ),
+        )
         return [
-            self._event_entry(
-                event_map[event_id]["record"],
-                event_map[event_id]["reasons"],
-            )
-            for event_id in sorted(event_map)
+            self._event_entry(item["record"], item["reasons"])
+            for item in ordered
         ]
 
     @staticmethod
