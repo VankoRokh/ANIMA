@@ -19,7 +19,7 @@ ANIMA — исследовательский проект модульного �
 
 Текущий фокус: **1 — Cognitive Memory** (InProgress).
 
-Stage 1.10 — Recovery / Idempotency: активировать persistent event_processing, атомарно связывать processing-status с Memory effects, безопасно повторять interrupted/failed Events и восстанавливать state counter без дубликатов.
+Stage 1.11 — Stage Validation: прогнать единый canonical corpus из 30–100 Events через Memory, Knowledge, Retrieval, Context, provenance и restart/replay с заранее заданными проверяемыми результатами.
 
 [Этапы и критерии](docs/ROADMAP/README.md).
 <!-- AUTO:summary:END -->
