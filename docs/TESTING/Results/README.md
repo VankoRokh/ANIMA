@@ -20,4 +20,5 @@
 | [TV-0011 — Stage 1.8 Retrieval](TV-0011.md) | 2026-10-26 | [1](../../ROADMAP/README.md#stage-1) | Passed | [ac2be3d](https://github.com/VankoRokh/ANIMA/commit/ac2be3d46ea095f59893fb22a900606dbdd52a34) |
 | [TV-0012 — Stage 1.9 Context Builder](TV-0012.md) | 2026-10-26 | [1](../../ROADMAP/README.md#stage-1) | Passed | [9f7ce82](https://github.com/VankoRokh/ANIMA/commit/9f7ce827f14343cb28a1e9e2c230168c735f888e) |
 | [TV-0013 — Stage 1.10 Recovery and Idempotency](TV-0013.md) | 2026-10-26 | [1](../../ROADMAP/README.md#stage-1) | Passed | [37ca51b](https://github.com/VankoRokh/ANIMA/commit/37ca51b26b05ae7496ce15f928f987be4aa911e2) |
+| [TV-0014 — Stage 1.11 End-to-End Validation](TV-0014.md) | 2026-10-26 | [1](../../ROADMAP/README.md#stage-1) | Passed | [dc718d9](https://github.com/VankoRokh/ANIMA/commit/dc718d995a12aca90bae38f2640204ddd0df4548) |
 <!-- AUTO:results:END -->
