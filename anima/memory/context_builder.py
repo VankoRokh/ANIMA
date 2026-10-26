@@ -170,7 +170,7 @@ class ContextBuilder:
             return {}
         if not isinstance(options, dict):
             raise ValueError("Context retrieval_options must be a dict")
-        forbidden = {"top_k", "relation_hops"} & set(options)
+        forbidden = {"query", "top_k", "relation_hops"} & set(options)
         if forbidden:
             names = ", ".join(sorted(forbidden))
             raise ValueError(
