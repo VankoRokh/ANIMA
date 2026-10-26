@@ -1,5 +1,6 @@
 from anima.config.paths import get_data_dir
 from anima.core.identity import Identity
+from anima.memory.composer import RuleBasedComposer
 from anima.memory.memory_store import MemoryStore
 from anima.memory.link_store import LinkStore
 from anima.memory.processor import MemoryProcessor
@@ -36,10 +37,12 @@ def main():
         memory_store
     )
     trace = DiagnosticTrace()
+    memory_composer = RuleBasedComposer()
     memory_processor = MemoryProcessor(
         memory_store=memory_store,
         event_log=event_log,
         link_store=link_store,
+        composer=memory_composer,
         trace=trace,
     )
     metrics = DiagnosticMetrics()
