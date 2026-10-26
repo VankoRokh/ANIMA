@@ -1,6 +1,6 @@
 class MemoryFilter:
     def is_meaningful(self, event):
-        if event.event_type != "user_input":
+        if event.event_type != "conversation.user":
             return False
 
         if not event.payload:
