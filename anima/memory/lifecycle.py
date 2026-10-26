@@ -1,5 +1,6 @@
 import json
 from datetime import datetime, timezone
+from uuid import uuid4
 
 from anima.memory.composer import RuleBasedComposer
 from anima.memory.memory_store import (
@@ -19,6 +20,15 @@ class MemoryLifecycle:
     @staticmethod
     def _now():
         return datetime.now(timezone.utc).isoformat(timespec="seconds")
+
+    @staticmethod
+    def _parsed_time(value):
+        return datetime.fromisoformat(value)
+
+    @classmethod
+    def _require_not_before(cls, timestamp, reference, label):
+        if cls._parsed_time(timestamp) < cls._parsed_time(reference):
+            raise ValueError(f"{label} cannot be earlier than {reference}")
 
     @staticmethod
     def _history_payload(changes):
@@ -87,6 +97,11 @@ class MemoryLifecycle:
                     "Only OPEN memory can be closed: "
                     f"{memory_id} is {row['status']}"
                 )
+            self._require_not_before(
+                closed_at,
+                row["updated_at"],
+                "Memory closed_at",
+            )
 
             connection.execute(
                 """
@@ -156,6 +171,17 @@ class MemoryLifecycle:
             if source_row["domain"] != target_row["domain"]:
                 raise ValueError("Cannot merge memories with different domains")
 
+            self._require_not_before(
+                merged_at,
+                source_row["updated_at"],
+                "Memory merged_at",
+            )
+            self._require_not_before(
+                merged_at,
+                target_row["updated_at"],
+                "Memory merged_at",
+            )
+
             composition = self.composer.compose_update(
                 target_row["content"],
                 source_row["content"],
@@ -165,14 +191,20 @@ class MemoryLifecycle:
             target_events = {
                 row["event_id"]
                 for row in connection.execute(
-                    "SELECT event_id FROM memory_sources WHERE memory_id = ?",
+                    """
+                    SELECT event_id FROM memory_sources
+                    WHERE memory_id = ? ORDER BY event_id
+                    """,
                     (target_id,),
                 ).fetchall()
             }
             source_events = [
                 row["event_id"]
                 for row in connection.execute(
-                    "SELECT event_id FROM memory_sources WHERE memory_id = ?",
+                    """
+                    SELECT event_id FROM memory_sources
+                    WHERE memory_id = ? ORDER BY event_id
+                    """,
                     (source_id,),
                 ).fetchall()
             ]
@@ -189,6 +221,66 @@ class MemoryLifecycle:
                     VALUES (?, ?)
                     """,
                     (target_id, event_id),
+                )
+
+            target_entities = {
+                row["target_id"]
+                for row in connection.execute(
+                    """
+                    SELECT target_id FROM relations
+                    WHERE source_kind = 'memory'
+                      AND source_id = ?
+                      AND relation_type = 'about'
+                      AND target_kind = 'entity'
+                      AND valid_until IS NULL
+                    ORDER BY row_id
+                    """,
+                    (target_id,),
+                ).fetchall()
+            }
+            source_entities = [
+                row["target_id"]
+                for row in connection.execute(
+                    """
+                    SELECT target_id FROM relations
+                    WHERE source_kind = 'memory'
+                      AND source_id = ?
+                      AND relation_type = 'about'
+                      AND target_kind = 'entity'
+                      AND valid_until IS NULL
+                    ORDER BY row_id
+                    """,
+                    (source_id,),
+                ).fetchall()
+            ]
+            added_entities = [
+                entity_id
+                for entity_id in source_entities
+                if entity_id not in target_entities
+            ]
+
+            for entity_id in added_entities:
+                connection.execute(
+                    """
+                    INSERT INTO relations(
+                        public_id,
+                        source_kind,
+                        source_id,
+                        relation_type,
+                        target_kind,
+                        target_id,
+                        created_at,
+                        valid_until,
+                        source_memory_id
+                    ) VALUES (?, 'memory', ?, 'about', 'entity', ?, ?, NULL, ?)
+                    """,
+                    (
+                        f"rel_{uuid4()}",
+                        target_id,
+                        entity_id,
+                        merged_at,
+                        target_id,
+                    ),
                 )
 
             connection.execute(
@@ -227,6 +319,7 @@ class MemoryLifecycle:
                 changes={
                     "content_after": target_content,
                     "content_before": target_row["content"],
+                    "entity_links_added": added_entities,
                     "source_events_added": added_events,
                 },
             )
@@ -247,12 +340,14 @@ class MemoryLifecycle:
         result = {
             "source": self.memory_store.get_memory(source_id),
             "target": self.memory_store.get_memory(target_id),
+            "entity_links_added": added_entities,
             "source_events_added": added_events,
         }
         self._trace(
             "memory_lifecycle: merge "
             f"source={source_id} target={target_id} "
-            f"events_added={len(added_events)}"
+            f"events_added={len(added_events)} "
+            f"entities_added={len(added_entities)}"
         )
         return result
 
