@@ -19,7 +19,7 @@ ANIMA — исследовательский проект модульного �
 
 Текущий фокус: **1 — Cognitive Memory** (InProgress).
 
-Stage 1.9 — Context Builder: собрать bounded ContextBundle из Retrieval/Provenance с отдельными FAST/DEEP policies, Knowledge-first selection и явными max_items/max_chars budgets.
+Stage 1.10 — Recovery / Idempotency: активировать persistent event_processing, атомарно связывать processing-status с Memory effects, безопасно повторять interrupted/failed Events и восстанавливать state counter без дубликатов.
 
 [Этапы и критерии](docs/ROADMAP/README.md).
 <!-- AUTO:summary:END -->
