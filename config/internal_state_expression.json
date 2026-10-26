@@ -1,0 +1,30 @@
+{
+  "schema_version": 1,
+  "ruleset_version": 1,
+  "axes": {
+    "energy": {
+      "baseline": 0.5,
+      "state": "fatigue",
+      "direction": -1,
+      "weight": 0.5
+    },
+    "caution": {
+      "baseline": 0.0,
+      "state": "uncertainty",
+      "direction": 1,
+      "weight": 0.8
+    },
+    "tension": {
+      "baseline": 0.0,
+      "state": "frustration",
+      "direction": 1,
+      "weight": 0.8
+    },
+    "positive_affect": {
+      "baseline": 0.0,
+      "state": "satisfaction",
+      "direction": 1,
+      "weight": 0.6
+    }
+  }
+}
