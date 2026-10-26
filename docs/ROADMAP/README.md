@@ -6,7 +6,7 @@
 показывают этот порядок, а не требуют отдельной платы или модели на каждом шаге.
 
 <!-- AUTO:roadmap:START -->
-**Текущая работа:** Stage 1.2 — Memory Store: заменить временный memories.jsonl на SQLite memory.db со схемой, транзакциями, индексами и FTS5 baseline.
+**Текущая работа:** Stage 1.4 — Memory Processor: реализовать deterministic Selection и объяснимый Association с CREATE/UPDATE/related decisions на контрольном corpus.
 
 **Фокус:** 1 — Cognitive Memory (InProgress).
 
@@ -81,8 +81,8 @@ Memories/Knowledge/Entities/Relations/History и состояние обрабо
 |---|---|---|
 | **1.0 Specification** | Зафиксированы Event/Memory/Knowledge, Entity/Relation, Processor, Composer, Context Builder, lifecycle и storage baseline | Документация однозначно описывает границы Stage 1 и отложенные механизмы |
 | **1.1 Event Foundation — Complete** | Универсальный Event: stable ID, timestamp, type, source, session_id, payload, references | Валидные/невалидные события, duplicate ID, повреждённая JSONL-строка и restart дают определённый результат; [TV-0004](../TESTING/Results/TV-0004.md) |
-| **1.2 Memory Store** | SQLite `memory.db`, schema, transactions, indexes, FTS5 | CRUD, rollback, reopen, constraints, FTS и базовые relation queries проходят тесты |
-| **1.3 Entities / Relations / Provenance** | Entity aliases, универсальные relations и цепочка `Knowledge → Memory → Event` | Для каждого контрольного объекта происхождение восстанавливается до source Events |
+| **1.2 Memory Store — Complete** | SQLite `memory.db`, schema, transactions, indexes, FTS5 | CRUD, rollback, reopen, constraints, FTS и базовые relation queries проходят тесты; [TV-0005](../TESTING/Results/TV-0005.md) |
+| **1.3 Entities / Relations / Provenance — Complete** | Entity aliases, универсальные relations и цепочка `Knowledge → Memory → Event` | Для каждого контрольного объекта происхождение восстанавливается до source Events; [TV-0006](../TESTING/Results/TV-0006.md) |
 | **1.4 Memory Processor** | Selection и объяснимый Association; `HIGH → UPDATE`, `MEDIUM → CREATE + related_to`, `LOW → CREATE` | На canonical corpus каждый Event попадает в ожидаемый эпизод, причины решения видны в trace |
 | **1.5 Memory Composer** | Заменяемый deterministic `RuleBasedComposer`, ограниченный `content` | CREATE/UPDATE сохраняют решения, результаты, причины, ограничения и открытые вопросы без копирования шума |
 | **1.6 Merge / History** | `OPEN/CLOSED/MERGED`, безопасный Merge и компактная история изменений | Merge не теряет provenance; исходная запись остаётся прослеживаемой; SPLIT не требуется |
