@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "current_stage": "1",
-  "focus": "Stage 1.6 — Merge / History: реализовать OPEN/CLOSED/MERGED lifecycle, безопасный Merge с сохранением provenance и компактную историю изменений.",
+  "focus": "Stage 1.7 — Knowledge Layer: реализовать Knowledge lifecycle с подтверждёнными source Memories, challenge/reconfirm/supersede/reject transitions и полным provenance.",
   "stages": [
     {"id": "D0", "title": "Documentation", "status": "Complete", "depends_on": [], "outcome": "Контекст и процедуры работы восстанавливаются из репозитория"},
     {"id": "0", "title": "Foundation", "status": "Complete", "depends_on": ["D0"], "outcome": "Перенос сохраняет идентичность, историю и возможность продолжения"},
