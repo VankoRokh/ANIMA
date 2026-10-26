@@ -10,6 +10,7 @@ class Runtime:
         event_log,
         memory,
         memory_processor,
+        event_processing,
         trace=None,
         metrics=None,
     ):
@@ -21,6 +22,8 @@ class Runtime:
         self.event_log = event_log
         self.memory = memory
         self.memory_processor = memory_processor
+        self.event_processing = event_processing
+        self._recovery_checked = False
 
     def _session_id(self):
         session = self.anima.get()["session"]
@@ -30,6 +33,16 @@ class Runtime:
 
         return f"session_{session:08d}"
 
+    def _ensure_recovered(self):
+        if self._recovery_checked:
+            return
+
+        self.event_processing.recover()
+        self.anima.reconcile_events_processed(
+            self.event_processing.finalized_count()
+        )
+        self._recovery_checked = True
+
     def _process_events(self):
         processed = []
 
@@ -37,8 +50,15 @@ class Runtime:
             event = self.event_bus.next_event()
 
             self.event_log.write(event)
-            memory_result = self.memory_processor.process_event(event)
-            self.anima.register_event()
+            try:
+                memory_result = self.event_processing.process(event)
+            except Exception:
+                self._recovery_checked = False
+                raise
+
+            self.anima.reconcile_events_processed(
+                self.event_processing.finalized_count()
+            )
 
             self._trace(
                 f"event: {event.event_type} processed, "
@@ -58,6 +78,7 @@ class Runtime:
         )
 
     def _wake(self):
+        self._ensure_recovered()
         self.anima.wake()
         self.event_bus.emit(
             "system.wake",
@@ -75,6 +96,7 @@ class Runtime:
         )
 
     def _user_input(self, text):
+        self._ensure_recovered()
         self.event_bus.emit(
             "conversation.user",
             {
@@ -101,6 +123,7 @@ class Runtime:
         )
 
     def _sleep(self):
+        self._ensure_recovered()
         self.event_bus.emit(
             "system.sleep",
             source="runtime",
