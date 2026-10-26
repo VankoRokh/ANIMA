@@ -24,6 +24,7 @@
 | Memory Lifecycle / History | [MemoryLifecycle](../../anima/memory/lifecycle.py): OPEN→CLOSED, Merge→MERGED и compact history | [lifecycle/merge/provenance](../../tests/test_memory_lifecycle.py) |
 | Knowledge Layer | [KnowledgeLayer](../../anima/memory/knowledge.py): CLOSED evidence, provisional/confirmed/challenged/superseded/rejected lifecycle и history | [knowledge lifecycle](../../tests/test_knowledge.py), [evidence/state machine](../../tests/test_knowledge_evidence.py) |
 | Retrieval | [RetrievalEngine](../../anima/memory/retrieval.py): exact ID, structured filters, Entity anchors, FTS5, 1-hop Relations и explainable ranking | [retrieval corpus](../../tests/test_retrieval.py) |
+| Context Builder | [ContextBuilder](../../anima/memory/context_builder.py): FAST/DEEP read policies, exact/Knowledge/Memory priority, provenance Events и strict item/character budget | [context corpus](../../tests/test_context_builder.py) |
 | Наблюдаемость | [DiagnosticTrace](../../anima/diagnostics/trace.py) и [DiagnosticMetrics](../../anima/diagnostics/metrics.py) | [trace](../../tests/test_trace.py), [metrics](../../tests/test_metrics.py) |
 | Изоляция тестов | [AnimaTestHarness](../../tests/harness.py) собирает Runtime во временном каталоге | [CLI/headless](../../tests/test_d1_validation.py) |
 
@@ -34,7 +35,8 @@
 [TV-0008](../TESTING/Results/TV-0008.md),
 [TV-0009](../TESTING/Results/TV-0009.md),
 [TV-0010](../TESTING/Results/TV-0010.md),
-[TV-0011](../TESTING/Results/TV-0011.md).
+[TV-0011](../TESTING/Results/TV-0011.md),
+[TV-0012](../TESTING/Results/TV-0012.md).
 
 ## Рабочий путь записи
 
@@ -225,6 +227,21 @@ Knowledge, старая становится `superseded`, а между ним�
 через exact ID или явный status filter. Deep traversal, embeddings, semantic/LLM
 rerank и query expansion в этот baseline не входят.
 
+## Context Builder
+
+`ContextBuilder` является read-only слоем поверх Retrieval/Provenance и формирует
+структурированный `ContextBundle`: query, consumer, budget, `knowledge[]`,
+`memories[]`, `events[]`, `truncated` и selection statistics.
+
+FAST использует узкую выборку без raw Events; DEEP разрешает один relation hop и
+добавляет deduplicated provenance Events. Exact-ID result имеет первый приоритет,
+после него обычная выборка предпочитает Knowledge перед Memories, а Events идут
+последними. Каждый объект сохраняет score/selection reason.
+
+`max_items` и `max_chars` являются жёсткими budget: запись, которая не помещается
+целиком, не обрезается, а пропускается с `truncated=true`. Token-aware budgets и
+model-specific policies отложены до появления конкретного model consumer.
+
 ## Каталог и контракты данных
 
 По умолчанию данные находятся в `<project>/data`; `ANIMA_DATA_DIR` задаёт другой
@@ -245,13 +262,12 @@ identity, session/event history и SQLite Memory Store. Старый `memories.j
 
 - EventBus FIFO остаётся RAM-only; persistent queue/ack отсутствуют.
 - JSONL и SQLite не образуют одну атомарную транзакцию.
-- `event_processing` пока только schema-каркас; idempotent retry — Stage 1.10.
+- `event_processing` и idempotent retry относятся к текущему Stage 1.10 и не
+  считаются реализованными до отдельной зелёной проверки.
 - Автоматические правила закрытия/merge Memory ещё не реализованы; lifecycle
   вызывается явно.
 - Автоматическое создание/принятие Knowledge моделью не реализовано; lifecycle
   вызывается явно на подтверждённом evidence.
-- Context Builder относится к текущему Stage 1.9 и не считается реализованным до
-  отдельной зелёной проверки.
 - Производительность 1k/10k/100k ещё не измерялась; оптимизация не выполнялась.
 - LLM/Deep Composer, embeddings, vector/graph DB, Sleep consolidation и
   distributed memory остаются отложенными механизмами.
