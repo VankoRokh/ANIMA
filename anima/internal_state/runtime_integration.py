@@ -5,7 +5,9 @@ from anima.internal_state.choice_engine import Candidate, ChoiceEngine
 from anima.internal_state.expression_adapter import ExpressionAdapter
 from anima.internal_state.goal_arbitration import GoalArbitrator
 from anima.internal_state.goal_progress import GoalObservation, GoalProgressEngine
+from anima.internal_state.goal_creation_recovery import GoalCreationRecovery
 from anima.internal_state.goals import GoalStore
+from anima.internal_state.recovery import RecoveryCoordinator
 from anima.internal_state.store import InternalStateStore
 from anima.internal_state.time_dynamics import TimeDynamics
 from anima.internal_state.transition_engine import StateSignal, TransitionEngine
@@ -35,14 +37,33 @@ class InternalStateRuntime:
             goal_store=self.goals,
         )
         self.expression_adapter = ExpressionAdapter(store)
+        self.recovery = RecoveryCoordinator(
+            store,
+            self.goals,
+            self.transition_engine,
+            self.goal_progress,
+        )
+        self.goal_creation_recovery = GoalCreationRecovery(
+            store,
+            self.goals,
+        )
         self._last_choice = None
+
+        recovered_goal_creations = self.goal_creation_recovery.recover_pending()
+        recovered = self.recovery.recover_pending()
+        recovered_sources = (*recovered_goal_creations, *recovered)
+        if recovered_sources:
+            self._trace(
+                "internal_state: recovered pending sources "
+                + ", ".join(recovered_sources)
+            )
 
     def _trace(self, message):
         if self.trace is not None:
             self.trace.record(message)
 
     def create_goal(self, **kwargs):
-        goal = self.goals.create_goal(**kwargs)
+        goal = self.goal_creation_recovery.create_goal(**kwargs)
         self._trace(
             f"internal_state: goal created {goal['id']} priority={goal['priority']}"
         )
@@ -51,7 +72,7 @@ class InternalStateRuntime:
     def process_signal(self, signal):
         if not isinstance(signal, StateSignal):
             raise TypeError("InternalStateRuntime requires a StateSignal")
-        transitions = self.transition_engine.process(signal)
+        transitions = self.recovery.process_signal(signal)
         self._trace(
             f"internal_state: signal {signal.kind} applied, "
             f"transitions={len(transitions)}"
@@ -61,7 +82,7 @@ class InternalStateRuntime:
     def observe_goal(self, observation):
         if not isinstance(observation, GoalObservation):
             raise TypeError("InternalStateRuntime requires a GoalObservation")
-        result = self.goal_progress.process(observation)
+        result = self.recovery.observe_goal(observation)
         self._trace(
             f"internal_state: goal observation {observation.kind} "
             f"goal={observation.goal_id} status={result.goal['status']}"
@@ -170,4 +191,5 @@ class InternalStateRuntime:
                     for item in expression["trace"]
                 ],
             },
+            "recovery": self.recovery.snapshot(),
         }
