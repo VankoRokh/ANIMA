@@ -6,16 +6,16 @@
 показывают этот порядок, а не требуют отдельной платы или модели на каждом шаге.
 
 <!-- AUTO:roadmap:START -->
-**Текущая работа:** Уточнить модель извлечения памяти, происхождение записей, бюджет контекста и baseline до начала реализации Stage 1.
+**Текущая работа:** Stage 1.1 — Event Foundation: расширить Event schema, стабильные IDs, references и валидацию до перехода к SQLite memory store.
 
-**Фокус:** 1 — Cognitive Memory (Planned).
+**Фокус:** 1 — Cognitive Memory (InProgress).
 
 | Этап | Проверяемый результат | Статус | Зависимости |
 |---|---|---|---|
 | [D0 — Documentation](#d0) | Контекст и процедуры работы восстанавливаются из репозитория | Complete | — |
 | [0 — Foundation](#stage-0) | Перенос сохраняет идентичность, историю и возможность продолжения | Complete | [D0](#d0) |
 | [D1 — Runtime, Tests & Observability](#d1) | Один сценарий запускается headless, наблюдается и проверяется изолированно | Complete | [0](#stage-0) |
-| [1 — Cognitive Memory](#stage-1) | Релевантный опыт извлекается с происхождением и ограниченным контекстом | Planned | [0](#stage-0), [D1](#d1) |
+| [1 — Cognitive Memory](#stage-1) | Релевантный опыт извлекается с происхождением и ограниченным контекстом | InProgress | [0](#stage-0), [D1](#d1) |
 | [2 — Internal State](#stage-2) | Влияние внутреннего состояния на выбор причинно прослеживается | Planned | [1](#stage-1) |
 | [3 — Sleep](#stage-3) | Консолидация прерывается и возобновляется без потери источников | Planned | [2](#stage-2) |
 | [4 — Agent](#stage-4) | Ограниченная задача выполняется инструментом и проверяется наблюдением | Planned | [3](#stage-3) |
@@ -53,23 +53,117 @@ GUI/TUI, telemetry server, удалённая отладка и графики �
 
 ## Stage 1
 
-**Цель и наблюдение.** Долговременная память возвращает ожидаемые эпизоды на
-фиксированном корпусе; каждый результат ведёт к исходным событиям, а рабочий
-контекст ограничен явным бюджетом. Условия старта — Foundation и диагностический harness D1.
+**Цель и наблюдение.** Доказать полный цикл долговременной памяти
+`Event → Memory → Knowledge → Retrieval → Context Builder`: релевантный опыт
+возвращается на фиксированном корпусе, каждый результат ведёт к исходным событиям,
+противоречия не затирают прошлое, а рабочий контекст ограничен явным бюджетом.
+Условия старта — Foundation и диагностический harness D1. Архитектурный выбор
+зафиксирован в [ADR-005](../DECISIONS/README.md#adr-005).
 
-**Работа.** IDs событий/эпизодов, ссылки на source events, deterministic retrieval,
-бюджет контекста, простые metadata/importance rules, обработка дубликатов и
-противоречий с сохранением источников. Архивирование/сжатие — после проверки восстановления.
-Генеративное обобщение не является условием этапа; embeddings/LLM сравниваются с baseline позднее.
+**Принципы.** Сначала deterministic baseline и объяснимые правила, затем усложнение.
+Event — подробный append-only журнал произошедшего; Memory — компактный опыт
+ограниченного эпизода; Knowledge — актуализированное утверждение из закрытого
+подтверждённого опыта. Entity служит устойчивым якорем, Relation — явной связью.
+Topic не хранится отдельной сущностью: это динамическая область связанных данных.
+Memory Processor отвечает за путь записи, Context Builder — за путь чтения.
 
-**Сценарии и приёмка.** Корпус из нескольких десятков событий и заранее заданные
-query/expected IDs; 100% обязательных IDs находятся в заданном top-k; у 100%
-результатов валидный provenance. Бюджет соблюдается и при избытке релевантных записей.
-Restart/recovery сохраняют IDs и выборку. Повреждённая/несовместимая запись даёт
-определённую ошибку. До реализации фиксируются единица бюджета, k и корпус.
+**Хранение.** `events.jsonl` остаётся append-only журналом. Структурированные
+Memories/Knowledge/Entities/Relations/History и состояние обработки событий
+хранятся в SQLite `memory.db`; FTS5 служит baseline полнотекстового поиска.
+Большие изображения/аудио/видео позже хранятся отдельно как Assets, а Events
+ссылаются на них. Старый `memories.jsonl` не мигрируется: тестовые данные не имеют
+ценности, compatibility layer не нужен. Public IDs стабильны и независимы от
+внутренних integer keys; время — ISO 8601 с UTC offset.
 
-**Регрессия и доказательства.** Foundation/D1; сохранить корпус, query → expected/retrieved IDs,
-максимальный контекст и финальную проверку.
+### Порядок реализации Stage 1
+
+| Шаг | Результат | Проверка завершения |
+|---|---|---|
+| **1.0 Specification** | Зафиксированы Event/Memory/Knowledge, Entity/Relation, Processor, Composer, Context Builder, lifecycle и storage baseline | Документация однозначно описывает границы Stage 1 и отложенные механизмы |
+| **1.1 Event Foundation** | Универсальный Event: stable ID, timestamp, type, source, session_id, payload, references | Валидные/невалидные события, duplicate ID, повреждённая JSONL-строка и restart дают определённый результат |
+| **1.2 Memory Store** | SQLite `memory.db`, schema, transactions, indexes, FTS5 | CRUD, rollback, reopen, constraints, FTS и базовые relation queries проходят тесты |
+| **1.3 Entities / Relations / Provenance** | Entity aliases, универсальные relations и цепочка `Knowledge → Memory → Event` | Для каждого контрольного объекта происхождение восстанавливается до source Events |
+| **1.4 Memory Processor** | Selection и объяснимый Association; `HIGH → UPDATE`, `MEDIUM → CREATE + related_to`, `LOW → CREATE` | На canonical corpus каждый Event попадает в ожидаемый эпизод, причины решения видны в trace |
+| **1.5 Memory Composer** | Заменяемый deterministic `RuleBasedComposer`, ограниченный `content` | CREATE/UPDATE сохраняют решения, результаты, причины, ограничения и открытые вопросы без копирования шума |
+| **1.6 Merge / History** | `OPEN/CLOSED/MERGED`, безопасный Merge и компактная история изменений | Merge не теряет provenance; исходная запись остаётся прослеживаемой; SPLIT не требуется |
+| **1.7 Knowledge Layer** | Knowledge из закрытого подтверждённого опыта; lifecycle `provisional/confirmed/challenged/superseded/rejected` | Противоречие переводит `confirmed → challenged`, но не заменяет знание до закрытия проверки |
+| **1.8 Retrieval** | ID/filters/entities/FTS/relations/ranking, сначала дешёвые и объяснимые методы | Заранее размеченные query возвращают обязательные IDs в заданном top-k |
+| **1.9 Context Builder** | Структурированный `ContextBundle` с `knowledge[]/memories[]/events[]`, reason и budget | `max_items/max_chars` соблюдаются; разные consumer policies дают воспроизводимый ограниченный контекст |
+| **1.10 Recovery / Idempotency** | `event_processing` и безопасное повторение операций после crash | Повтор одного Event не создаёт дубликаты; зависшая обработка обнаруживается и восстанавливается |
+| **1.11 Stage Validation** | End-to-end corpus примерно 30–100 Events с ожидаемыми Memories/Knowledge/Relations/Context | Полный сценарий проходит после restart и сохраняет provenance, статусы и retrieval |
+| **1.12 Performance Baseline** | Измерены latency/CPU/RAM/storage на синтетических 1k/10k/100k данных | Результаты записаны без преждевременных SLA и оптимизаций |
+
+### Правила Memory Processor
+
+Selection решает `process/skip`. Association никогда не сравнивает Event со всей
+памятью: сначала используются `OPEN` Memories, task/session/domain, Entities и FTS,
+затем небольшой набор кандидатов получает объяснимый score. Высокое совпадение
+обновляет открытый эпизод; среднее создаёт новый связанный эпизод; низкое — новый
+независимый. Консервативная ошибка предпочтительнее: лишние Memories можно позже
+объединить, неверное склеивание искажает историю.
+
+Episodic Memory представляет ограниченный по времени и смыслу эпизод, а не вечный
+документ по теме. `OPEN` Memory можно уточнять и сокращать; `CLOSED` по умолчанию
+не переписывается поздним опытом. `MERGED` сохраняет ссылку на итоговую запись.
+`content` — самодостаточная смысловая выжимка; metadata хранит навигацию и
+происхождение. Composer является заменяемым модулем и не является storage.
+
+Knowledge создаётся из закрытого подтверждённого опыта или набора связанных
+закрытых Memories. Новая связанная ветка сама по себе не переписывает знание.
+Подтверждённое Knowledge при существенном противоречии сначала становится
+`challenged`, затем после закрытия проверки возвращается в `confirmed` либо
+переходит в `superseded/rejected`; старое знание не удаляется. Числовой confidence
+на Stage 1 не требуется: используются status, supporting/contradicting sources.
+
+### Инженерный baseline
+
+- `memory.db`: memories, memory_sources, knowledge, knowledge_sources, entities,
+  entity_aliases, memory_entities, knowledge_entities, relations, history,
+  event_processing и FTS indexes.
+- Одна универсальная таблица `relations`; дробить её только после измеренной
+  проблемы скорости или целостности.
+- Internal SQLite key — integer; public ID — UUIDv7 с type-prefix (`ev_`, `mem_`,
+  `kn_`, `ent_`, `rel_`, `asset_`).
+- `importance`: `0=low`, `1=normal`, `2=high`, `3=critical`; relevance всегда
+  важнее importance при retrieval.
+- `event_processing`: `pending/processing/done/failed/skipped`, processor/version,
+  attempts и timestamps. Зависшие операции восстанавливаются при старте; Sleep
+  позднее может повторно разбирать backlog/failed.
+- Все изменения Memory/Knowledge/relations в одном действии выполняются SQLite
+  transaction; JSONL и SQLite не обязаны быть общей атомарной транзакцией.
+- History хранит существенные delta/change records, а не полную копию каждой версии.
+- Context Builder возвращает структурированный `ContextBundle`; Stage 1 использует
+  `max_items/max_chars`, token-aware budget откладывается до конкретной модели.
+- Graph navigation по умолчанию ограничена одним hop; второй допускается только
+  при явной необходимости.
+
+### Валидация и доказательства
+
+Начальный canonical corpus для разработки — примерно 10–20 Events; к финальной
+валидации расширяется до 30–100. Он включает продолжение одного эпизода,
+независимые эпизоды, шум, повтор, procedural memory, связанные Entities,
+решение, противоречие, Knowledge challenge/confirmation или supersession,
+restart и failed processing. Для corpus заранее задаются ожидаемые Memories,
+Knowledge, Relations и query → expected IDs.
+
+Обязательные свойства: 100% обязательных expected IDs находятся в заданном top-k;
+у 100% возвращаемых контрольных записей валидный provenance; budget соблюдается;
+повторная обработка не размножает данные; restart/recovery сохраняют IDs и выборку;
+invalid transition, dangling/missing source и transaction failure дают определённую
+ошибку. Показательный итог Stage сохраняется по правилам [Testing](../TESTING/README.md).
+
+Performance на Stage 1 только измеряется: Event append, Memory create/update,
+Entity/Knowledge lookup, FTS, 1-hop relation, Context Builder, batch processing,
+CPU, peak RAM и DB size на 1k/10k/100k синтетических данных. Оптимизация вводится
+только после измеренного bottleneck.
+
+**Definition of Done.** На фиксированном end-to-end corpus Events детерминированно
+формируют ожидаемые Memories; закрытый опыт создаёт Knowledge; новый противоречащий
+опыт переводит его в `challenged`, а закрытая проверка подтверждает или заменяет;
+Retrieval и Context Builder возвращают ожидаемый ограниченный контекст; provenance
+проходит до source Events; restart и повторная обработка не повреждают данные;
+performance baseline зафиксирован. Отложенные механизмы перечислены в
+[Research](Research.md#отложенные-механизмы-памяти-stage-1).
 
 ## Stage 2
 
