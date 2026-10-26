@@ -20,6 +20,7 @@
 | Entities / Relations | [LinkStore](../../anima/memory/link_store.py): Entity aliases, универсальные Relations и low-level Knowledge anchors | [relations/entity resolution](../../tests/test_provenance.py) |
 | Provenance | [ProvenanceResolver](../../anima/memory/provenance.py): Memory/Relation/Knowledge/Entity → source Memory → raw Event | [provenance](../../tests/test_provenance.py) |
 | Memory Processor | [MemoryProcessor](../../anima/memory/processor.py): Selection, bounded candidates, explainable Association и create/update/create_related | [association corpus](../../tests/test_memory_processor.py) |
+| Event Processing / Recovery | [EventProcessingCoordinator](../../anima/memory/event_processing.py): persistent ledger, atomic Event effects, replay/retry/recovery и raw Event identity check | [event processing](../../tests/test_event_processing.py), [backup/restart](../../tests/test_recovery.py) |
 | Memory Composer | [RuleBasedComposer](../../anima/memory/composer.py): deterministic bounded `content`, deduplication и conservative revision | [composer](../../tests/test_memory_composer.py), [revision](../../tests/test_memory_composer_revision.py) |
 | Memory Lifecycle / History | [MemoryLifecycle](../../anima/memory/lifecycle.py): OPEN→CLOSED, Merge→MERGED и compact history | [lifecycle/merge/provenance](../../tests/test_memory_lifecycle.py) |
 | Knowledge Layer | [KnowledgeLayer](../../anima/memory/knowledge.py): CLOSED evidence, provisional/confirmed/challenged/superseded/rejected lifecycle и history | [knowledge lifecycle](../../tests/test_knowledge.py), [evidence/state machine](../../tests/test_knowledge_evidence.py) |
@@ -36,22 +37,25 @@
 [TV-0009](../TESTING/Results/TV-0009.md),
 [TV-0010](../TESTING/Results/TV-0010.md),
 [TV-0011](../TESTING/Results/TV-0011.md),
-[TV-0012](../TESTING/Results/TV-0012.md).
+[TV-0012](../TESTING/Results/TV-0012.md),
+[TV-0013](../TESTING/Results/TV-0013.md).
 
 ## Рабочий путь записи
 
-Runtime создаёт Events и всегда сначала пишет их в append-only `events.jsonl`.
-Затем `MemoryProcessor` выполняет Selection и Association. Для содержательных
-`conversation.user` он либо создаёт новую Memory, либо обновляет OPEN-эпизод, либо
-создаёт новую связанную Memory. Формирование `content` вынесено в отдельный
-Composer.
+Runtime создаёт Event и сначала пишет его в append-only `events.jsonl`.
+`EventProcessingCoordinator` требует точного присутствия этой raw-записи, затем в
+одной SQLite-транзакции переводит ledger в `processing`, вызывает
+`MemoryProcessor` и фиксирует Memory/Relations вместе с final status `done` или
+`skipped`. После commit Runtime согласует `state.json.events_processed` с числом
+final ledger records.
 
 ```mermaid
 flowchart TD
     Q["EventBus.next_event"] --> L["EventLog.write"]
-    L --> P["MemoryProcessor"]
+    L --> E["EventProcessingCoordinator"]
+    E --> P["MemoryProcessor"]
     P --> S{"Selection"}
-    S -->|skip| R["register_event + trace"]
+    S -->|skip| F["ledger = skipped"]
     S -->|process| A["bounded Association"]
     A -->|HIGH| U["UPDATE OPEN Memory"]
     A -->|MEDIUM| C["CREATE + related_to"]
@@ -59,12 +63,16 @@ flowchart TD
     U --> X["RuleBasedComposer"]
     C --> X
     N --> X
-    X --> DB["memory.db"]
-    DB --> R
+    X --> DB["Memory/Relations + ledger = done"]
+    F --> K["SQLite commit"]
+    DB --> K
+    K --> R["reconcile state counter + trace"]
 ```
 
 JSONL Event и SQLite Memory сознательно не объединены одной общей транзакцией.
-Persistent `event_processing`/retry относится к Stage 1.10.
+Разрыв закрывается recovery protocol: raw Event без ledger может быть принят или
+повторён по определённым правилам, а SQLite effects и processing-status одного
+Event являются атомарными между собой.
 
 ## Event Foundation
 
@@ -147,6 +155,31 @@ Explainable score использует domain/type, session, lexical overlap, En
 блокирует UPDATE. Trace сохраняет action, score и reasons.
 
 CLOSED/MERGED записи не используются как UPDATE candidates.
+
+## Event Processing и Recovery
+
+`EventProcessingCoordinator` использует ключ `(event_id, processor,
+processor_version)` и статусы `pending/processing/done/failed/skipped`. Final
+`done/skipped` Event при replay не запускает Memory effects повторно.
+
+Перед processing проверяется, что Event уже присутствует в `events.jsonl` и его
+полная raw-запись совпадает с переданным объектом. Ledger transition,
+Memory create/update, `memory_sources`, Entity links и `related_to` одного Event
+выполняются в одной SQLite-транзакции. Ошибка до commit откатывает эффекты, после
+чего отдельная запись `failed` сохраняет attempts и last_error для retry.
+
+При restart coordinator:
+
+- принимает legacy raw Event как `done`, если его effect уже виден в
+  `memory_sources`;
+- принимает невыбранный lifecycle/empty Event как `skipped`;
+- делает содержательный raw Event без effect `pending` и повторяет его;
+- повторяет stale `processing/failed`;
+- выдаёт ошибку, если ledger ссылается на отсутствующий raw Event.
+
+Runtime после recovery восстанавливает `events_processed` по числу final ledger
+records, поэтому crash после SQLite commit, но до записи `state.json`, не приводит
+к повторному Memory effect.
 
 ## RuleBasedComposer
 
@@ -261,13 +294,14 @@ identity, session/event history и SQLite Memory Store. Старый `memories.j
 ## Подтверждённые ограничения
 
 - EventBus FIFO остаётся RAM-only; persistent queue/ack отсутствуют.
-- JSONL и SQLite не образуют одну атомарную транзакцию.
-- `event_processing` и idempotent retry относятся к текущему Stage 1.10 и не
-  считаются реализованными до отдельной зелёной проверки.
+- JSONL append и SQLite commit не образуют одну физическую транзакцию; recovery
+  protocol закрывает этот разрыв на уровне обработки, но не делает файлы атомарными.
 - Автоматические правила закрытия/merge Memory ещё не реализованы; lifecycle
   вызывается явно.
 - Автоматическое создание/принятие Knowledge моделью не реализовано; lifecycle
   вызывается явно на подтверждённом evidence.
+- Общий 30–100 Event end-to-end corpus относится к текущему Stage 1.11 и не
+  считается подтверждённым до отдельной зелёной проверки.
 - Производительность 1k/10k/100k ещё не измерялась; оптимизация не выполнялась.
 - LLM/Deep Composer, embeddings, vector/graph DB, Sleep consolidation и
   distributed memory остаются отложенными механизмами.
