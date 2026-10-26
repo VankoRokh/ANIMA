@@ -3,6 +3,7 @@ from pathlib import Path
 from anima.core.event_bus import EventBus
 from anima.core.identity import Identity
 from anima.core.state import AnimaState
+from anima.memory.composer import RuleBasedComposer
 from anima.memory.episodic import EpisodicMemory
 from anima.memory.event_log import EventLog
 from anima.memory.link_store import LinkStore
@@ -45,10 +46,12 @@ class AnimaTestHarness:
         )
 
         self.trace = DiagnosticTrace()
+        self.memory_composer = RuleBasedComposer()
         self.memory_processor = MemoryProcessor(
             memory_store=self.memory_store,
             event_log=self.event_log,
             link_store=self.link_store,
+            composer=self.memory_composer,
             trace=self.trace,
         )
         self.metrics = DiagnosticMetrics()
