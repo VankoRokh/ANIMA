@@ -98,6 +98,9 @@ Memories/Knowledge/Entities/Relations/History и состояние обрабо
 таблица relations предпочтительнее нескольких специализированных, пока benchmark
 не покажет проблему производительности или целостности. Большие media-assets
 хранятся отдельно и связываются references; полноценная media-обработка отложена.
+Public IDs на Stage 1 используют type-prefix + UUIDv4: это сохраняет baseline
+совместимым с Python 3.12+ без собственной реализации UUIDv7; порядок по времени
+задаётся отдельными timestamp-полями, а не структурой ID.
 
 Episodic Memory имеет lifecycle `OPEN/CLOSED/MERGED`: закрытый эпизод по умолчанию
 не переписывается поздним опытом. Knowledge использует
