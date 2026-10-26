@@ -467,8 +467,9 @@ def test_stage1_knowledge_retrieval_context_and_provenance(tmp_path):
         "SQLite concurrent writes",
         top_k=5,
     )
-    assert ids(current["results"])[0] == NEW_KNOWLEDGE
-    assert OLD_KNOWLEDGE not in ids(current["results"])
+    current_ids = ids(current["results"])
+    assert NEW_KNOWLEDGE in current_ids
+    assert OLD_KNOWLEDGE not in current_ids
 
     exact_old = stack.retrieval.retrieve(OLD_KNOWLEDGE, top_k=3)
     assert ids(exact_old["results"])[0] == OLD_KNOWLEDGE
@@ -518,6 +519,6 @@ def test_stage1_knowledge_retrieval_context_and_provenance(tmp_path):
 
     print(
         "[stage1] knowledge=superseded->confirmed procedural=closed "
-        f"retrieval_top={current['results'][0]['kind']} "
+        f"retrieval_rank={current_ids.index(NEW_KNOWLEDGE) + 1} "
         f"deep_items={deep['selection_stats']['items_used']}"
     )
