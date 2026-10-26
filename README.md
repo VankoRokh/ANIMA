@@ -19,7 +19,7 @@ ANIMA — исследовательский проект модульного �
 
 Текущий фокус: **1 — Cognitive Memory** (InProgress).
 
-Stage 1.2 — Memory Store: заменить временный memories.jsonl на SQLite memory.db со схемой, транзакциями, индексами и FTS5 baseline.
+Stage 1.4 — Memory Processor: реализовать deterministic Selection и объяснимый Association с CREATE/UPDATE/related decisions на контрольном corpus.
 
 [Этапы и критерии](docs/ROADMAP/README.md).
 <!-- AUTO:summary:END -->
