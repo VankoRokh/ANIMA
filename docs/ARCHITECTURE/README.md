@@ -22,6 +22,7 @@
 | Memory Processor | [MemoryProcessor](../../anima/memory/processor.py): Selection, bounded candidates, explainable Association и create/update/create_related | [association corpus](../../tests/test_memory_processor.py) |
 | Memory Composer | [RuleBasedComposer](../../anima/memory/composer.py): deterministic bounded `content`, deduplication и conservative revision | [composer](../../tests/test_memory_composer.py), [revision](../../tests/test_memory_composer_revision.py) |
 | Memory Lifecycle / History | [MemoryLifecycle](../../anima/memory/lifecycle.py): OPEN→CLOSED, Merge→MERGED и compact history | [lifecycle/merge/provenance](../../tests/test_memory_lifecycle.py) |
+| Knowledge Layer | [KnowledgeLayer](../../anima/memory/knowledge.py): CLOSED evidence, provisional/confirmed/challenged/superseded/rejected lifecycle и history | [knowledge lifecycle](../../tests/test_knowledge.py), [evidence/state machine](../../tests/test_knowledge_evidence.py) |
 | Наблюдаемость | [DiagnosticTrace](../../anima/diagnostics/trace.py) и [DiagnosticMetrics](../../anima/diagnostics/metrics.py) | [trace](../../tests/test_trace.py), [metrics](../../tests/test_metrics.py) |
 | Изоляция тестов | [AnimaTestHarness](../../tests/harness.py) собирает Runtime во временном каталоге | [CLI/headless](../../tests/test_d1_validation.py) |
 
@@ -30,7 +31,8 @@
 [TV-0006](../TESTING/Results/TV-0006.md),
 [TV-0007](../TESTING/Results/TV-0007.md),
 [TV-0008](../TESTING/Results/TV-0008.md),
-[TV-0009](../TESTING/Results/TV-0009.md).
+[TV-0009](../TESTING/Results/TV-0009.md),
+[TV-0010](../TESTING/Results/TV-0010.md).
 
 ## Рабочий путь записи
 
@@ -175,6 +177,31 @@ Target получает недостающие source Event links и актив�
 Обе стороны Merge и close фиксируются в `history`; операция выполняется одной
 SQLite-транзакцией. SPLIT намеренно не входит в Stage 1 baseline.
 
+## Knowledge Layer
+
+`KnowledgeLayer` не вызывается автоматически из Memory Processor: существование
+Memory само по себе не делает утверждение знанием. Новый candidate создаётся только
+из CLOSED source Memory и получает `supports` Relation с provenance.
+
+Подтверждённый lifecycle:
+
+```text
+provisional → confirmed → challenged → confirmed
+                                  ├→ superseded
+                                  └→ rejected
+```
+
+Investigation хранится отдельной Relation и не меняет статус Knowledge. Challenge
+требует CLOSED contradicting Memory; reconfirm после challenge требует нового
+supporting evidence. Одна и та же Memory не может одновременно поддерживать и
+противоречить одному Knowledge.
+
+Supersession не переписывает старое утверждение: создаётся новая confirmed
+Knowledge, старая становится `superseded`, а между ними создаётся Relation
+`supersedes`. `superseded` и `rejected` являются терминальными состояниями для
+новых investigation branches. Переходы и существенные evidence changes пишутся в
+`history`; provenance продолжает проходить до raw Events.
+
 ## Каталог и контракты данных
 
 По умолчанию данные находятся в `<project>/data`; `ANIMA_DATA_DIR` задаёт другой
@@ -198,10 +225,10 @@ identity, session/event history и SQLite Memory Store. Старый `memories.j
 - `event_processing` пока только schema-каркас; idempotent retry — Stage 1.10.
 - Автоматические правила закрытия/merge Memory ещё не реализованы; lifecycle
   вызывается явно.
-- Knowledge anchors и Relations существуют, но **полный Knowledge lifecycle**
-  `provisional/confirmed/challenged/superseded/rejected` относится к текущему
-  Stage 1.7 и не считается реализованным до отдельной зелёной проверки.
-- Общий Retrieval/ranking — Stage 1.8; Context Builder — Stage 1.9.
+- Автоматическое создание/принятие Knowledge моделью не реализовано; lifecycle
+  вызывается явно на подтверждённом evidence.
+- Общий Retrieval/ranking относится к текущему Stage 1.8 и не считается
+  реализованным до отдельной зелёной проверки; Context Builder — Stage 1.9.
 - Производительность 1k/10k/100k ещё не измерялась; оптимизация не выполнялась.
 - LLM/Deep Composer, embeddings, vector/graph DB, Sleep consolidation и
   distributed memory остаются отложенными механизмами.
