@@ -13,8 +13,8 @@ def test_memory_store_writes_and_memory_reads(tmp_path):
     memory = EpisodicMemory(memory_file)
 
     record = {
-        "source": "user_input",
-        "timestamp": "2026-10-13T12:00:00",
+        "source": "conversation.user",
+        "timestamp": "2026-10-26T12:00:00+00:00",
         "content": {
             "text": "hello",
         },
@@ -34,7 +34,7 @@ def test_memory_store_rejects_invalid_record(tmp_path):
     store = MemoryStore(memory_file)
 
     invalid = {
-        "source": "user_input",
+        "source": "conversation.user",
     }
 
     with pytest.raises(ValueError):
@@ -45,8 +45,8 @@ def test_memory_reports_malformed_line(tmp_path):
     memory_file = tmp_path / "memories.jsonl"
 
     memory_file.write_text(
-        '{"source":"user_input",'
-        '"timestamp":"2026-10-13T12:00:00",'
+        '{"source":"conversation.user",'
+        '"timestamp":"2026-10-26T12:00:00+00:00",'
         '"content":{"text":"hello"}}\n'
         '{"source":\n',
         encoding="utf-8",
@@ -69,8 +69,8 @@ def test_memory_reports_invalid_record_with_line_number(
     memory_file.write_text(
         json.dumps(
             {
-                "source": "user_input",
-                "timestamp": "2026-10-13T12:00:00",
+                "source": "conversation.user",
+                "timestamp": "2026-10-26T12:00:00+00:00",
                 "content": {
                     "text": 123,
                 },
