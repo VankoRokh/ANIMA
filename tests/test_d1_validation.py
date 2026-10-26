@@ -4,6 +4,7 @@ import subprocess
 import sys
 from pathlib import Path
 
+from anima.memory.memory_store import MemoryStore
 from tests.harness import AnimaTestHarness
 
 
@@ -84,13 +85,9 @@ def test_d1_cli_and_headless_are_equivalent(
         cli_dir / "events.jsonl"
     )
 
-    headless_memory = read_jsonl(
-        headless_dir / "memories.jsonl"
-    )
-
-    cli_memory = read_jsonl(
-        cli_dir / "memories.jsonl"
-    )
+    headless_memory = headless.memory_store.list_memories()
+    cli_store = MemoryStore(cli_dir / "memory.db")
+    cli_memory = cli_store.list_memories()
 
     assert scenario_result == [
         {
@@ -165,10 +162,31 @@ def test_d1_cli_and_headless_are_equivalent(
     assert len(cli_memory) == 1
 
     assert (
-        headless_memory[0]["content"]["text"]
-        == cli_memory[0]["content"]["text"]
+        headless_memory[0]["content"]
+        == cli_memory[0]["content"]
         == "D1 validation"
     )
+
+    assert headless_memory[0]["type"] == "episodic"
+    assert cli_memory[0]["type"] == "episodic"
+    assert headless_memory[0]["domain"] == "user"
+    assert cli_memory[0]["domain"] == "user"
+
+    headless_user_event = next(
+        event for event in headless_events
+        if event["type"] == "conversation.user"
+    )
+    cli_user_event = next(
+        event for event in cli_events
+        if event["type"] == "conversation.user"
+    )
+
+    assert headless.memory_store.source_events(
+        headless_memory[0]["id"]
+    ) == [headless_user_event["id"]]
+    assert cli_store.source_events(
+        cli_memory[0]["id"]
+    ) == [cli_user_event["id"]]
 
     trace = headless.trace.lines()
 
