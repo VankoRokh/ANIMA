@@ -18,17 +18,26 @@ def test_runtime_headless_lifecycle():
         assert [
             event.event_type
             for event in wake_events
-        ] == ["wake"]
+        ] == ["system.wake"]
 
         assert [
             event.event_type
             for event in input_events
-        ] == ["user_input"]
+        ] == ["conversation.user"]
 
         assert [
             event.event_type
             for event in sleep_events
-        ] == ["sleep"]
+        ] == ["system.sleep"]
+
+        assert {
+            event.session_id
+            for event in (
+                wake_events
+                + input_events
+                + sleep_events
+            )
+        } == {"session_00000001"}
 
         snapshot = anima.snapshot()
 
