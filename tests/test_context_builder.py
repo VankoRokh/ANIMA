@@ -138,7 +138,7 @@ def test_fast_and_deep_policies_are_deterministic_and_distinct(tmp_path):
     assert deep["consumer"] == "DEEP"
     assert ids(deep["knowledge"]) == [K_CURRENT]
     assert M_PROBE in ids(deep["memories"])
-    assert set(ids(deep["events"])) == {EV_SQLITE, EV_PROBE}
+    assert ids(deep["events"]) == [EV_SQLITE, EV_PROBE]
     assert deep["selection_stats"]["selected_events"] == 2
 
 
@@ -158,6 +158,22 @@ def test_knowledge_is_selected_before_memory_when_item_budget_is_tight(tmp_path)
     assert bundle["truncated"] is True
     assert bundle["selection_stats"]["items_used"] == 1
     assert bundle["selection_stats"]["omitted_budget"] >= 1
+
+
+def test_exact_id_precedes_knowledge_first_policy(tmp_path):
+    _, _, _, builder = build_stack(tmp_path)
+
+    bundle = builder.build(
+        M_PROBE,
+        consumer="DEEP",
+        max_items=1,
+        max_chars=500,
+    )
+
+    assert bundle["knowledge"] == []
+    assert ids(bundle["memories"]) == [M_PROBE]
+    assert "exact_id:+100" in bundle["memories"][0]["selection_reason"]
+    assert bundle["truncated"] is True
 
 
 def test_char_budget_skips_whole_records_instead_of_cutting_content(tmp_path):
