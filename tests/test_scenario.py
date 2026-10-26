@@ -24,15 +24,15 @@ def test_scenario_runner_executes_headless_scenario():
         assert result == [
             {
                 "action": "wake",
-                "events": ["wake"],
+                "events": ["system.wake"],
             },
             {
                 "action": "user_input",
-                "events": ["user_input"],
+                "events": ["conversation.user"],
             },
             {
                 "action": "sleep",
-                "events": ["sleep"],
+                "events": ["system.sleep"],
             },
         ]
 
