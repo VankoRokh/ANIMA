@@ -1,13 +1,16 @@
+import math
 import sqlite3
 from contextlib import contextmanager
 from datetime import datetime, timezone
 from pathlib import Path
+from uuid import UUID, uuid4
 
 from anima.config.paths import get_data_dir
 from anima.internal_state.config import load_internal_state_config
 
 
 SCHEMA_VERSION = 1
+STATE_TRANSITION_ID_PREFIX = "st_"
 
 SCHEMA_SQL = """
 CREATE TABLE IF NOT EXISTS schema_meta (
@@ -89,6 +92,55 @@ CREATE INDEX IF NOT EXISTS idx_goal_transitions_goal_time
 
 def _now():
     return datetime.now(timezone.utc).isoformat(timespec="seconds")
+
+
+def _is_number(value):
+    return isinstance(value, (int, float)) and not isinstance(value, bool)
+
+
+def _validate_timestamp(value, label):
+    if not isinstance(value, str) or not value:
+        raise ValueError(f"{label} must be a non-empty ISO 8601 string")
+    try:
+        parsed = datetime.fromisoformat(value)
+    except ValueError as error:
+        raise ValueError(f"{label} must be ISO 8601") from error
+    if parsed.tzinfo is None or parsed.utcoffset() is None:
+        raise ValueError(f"{label} must include a UTC offset")
+
+
+def _validate_non_empty_string(value, label):
+    if not isinstance(value, str) or not value.strip():
+        raise ValueError(f"{label} must be a non-empty string")
+
+
+def _validate_optional_string(value, label):
+    if value is not None:
+        _validate_non_empty_string(value, label)
+
+
+def _validate_transition_id(public_id):
+    if (
+        not isinstance(public_id, str)
+        or not public_id.startswith(STATE_TRANSITION_ID_PREFIX)
+    ):
+        raise ValueError("StateTransition public_id must be an st_ UUIDv4")
+
+    raw_uuid = public_id[len(STATE_TRANSITION_ID_PREFIX):]
+    try:
+        parsed = UUID(raw_uuid)
+    except (ValueError, AttributeError) as error:
+        raise ValueError("StateTransition public_id must be an st_ UUIDv4") from error
+
+    if parsed.version != 4 or str(parsed) != raw_uuid:
+        raise ValueError("StateTransition public_id must be an st_ UUIDv4")
+
+
+def _validate_optional_non_negative_number(value, label):
+    if value is None:
+        return
+    if not _is_number(value) or not math.isfinite(float(value)) or value < 0.0:
+        raise ValueError(f"{label} must be a finite non-negative number or null")
 
 
 class InternalStateStore:
@@ -180,7 +232,7 @@ class InternalStateStore:
     def transaction(self):
         connection = self._connect()
         try:
-            connection.execute("BEGIN")
+            connection.execute("BEGIN IMMEDIATE")
             yield connection
         except Exception:
             connection.rollback()
@@ -215,6 +267,28 @@ class InternalStateStore:
             "ruleset_version": row["ruleset_version"],
         }
 
+    @staticmethod
+    def _row_to_state_transition(row):
+        if row is None:
+            return None
+        return {
+            "id": row["public_id"],
+            "state_name": row["state_name"],
+            "timestamp": row["timestamp"],
+            "before": row["before_value"],
+            "delta": row["delta"],
+            "after": row["after_value"],
+            "cause_type": row["cause_type"],
+            "source_id": row["source_id"],
+            "rule_id": row["rule_id"],
+            "reason": row["reason"],
+            "importance": row["importance"],
+            "repetition_factor": row["repetition_factor"],
+            "elapsed_seconds": row["elapsed_seconds"],
+            "goal_id": row["goal_id"],
+            "candidate_id": row["candidate_id"],
+        }
+
     def get_state(self, state_name):
         if not isinstance(state_name, str) or not state_name:
             raise ValueError("State name must be a non-empty string")
@@ -232,6 +306,199 @@ class InternalStateStore:
             ).fetchall()
         return [self._row_to_state(row) for row in rows]
 
+    def apply_state_transition(
+        self,
+        *,
+        state_name,
+        delta,
+        cause_type,
+        rule_id,
+        reason,
+        source_id=None,
+        importance=None,
+        repetition_factor=None,
+        elapsed_seconds=None,
+        goal_id=None,
+        candidate_id=None,
+        timestamp=None,
+        public_id=None,
+    ):
+        if state_name not in self.config["states"]:
+            raise ValueError(f"Unknown Internal State: {state_name!r}")
+
+        if not _is_number(delta) or not math.isfinite(float(delta)):
+            raise ValueError("StateTransition delta must be a finite number")
+        delta = float(delta)
+
+        _validate_non_empty_string(cause_type, "StateTransition cause_type")
+        _validate_non_empty_string(rule_id, "StateTransition rule_id")
+        _validate_non_empty_string(reason, "StateTransition reason")
+        _validate_optional_string(source_id, "StateTransition source_id")
+        _validate_optional_string(goal_id, "StateTransition goal_id")
+        _validate_optional_string(candidate_id, "StateTransition candidate_id")
+
+        if importance is not None and (
+            not isinstance(importance, int)
+            or isinstance(importance, bool)
+            or importance not in range(4)
+        ):
+            raise ValueError(
+                "StateTransition importance must be an integer from 0 to 3 or null"
+            )
+
+        _validate_optional_non_negative_number(
+            repetition_factor,
+            "StateTransition repetition_factor",
+        )
+        _validate_optional_non_negative_number(
+            elapsed_seconds,
+            "StateTransition elapsed_seconds",
+        )
+
+        timestamp = timestamp or _now()
+        _validate_timestamp(timestamp, "StateTransition timestamp")
+
+        public_id = public_id or f"{STATE_TRANSITION_ID_PREFIX}{uuid4()}"
+        _validate_transition_id(public_id)
+
+        spec = self.config["states"][state_name]
+
+        try:
+            with self.transaction() as connection:
+                row = connection.execute(
+                    "SELECT value FROM state_values WHERE name = ?",
+                    (state_name,),
+                ).fetchone()
+                if row is None:
+                    raise ValueError(f"Unknown Internal State: {state_name!r}")
+
+                before = float(row["value"])
+                after = before + delta
+                minimum = float(spec["minimum"])
+                maximum = float(spec["maximum"])
+
+                if not minimum <= after <= maximum:
+                    raise ValueError(
+                        f"StateTransition would move {state_name!r} outside "
+                        f"{minimum}..{maximum}: {before} + {delta} = {after}"
+                    )
+
+                connection.execute(
+                    """
+                    UPDATE state_values
+                    SET value = ?, updated_at = ?, ruleset_version = ?
+                    WHERE name = ?
+                    """,
+                    (
+                        after,
+                        timestamp,
+                        self.config["ruleset_version"],
+                        state_name,
+                    ),
+                )
+                connection.execute(
+                    """
+                    INSERT INTO state_transitions(
+                        public_id, state_name, timestamp, before_value, delta,
+                        after_value, cause_type, source_id, rule_id, reason,
+                        importance, repetition_factor, elapsed_seconds,
+                        goal_id, candidate_id
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        public_id,
+                        state_name,
+                        timestamp,
+                        before,
+                        delta,
+                        after,
+                        cause_type.strip(),
+                        source_id.strip() if source_id is not None else None,
+                        rule_id.strip(),
+                        reason.strip(),
+                        importance,
+                        float(repetition_factor)
+                        if repetition_factor is not None
+                        else None,
+                        float(elapsed_seconds) if elapsed_seconds is not None else None,
+                        goal_id.strip() if goal_id is not None else None,
+                        candidate_id.strip() if candidate_id is not None else None,
+                    ),
+                )
+        except sqlite3.IntegrityError as error:
+            raise ValueError(
+                f"Cannot apply StateTransition {public_id}: {error}"
+            ) from error
+
+        return self.get_state_transition(public_id)
+
+    def get_state_transition(self, public_id):
+        _validate_transition_id(public_id)
+        with self._connect() as connection:
+            row = connection.execute(
+                "SELECT * FROM state_transitions WHERE public_id = ?",
+                (public_id,),
+            ).fetchone()
+        return self._row_to_state_transition(row)
+
+    def list_state_transitions(self, *, state_name=None, limit=None):
+        if state_name is not None and state_name not in self.config["states"]:
+            raise ValueError(f"Unknown Internal State: {state_name!r}")
+
+        if limit is not None and (
+            not isinstance(limit, int)
+            or isinstance(limit, bool)
+            or limit < 0
+        ):
+            raise ValueError(
+                "StateTransition limit must be a non-negative integer or null"
+            )
+
+        if limit == 0:
+            return []
+
+        clauses = []
+        values = []
+        if state_name is not None:
+            clauses.append("state_name = ?")
+            values.append(state_name)
+
+        where = f"WHERE {' AND '.join(clauses)}" if clauses else ""
+        limit_sql = ""
+        if limit is not None:
+            limit_sql = " LIMIT ?"
+            values.append(limit)
+
+        with self._connect() as connection:
+            rows = connection.execute(
+                f"""
+                SELECT * FROM state_transitions
+                {where}
+                ORDER BY row_id DESC
+                {limit_sql}
+                """,
+                values,
+            ).fetchall()
+
+        return [
+            self._row_to_state_transition(row)
+            for row in reversed(rows)
+        ]
+
+    def transition_count(self, state_name=None):
+        if state_name is not None and state_name not in self.config["states"]:
+            raise ValueError(f"Unknown Internal State: {state_name!r}")
+
+        query = "SELECT COUNT(*) AS count FROM state_transitions"
+        values = ()
+        if state_name is not None:
+            query += " WHERE state_name = ?"
+            values = (state_name,)
+
+        with self._connect() as connection:
+            row = connection.execute(query, values).fetchone()
+        return row["count"]
+
     def export_debug(self):
         with self._connect() as connection:
             rows = connection.execute(
@@ -246,4 +513,5 @@ class InternalStateStore:
             "ruleset_version": self.ruleset_version(),
             "tables": [row["name"] for row in rows],
             "states": self.list_states(),
+            "state_transition_count": self.transition_count(),
         }
