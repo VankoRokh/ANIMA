@@ -17,9 +17,9 @@ ANIMA — исследовательский проект модульного �
 <!-- AUTO:summary:START -->
 Версия прототипа: **00.1-alpha** (из кода).
 
-Текущий фокус: **1 — Cognitive Memory** (InProgress).
+Текущий фокус: **2 — Internal State** (InProgress).
 
-Stage 1.12 — Performance Baseline: измерить Event append, Memory create/update, Entity/Knowledge lookup, FTS, 1-hop Relations, FAST/DEEP Context, batch processing, CPU, peak RAM и storage scaling на синтетических 1k/10k/100k данных без преждевременных SLA.
+Stage 2.0 — Internal State specification: определить минимальный набор целей и внутренних переменных, их диапазоны, источники изменений, decay/recovery и объяснимое влияние на выбор до реализации runtime-механики.
 
 [Этапы и критерии](docs/ROADMAP/README.md).
 <!-- AUTO:summary:END -->
