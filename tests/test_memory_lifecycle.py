@@ -17,6 +17,7 @@ EVENT_2 = "ev_22222222-2222-4222-8222-222222222222"
 MEMORY_1 = "mem_33333333-3333-4333-8333-333333333333"
 MEMORY_2 = "mem_44444444-4444-4444-8444-444444444444"
 MEMORY_3 = "mem_55555555-5555-4555-8555-555555555555"
+ENTITY_SQLITE = "ent_77777777-7777-4777-8777-777777777777"
 
 
 def create_event(log, event_id, text, timestamp):
@@ -127,6 +128,19 @@ def test_merge_preserves_source_record_and_raw_event_provenance(tmp_path):
         "Constraint: keep storage local.",
         TIME_2,
     )
+    links.create_entity(
+        entity_type="technology",
+        canonical_name="SQLite",
+        public_id=ENTITY_SQLITE,
+    )
+    links.create_relation(
+        source_kind="memory",
+        source_id=MEMORY_2,
+        relation_type="about",
+        target_kind="entity",
+        target_id=ENTITY_SQLITE,
+        created_at=TIME_2,
+    )
 
     result = lifecycle.merge(
         MEMORY_2,
@@ -150,6 +164,22 @@ def test_merge_preserves_source_record_and_raw_event_provenance(tmp_path):
     assert set(store.source_events(MEMORY_1)) == {EVENT_1, EVENT_2}
     assert store.source_events(MEMORY_2) == [EVENT_2]
     assert result["source_events_added"] == [EVENT_2]
+    assert result["entity_links_added"] == [ENTITY_SQLITE]
+
+    target_about = links.relations_for(
+        "memory",
+        MEMORY_1,
+        direction="outgoing",
+        relation_types={"about"},
+    )
+    source_about = links.relations_for(
+        "memory",
+        MEMORY_2,
+        direction="outgoing",
+        relation_types={"about"},
+    )
+    assert [relation["target_id"] for relation in target_about] == [ENTITY_SQLITE]
+    assert [relation["target_id"] for relation in source_about] == [ENTITY_SQLITE]
 
     target_provenance = provenance.memory(MEMORY_1)
     assert {
@@ -164,6 +194,7 @@ def test_merge_preserves_source_record_and_raw_event_provenance(tmp_path):
     assert target_history[-1]["changes"]["content_before"] == target["content"]
     assert target_history[-1]["changes"]["content_after"] == merged_target["content"]
     assert target_history[-1]["changes"]["source_events_added"] == [EVENT_2]
+    assert target_history[-1]["changes"]["entity_links_added"] == [ENTITY_SQLITE]
 
     source_history = lifecycle.history(MEMORY_2)
     assert source_history[-1]["operation"] == "merged"
@@ -268,3 +299,32 @@ def test_merge_rejects_different_type_or_domain(tmp_path):
 
     with pytest.raises(ValueError, match="different domains"):
         lifecycle.merge(MEMORY_3, MEMORY_1, merged_at=TIME_2)
+
+
+def test_lifecycle_rejects_timestamps_before_last_memory_change(tmp_path):
+    store = MemoryStore(tmp_path / "memory.db")
+    lifecycle = MemoryLifecycle(memory_store=store)
+
+    create_memory(
+        store,
+        MEMORY_1,
+        EVENT_1,
+        "Target",
+        TIME_2,
+    )
+    create_memory(
+        store,
+        MEMORY_2,
+        EVENT_2,
+        "Source",
+        TIME_2,
+    )
+
+    with pytest.raises(ValueError, match="closed_at cannot be earlier"):
+        lifecycle.close(MEMORY_1, closed_at=TIME_1)
+
+    with pytest.raises(ValueError, match="merged_at cannot be earlier"):
+        lifecycle.merge(MEMORY_2, MEMORY_1, merged_at=TIME_1)
+
+    assert store.get_memory(MEMORY_1)["status"] == "open"
+    assert store.get_memory(MEMORY_2)["status"] == "open"
