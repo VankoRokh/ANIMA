@@ -25,21 +25,21 @@ class AnimaTestHarness:
             self.data_dir / "identity.json"
         )
 
-        self.memory = EpisodicMemory(
-            self.data_dir / "memories.jsonl"
-        )
-
         self.event_bus = EventBus()
 
         self.event_log = EventLog(
             self.data_dir / "events.jsonl"
         )
 
-        self.memory_filter = MemoryFilter()
-
         self.memory_store = MemoryStore(
-            self.data_dir / "memories.jsonl"
+            self.data_dir / "memory.db"
         )
+
+        self.memory = EpisodicMemory(
+            self.memory_store
+        )
+
+        self.memory_filter = MemoryFilter()
 
         self.trace = DiagnosticTrace()
         self.metrics = DiagnosticMetrics()
