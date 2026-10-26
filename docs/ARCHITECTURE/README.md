@@ -1,168 +1,207 @@
 # Реализованная архитектура
 
-Здесь описан работающий локальный Python-контур. Будущие механизмы находятся в
-[Roadmap](../ROADMAP/README.md) и [исследованиях](../ROADMAP/Research.md).
-Архитектура и реализация объединены: каждая строка ведёт к исходнику и проверке.
+Здесь описан только работающий и подтверждённый локальный Python-контур.
+Будущие механизмы находятся в [Roadmap](../ROADMAP/README.md) и
+[Research](../ROADMAP/Research.md). Принятый ADR или наличие таблицы в схеме сами
+по себе не считаются реализацией.
 
 ## Компоненты и подтверждение
 
 | Компонент | Код и граница ответственности | Проверки |
 |---|---|---|
-| Сборка и путь данных | [main](../../main.py) собирает зависимости; [paths](../../anima/config/paths.py) выбирает каталог | [cwd и внешний каталог](../../tests/test_data_directory.py), [CLI/headless](../../tests/test_d1_validation.py) |
-| Runtime | [Runtime](../../anima/runtime.py): wake/user_input/sleep, session_id для Events, обработка событий, snapshot | [lifecycle](../../tests/test_runtime.py), [end-to-end](../../tests/test_d1_validation.py) |
-| Headless | [ScenarioRunner](../../anima/scenario.py): список шагов без input(), результат каждого шага | [сценарии и ошибки](../../tests/test_scenario.py) |
-| CLI | [run_cli](../../anima/interfaces/cli.py): ввод/вывод и штатные EOF/Ctrl+C | [прерывания](../../tests/test_cli_session.py), [эквивалентность](../../tests/test_d1_validation.py) |
-| Идентичность | [Identity](../../anima/core/identity.py): новый UUID4 или загрузка существующего | [ID при переносе](../../tests/test_data_directory.py), [ID в snapshot](../../tests/test_runtime.py) |
-| Состояние | [AnimaState](../../anima/core/state.py): lifecycle, проверка структуры, временный файл и os.replace | [валидация и сохранение](../../tests/test_state.py), [recovery](../../tests/test_recovery.py) |
-| События | [Event/EventBus](../../anima/core/event_bus.py): `ev_` UUIDv4, hierarchical type, timezone-aware timestamp, source/session/references и FIFO | [schema/валидация/ID/references](../../tests/test_events.py) |
-| Сырой журнал | [EventLog](../../anima/memory/event_log.py): append-only JSONL, валидация и duplicate-ID detection при write/reopen | [порядок/повреждения/дубликаты/reopen](../../tests/test_events.py), [история после restore](../../tests/test_recovery.py) |
-| SQLite Memory Store | [MemoryStore](../../anima/memory/memory_store.py): schema v1, transactions, Memory CRUD, source links, indexes и FTS5 | [schema/CRUD/reopen/rollback/constraints/FTS/FK](../../tests/test_memory.py) |
-| Чтение памяти | [EpisodicMemory](../../anima/memory/episodic.py): совместимый read-view `load/count/last` над MemoryStore | [reader view](../../tests/test_memory.py), [restore](../../tests/test_recovery.py) |
-| Временный отбор памяти | [MemoryFilter](../../anima/memory/filter.py): непустой `conversation.user` → простая episodic Memory | [Runtime/D1 integration](../../tests/test_d1_validation.py) |
-| Наблюдаемость | [DiagnosticTrace](../../anima/diagnostics/trace.py): записи/строки; [DiagnosticMetrics](../../anima/diagnostics/metrics.py): длительности и process resources | [trace](../../tests/test_trace.py), [metrics/snapshot](../../tests/test_metrics.py) |
-| Изоляция проверок | [AnimaTestHarness](../../tests/harness.py) собирает Runtime во временном каталоге | [CLI/headless](../../tests/test_d1_validation.py) |
+| Сборка и путь данных | [main](../../main.py) собирает зависимости; [paths](../../anima/config/paths.py) выбирает каталог данных | [cwd/внешний каталог](../../tests/test_data_directory.py), [CLI/headless](../../tests/test_d1_validation.py) |
+| Runtime | [Runtime](../../anima/runtime.py): wake/user_input/sleep, Event processing и snapshot | [lifecycle](../../tests/test_runtime.py), [end-to-end](../../tests/test_d1_validation.py) |
+| CLI и headless | [CLI](../../anima/interfaces/cli.py) владеет терминальным вводом; [ScenarioRunner](../../anima/scenario.py) выполняет сценарии без input() | [CLI session](../../tests/test_cli_session.py), [scenario](../../tests/test_scenario.py) |
+| Идентичность и состояние | [Identity](../../anima/core/identity.py) хранит постоянный UUID4; [AnimaState](../../anima/core/state.py) сохраняет lifecycle/state | [state](../../tests/test_state.py), [recovery](../../tests/test_recovery.py) |
+| Events | [Event/EventBus](../../anima/core/event_bus.py): `ev_` UUIDv4, hierarchical type, timestamp/source/session/references и FIFO | [Event Foundation](../../tests/test_events.py) |
+| Raw Event Log | [EventLog](../../anima/memory/event_log.py): append-only JSONL, validation и duplicate-ID detection | [порядок/повреждения/reopen](../../tests/test_events.py), [restore](../../tests/test_recovery.py) |
+| SQLite Memory Store | [MemoryStore](../../anima/memory/memory_store.py): schema v1, transactions, Memory CRUD/source links, indexes и FTS5 | [store/FTS/FK/rollback](../../tests/test_memory.py) |
+| Memory read-view | [EpisodicMemory](../../anima/memory/episodic.py): `load/count/last` поверх того же MemoryStore | [reader view](../../tests/test_memory.py), [recovery](../../tests/test_recovery.py) |
+| Entities / Relations | [LinkStore](../../anima/memory/link_store.py): Entity aliases, универсальные Relations и low-level Knowledge anchors | [relations/entity resolution](../../tests/test_provenance.py) |
+| Provenance | [ProvenanceResolver](../../anima/memory/provenance.py): Memory/Relation/Knowledge/Entity → source Memory → raw Event | [provenance](../../tests/test_provenance.py) |
+| Memory Processor | [MemoryProcessor](../../anima/memory/processor.py): Selection, bounded candidates, explainable Association и create/update/create_related | [association corpus](../../tests/test_memory_processor.py) |
+| Memory Composer | [RuleBasedComposer](../../anima/memory/composer.py): deterministic bounded `content`, deduplication и conservative revision | [composer](../../tests/test_memory_composer.py), [revision](../../tests/test_memory_composer_revision.py) |
+| Memory Lifecycle / History | [MemoryLifecycle](../../anima/memory/lifecycle.py): OPEN→CLOSED, Merge→MERGED и compact history | [lifecycle/merge/provenance](../../tests/test_memory_lifecycle.py) |
+| Наблюдаемость | [DiagnosticTrace](../../anima/diagnostics/trace.py) и [DiagnosticMetrics](../../anima/diagnostics/metrics.py) | [trace](../../tests/test_trace.py), [metrics](../../tests/test_metrics.py) |
+| Изоляция тестов | [AnimaTestHarness](../../tests/harness.py) собирает Runtime во временном каталоге | [CLI/headless](../../tests/test_d1_validation.py) |
 
-Показательные проверки: [Event Foundation TV-0004](../TESTING/Results/TV-0004.md)
-и [SQLite Memory Store TV-0005](../TESTING/Results/TV-0005.md).
+Показательные результаты: [TV-0004](../TESTING/Results/TV-0004.md),
+[TV-0005](../TESTING/Results/TV-0005.md),
+[TV-0006](../TESTING/Results/TV-0006.md),
+[TV-0007](../TESTING/Results/TV-0007.md),
+[TV-0008](../TESTING/Results/TV-0008.md),
+[TV-0009](../TESTING/Results/TV-0009.md).
 
-## Жизненный цикл и запись
+## Рабочий путь записи
 
-`main.py` создаёт один `MemoryStore(data/memory.db)` и передаёт его Runtime/CLI.
-`wake()` создаёт `system.wake`, `user_input(text)` — `conversation.user`, `sleep()` —
-`system.sleep`. Runtime добавляет активный `session_XXXXXXXX`, записывает каждый
-Event в append-only `events.jsonl`, а временный MemoryFilter отбирает только
-непустой пользовательский ввод.
+Runtime создаёт Events и всегда сначала пишет их в append-only `events.jsonl`.
+Затем `MemoryProcessor` выполняет Selection и Association. Для содержательных
+`conversation.user` он либо создаёт новую Memory, либо обновляет OPEN-эпизод, либо
+создаёт новую связанную Memory. Формирование `content` вынесено в отдельный
+Composer.
 
 ```mermaid
 flowchart TD
     Q["EventBus.next_event"] --> L["EventLog.write"]
-    L --> F{"Непустой conversation.user?"}
-    F -->|Да| M["MemoryFilter.create_memory"]
-    M --> DB["MemoryStore.write → SQLite transaction"]
-    F -->|Нет| S["Увеличить events_processed"]
-    DB --> S
-    S --> T["Trace и результат Runtime"]
-    T --> N{"Есть следующее событие?"}
-    N -->|Да| Q
-    N -->|Нет| E["Возврат вызывающему"]
+    L --> P["MemoryProcessor"]
+    P --> S{"Selection"}
+    S -->|skip| R["register_event + trace"]
+    S -->|process| A["bounded Association"]
+    A -->|HIGH| U["UPDATE OPEN Memory"]
+    A -->|MEDIUM| C["CREATE + related_to"]
+    A -->|LOW| N["CREATE"]
+    U --> X["RuleBasedComposer"]
+    C --> X
+    N --> X
+    X --> DB["memory.db"]
+    DB --> R
 ```
 
-JSONL Event и SQLite Memory сознательно не являются одной общей транзакцией.
-Persistent `event_processing` и безопасный retry относятся к Stage 1.10.
+JSONL Event и SQLite Memory сознательно не объединены одной общей транзакцией.
+Persistent `event_processing`/retry относится к Stage 1.10.
 
 ## Event Foundation
 
 Event имеет обязательные поля `id`, `type`, `timestamp`, `source`, `session_id`,
-`payload`, `references`. Public ID — `ev_` + canonical UUIDv4. Новый timestamp
-создаётся в UTC и обязан быть ISO 8601 со смещением.
-
-Тип события — hierarchical lowercase name минимум из двух сегментов, например
-`system.wake`, `conversation.user`, `observation.visual`. Lifecycle Events требуют
-null payload; `conversation.user` — объект со строковым `text`; остальные типы
-допускают JSON-serializable payload. `references` — список `{kind, id}`.
+`payload`, `references`. Public ID — `ev_` + UUIDv4; timestamp — ISO 8601 со
+смещением. Тип — hierarchical lowercase name (`system.wake`,
+`conversation.user`, `observation.visual`).
 
 EventLog при reopen валидирует существующий журнал и восстанавливает ID set.
-Duplicate ID, malformed JSON и invalid Event дают определённую ошибку.
+Malformed JSON, invalid Event и duplicate Event ID дают определённую ошибку.
 
 ## SQLite Memory Store
 
-`memory.db` имеет `schema_version = 1`. Соединения включают
-`PRAGMA foreign_keys = ON`; инициализация не принимает неизвестную версию схемы
-или невалидный SQLite-файл. Записи изменяются через явный transaction context:
-успех делает commit, исключение — rollback.
+`memory.db` использует schema version 1 и `PRAGMA foreign_keys = ON`.
+SQLite-транзакция делает commit только при полном успехе операции; исключение
+вызывает rollback.
 
-### Реализованные таблицы
+Основные таблицы:
 
-- `schema_meta`;
 - `memories`, `memory_sources`;
-- `knowledge`, `knowledge_sources`;
+- `knowledge`;
 - `entities`, `entity_aliases`;
-- `memory_entities`, `knowledge_entities`;
 - `relations`;
 - `history`;
 - `event_processing`;
-- FTS5 virtual tables `memory_fts`, `knowledge_fts`.
+- FTS5: `memory_fts`, `knowledge_fts`.
 
-На Stage 1.2 поведенчески реализован именно Memory слой. Таблицы Knowledge,
-Entities, Relations, History и event_processing пока являются подготовленным
-каркасом следующих шагов и сами по себе не доказывают их функциональность.
+`knowledge_sources`, `memory_entities`, `knowledge_entities` остаются ранним
+каркасом schema v1; канонические семантические связи уже хранятся в универсальной
+`relations`. Их удаление/миграция не требуется до доказанной необходимости schema v2.
 
 ### Memory contract
 
-`memories` использует внутренний `INTEGER PRIMARY KEY` и внешний
-`mem_<UUIDv4>`. Поля: `type`, `domain`, `status`, `content`, `importance`,
-`created_at`, `updated_at`, `closed_at`, `merged_into`.
+Memory использует внутренний integer key и внешний `mem_<UUIDv4>`.
+Поля: `type`, `domain`, `status`, `content`, `importance`, `created_at`,
+`updated_at`, `closed_at`, `merged_into`.
 
-Допустимо:
+Допустимые статусы: `open`, `closed`, `merged`. Runtime/Processor создаёт
+`episodic/user/open`, importance=1. `memory_sources` связывает Memory с raw Event ID.
 
-- type: `episodic`, `procedural`;
-- domain: `self`, `user`, `project`, `environment`, `system`;
-- status: `open`, `closed`, `merged`;
-- importance: целое `0..3`.
+FTS5 индексирует `Memory.content`; triggers синхронизируют индекс при
+insert/update/delete. Это baseline поиска, а не доказательство производительности.
 
-Runtime на текущем переходном шаге создаёт `episodic/user/open`, importance=1.
-`MemoryFilter` превращает текст `conversation.user` в строковый `content` и
-передаёт его `event_id` как `source_event_id`. `MemoryStore.write()` создаёт
-Memory и связь в `memory_sources` одной SQLite-транзакцией.
+## Entities, Relations и provenance
 
-MemoryStore предоставляет `create_memory`, `get_memory`, `list_memories`,
-`count`, `last`, `source_events`, `update_memory`, `delete_memory` и
-`search_memories`. `EpisodicMemory` больше не владеет отдельным файлом: это тонкий
-read-view над тем же Store для сохранения существующего Runtime/CLI interface.
+Entity — устойчивый якорь с canonical name, aliases и status. Resolution идёт
+консервативно: exact canonical → exact alias → normalized match. Неоднозначность
+не приводит к автоматическому merge.
 
-### FTS и индексы
+Semantic links хранятся в одной `relations`:
 
-FTS5 индексирует `Memory.content` и `Knowledge.statement`. SQLite triggers
-синхронизируют FTS при insert/update/delete. `search_memories()` использует MATCH,
-`bm25` и limit. На Memory есть индексы status/domain/type/created_at; source Event
-индексируется отдельно. Остальные таблицы также получили baseline indexes для
-будущих запросов Stage 1.
+- `about`;
+- `related_to`, `continues`, `derived_from`;
+- `supports`, `contradicts`, `investigates`;
+- `supersedes`.
 
-Это функциональный baseline, а не доказательство оптимальной производительности.
-Benchmark и решение об оптимизации относятся к Stage 1.12.
+Каждая Relation обязана иметь `source_memory_id`, поэтому семантическая связь не
+возникает без прослеживаемого Memory evidence. `ProvenanceResolver` проверяет
+существование фактических source Events в `events.jsonl`, а не только наличие ID
+в SQLite.
 
-## Каталог и контракты данных
+Подтверждённые цепочки включают:
 
-По умолчанию каталог — `<project>/data`; `ANIMA_DATA_DIR` задаёт другой путь.
-Файлы экземпляра резервируются отдельно от Git.
+```text
+Memory → Event
+Knowledge → supporting/contradicting Memory → Event
+Relation → source Memory → Event
+Entity → about Memory → Event
+```
 
-| Файл | Фактический контракт |
+## Memory Processor
+
+Selection Stage 1.4 обрабатывает непустой `conversation.user`; lifecycle Events и
+пустой ввод пропускаются. Association не сравнивает Event со всей памятью:
+берётся bounded набор OPEN episodic/user Memories и FTS candidates.
+
+Explainable score использует domain/type, session, lexical overlap, Entity overlap
+и близость времени. Сильное совпадение обновляет OPEN Memory; среднее создаёт
+новую + `related_to`; слабое создаёт независимую Memory. Большой временной разрыв
+блокирует UPDATE. Trace сохраняет action, score и reasons.
+
+CLOSED/MERGED записи не используются как UPDATE candidates.
+
+## RuleBasedComposer
+
+Composer отделён от Association: Processor решает **куда** писать, Composer —
+**что** сохранять в `Memory.content`.
+
+Baseline Composer:
+
+- нормализует whitespace;
+- удаляет точные повторы;
+- имеет явный `max_chars` budget;
+- при переполнении приоритизирует решения, результаты, изменения, ограничения,
+  причины и открытые вопросы;
+- может заменить короткий факт более полной формулировкой;
+- допускает явную replacement-формулировку (`instead/вместо/replaced/заменили`).
+
+Это deterministic baseline, а не полноценное семантическое суммаризирование.
+Small/Deep Composer остаётся отложенным сравнительным механизмом.
+
+## Memory Lifecycle и History
+
+`MemoryLifecycle` реализует только явные операции:
+
+- `OPEN → CLOSED`;
+- `OPEN/CLOSED source → MERGED`, если target остаётся OPEN.
+
+Merge требует одинаковые type/domain, запрещает self-merge и timestamp раньше
+последнего изменения. Source не удаляется: он сохраняет свой `content`, собственные
+source Event links, `status=merged` и `merged_into=<target>`.
+
+Target получает недостающие source Event links и активные `about` Entity anchors.
+Обе стороны Merge и close фиксируются в `history`; операция выполняется одной
+SQLite-транзакцией. SPLIT намеренно не входит в Stage 1 baseline.
+
+## Каталог данных и recovery
+
+По умолчанию данные находятся в `<project>/data`; `ANIMA_DATA_DIR` задаёт другой
+каталог.
+
+| Файл | Контракт |
 |---|---|
-| `identity.json` | schema_version, instance_id, created_at; UUID4 |
+| `identity.json` | schema_version, постоянный instance_id, created_at |
 | `state.json` | lifecycle/status/session/timestamps/events_processed |
-| `events.jsonl` | append-only Events: `ev_<UUIDv4>`, type, timestamp, source, session_id, payload, references |
-| `memory.db` | SQLite schema v1; Cognitive Memory storage baseline |
+| `events.jsonl` | append-only raw Events |
+| `memory.db` | SQLite Cognitive Memory storage |
 
-`memories.jsonl` больше не является частью рабочего Runtime и не мигрируется.
-Старые тестовые данные были признаны неценными; compatibility import отсутствует.
+Backup/restore копирует весь data-каталог. После восстановления продолжаются
+identity, session/event history и SQLite Memory Store. Старый `memories.jsonl`
+больше не является рабочим форматом и не мигрируется.
 
-## Recovery и подтверждённые свойства
+## Подтверждённые ограничения
 
-Backup/restore копирует весь data-каталог, включая `memory.db`. После восстановления
-следующая сессия продолжает Event history, а Memory Store повторно открывает
-существующую SQLite-базу. D1 CLI/headless остаются эквивалентны после замены
-JSONL-memory на SQLite.
-
-Локальная проверка Stage 1.2 на Python 3.14.4: полный suite `84 passed`; отдельный
-Memory Store suite `8 passed`. Подробности и ограничения — [TV-0005](../TESTING/Results/TV-0005.md).
-
-## Подтверждённые границы и ограничения
-
-- EventBus FIFO остаётся RAM-only; persistent queue и acknowledgement отсутствуют.
-- EventLog и `memory.db` не являются одной атомарной транзакцией.
-- `event_processing` пока только таблица схемы; pending/processing/retry ещё не реализованы.
-- `memory_sources` хранит `event_id`, но SQLite не может foreign-key ссылаться на
-  append-only JSONL. Существование source Event пока обеспечивается приложением и тестами.
-- Memory lifecycle поля существуют, но полные правила OPEN/CLOSED/MERGED и Merge
-  относятся к Stage 1.6.
-- Entity aliases, Relations semantics и полный provenance реализуются в Stage 1.3.
-- Knowledge lifecycle реализуется в Stage 1.7.
-- FTS5 уже работает как baseline, но полный Retrieval/ranking относится к Stage 1.8.
-- MemoryFilter остаётся временным простым адаптером; Association/Processor и
-  Composer появятся в Stage 1.4–1.5.
-- Производительность на 1k/10k/100k ещё не измерялась; оптимизация не выполнялась.
-- Модели, embeddings, vector/graph DB, Sleep consolidation и distributed memory
-  остаются отложенными механизмами.
-
-Механизм переносится сюда из планов после реализации и подтверждения сценариями.
-Принятый ADR сам по себе не доказывает готовность.
+- EventBus FIFO остаётся RAM-only; persistent queue/ack отсутствуют.
+- JSONL и SQLite не образуют одну атомарную транзакцию.
+- `event_processing` пока только schema-каркас; idempotent retry — Stage 1.10.
+- Автоматические правила закрытия/merge Memory ещё не реализованы; lifecycle
+  вызывается явно.
+- Knowledge anchors и Relations существуют, но **полный Knowledge lifecycle**
+  `provisional/confirmed/challenged/superseded/rejected` относится к текущему
+  Stage 1.7 и не считается реализованным до отдельной зелёной проверки.
+- Общий Retrieval/ranking — Stage 1.8; Context Builder — Stage 1.9.
+- Производительность 1k/10k/100k ещё не измерялась; оптимизация не выполнялась.
+- LLM/Deep Composer, embeddings, vector/graph DB, Sleep consolidation и
+  distributed memory остаются отложенными механизмами.
