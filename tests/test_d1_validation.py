@@ -95,15 +95,15 @@ def test_d1_cli_and_headless_are_equivalent(
     assert scenario_result == [
         {
             "action": "wake",
-            "events": ["wake"],
+            "events": ["system.wake"],
         },
         {
             "action": "user_input",
-            "events": ["user_input"],
+            "events": ["conversation.user"],
         },
         {
             "action": "sleep",
-            "events": ["sleep"],
+            "events": ["system.sleep"],
         },
     ]
 
@@ -125,7 +125,41 @@ def test_d1_cli_and_headless_are_equivalent(
     ] == [
         event["type"]
         for event in cli_events
+    ] == [
+        "system.wake",
+        "conversation.user",
+        "system.sleep",
     ]
+
+    assert [
+        event["source"]
+        for event in headless_events
+    ] == [
+        event["source"]
+        for event in cli_events
+    ] == [
+        "runtime",
+        "user",
+        "runtime",
+    ]
+
+    assert {
+        event["session_id"]
+        for event in headless_events
+    } == {"session_00000001"}
+    assert {
+        event["session_id"]
+        for event in cli_events
+    } == {"session_00000001"}
+
+    assert len({
+        event["id"]
+        for event in headless_events
+    }) == 3
+    assert len({
+        event["id"]
+        for event in cli_events
+    }) == 3
 
     assert len(headless_memory) == 1
     assert len(cli_memory) == 1
