@@ -6,7 +6,7 @@
 показывают этот порядок, а не требуют отдельной платы или модели на каждом шаге.
 
 <!-- AUTO:roadmap:START -->
-**Текущая работа:** Stage 2.0 — Internal State specification: определить минимальный набор целей и внутренних переменных, их диапазоны, источники изменений, decay/recovery и объяснимое влияние на выбор до реализации runtime-механики.
+**Текущая работа:** Stage 2.1 — Internal State Storage: реализовать отдельную конфигурацию и transactional internal_state.db для текущих значений, причинной истории и lifecycle целей до механики выбора.
 
 **Фокус:** 2 — Internal State (InProgress).
 
@@ -171,21 +171,134 @@ performance baseline зафиксирован. Stage 1 завершён; док�
 
 ## Stage 2
 
-**Цель и наблюдение.** Минимальные цели и ограниченные внутренние переменные
-причинно влияют на выбор. Одинаковый вход при neutral/altered state даёт ожидаемое
-различие приоритетов с объяснимой цепочкой причин.
+**Цель и наблюдение.** Доказать, что минимальные Goals и ограниченный Internal State
+предсказуемо и причинно влияют на сравнение вариантов, не подменяя саму цель.
+Одинаковая ситуация и одинаковые Candidates при neutral/altered state должны давать
+заранее ожидаемое изменение score/priority, а trace — полностью объяснять источник
+каждого изменения и итогового выбора. Архитектурный выбор зафиксирован в
+[ADR-006](../DECISIONS/README.md#adr-006).
 
-**Работа.** Цель имеет источник, приоритет, статус, критерий результата и отмену.
-Определяются диапазоны переменных, изменение/decay/recovery и сохранение.
-Внешнее эмоциональное выражение зависит от внутреннего слоя.
+**Принципы.** Internal State является регулирующим входом, а не отдельным субъектом
+решения: он не создаёт Goal или Candidate и не может молча отменить внешнюю задачу.
+Первый baseline детерминирован и независим от LLM. Все значения ограничены
+`0.0..1.0`; прямое изменение из произвольных компонентов запрещено. Каждое изменение
+проходит через Transition Engine и сохраняет причинную историю. Точные коэффициенты,
+веса и рабочий период являются конфигурацией и уточняются тестами, а не считаются
+неизменной архитектурой.
 
-**Сценарии и приёмка.** Одинаковые входы с разными контролируемыми состояниями;
-значения в диапазоне; у каждого изменения source/reason в trace. Restart не
-создаёт скрытого дрейфа; завершённая/отменённая цель больше не активна; внешнее
-выражение не меняет внутренний слой без отдельного правила. Все контрольные
-сценарии дают предсказуемое направление выбора и воспроизводимое состояние.
+### Порядок реализации Stage 2
 
-**Регрессия и доказательства.** Предыдущие этапы; сравнение neutral/altered и trace причин.
+| Шаг | Результат | Проверка завершения |
+|---|---|---|
+| **2.0 Specification — Complete** | Зафиксированы Goal, четыре baseline state, causal transitions, time dynamics, Choice и Expression; принят ADR-006 | Документация однозначно задаёт границы Stage 2, invariants и отложенные механизмы |
+| **2.1 Internal State Storage** | Версионируемая конфигурация правил и transactional `internal_state.db` для state/goals/history | Schema создаётся/переоткрывается; constraints и transaction rollback защищают текущие значения и историю |
+| **2.2 State History** | Причинный `StateTransition` с `before/delta/after`, source, rule, reason и optional context | Любое контрольное изменение восстанавливается до причины; прямой обход history/state transaction не допускается |
+| **2.3 Goal Model** | Stable Goal с source, priority, status, success criterion, timestamps и resolution reason; `ACTIVE/BLOCKED/COMPLETED/CANCELLED` | Lifecycle и invalid transitions детерминированы; completed/cancelled Goal больше не участвует в выборе |
+| **2.4 State Variables** | `fatigue/uncertainty/frustration/satisfaction`, range/baseline и правила влияния | Clamp/validation работают; каждое состояние имеет отдельную семантику и не дублирует Goal |
+| **2.5 Transition Engine** | Event/result-driven правила с importance и repetition factors там, где они нужны | Одинаковый вход даёт одинаковый delta; high/low importance и repeated success/failure дают ожидаемо различный эффект |
+| **2.6 Time Dynamics** | Инъецируемое время и lazy elapsed-time evaluation для growth/decay/recovery | Частота цикла и restart не меняют итог; uncertainty не decay; остальные временные правила воспроизводимы |
+| **2.7 Goal Progress / Arbitration** | Проверяемый progress/result и объяснимый порядок нескольких активных Goals | Успех требует observation/criterion; blocked/reactivated и конкурирующие Goals дают определённый порядок без self-goal override |
+| **2.8 Choice Engine** | Candidates получают base evaluation и ограниченные state modifiers с score trace | Neutral/altered state меняет ожидаемый выбор; ни один modifier не имеет неограниченного веса и не создаёт новый Candidate |
+| **2.9 Expression Adapter** | Internal State → зависимый ExpressionProfile | Tone/voice/visual profile меняется от state, но Expression сам не меняет Internal State без отдельного правила |
+| **2.10 Runtime Integration** | Полная цепочка `Event/Result → State/Goal → Candidates → Choice → Trace` в headless Runtime | Scenario snapshot показывает Goals, state, transitions, component scores и выбранный Candidate |
+| **2.11 Recovery / Idempotency** | Crash/restart/replay не дублируют transitions и не создают скрытый time drift | Повтор одного source не применяет эффект дважды; recovery сохраняет state/history/goals согласованными |
+| **2.12 Decision Performance** | Baseline latency/CPU/RAM для Choice с ростом Candidates и диагностикой | Измерены 2/10/100 Candidates: base, state modifiers и modifiers+trace/history; SLA пока не задаётся |
+| **2.13 Stage Validation** | End-to-end canonical scenarios для четырёх states, Goals, Choice, time, restart и Expression | Все ожидаемые направления изменений/выбора воспроизводимы, causal history полна и регрессия предыдущих этапов зелёная |
+
+### Goal и регулирующий слой
+
+Goal содержит стабильный ID, `source`, `priority`, `status`, описание/критерий
+результата, timestamps и причину разрешения. Самогенерируемые цели на Stage 2 не
+реализуются; поле source оставляет для них архитектурное место без преждевременного
+механизма authority. Внутренняя оценка, состояние Goal и объективная проверка
+результата являются разными фактами: текст «успешно» или вызов инструмента сами по
+себе не завершают Goal.
+
+Первый Internal State состоит из четырёх переменных:
+
+| State | Повышение / понижение | Временное поведение | Основное влияние на Choice |
+|---|---|---|---|
+| `fatigue` | awake duration + workload; recovery/Sleep снижает | растёт относительно настраиваемого `awake_work_period`; восстановление при отдыхе | штрафует дорогие/трудоёмкие варианты, но не отменяет Goal |
+| `uncertainty` | недостаток/противоречие информации повышает; подтверждение снижает с учётом importance/quality | пассивно не меняется | повышает ценность information gain и осторожность к необратимому риску |
+| `frustration` | повторные неудачи одной стратегии усиливают рост; прогресс/смена стратегии снижают | постепенно возвращается к baseline | снижает склонность повторять подтверждённо неудачный путь и поддерживает альтернативу |
+| `satisfaction` | только проверенный прогресс/успех; importance усиливает, однотипные повторы дают diminishing returns | постепенно затухает к baseline | даёт небольшой бонус продолжению доказавшей эффективность стратегии |
+
+Для `fatigue` time component зависит от доли текущего awake-периода относительно
+настраиваемой рабочей длительности: ранний рост медленнее, ближе к пределу — выше,
+после превышения — ещё выше. Workload добавляет отдельный компонент; Stage 2 может
+использовать условные категории стоимости, реальные CPU/GPU/power сигналы вводятся
+после измерений на следующих стадиях.
+
+`uncertainty` использует важность ситуации и качество подтверждения: одинаковый
+информационный пробел при low/high importance даёт разный delta, а прямое проверенное
+наблюдение может снижать значение сильнее косвенного сигнала. Один Event не обязан
+сбрасывать uncertainty полностью, если источник неопределённости разрешён только
+частично.
+
+Повторная одинаковая ошибка должна увеличивать `frustration` сильнее первой до
+ограниченного потолка; серия связывается как минимум с Goal, Candidate/strategy и
+failure type. Для `satisfaction` действует обратный принцип: последовательные
+однотипные подтверждённые successes дают уменьшающийся прирост. Это не глобальная
+reward-функция; максимальное влияние satisfaction на Choice намеренно ограничено
+сильнее остальных baseline signals.
+
+### Причинность, время и хранение
+
+Живая state/history/goal информация хранится отдельно от lifecycle `state.json` в
+SQLite `internal_state.db`; правила и коэффициенты находятся в версионируемой
+конфигурации. Минимальный baseline БД включает текущие state values, state transitions,
+goals и goal transitions. Изменение текущего значения и запись его истории выполняются
+одной transaction.
+
+`StateTransition` хранит state, timestamp, `before/delta/after`, `cause_type`,
+`source_id`, `rule_id`, `reason`; при необходимости — importance, repetition factor,
+elapsed time, Goal и Candidate. Временные изменения считаются лениво при значимом
+обращении по elapsed time, а не фоновым tick-loop: это исключает зависимость от FPS
+и тысячи микрозаписей history. В тестах clock инъецируется.
+
+### Choice и Expression
+
+Choice Engine получает уже существующие Goal и Candidates. Сначала считается
+базовая пригодность варианта, затем применяются bounded modifiers Internal State.
+Trace обязан показывать вклад base score и каждого modifier, чтобы различие между
+neutral и altered state было причинно наблюдаемым. На Stage 2 Planner не требуется:
+Candidates задаются сценарием/consumer и служат контролируемым материалом для
+проверки механизма выбора.
+
+Expression является зависимым отображением Internal State в параметры тона,
+голоса или будущей визуализации. Обратного скрытого пути `Expression → State` нет;
+если позднее понадобится такая связь, она должна быть отдельным явным правилом с
+источником и history.
+
+### Валидация и доказательства
+
+Canonical scenarios должны включать: neutral baseline; high fatigue; low/high
+importance uncertainty; отсутствие passive uncertainty decay; прямое и косвенное
+подтверждение; escalating repeated failure frustration; прекращение серии после
+смены стратегии; diminishing repeated-success satisfaction; разные importance
+успеха; fatigue в начале/конце/после рабочего периода и дополнительный workload;
+Sleep/recovery; конкурирующие Goals; blocked/reactivated/completed/cancelled Goal;
+Expression dependency; restart/replay/idempotency и одинаковый injected time.
+
+Для каждого контрольного state transition причина должна восстанавливаться из
+history. Для каждого контрольного Choice trace показывает base evaluation и все
+применённые modifiers. Проверяется, что state не создаёт Goal/Candidate, завершённая
+или отменённая цель не влияет на выбор, modifier не получает неограниченного веса,
+а одинаковые исходные данные и время дают одинаковый итог.
+
+Decision performance измеряется отдельно от общей Runtime latency минимум для
+2/10/100 Candidates в трёх режимах: base evaluation, state modifiers и modifiers
+с trace/history. Значение фиксируется как baseline без SLA для будущего Fast,
+Agent и аппаратного переноса.
+
+**Definition of Done.** На фиксированных end-to-end scenarios Goals имеют корректный
+lifecycle и проверяемые результаты; четыре baseline state изменяются только через
+причинные transitions, соблюдают диапазон и временные правила; neutral/altered state
+предсказуемо меняет оценку Candidates, но не подменяет Goal; trace объясняет итоговый
+Choice; restart/replay не создают дублирования или time drift; Expression остаётся
+зависимым слоем; decision-performance baseline записан; регрессия Foundation, D1 и
+Stage 1 проходит. Отложенные расширения перечислены в
+[Research](Research.md#отложенные-механизмы-internal-state).
 
 ## Stage 3
 
