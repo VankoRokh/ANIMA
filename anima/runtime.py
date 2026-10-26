@@ -1,3 +1,6 @@
+from anima.internal_state.runtime_integration import InternalStateRuntime
+
+
 class Runtime:
     """Orchestrate ANIMA lifecycle independently from user interfaces."""
 
@@ -13,7 +16,16 @@ class Runtime:
         event_processing,
         trace=None,
         metrics=None,
+        internal_state=None,
     ):
+        if internal_state is not None and not isinstance(
+            internal_state,
+            InternalStateRuntime,
+        ):
+            raise TypeError(
+                "Runtime internal_state must be an InternalStateRuntime or null"
+            )
+
         self.trace = trace
         self.metrics = metrics
         self.anima = anima
@@ -23,6 +35,7 @@ class Runtime:
         self.memory = memory
         self.memory_processor = memory_processor
         self.event_processing = event_processing
+        self.internal_state = internal_state
         self._recovery_checked = False
 
     def _session_id(self):
@@ -136,6 +149,56 @@ class Runtime:
 
         return processed
 
+    def _require_internal_state(self):
+        if self.internal_state is None:
+            raise RuntimeError(
+                "Internal State runtime is not configured"
+            )
+        return self.internal_state
+
+    def create_goal(self, **kwargs):
+        return self._measure(
+            "runtime.internal_state.create_goal",
+            lambda: self._require_internal_state().create_goal(**kwargs),
+        )
+
+    def process_state_signal(self, signal):
+        return self._measure(
+            "runtime.internal_state.signal",
+            lambda: self._require_internal_state().process_signal(signal),
+        )
+
+    def observe_goal(self, observation):
+        return self._measure(
+            "runtime.internal_state.goal_observation",
+            lambda: self._require_internal_state().observe_goal(observation),
+        )
+
+    def evaluate_internal_time(self, *, now, mode, period_started_at):
+        return self._measure(
+            "runtime.internal_state.time",
+            lambda: self._require_internal_state().evaluate_time(
+                now=now,
+                mode=mode,
+                period_started_at=period_started_at,
+            ),
+        )
+
+    def choose(self, goal_id, candidates):
+        return self._measure(
+            "runtime.internal_state.choice",
+            lambda: self._require_internal_state().choose(
+                goal_id,
+                candidates,
+            ),
+        )
+
+    def arbitrate_goals(self):
+        return self._measure(
+            "runtime.internal_state.goal_arbitration",
+            self._require_internal_state().arbitrate_goals,
+        )
+
     def snapshot(self):
         identity = self.identity.get()
         state = self.anima.get()
@@ -158,10 +221,20 @@ class Runtime:
             "memory": {
                 "count": self.memory.count(),
             },
+            "internal_state": (
+                self.internal_state.snapshot()
+                if self.internal_state is not None
+                else None
+            ),
             "diagnostics": {
                 "metrics": (
                     self.metrics.snapshot()
                     if self.metrics is not None
+                    else None
+                ),
+                "trace": (
+                    self.trace.entries()
+                    if self.trace is not None
                     else None
                 ),
             },

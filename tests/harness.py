@@ -14,6 +14,8 @@ from anima.runtime import Runtime
 from anima.scenario import ScenarioRunner
 from anima.diagnostics.trace import DiagnosticTrace
 from anima.diagnostics.metrics import DiagnosticMetrics
+from anima.internal_state.runtime_integration import InternalStateRuntime
+from anima.internal_state.store import InternalStateStore
 
 
 class AnimaTestHarness:
@@ -62,6 +64,13 @@ class AnimaTestHarness:
             trace=self.trace,
         )
         self.metrics = DiagnosticMetrics()
+        self.internal_state_store = InternalStateStore(
+            self.data_dir / "internal_state.db"
+        )
+        self.internal_state = InternalStateRuntime(
+            self.internal_state_store,
+            trace=self.trace,
+        )
 
         self.runtime = Runtime(
             anima=self.state,
@@ -73,6 +82,7 @@ class AnimaTestHarness:
             event_processing=self.event_processing,
             trace=self.trace,
             metrics=self.metrics,
+            internal_state=self.internal_state,
         )
 
         self.scenario_runner = ScenarioRunner(

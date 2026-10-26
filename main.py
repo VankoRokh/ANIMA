@@ -13,6 +13,8 @@ from anima.interfaces.cli import run_cli
 from anima.runtime import Runtime
 from anima.diagnostics.metrics import DiagnosticMetrics
 from anima.diagnostics.trace import DiagnosticTrace
+from anima.internal_state.runtime_integration import InternalStateRuntime
+from anima.internal_state.store import InternalStateStore
 
 
 def main():
@@ -53,6 +55,13 @@ def main():
         trace=trace,
     )
     metrics = DiagnosticMetrics()
+    internal_state_store = InternalStateStore(
+        data_dir / "internal_state.db"
+    )
+    internal_state = InternalStateRuntime(
+        internal_state_store,
+        trace=trace,
+    )
 
     runtime = Runtime(
         anima=anima,
@@ -64,6 +73,7 @@ def main():
         event_processing=event_processing,
         trace=trace,
         metrics=metrics,
+        internal_state=internal_state,
     )
 
     run_cli(
