@@ -6,7 +6,7 @@
 показывают этот порядок, а не требуют отдельной платы или модели на каждом шаге.
 
 <!-- AUTO:roadmap:START -->
-**Текущая работа:** Stage 1.1 — Event Foundation: расширить Event schema, стабильные IDs, references и валидацию до перехода к SQLite memory store.
+**Текущая работа:** Stage 1.2 — Memory Store: заменить временный memories.jsonl на SQLite memory.db со схемой, транзакциями, индексами и FTS5 baseline.
 
 **Фокус:** 1 — Cognitive Memory (InProgress).
 
@@ -80,7 +80,7 @@ Memories/Knowledge/Entities/Relations/History и состояние обрабо
 | Шаг | Результат | Проверка завершения |
 |---|---|---|
 | **1.0 Specification** | Зафиксированы Event/Memory/Knowledge, Entity/Relation, Processor, Composer, Context Builder, lifecycle и storage baseline | Документация однозначно описывает границы Stage 1 и отложенные механизмы |
-| **1.1 Event Foundation** | Универсальный Event: stable ID, timestamp, type, source, session_id, payload, references | Валидные/невалидные события, duplicate ID, повреждённая JSONL-строка и restart дают определённый результат |
+| **1.1 Event Foundation — Complete** | Универсальный Event: stable ID, timestamp, type, source, session_id, payload, references | Валидные/невалидные события, duplicate ID, повреждённая JSONL-строка и restart дают определённый результат; [TV-0004](../TESTING/Results/TV-0004.md) |
 | **1.2 Memory Store** | SQLite `memory.db`, schema, transactions, indexes, FTS5 | CRUD, rollback, reopen, constraints, FTS и базовые relation queries проходят тесты |
 | **1.3 Entities / Relations / Provenance** | Entity aliases, универсальные relations и цепочка `Knowledge → Memory → Event` | Для каждого контрольного объекта происхождение восстанавливается до source Events |
 | **1.4 Memory Processor** | Selection и объяснимый Association; `HIGH → UPDATE`, `MEDIUM → CREATE + related_to`, `LOW → CREATE` | На canonical corpus каждый Event попадает в ожидаемый эпизод, причины решения видны в trace |
@@ -122,8 +122,9 @@ Knowledge создаётся из закрытого подтверждённо�
   event_processing и FTS indexes.
 - Одна универсальная таблица `relations`; дробить её только после измеренной
   проблемы скорости или целостности.
-- Internal SQLite key — integer; public ID — UUIDv7 с type-prefix (`ev_`, `mem_`,
-  `kn_`, `ent_`, `rel_`, `asset_`).
+- Internal SQLite key — integer; public ID — UUIDv4 с type-prefix (`ev_`, `mem_`,
+  `kn_`, `ent_`, `rel_`, `asset_`). UUIDv4 выбран для совместимости с Python 3.12+;
+  временная сортировка хранится отдельными timestamp-полями.
 - `importance`: `0=low`, `1=normal`, `2=high`, `3=critical`; relevance всегда
   важнее importance при retrieval.
 - `event_processing`: `pending/processing/done/failed/skipped`, processor/version,
