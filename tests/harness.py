@@ -5,8 +5,9 @@ from anima.core.identity import Identity
 from anima.core.state import AnimaState
 from anima.memory.episodic import EpisodicMemory
 from anima.memory.event_log import EventLog
-from anima.memory.filter import MemoryFilter
+from anima.memory.link_store import LinkStore
 from anima.memory.memory_store import MemoryStore
+from anima.memory.processor import MemoryProcessor
 from anima.runtime import Runtime
 from anima.scenario import ScenarioRunner
 from anima.diagnostics.trace import DiagnosticTrace
@@ -35,13 +36,21 @@ class AnimaTestHarness:
             self.data_dir / "memory.db"
         )
 
+        self.link_store = LinkStore(
+            self.memory_store
+        )
+
         self.memory = EpisodicMemory(
             self.memory_store
         )
 
-        self.memory_filter = MemoryFilter()
-
         self.trace = DiagnosticTrace()
+        self.memory_processor = MemoryProcessor(
+            memory_store=self.memory_store,
+            event_log=self.event_log,
+            link_store=self.link_store,
+            trace=self.trace,
+        )
         self.metrics = DiagnosticMetrics()
 
         self.runtime = Runtime(
@@ -50,8 +59,7 @@ class AnimaTestHarness:
             event_bus=self.event_bus,
             event_log=self.event_log,
             memory=self.memory,
-            memory_filter=self.memory_filter,
-            memory_store=self.memory_store,
+            memory_processor=self.memory_processor,
             trace=self.trace,
             metrics=self.metrics,
         )
