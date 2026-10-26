@@ -1,4 +1,3 @@
-import json
 from datetime import datetime, timezone
 
 from anima.core.event_bus import Event
@@ -7,7 +6,6 @@ from anima.core.event_bus import Event
 PROCESSOR_NAME = "memory_processor"
 PROCESSOR_VERSION = "1.0"
 FINAL_STATUSES = {"done", "skipped"}
-RETRYABLE_STATUSES = {"pending", "processing", "failed"}
 
 
 class EventProcessingCoordinator:
@@ -102,6 +100,7 @@ class EventProcessingCoordinator:
     def process(self, event):
         if not isinstance(event, Event):
             raise ValueError("EventProcessingCoordinator requires an Event")
+        self._require_raw_event(event)
 
         previous = self.get(event.event_id)
         if previous is not None and previous["status"] in FINAL_STATUSES:
@@ -226,6 +225,20 @@ class EventProcessingCoordinator:
             "retried": len(recovered),
             "finalized": self.finalized_count(),
         }
+
+    def _require_raw_event(self, event):
+        expected = event.to_dict()
+        for record in self.event_log.load_events():
+            if record["id"] != event.event_id:
+                continue
+            if record != expected:
+                raise ValueError(
+                    f"Raw event {event.event_id} does not match processing Event"
+                )
+            return
+        raise ValueError(
+            f"Raw event {event.event_id} must be written before processing"
+        )
 
     def _bootstrap_missing(self, events):
         adopted = 0
