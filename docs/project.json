@@ -1,12 +1,12 @@
 {
   "schema_version": 1,
   "current_stage": "1",
-  "focus": "Уточнить модель извлечения памяти, происхождение записей, бюджет контекста и baseline до начала реализации Stage 1.",
+  "focus": "Stage 1.1 — Event Foundation: расширить Event schema, стабильные IDs, references и валидацию до перехода к SQLite memory store.",
   "stages": [
     {"id": "D0", "title": "Documentation", "status": "Complete", "depends_on": [], "outcome": "Контекст и процедуры работы восстанавливаются из репозитория"},
     {"id": "0", "title": "Foundation", "status": "Complete", "depends_on": ["D0"], "outcome": "Перенос сохраняет идентичность, историю и возможность продолжения"},
     {"id": "D1", "title": "Runtime, Tests & Observability", "status": "Complete", "depends_on": ["0"], "outcome": "Один сценарий запускается headless, наблюдается и проверяется изолированно"},
-    {"id": "1", "title": "Cognitive Memory", "status": "Planned", "depends_on": ["0", "D1"], "outcome": "Релевантный опыт извлекается с происхождением и ограниченным контекстом"},
+    {"id": "1", "title": "Cognitive Memory", "status": "InProgress", "depends_on": ["0", "D1"], "outcome": "Релевантный опыт извлекается с происхождением и ограниченным контекстом"},
     {"id": "2", "title": "Internal State", "status": "Planned", "depends_on": ["1"], "outcome": "Влияние внутреннего состояния на выбор причинно прослеживается"},
     {"id": "3", "title": "Sleep", "status": "Planned", "depends_on": ["2"], "outcome": "Консолидация прерывается и возобновляется без потери источников"},
     {"id": "4", "title": "Agent", "status": "Planned", "depends_on": ["3"], "outcome": "Ограниченная задача выполняется инструментом и проверяется наблюдением"},
