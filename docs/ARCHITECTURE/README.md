@@ -38,7 +38,9 @@
 [TV-0010](../TESTING/Results/TV-0010.md),
 [TV-0011](../TESTING/Results/TV-0011.md),
 [TV-0012](../TESTING/Results/TV-0012.md),
-[TV-0013](../TESTING/Results/TV-0013.md).
+[TV-0013](../TESTING/Results/TV-0013.md),
+[TV-0014](../TESTING/Results/TV-0014.md),
+[TV-0015](../TESTING/Results/TV-0015.md).
 
 ## Рабочий путь записи
 
@@ -275,6 +277,26 @@ FAST использует узкую выборку без raw Events; DEEP ра
 целиком, не обрезается, а пропускается с `truncated=true`. Token-aware budgets и
 model-specific policies отложены до появления конкретного model consumer.
 
+## Stage 1 validation и performance baseline
+
+Финальный Stage 1 corpus содержит 37 raw Events в 11 сессиях и проходит через
+restart/replay, Memory/Relations, CLOSED evidence, Knowledge supersession,
+Retrieval, FAST/DEEP Context и provenance до исходных Events. Результат подтверждён
+[TV-0014](../TESTING/Results/TV-0014.md).
+
+Performance baseline [TV-0015](../TESTING/Results/TV-0015.md) измеряет 1k/10k/100k
+синтетических записей без заданного SLA. На 100k Event append остаётся около
+15.5k/s, Memory CRUD/lookup и 1-hop — около 1 ms, FTS — около 10 ms p95,
+Retrieval — около 119 ms p95, FAST Context — около 118 ms p95. Полный data-каталог
+занимает около 152 MB, peak RSS процесса достиг 265 MB.
+
+Измерены два существенных bottleneck: production EventProcessing batch падает до
+0.41 events/s на 100k, а DEEP Context достигает около 23.4 s p95. Текущий
+coordinator для каждого Event линейно перечитывает raw Event log при identity
+check; provenance при каждом выбранном объекте заново строит полный Event index.
+Baseline сохранён до оптимизации, чтобы последующие изменения сравнивались с
+фактическими исходными числами.
+
 ## Каталог и контракты данных
 
 По умолчанию данные находятся в `<project>/data`; `ANIMA_DATA_DIR` задаёт другой
@@ -300,8 +322,8 @@ identity, session/event history и SQLite Memory Store. Старый `memories.j
   вызывается явно.
 - Автоматическое создание/принятие Knowledge моделью не реализовано; lifecycle
   вызывается явно на подтверждённом evidence.
-- Общий 30–100 Event end-to-end corpus относится к текущему Stage 1.11 и не
-  считается подтверждённым до отдельной зелёной проверки.
-- Производительность 1k/10k/100k ещё не измерялась; оптимизация не выполнялась.
+- EventProcessing raw identity check и DEEP provenance используют повторные полные
+  сканирования `events.jsonl`; на 100k это даёт 0.41 batch events/s и около 23.4 s
+  p95 DEEP Context. Оптимизация отложена после фиксации baseline.
 - LLM/Deep Composer, embeddings, vector/graph DB, Sleep consolidation и
   distributed memory остаются отложенными механизмами.
