@@ -19,7 +19,7 @@ ANIMA — исследовательский проект модульного �
 
 Текущий фокус: **2 — Internal State** (InProgress).
 
-Stage 2.0 — Internal State specification: определить минимальный набор целей и внутренних переменных, их диапазоны, источники изменений, decay/recovery и объяснимое влияние на выбор до реализации runtime-механики.
+Stage 2.1 — Internal State Storage: реализовать отдельную конфигурацию и transactional internal_state.db для текущих значений, причинной истории и lifecycle целей до механики выбора.
 
 [Этапы и критерии](docs/ROADMAP/README.md).
 <!-- AUTO:summary:END -->
