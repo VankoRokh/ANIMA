@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "current_stage": "1",
-  "focus": "Stage 1.10 — Recovery / Idempotency: активировать persistent event_processing, атомарно связывать processing-status с Memory effects, безопасно повторять interrupted/failed Events и восстанавливать state counter без дубликатов.",
+  "focus": "Stage 1.11 — Stage Validation: прогнать единый canonical corpus из 30–100 Events через Memory, Knowledge, Retrieval, Context, provenance и restart/replay с заранее заданными проверяемыми результатами.",
   "stages": [
     {"id": "D0", "title": "Documentation", "status": "Complete", "depends_on": [], "outcome": "Контекст и процедуры работы восстанавливаются из репозитория"},
     {"id": "0", "title": "Foundation", "status": "Complete", "depends_on": ["D0"], "outcome": "Перенос сохраняет идентичность, историю и возможность продолжения"},
