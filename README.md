@@ -19,7 +19,7 @@ ANIMA — исследовательский проект модульного �
 
 Текущий фокус: **1 — Cognitive Memory** (InProgress).
 
-Stage 1.11 — Stage Validation: прогнать единый canonical corpus из 30–100 Events через Memory, Knowledge, Retrieval, Context, provenance и restart/replay с заранее заданными проверяемыми результатами.
+Stage 1.12 — Performance Baseline: измерить Event append, Memory create/update, Entity/Knowledge lookup, FTS, 1-hop Relations, FAST/DEEP Context, batch processing, CPU, peak RAM и storage scaling на синтетических 1k/10k/100k данных без преждевременных SLA.
 
 [Этапы и критерии](docs/ROADMAP/README.md).
 <!-- AUTO:summary:END -->
