@@ -73,4 +73,6 @@ def test_keyboard_interrupt_after_input_preserves_input(
 
     memories = anima.memory.load_memories()
 
-    assert memories[0]["content"]["text"] == "important input"
+    assert memories[0]["content"] == "important input"
+    assert memories[0]["type"] == "episodic"
+    assert memories[0]["domain"] == "user"
