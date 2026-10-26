@@ -1,0 +1,16 @@
+{
+  "schema_version": 1,
+  "ruleset_version": 1,
+  "awake_work_period_seconds": 28800,
+  "fatigue": {
+    "awake_segments": [
+      {"until_ratio": 0.50, "rate_per_hour": 0.01},
+      {"until_ratio": 0.85, "rate_per_hour": 0.02},
+      {"until_ratio": 1.00, "rate_per_hour": 0.04}
+    ],
+    "beyond_rate_per_hour": 0.07,
+    "recovery_rate_per_hour": 0.08
+  },
+  "frustration": {"recovery_rate_per_hour": 0.03},
+  "satisfaction": {"decay_rate_per_hour": 0.04}
+}
