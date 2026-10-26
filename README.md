@@ -19,7 +19,7 @@ ANIMA — исследовательский проект модульного �
 
 Текущий фокус: **1 — Cognitive Memory** (InProgress).
 
-Stage 1.7 — Knowledge Layer: реализовать Knowledge lifecycle с подтверждёнными source Memories, challenge/reconfirm/supersede/reject transitions и полным provenance.
+Stage 1.8 — Retrieval: реализовать deterministic поиск по exact ID, structured filters, Entities, FTS и 1-hop Relations с объяснимым ranking и ожидаемыми top-k IDs.
 
 [Этапы и критерии](docs/ROADMAP/README.md).
 <!-- AUTO:summary:END -->
