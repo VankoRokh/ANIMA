@@ -6,17 +6,17 @@
 показывают этот порядок, а не требуют отдельной платы или модели на каждом шаге.
 
 <!-- AUTO:roadmap:START -->
-**Текущая работа:** Stage 1.12 — Performance Baseline: измерить Event append, Memory create/update, Entity/Knowledge lookup, FTS, 1-hop Relations, FAST/DEEP Context, batch processing, CPU, peak RAM и storage scaling на синтетических 1k/10k/100k данных без преждевременных SLA.
+**Текущая работа:** Stage 2.0 — Internal State specification: определить минимальный набор целей и внутренних переменных, их диапазоны, источники изменений, decay/recovery и объяснимое влияние на выбор до реализации runtime-механики.
 
-**Фокус:** 1 — Cognitive Memory (InProgress).
+**Фокус:** 2 — Internal State (InProgress).
 
 | Этап | Проверяемый результат | Статус | Зависимости |
 |---|---|---|---|
 | [D0 — Documentation](#d0) | Контекст и процедуры работы восстанавливаются из репозитория | Complete | — |
 | [0 — Foundation](#stage-0) | Перенос сохраняет идентичность, историю и возможность продолжения | Complete | [D0](#d0) |
 | [D1 — Runtime, Tests & Observability](#d1) | Один сценарий запускается headless, наблюдается и проверяется изолированно | Complete | [0](#stage-0) |
-| [1 — Cognitive Memory](#stage-1) | Релевантный опыт извлекается с происхождением и ограниченным контекстом | InProgress | [0](#stage-0), [D1](#d1) |
-| [2 — Internal State](#stage-2) | Влияние внутреннего состояния на выбор причинно прослеживается | Planned | [1](#stage-1) |
+| [1 — Cognitive Memory](#stage-1) | Релевантный опыт извлекается с происхождением и ограниченным контекстом | Complete | [0](#stage-0), [D1](#d1) |
+| [2 — Internal State](#stage-2) | Влияние внутреннего состояния на выбор причинно прослеживается | InProgress | [1](#stage-1) |
 | [3 — Sleep](#stage-3) | Консолидация прерывается и возобновляется без потери источников | Planned | [2](#stage-2) |
 | [4 — Agent](#stage-4) | Ограниченная задача выполняется инструментом и проверяется наблюдением | Planned | [3](#stage-3) |
 | [5 — Virtual ANIMA](#stage-5) | Длительная работа на ПК/VM имеет измеренный ресурсный профиль | Planned | [4](#stage-4) |
@@ -91,7 +91,7 @@ Memories/Knowledge/Entities/Relations/History и состояние обрабо
 | **1.9 Context Builder — Complete** | Структурированный `ContextBundle` с `knowledge[]/memories[]/events[]`, reason и budget | `max_items/max_chars` соблюдаются; разные consumer policies дают воспроизводимый ограниченный контекст; [TV-0012](../TESTING/Results/TV-0012.md) |
 | **1.10 Recovery / Idempotency — Complete** | `event_processing` и безопасное повторение операций после crash | Повтор одного Event не создаёт дубликаты; зависшая обработка обнаруживается и восстанавливается; [TV-0013](../TESTING/Results/TV-0013.md) |
 | **1.11 Stage Validation — Complete** | End-to-end corpus примерно 30–100 Events с ожидаемыми Memories/Knowledge/Relations/Context | 37-Event corpus проходит после restart/replay и сохраняет provenance, статусы, Retrieval и bounded Context; [TV-0014](../TESTING/Results/TV-0014.md) |
-| **1.12 Performance Baseline** | Измерены latency/CPU/RAM/storage на синтетических 1k/10k/100k данных | Результаты записаны без преждевременных SLA и оптимизаций |
+| **1.12 Performance Baseline — Complete** | Измерены latency/CPU/RAM/storage на синтетических 1k/10k/100k данных | Baseline зафиксирован без SLA; выявлены scaling bottleneck EventProcessing и DEEP provenance; [TV-0015](../TESTING/Results/TV-0015.md) |
 
 ### Правила Memory Processor
 
@@ -152,18 +152,22 @@ Retrieval и FAST/DEEP Context с provenance до raw Events.
 invalid transition, dangling/missing source и transaction failure дают определённую
 ошибку. Функциональный end-to-end baseline подтверждён [TV-0014](../TESTING/Results/TV-0014.md).
 
-Performance на Stage 1 только измеряется: Event append, Memory create/update,
-Entity/Knowledge lookup, FTS, 1-hop relation, Context Builder, batch processing,
-CPU, peak RAM и DB size на 1k/10k/100k синтетических данных. Оптимизация вводится
-только после измеренного bottleneck.
+Performance baseline [TV-0015](../TESTING/Results/TV-0015.md) измерен на 1k/10k/100k.
+Event append сохраняется около 15k/s; SQLite CRUD/lookup и 1-hop остаются около
+1 ms, FTS на 100k — около 10 ms p95. При этом DEEP Context достиг 23.4 s p95, а
+production EventProcessing batch снизился до 0.41 events/s на 100k. Кодовая
+ревизия связывает это с повторными полными сканированиями raw `events.jsonl` в
+processing identity check и при построении provenance Event index. Эти ограничения
+зафиксированы до оптимизации и служат сравнительным baseline.
 
 **Definition of Done.** На фиксированном end-to-end corpus Events детерминированно
 формируют ожидаемые Memories; закрытый опыт создаёт Knowledge; новый противоречащий
 опыт переводит его в `challenged`, а закрытая проверка подтверждает или заменяет;
 Retrieval и Context Builder возвращают ожидаемый ограниченный контекст; provenance
 проходит до source Events; restart и повторная обработка не повреждают данные;
-performance baseline зафиксирован. Отложенные механизмы перечислены в
-[Research](Research.md#отложенные-механизмы-памяти-stage-1).
+performance baseline зафиксирован. Stage 1 завершён; доказательства собраны в
+[TV-0004 — TV-0015](../TESTING/Results/README.md). Отложенные механизмы перечислены
+в [Research](Research.md#отложенные-механизмы-памяти-stage-1).
 
 ## Stage 2
 
