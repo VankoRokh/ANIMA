@@ -7,7 +7,7 @@ def test_trace_records_messages():
     trace = DiagnosticTrace()
 
     trace.record("runtime: wake requested")
-    trace.record("event: wake processed")
+    trace.record("event: system.wake processed")
 
     entries = trace.entries()
 
@@ -20,13 +20,13 @@ def test_trace_records_messages():
 
     assert (
         entries[1]["message"]
-        == "event: wake processed"
+        == "event: system.wake processed"
     )
 
     lines = trace.lines()
 
     assert "runtime: wake requested" in lines[0]
-    assert "event: wake processed" in lines[1]
+    assert "event: system.wake processed" in lines[1]
 
 
 def test_trace_rejects_invalid_messages():
@@ -76,11 +76,11 @@ def test_runtime_produces_human_readable_trace(
 
     assert messages == [
         "runtime: wake requested",
-        "event: wake processed, memory=skipped",
+        "event: system.wake processed, memory=skipped",
         "runtime: user_input received",
-        "event: user_input processed, memory=stored",
+        "event: conversation.user processed, memory=stored",
         "runtime: sleep requested",
-        "event: sleep processed, memory=skipped",
+        "event: system.sleep processed, memory=skipped",
         "runtime: sleeping",
     ]
 
