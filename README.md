@@ -19,7 +19,7 @@ ANIMA — исследовательский проект модульного �
 
 Текущий фокус: **1 — Cognitive Memory** (InProgress).
 
-Stage 1.3 — Entities / Relations / Provenance: реализовать Entity aliases, универсальные relations и восстанавливаемую цепочку происхождения Memory/Knowledge до source Events.
+Stage 1.2 — Memory Store: заменить временный memories.jsonl на SQLite memory.db со схемой, транзакциями, индексами и FTS5 baseline.
 
 [Этапы и критерии](docs/ROADMAP/README.md).
 <!-- AUTO:summary:END -->
