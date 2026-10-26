@@ -19,7 +19,7 @@ ANIMA — исследовательский проект модульного �
 
 Текущий фокус: **1 — Cognitive Memory** (InProgress).
 
-Stage 1.4 — Memory Processor: реализовать deterministic Selection и объяснимый Association с CREATE/UPDATE/related decisions на контрольном corpus.
+Stage 1.6 — Merge / History: реализовать OPEN/CLOSED/MERGED lifecycle, безопасный Merge с сохранением provenance и компактную историю изменений.
 
 [Этапы и критерии](docs/ROADMAP/README.md).
 <!-- AUTO:summary:END -->
