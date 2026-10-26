@@ -1,0 +1,31 @@
+{
+  "schema_version": 1,
+  "ruleset_version": 1,
+  "importance_multipliers": {
+    "0": 0.5,
+    "1": 1.0,
+    "2": 1.5,
+    "3": 2.0
+  },
+  "deltas": {
+    "workload_low": 0.02,
+    "workload_normal": 0.04,
+    "workload_high": 0.07,
+    "information_gap": 0.06,
+    "information_conflict": 0.10,
+    "information_confirmed_indirect": -0.05,
+    "information_confirmed_direct": -0.10,
+    "failure": 0.07,
+    "progress_frustration": -0.06,
+    "strategy_changed": -0.10,
+    "verified_success_frustration": -0.12,
+    "verified_progress_satisfaction": 0.08,
+    "verified_success_satisfaction": 0.14
+  },
+  "repetition": {
+    "failure_growth_per_repeat": 0.5,
+    "failure_max_factor": 3.0,
+    "success_decay_per_repeat": 0.5,
+    "success_min_factor": 0.25
+  }
+}
