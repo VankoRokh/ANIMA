@@ -1,0 +1,10 @@
+{
+  "schema_version": 1,
+  "ruleset_version": 1,
+  "states": {
+    "fatigue": {"minimum": 0.0, "baseline": 0.0, "maximum": 1.0},
+    "uncertainty": {"minimum": 0.0, "baseline": 0.0, "maximum": 1.0},
+    "frustration": {"minimum": 0.0, "baseline": 0.0, "maximum": 1.0},
+    "satisfaction": {"minimum": 0.0, "baseline": 0.0, "maximum": 1.0}
+  }
+}
