@@ -77,6 +77,23 @@ class SleepChunkExecutor:
             )
         return latest["sequence"] + 1, latest["checkpoint"]
 
+    def _completed_replay(self, work_item):
+        result = self.derived_results.get_by_work_item(work_item.public_id)
+        if result is None:
+            raise ValueError(
+                "Completed WorkItem is missing its persistent DerivedResult"
+            )
+        checkpoints = self.sleep_store.list_checkpoints(work_item.public_id)
+        committed = len(checkpoints)
+        return ExecutionOutcome(
+            work_item_id=work_item.public_id,
+            status="completed",
+            resumed_from_sequence=committed,
+            processed_chunks=0,
+            committed_chunks=committed,
+            final_result=result,
+        )
+
     def run(
         self,
         work_item_id,
@@ -93,6 +110,15 @@ class SleepChunkExecutor:
         work_item = self.sleep_store.get_work_item(work_item_id)
         if work_item is None:
             raise ValueError(f"Unknown WorkItem: {work_item_id}")
+
+        if work_item.status == "completed":
+            return self._completed_replay(work_item)
+
+        existing_result = self.derived_results.get_by_work_item(work_item_id)
+        if existing_result is not None:
+            raise ValueError(
+                "Non-completed WorkItem already has a persistent DerivedResult"
+            )
 
         processor = self.processor_registry.resolve(work_item)
         latest = self.sleep_store.get_latest_checkpoint(work_item_id)
