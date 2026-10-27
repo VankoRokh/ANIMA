@@ -50,6 +50,8 @@ from .planner import (
     ProposalDraft,
     planner_request_hash,
 )
+from .recoverable_runtime import RecoverableAgentLoop
+from .recovery import AgentRecoveryJournal, RecoveryStepArtifacts
 from .runtime import AgentLoop, AgentLoopResult, AgentTurnResult
 from .store import AgentStore
 from .tools import (
@@ -83,6 +85,7 @@ __all__ = [
     "AgentLoopResult",
     "AgentMemoryIntegration",
     "AgentMemoryIntegrationResult",
+    "AgentRecoveryJournal",
     "AgentStore",
     "AgentTurnResult",
     "CandidateAdaptation",
@@ -104,6 +107,8 @@ __all__ = [
     "PlannerTurn",
     "ProposalChoiceCoordinator",
     "ProposalDraft",
+    "RecoverableAgentLoop",
+    "RecoveryStepArtifacts",
     "SIGNIFICANT_VERIFICATION_OUTCOMES",
     "SandboxExecutor",
     "SandboxHandler",
