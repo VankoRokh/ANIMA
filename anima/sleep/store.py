@@ -1,3 +1,4 @@
+import json
 import sqlite3
 from contextlib import contextmanager
 from datetime import datetime, timezone
@@ -14,9 +15,10 @@ from anima.sleep.contracts import (
 )
 
 
-SCHEMA_VERSION = 2
+SCHEMA_VERSION = 3
 SLEEP_JOB_ID_PREFIX = "sj_"
 SLEEP_JOB_TRANSITION_ID_PREFIX = "sjt_"
+WORK_CHECKPOINT_ID_PREFIX = "wcp_"
 SLEEP_JOB_STATUSES = {
     "queued",
     "running",
@@ -105,6 +107,21 @@ CREATE INDEX IF NOT EXISTS idx_work_items_source
     ON work_items(source_kind, source_id);
 CREATE INDEX IF NOT EXISTS idx_work_items_priority
     ON work_items(job_id, priority DESC, row_id);
+
+CREATE TABLE IF NOT EXISTS work_item_checkpoints (
+    row_id INTEGER PRIMARY KEY,
+    public_id TEXT NOT NULL UNIQUE,
+    work_item_id TEXT NOT NULL,
+    sequence INTEGER NOT NULL CHECK (sequence >= 0),
+    checkpoint_json TEXT NOT NULL,
+    local_result_json TEXT,
+    created_at TEXT NOT NULL,
+    UNIQUE(work_item_id, sequence),
+    FOREIGN KEY (work_item_id) REFERENCES work_items(public_id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_work_item_checkpoints_item_sequence
+    ON work_item_checkpoints(work_item_id, sequence, row_id);
 """
 
 
@@ -126,6 +143,24 @@ def _validate_timestamp(value, label):
 def _validate_non_empty_string(value, label):
     if not isinstance(value, str) or not value.strip():
         raise ValueError(f"{label} must be a non-empty string")
+
+
+def _validate_non_negative_int(value, label):
+    if not isinstance(value, int) or isinstance(value, bool) or value < 0:
+        raise ValueError(f"{label} must be a non-negative integer")
+
+
+def _json_dumps(value, label):
+    try:
+        return json.dumps(
+            value,
+            ensure_ascii=False,
+            allow_nan=False,
+            sort_keys=True,
+            separators=(",", ":"),
+        )
+    except (TypeError, ValueError) as error:
+        raise ValueError(f"{label} must be JSON-serializable") from error
 
 
 def _validate_uuid4_id(public_id, *, prefix, label):
@@ -161,6 +196,14 @@ def _validate_work_item_id(public_id):
     )
 
 
+def _validate_checkpoint_id(public_id):
+    _validate_uuid4_id(
+        public_id,
+        prefix=WORK_CHECKPOINT_ID_PREFIX,
+        label="Work checkpoint public_id",
+    )
+
+
 class SleepStore:
     def __init__(self, database_file=None):
         self.database_file = (
@@ -192,7 +235,8 @@ class SleepStore:
                     "SELECT value FROM schema_meta WHERE key = 'schema_version'"
                 ).fetchone()
 
-                if row is not None and row["value"] not in {"1", str(SCHEMA_VERSION)}:
+                supported_existing = {"1", "2", str(SCHEMA_VERSION)}
+                if row is not None and row["value"] not in supported_existing:
                     raise ValueError(
                         f"Unsupported Sleep database schema in {self.database_file}"
                     )
@@ -204,7 +248,7 @@ class SleepStore:
                         "INSERT INTO schema_meta(key, value) VALUES('schema_version', ?)",
                         (str(SCHEMA_VERSION),),
                     )
-                elif row["value"] == "1":
+                elif row["value"] != str(SCHEMA_VERSION):
                     connection.execute(
                         "UPDATE schema_meta SET value = ? WHERE key = 'schema_version'",
                         (str(SCHEMA_VERSION),),
@@ -290,6 +334,23 @@ class SleepStore:
             attempts=row["attempts"],
             checkpoint_ref=row["checkpoint_ref"],
         )
+
+    @staticmethod
+    def _row_to_checkpoint(row):
+        if row is None:
+            return None
+        return {
+            "id": row["public_id"],
+            "work_item_id": row["work_item_id"],
+            "sequence": row["sequence"],
+            "checkpoint": json.loads(row["checkpoint_json"]),
+            "local_result": (
+                None
+                if row["local_result_json"] is None
+                else json.loads(row["local_result_json"])
+            ),
+            "created_at": row["created_at"],
+        }
 
     def create_job(self, *, public_id=None, created_at=None, reason="job created"):
         public_id = public_id or f"{SLEEP_JOB_ID_PREFIX}{uuid4()}"
@@ -493,3 +554,205 @@ class SleepStore:
                 tuple(values),
             ).fetchall()
         return [self._row_to_work_item(row) for row in rows]
+
+    def begin_work_item(self, public_id, *, timestamp=None):
+        _validate_work_item_id(public_id)
+        timestamp = timestamp or _now()
+        _validate_timestamp(timestamp, "WorkItem begin timestamp")
+
+        with self.transaction() as connection:
+            row = connection.execute(
+                "SELECT status FROM work_items WHERE public_id = ?",
+                (public_id,),
+            ).fetchone()
+            if row is None:
+                raise ValueError(f"Unknown WorkItem: {public_id}")
+            if row["status"] not in {"queued", "checkpointed"}:
+                raise ValueError(
+                    f"Cannot begin WorkItem from status: {row['status']}"
+                )
+            connection.execute(
+                """
+                UPDATE work_items
+                SET status = 'running', attempts = attempts + 1, updated_at = ?
+                WHERE public_id = ?
+                """,
+                (timestamp, public_id),
+            )
+
+        return self.get_work_item(public_id)
+
+    def commit_work_item_chunk(
+        self,
+        public_id,
+        *,
+        sequence,
+        checkpoint,
+        local_result=None,
+        checkpoint_id=None,
+        timestamp=None,
+    ):
+        _validate_work_item_id(public_id)
+        _validate_non_negative_int(sequence, "Work checkpoint sequence")
+        checkpoint_id = checkpoint_id or f"{WORK_CHECKPOINT_ID_PREFIX}{uuid4()}"
+        _validate_checkpoint_id(checkpoint_id)
+        timestamp = timestamp or _now()
+        _validate_timestamp(timestamp, "Work checkpoint timestamp")
+        checkpoint_json = _json_dumps(checkpoint, "Work checkpoint")
+        local_result_json = (
+            None
+            if local_result is None
+            else _json_dumps(local_result, "Work checkpoint local_result")
+        )
+
+        try:
+            with self.transaction() as connection:
+                work_item = connection.execute(
+                    "SELECT status FROM work_items WHERE public_id = ?",
+                    (public_id,),
+                ).fetchone()
+                if work_item is None:
+                    raise ValueError(f"Unknown WorkItem: {public_id}")
+                if work_item["status"] != "running":
+                    raise ValueError(
+                        "Chunk can be committed only for running WorkItem: "
+                        f"{work_item['status']}"
+                    )
+
+                latest = connection.execute(
+                    """
+                    SELECT sequence FROM work_item_checkpoints
+                    WHERE work_item_id = ?
+                    ORDER BY sequence DESC, row_id DESC
+                    LIMIT 1
+                    """,
+                    (public_id,),
+                ).fetchone()
+                expected = 0 if latest is None else latest["sequence"] + 1
+                if sequence != expected:
+                    raise ValueError(
+                        f"Work checkpoint sequence must be {expected}, got {sequence}"
+                    )
+
+                connection.execute(
+                    """
+                    INSERT INTO work_item_checkpoints(
+                        public_id, work_item_id, sequence,
+                        checkpoint_json, local_result_json, created_at
+                    ) VALUES (?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        checkpoint_id,
+                        public_id,
+                        sequence,
+                        checkpoint_json,
+                        local_result_json,
+                        timestamp,
+                    ),
+                )
+                connection.execute(
+                    """
+                    UPDATE work_items
+                    SET checkpoint_ref = ?, updated_at = ?
+                    WHERE public_id = ?
+                    """,
+                    (checkpoint_id, timestamp, public_id),
+                )
+        except sqlite3.IntegrityError as error:
+            raise ValueError(
+                f"Cannot commit WorkItem checkpoint {checkpoint_id}: {error}"
+            ) from error
+
+        return self.get_checkpoint(checkpoint_id)
+
+    def get_checkpoint(self, checkpoint_id):
+        _validate_checkpoint_id(checkpoint_id)
+        with self._connect() as connection:
+            row = connection.execute(
+                "SELECT * FROM work_item_checkpoints WHERE public_id = ?",
+                (checkpoint_id,),
+            ).fetchone()
+        return self._row_to_checkpoint(row)
+
+    def list_checkpoints(self, public_id):
+        _validate_work_item_id(public_id)
+        with self._connect() as connection:
+            rows = connection.execute(
+                """
+                SELECT * FROM work_item_checkpoints
+                WHERE work_item_id = ?
+                ORDER BY sequence, row_id
+                """,
+                (public_id,),
+            ).fetchall()
+        return [self._row_to_checkpoint(row) for row in rows]
+
+    def get_latest_checkpoint(self, public_id):
+        _validate_work_item_id(public_id)
+        with self._connect() as connection:
+            row = connection.execute(
+                """
+                SELECT * FROM work_item_checkpoints
+                WHERE work_item_id = ?
+                ORDER BY sequence DESC, row_id DESC
+                LIMIT 1
+                """,
+                (public_id,),
+            ).fetchone()
+        return self._row_to_checkpoint(row)
+
+    def pause_work_item(self, public_id, *, timestamp=None):
+        _validate_work_item_id(public_id)
+        timestamp = timestamp or _now()
+        _validate_timestamp(timestamp, "WorkItem pause timestamp")
+
+        with self.transaction() as connection:
+            row = connection.execute(
+                "SELECT status, checkpoint_ref FROM work_items WHERE public_id = ?",
+                (public_id,),
+            ).fetchone()
+            if row is None:
+                raise ValueError(f"Unknown WorkItem: {public_id}")
+            if row["status"] != "running":
+                raise ValueError(
+                    f"Cannot checkpoint WorkItem from status: {row['status']}"
+                )
+            if row["checkpoint_ref"] is None:
+                raise ValueError("Cannot checkpoint WorkItem before first committed chunk")
+            connection.execute(
+                """
+                UPDATE work_items
+                SET status = 'checkpointed', updated_at = ?
+                WHERE public_id = ?
+                """,
+                (timestamp, public_id),
+            )
+
+        return self.get_work_item(public_id)
+
+    def complete_work_item(self, public_id, *, timestamp=None):
+        _validate_work_item_id(public_id)
+        timestamp = timestamp or _now()
+        _validate_timestamp(timestamp, "WorkItem completion timestamp")
+
+        with self.transaction() as connection:
+            row = connection.execute(
+                "SELECT status FROM work_items WHERE public_id = ?",
+                (public_id,),
+            ).fetchone()
+            if row is None:
+                raise ValueError(f"Unknown WorkItem: {public_id}")
+            if row["status"] != "running":
+                raise ValueError(
+                    f"Cannot complete WorkItem from status: {row['status']}"
+                )
+            connection.execute(
+                """
+                UPDATE work_items
+                SET status = 'completed', updated_at = ?
+                WHERE public_id = ?
+                """,
+                (timestamp, public_id),
+            )
+
+        return self.get_work_item(public_id)
