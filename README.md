@@ -19,7 +19,7 @@ ANIMA — исследовательский проект модульного �
 
 Текущий фокус: **3 — Sleep** (InProgress).
 
-Stage 3.6 — Chunk / Checkpoint / Resume: реализовать persistent chunk checkpoints и безопасный resume, чтобы committed chunk не выполнялся повторно после interruption/restart.
+Stage 3.10 — Observability / Resource Budget: сделать Sleep progress, queue, budget и elapsed/CPU/RAM/storage metrics наблюдаемыми и детерминированно приостанавливать работу при исчерпании runtime budget.
 
 [Этапы и критерии](docs/ROADMAP/README.md).
 <!-- AUTO:summary:END -->
