@@ -18,6 +18,8 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from anima.agent import (
+    SMALL_LLM_MAX_OUTPUT_TOKENS,
+    SMALL_LLM_MAX_PROMPT_CHARS,
     AgentStore,
     DeterministicGoalVerifier,
     GoalVerificationBridge,
@@ -26,6 +28,9 @@ from anima.agent import (
     ProposalChoiceCoordinator,
     RecoverableAgentLoop,
     SandboxExecutor,
+    SmallLLMPromptProfile,
+    SmallModelLLMPlanner,
+    SmallModelOpenAICompatibleChatTransport,
     VerificationSpec,
     build_sandbox_registry,
 )
@@ -86,6 +91,23 @@ def build_parser():
         action="store_true",
         help="Do not send response_format=json_object for endpoints that reject it",
     )
+    parser.add_argument(
+        "--small-model-profile",
+        action="store_true",
+        help="Use the compact bounded Planner projection intended for small local models",
+    )
+    parser.add_argument(
+        "--max-prompt-chars",
+        type=int,
+        default=SMALL_LLM_MAX_PROMPT_CHARS,
+        help="Character budget for --small-model-profile",
+    )
+    parser.add_argument(
+        "--max-output-tokens",
+        type=int,
+        default=SMALL_LLM_MAX_OUTPUT_TOKENS,
+        help="Completion token budget for --small-model-profile",
+    )
     return parser
 
 
@@ -96,6 +118,39 @@ def _sum_known(values):
     return sum(values)
 
 
+def _build_planner(args, api_key):
+    transport_kwargs = {
+        "base_url": args.base_url,
+        "model": args.model,
+        "api_key": api_key,
+        "provider": args.provider,
+        "request_json_object": not args.no_response_format,
+        "input_cost_per_million": args.input_cost_per_million,
+        "output_cost_per_million": args.output_cost_per_million,
+    }
+    if args.small_model_profile:
+        profile = SmallLLMPromptProfile(max_prompt_chars=args.max_prompt_chars)
+        transport = SmallModelOpenAICompatibleChatTransport(
+            max_output_tokens=args.max_output_tokens,
+            **transport_kwargs,
+        )
+        return SmallModelLLMPlanner(
+            transport,
+            profile=profile,
+            name="small-llm-experiment",
+            version="1",
+            timeout_seconds=args.timeout,
+        )
+
+    transport = OpenAICompatibleChatTransport(**transport_kwargs)
+    return LLMPlanner(
+        transport,
+        name="llm-experiment",
+        version="1",
+        timeout_seconds=args.timeout,
+    )
+
+
 def run_experiment(args):
     if not args.base_url:
         raise ValueError("--base-url or ANIMA_LLM_BASE_URL is required")
@@ -103,23 +158,13 @@ def run_experiment(args):
         raise ValueError("--model or ANIMA_LLM_MODEL is required")
     if args.max_steps <= 0:
         raise ValueError("--max-steps must be positive")
+    if args.small_model_profile:
+        if args.max_prompt_chars <= 0:
+            raise ValueError("--max-prompt-chars must be positive")
+        if args.max_output_tokens <= 0:
+            raise ValueError("--max-output-tokens must be positive")
     api_key = os.environ.get(args.api_key_env)
-
-    transport = OpenAICompatibleChatTransport(
-        base_url=args.base_url,
-        model=args.model,
-        api_key=api_key,
-        provider=args.provider,
-        request_json_object=not args.no_response_format,
-        input_cost_per_million=args.input_cost_per_million,
-        output_cost_per_million=args.output_cost_per_million,
-    )
-    planner = LLMPlanner(
-        transport,
-        name="llm-experiment",
-        version="1",
-        timeout_seconds=args.timeout,
-    )
+    planner = _build_planner(args, api_key)
 
     with tempfile.TemporaryDirectory(prefix="anima-stage4-llm-") as temp:
         data_dir = Path(temp)
@@ -175,9 +220,16 @@ def run_experiment(args):
         result = loop.run(run["id"], spec, max_steps=args.max_steps)
 
         calls = [record.to_dict() for record in planner.call_history]
+        prompt_metrics = [
+            metric.to_dict()
+            for metric in getattr(planner, "prompt_metrics", ())
+        ]
         output = {
             "provider": args.provider,
             "model": args.model,
+            "planner_profile": (
+                "small-model" if args.small_model_profile else "full"
+            ),
             "completed": result.completed,
             "stop_reason": result.stop_reason,
             "run_status": result.run["status"],
@@ -205,6 +257,7 @@ def run_experiment(args):
                 if (sandbox / "result.txt").is_file()
                 else None
             ),
+            "prompt_metrics": prompt_metrics,
             "llm_calls": calls,
             "llm_totals": {
                 "latency_ms": sum(record["latency_ms"] for record in calls),
