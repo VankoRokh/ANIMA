@@ -172,10 +172,22 @@ class Runtime:
             )
         return self.sleep_runtime
 
-    def activate_sleep_job(self, job_id):
+    def activate_sleep_job(self, job_id, *, budget=None):
         return self._measure(
             "runtime.sleep.activate_job",
-            lambda: self._require_sleep_runtime().activate_job(job_id),
+            lambda: self._require_sleep_runtime().activate_job(
+                job_id,
+                budget=budget,
+            ),
+        )
+
+    def configure_sleep_budget(self, job_id, budget):
+        return self._measure(
+            "runtime.sleep.configure_budget",
+            lambda: self._require_sleep_runtime().configure_budget(
+                job_id,
+                budget,
+            ),
         )
 
     def process_sleep_work(
