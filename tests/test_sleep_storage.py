@@ -9,7 +9,7 @@ def test_sleep_store_initializes_schema_and_queued_job(tmp_path):
     store = SleepStore(tmp_path / "sleep.db")
     job = store.create_job(created_at="2026-10-27T12:00:00+00:00")
 
-    assert store.schema_version() == 2
+    assert store.schema_version() == 3
     assert job["id"].startswith("sj_")
     assert job["status"] == "queued"
     assert job["created_at"] == "2026-10-27T12:00:00+00:00"
