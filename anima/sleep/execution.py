@@ -42,6 +42,21 @@ class SleepChunkExecutor:
                 "interrupt_after_new_chunks must be a positive integer or null"
             )
 
+    @staticmethod
+    def _resume_state(work_item, latest, processor):
+        if latest is None:
+            if work_item.status == "checkpointed" or work_item.checkpoint_ref is not None:
+                raise ValueError(
+                    "WorkItem checkpoint metadata exists without a persisted checkpoint"
+                )
+            return 0, processor.initial_checkpoint(work_item)
+
+        if work_item.checkpoint_ref != latest["id"]:
+            raise ValueError(
+                "WorkItem checkpoint_ref does not match latest persisted checkpoint"
+            )
+        return latest["sequence"] + 1, latest["checkpoint"]
+
     def run(
         self,
         work_item_id,
@@ -61,12 +76,11 @@ class SleepChunkExecutor:
 
         processor = self.processor_registry.resolve(work_item)
         latest = self.sleep_store.get_latest_checkpoint(work_item_id)
-        if latest is None:
-            resumed_from_sequence = 0
-            checkpoint = processor.initial_checkpoint(work_item)
-        else:
-            resumed_from_sequence = latest["sequence"] + 1
-            checkpoint = latest["checkpoint"]
+        resumed_from_sequence, checkpoint = self._resume_state(
+            work_item,
+            latest,
+            processor,
+        )
 
         work_item = self.sleep_store.begin_work_item(work_item_id)
         processed_chunks = 0
