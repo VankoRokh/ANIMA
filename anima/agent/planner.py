@@ -2,13 +2,13 @@ import hashlib
 import json
 from abc import ABC, abstractmethod
 from collections.abc import Callable, Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from types import MappingProxyType
 from uuid import UUID, uuid4
 
 from anima.agent.contracts import ActionProposal
-from anima.agent.tools import ToolDescriptor, ToolInputError
+from anima.agent.tools import ToolDescriptor
 
 
 PLANNER_TURN_ID_PREFIX = "pt_"
@@ -141,8 +141,8 @@ class PlannerRequest:
     tools: tuple[ToolDescriptor, ...]
     recent_steps: tuple[Mapping, ...] = ()
     recent_observations: tuple[Mapping, ...] = ()
-    constraints: Mapping = MappingProxyType({})
-    remaining_budget: Mapping = MappingProxyType({})
+    constraints: Mapping = field(default_factory=dict)
+    remaining_budget: Mapping = field(default_factory=dict)
 
     def __post_init__(self):
         _validate_prefixed_uuid4(self.run_id, prefix="ar_", label="PlannerRequest run_id")
@@ -234,11 +234,20 @@ class PlannerRequest:
         tools = record["tools"]
         if not isinstance(tools, list):
             raise ValueError("PlannerRequest tools must be an array")
+        if not isinstance(record["recent_steps"], list):
+            raise ValueError("PlannerRequest recent_steps must be an array")
+        if not isinstance(record["recent_observations"], list):
+            raise ValueError("PlannerRequest recent_observations must be an array")
         descriptors = []
         for index, item in enumerate(tools):
             if not isinstance(item, dict):
                 raise ValueError(f"PlannerRequest tools[{index}] must be an object")
-            descriptors.append(ToolDescriptor(**item))
+            descriptor_record = dict(item)
+            if isinstance(descriptor_record.get("sandbox_scope"), list):
+                descriptor_record["sandbox_scope"] = tuple(
+                    descriptor_record["sandbox_scope"]
+                )
+            descriptors.append(ToolDescriptor(**descriptor_record))
         return cls(
             run_id=record["run_id"],
             step_id=record["step_id"],
@@ -467,10 +476,7 @@ class PlannerAdapter(ABC):
         for rank, draft in enumerate(decision.proposals, start=1):
             descriptor = request.tool_descriptor(draft.tool, draft.tool_version)
             arguments = _thaw_json(draft.arguments)
-            try:
-                descriptor.validate_input(arguments)
-            except ToolInputError:
-                raise
+            descriptor.validate_input(arguments)
             proposals.append(
                 ActionProposal.create(
                     rank=rank,
@@ -499,7 +505,13 @@ class PlannerAdapter(ABC):
 class DeterministicPlanner(PlannerAdapter):
     """Deterministic baseline whose strategy has no execution or writable-state handle."""
 
-    def __init__(self, strategy: Callable[[PlannerRequest], PlannerDecision], *, name="deterministic", version="1"):
+    def __init__(
+        self,
+        strategy: Callable[[PlannerRequest], PlannerDecision],
+        *,
+        name="deterministic",
+        version="1",
+    ):
         if not callable(strategy):
             raise TypeError("DeterministicPlanner strategy must be callable")
         super().__init__(name=name, version=version)
