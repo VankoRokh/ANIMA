@@ -100,6 +100,40 @@ class ScenarioRunner:
         elif action == "sleep":
             events = self.runtime.sleep()
 
+        elif action == "sleep_job_activate":
+            job = self.runtime.activate_sleep_job(
+                self._require(step, "job_id", action)
+            )
+            return {
+                "action": action,
+                "job": dict(job),
+            }
+
+        elif action == "sleep_process":
+            chunks = self._require(step, "chunks", action)
+            if not isinstance(chunks, list):
+                raise ValueError(
+                    "Scenario action 'sleep_process' chunks must be a list"
+                )
+            outcome = self.runtime.process_sleep_work(
+                self._require(step, "work_item_id", action),
+                chunks,
+                max_new_chunks=step.get("max_new_chunks", 1),
+            )
+            return {
+                "action": action,
+                "work_item_id": outcome.work_item_id,
+                "status": outcome.status,
+                "resumed_from_sequence": outcome.resumed_from_sequence,
+                "processed_chunks": outcome.processed_chunks,
+                "committed_chunks": outcome.committed_chunks,
+                "final_result": (
+                    outcome.final_result.to_dict()
+                    if outcome.final_result is not None
+                    else None
+                ),
+            }
+
         elif action == "goal_create":
             goal = self.runtime.create_goal(
                 source=self._require(step, "source", action),
