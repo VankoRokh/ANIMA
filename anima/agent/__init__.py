@@ -35,6 +35,7 @@ from .planner import (
     ProposalDraft,
     planner_request_hash,
 )
+from .runtime import AgentLoop, AgentLoopResult, AgentTurnResult
 from .store import AgentStore
 from .tools import (
     SchemaValidationError,
@@ -55,7 +56,10 @@ from .verification import (
 __all__ = [
     "Action",
     "ActionProposal",
+    "AgentLoop",
+    "AgentLoopResult",
     "AgentStore",
+    "AgentTurnResult",
     "CandidateAdaptation",
     "CandidateAdapter",
     "CandidateFeatureTrace",
