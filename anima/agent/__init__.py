@@ -18,6 +18,15 @@ from .executor import (
     operation_kind,
     sandbox_tool_descriptors,
 )
+from .planner import (
+    DeterministicPlanner,
+    PlannerAdapter,
+    PlannerDecision,
+    PlannerRequest,
+    PlannerTurn,
+    ProposalDraft,
+    planner_request_hash,
+)
 from .store import AgentStore
 from .tools import (
     SchemaValidationError,
@@ -31,9 +40,15 @@ __all__ = [
     "Action",
     "ActionProposal",
     "AgentStore",
+    "DeterministicPlanner",
     "ExecutionReceipt",
     "ExecutionRejectedError",
     "Observation",
+    "PlannerAdapter",
+    "PlannerDecision",
+    "PlannerRequest",
+    "PlannerTurn",
+    "ProposalDraft",
     "SandboxExecutor",
     "SandboxHandler",
     "SchemaValidationError",
@@ -47,6 +62,7 @@ __all__ = [
     "action_request_hash",
     "build_sandbox_registry",
     "operation_kind",
+    "planner_request_hash",
     "sandbox_tool_descriptors",
     "validate_execution_trace",
     "validate_verification_trace",
