@@ -19,7 +19,7 @@ ANIMA — исследовательский проект модульного �
 
 Текущий фокус: **4 — Agent** (InProgress).
 
-Stage 4.0 — Agent Specification: зафиксировать AgentRun/AgentStep, Tool/Action/Observation, PlannerAdapter, Goal verification, persistence/recovery boundaries и критерии deterministic/LLM validation до начала production-реализации.
+Stage 4.1 — Agent Storage / Lifecycle: реализовать transactional `agent.db`, persistent AgentRun/AgentStep lifecycle и stable operation identity по принятой Stage 4.0 Specification.
 
 [Этапы и критерии](docs/ROADMAP/README.md).
 <!-- AUTO:summary:END -->
