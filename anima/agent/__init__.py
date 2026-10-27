@@ -66,6 +66,19 @@ from .planner import (
 from .recoverable_runtime import RecoverableAgentLoop
 from .recovery import AgentRecoveryJournal, RecoveryStepArtifacts
 from .runtime import AgentLoop, AgentLoopResult, AgentTurnResult
+from .small_llm import (
+    SMALL_LLM_MAX_OUTPUT_TOKENS,
+    SMALL_LLM_MAX_PROMPT_CHARS,
+    SMALL_LLM_MAX_TOOLS,
+    SMALL_LLM_RECENT_OBSERVATIONS,
+    SMALL_LLM_RECENT_STEPS,
+    SmallLLMPromptBudgetError,
+    SmallLLMPromptMetrics,
+    SmallLLMPromptProfile,
+    SmallModelLLMPlanner,
+    SmallModelOpenAICompatibleChatTransport,
+    build_small_llm_planner_prompts,
+)
 from .store import AgentStore
 from .tools import (
     SchemaValidationError,
@@ -132,9 +145,19 @@ __all__ = [
     "RecoverableAgentLoop",
     "RecoveryStepArtifacts",
     "SIGNIFICANT_VERIFICATION_OUTCOMES",
+    "SMALL_LLM_MAX_OUTPUT_TOKENS",
+    "SMALL_LLM_MAX_PROMPT_CHARS",
+    "SMALL_LLM_MAX_TOOLS",
+    "SMALL_LLM_RECENT_OBSERVATIONS",
+    "SMALL_LLM_RECENT_STEPS",
     "SandboxExecutor",
     "SandboxHandler",
     "SchemaValidationError",
+    "SmallLLMPromptBudgetError",
+    "SmallLLMPromptMetrics",
+    "SmallLLMPromptProfile",
+    "SmallModelLLMPlanner",
+    "SmallModelOpenAICompatibleChatTransport",
     "ToolDescriptor",
     "ToolInputError",
     "ToolOutputError",
@@ -147,6 +170,7 @@ __all__ = [
     "action_request_hash",
     "build_llm_planner_prompts",
     "build_sandbox_registry",
+    "build_small_llm_planner_prompts",
     "operation_kind",
     "parse_llm_planner_decision",
     "planner_request_hash",
