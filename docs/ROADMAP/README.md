@@ -6,9 +6,9 @@
 показывают этот порядок, а не требуют отдельной платы или модели на каждом шаге.
 
 <!-- AUTO:roadmap:START -->
-**Текущая работа:** Stage 3 — Sleep завершён и подтверждён финальной end-to-end валидацией. Следующий этап — Stage 4 — Agent; реализация ещё не начата.
+**Текущая работа:** Stage 4.0 — Agent Specification: зафиксировать AgentRun/AgentStep, Tool/Action/Observation, PlannerAdapter, Goal verification, persistence/recovery boundaries и критерии deterministic/LLM validation до начала production-реализации.
 
-**Фокус:** 3 — Sleep (Complete).
+**Фокус:** 4 — Agent (InProgress).
 
 | Этап | Проверяемый результат | Статус | Зависимости |
 |---|---|---|---|
@@ -18,7 +18,7 @@
 | [1 — Cognitive Memory](#stage-1) | Релевантный опыт извлекается с происхождением и ограниченным контекстом | Complete | [0](#stage-0), [D1](#d1) |
 | [2 — Internal State](#stage-2) | Влияние внутреннего состояния на выбор причинно прослеживается | Complete | [1](#stage-1) |
 | [3 — Sleep](#stage-3) | Консолидация прерывается и возобновляется без потери источников | Complete | [2](#stage-2) |
-| [4 — Agent](#stage-4) | Ограниченная задача выполняется инструментом и проверяется наблюдением | Planned | [3](#stage-3) |
+| [4 — Agent](#stage-4) | Ограниченная задача выполняется инструментом и проверяется наблюдением | InProgress | [3](#stage-3) |
 | [5 — Virtual ANIMA](#stage-5) | Длительная работа на ПК/VM имеет измеренный ресурсный профиль | Planned | [4](#stage-4) |
 | [6 — Cyberdeck](#stage-6) | Измеренная нагрузка переносится на автономное устройство | Planned | [5](#stage-5) |
 | [7 — Modular embodiment](#stage-7) | Узлы диагностируются и заменяются без потери данных экземпляра | Planned | [6](#stage-6) |
@@ -85,7 +85,7 @@ Memories/Knowledge/Entities/Relations/History и состояние обрабо
 | **1.3 Entities / Relations / Provenance — Complete** | Entity aliases, универсальные relations и цепочка `Knowledge → Memory → Event` | Для каждого контрольного объекта происхождение восстанавливается до source Events; [TV-0006](../TESTING/Results/TV-0006.md) |
 | **1.4 Memory Processor — Complete** | Selection и объяснимый Association; `HIGH → UPDATE`, `MEDIUM → CREATE + related_to`, `LOW → CREATE` | На canonical corpus каждый Event попадает в ожидаемый эпизод, причины решения видны в trace; [TV-0007](../TESTING/Results/TV-0007.md) |
 | **1.5 Memory Composer — Complete** | Заменяемый deterministic `RuleBasedComposer`, ограниченный `content` | CREATE/UPDATE сохраняют решения, результаты, причины, ограничения и открытые вопросы без копирования шума; [TV-0008](../TESTING/Results/TV-0008.md) |
-| **1.6 Merge / History — Complete** | `OPEN/CLOSED/MERGED`, безопасный Merge и компактная история изменений | Merge не теряет provenance; исходная запись остаётся прослеживаемой; [TV-0009](../TESTING/Results/TV-0009.md) |
+| **1.6 Merge / History — Complete** | `OPEN/CLOSED/MERGED`, безопасный Merge и compact history | Merge не теряет provenance; исходная запись остаётся прослеживаемой; [TV-0009](../TESTING/Results/TV-0009.md) |
 | **1.7 Knowledge Layer — Complete** | Knowledge из закрытого подтверждённого опыта; lifecycle `provisional/confirmed/challenged/superseded/rejected` | Противоречие переводит `confirmed → challenged`, но не заменяет знание до закрытия проверки; [TV-0010](../TESTING/Results/TV-0010.md) |
 | **1.8 Retrieval — Complete** | ID/filters/entities/FTS/relations/ranking, сначала дешёвые и объяснимые методы | Заранее размеченные query возвращают обязательные IDs в заданном top-k; [TV-0011](../TESTING/Results/TV-0011.md) |
 | **1.9 Context Builder — Complete** | Структурированный `ContextBundle` с `knowledge[]/memories[]/events[]`, reason и budget | `max_items/max_chars` соблюдаются; разные consumer policies дают воспроизводимый ограниченный контекст; [TV-0012](../TESTING/Results/TV-0012.md) |
@@ -418,19 +418,129 @@ synthetic test; resource/performance baseline записан; canonical end-to-e
 
 ## Stage 4
 
-**Цель и наблюдение.** В sandbox ограниченная задача проходит plan → action →
-observation → result и заканчивается определённым статусом.
+**Цель и наблюдение.** Доказать, что существующий Goal может быть преобразован в
+ограниченную последовательность реальных действий в sandbox: система получает
+bounded Context, формирует несколько допустимых вариантов, применяет существующий
+Choice/Internal State, выполняет ровно одно выбранное действие через Tool contract,
+получает независимое Observation, проверяет progress/result и либо завершает Goal,
+либо делает следующий цикл. Архитектурный выбор зафиксирован в
+[ADR-008](../DECISIONS/README.md#adr-008).
 
-**Работа.** Tool contract с аргументами/результатом, planner/executor loop,
-наблюдение после действия, timeout/error/cancel, dry-run или sandbox для опасных
-операций. Execution trace сохраняется как опыт с проверяемым результатом.
+**Ключевые invariants.** Planner предлагает, но не исполняет. Executor исполняет
+только зарегистрированный Tool. Успешный tool call не равен успешному Goal:
+завершение требует Observation и проверки success criterion. Planner/LLM не имеет
+прямого writable-доступа к Goal, Memory, Knowledge или Internal State. На baseline
+Planner не видит значения Internal State, чтобы их влияние оставалось отдельно
+наблюдаемым через Choice. Один agent turn выполняет не более одного реального
+Action; длинный план является лишь гипотезой и пересматривается после Observation.
 
-**Сценарии и приёмка.** Многошаговый успех, неверные аргументы, отказ/timeout,
-прерывание между шагами и определённое состояние после restart. Повтор команды
-не повторяет подтверждённое необратимое действие без явного разрешения. Успех
-подтверждается observation. Хотя бы один полный workflow проходит success/failure/cancel.
+Tool system использует собственный JSON-Schema contract ANIMA и системную metadata
+о side effects/reversibility/idempotency/timeout/sandbox scope. Контракт должен быть
+пригоден для будущего MCP adapter, но внутренний Agent не зависит от MCP runtime.
+`PlannerAdapter` скрывает provider-specific API и возвращает общий структурированный
+`PlannerTurn` с ranked `ActionProposal`. Системные Candidate features — risk, effort,
+information gain, repeated failure и подобные — вычисляет ANIMA, а не модель.
 
-**Регрессия и доказательства.** Предыдущие этапы; успешный trace и один failure/recovery.
+Operational execution history и долговременный опыт разделены. Persistent
+`agent.db` должен стать источником истины для AgentRun/AgentStep, proposal/selection,
+execution receipt, observation и operation IDs, необходимых recovery/idempotency.
+Значимые действия и результаты публикуются как компактные `agent.*` Events, а
+долговременная Memory формируется через обычный Event/Memory pipeline. Большие
+outputs не копируются во все слои и при необходимости остаются внешними данными
+со stable reference.
+
+### Рабочая декомпозиция Stage 4
+
+Таблица ниже — план текущей итерации, а не неизменяемая архитектура. После 4.0 шаги
+можно объединять, дробить или переставлять, если тесты показывают более корректную
+границу. Изменение accepted invariants требует отдельного пересмотра ADR-008.
+
+| Шаг | Результат | Проверка завершения |
+|---|---|---|
+| **4.0 Specification — InProgress** | Зафиксировать AgentRun/AgentStep, PlannerTurn/ActionProposal, Tool/Action/ExecutionReceipt/Observation/VerificationResult, ownership, lifecycle, storage и recovery boundaries | Документация однозначно отвечает, кто создаёт/изменяет каждую сущность, где проходят atomic/idempotent boundaries, что является observation и кто имеет authority завершить Goal |
+| **4.1 Agent Storage / Lifecycle — Planned** | Transactional `agent.db` для persistent run/step state и operation identity без копирования Memory/Tool payload | Schema/reopen/constraints/rollback проходят; restart сохраняет run identity и последнее допустимое состояние; invalid lifecycle transition определён |
+| **4.2 Tool Contract / Registry — Planned** | Версионированные ToolDescriptor и Registry с JSON Schema, side-effect/reversibility/idempotency/timeout/sandbox metadata | Валидный tool регистрируется; duplicate/version/schema/unsupported tool дают явную ошибку; metadata принадлежит системе, а не Planner |
+| **4.3 Action / Observation Contracts — Planned** | Разделены proposal, selected Action, ExecutionReceipt, Observation и verification; данные имеют stable IDs/refs | Tool success не закрывает Goal; observation можно связать с конкретным action/receipt; malformed или dangling refs отклоняются |
+| **4.4 Sandbox Executor / Idempotency — Planned** | Первый обратимый файловый sandbox (`list/read/write`) и при необходимости deterministic calculator; Executor не выходит за разрешённый root и использует operation IDs для side effects | Path escape/unknown tool/invalid args/timeout определены; подтверждённый write не повторяется после replay; read-only операции безопасно повторимы |
+| **4.5 PlannerAdapter / Deterministic Planner — Planned** | Общий PlannerAdapter возвращает bounded ranked ActionProposals; deterministic planner позволяет тестировать agent loop без LLM | Planner можно заменить без изменения Executor/Choice/Verifier; output schema валидируется; Planner не может исполнить Tool или изменить системное состояние напрямую |
+| **4.6 Candidate Adaptation / Choice Integration — Planned** | Proposal преобразуется в существующий Candidate: planner rank даёт ограниченный base preference, системные признаки вычисляются из Tool/history/context, затем Choice применяет Internal State | Один набор proposals при neutral/altered state даёт ожидаемо различный выбор; Planner не может занизить risk/effort или обойти Choice |
+| **4.7 Goal Verification / Progress — Planned** | Observation переводится в проверяемый Goal progress/result через deterministic baseline verifier | Положительный tool receipt без нужного состояния не завершает Goal; реальное подтверждение success criterion завершает; failure/partial progress остаются различимы |
+| **4.8 Agent Loop / Runtime Integration — Planned** | Полный пошаговый цикл `Goal → Context → proposals → Choice → Action → Observation → verification → next turn` интегрирован в headless Runtime | Многошаговая sandbox-задача завершается без скрытых прямых вызовов; за turn выполняется не более одного Action; cancel/budget/terminal Goal останавливают loop определённо |
+| **4.9 Agent Events / Experience Capture — Planned** | Существенные action/observation/result/failure/strategy-change публикуются как компактные `agent.*` Events с refs | EventLog показывает причинную цепочку run без дублирования полного execution history; replay не размножает значимые Events |
+| **4.10 Memory Integration — Planned** | Agent experience формирует bounded episodic Memory через обычный processing path, а не прямую запись Planner/Executor | Один multi-step run не превращается в Memory на каждый технический tool call; итоговый эпизод сохраняет Goal, значимые failures/adjustments/result и provenance до Events |
+| **4.11 Recovery / Interruption / Replay — Planned** | Crash/restart/timeout/cancel восстанавливают run на безопасной границе; confirmed side effect не выполняется повторно | Прерывание до/после execution/observation commit имеет определённый recovery path; replay не создаёт второй логический effect или второй completed Goal |
+| **4.12 LLM Planner Experiment — Planned** | Реальная LLM подключается только через PlannerAdapter и решает тот же canonical sandbox task, что deterministic baseline | Сравниваются schema validity, invalid/forbidden proposals, replanning, Goal success, tool calls, latency, tokens/model cost; смена Planner не требует изменения Agent/Tool/Choice/Verifier contracts |
+| **4.13 Observability / Budgets — Planned** | Snapshot/trace показывает run/step, Goal, context budget, proposals, Candidate/Choice trace, selected Action, receipt/observation, verifier result и remaining budgets | По trace можно восстановить причину каждого действия; max steps/tool calls/time/model budget останавливают run определённо без повреждения state |
+| **4.14 Performance Baseline — Planned** | Измерить deterministic orchestration/storage/verification отдельно от стоимости LLM и Tool implementation | Baseline зафиксирован без SLA; видна стоимость Agent loop, persistence, Choice/verification и отдельно model/tool latency; bottlenecks записаны до оптимизации |
+| **4.15 Stage Validation — Planned** | Canonical scenario объединяет Goal, Context/Memory, failure, Internal State/Choice, strategy change, sandbox actions, restart, verification и повторное использование опыта; отдельный LLM run проходит тот же contract | Success/failure/cancel/recovery имеют определённые outcomes; replay не повторяет confirmed effect; Goal закрывается только по observation; agent experience доступен следующему сходному Goal; полный regression suite зелёный |
+
+### Planner и LLM boundary
+
+Первый Planner baseline deterministic. Это позволяет проверить agent architecture,
+не смешивая ошибки orchestration с вероятностным model output. Реальная LLM является
+обязательным экспериментом Stage 4, но не владельцем Agent: provider-specific
+function/tool calling преобразуется adapter-ом в `ActionProposal`, после чего
+validation, Candidate adaptation, Choice, execution и verification выполняются
+обычными компонентами ANIMA.
+
+Planner получает Goal, bounded ContextBundle, доступные ToolDescriptors, recent
+AgentSteps/Observations, run constraints и remaining budget. На baseline Internal
+State values в PlannerRequest не передаются. Planner возвращает несколько ranked
+proposals и краткое rationale/expected observation, достаточные для trace; свободный
+chain-of-thought не является контрактом и не требуется для хранения. Модель может
+сообщить, что считает Goal завершённым или что не знает следующего шага, но такое
+сообщение не имеет authority изменить Goal lifecycle.
+
+### Action, observation и опыт
+
+Каждый внешний effect проходит `ToolDescriptor → validated Action → Executor`.
+ExecutionReceipt фиксирует факт попытки/выполнения, но Observation отвечает на
+вопрос, что реально стало состоянием среды. Для `write(result.txt)` receipt `ok`
+недостаточен: verifier должен получить наблюдение, подтверждающее существование и
+содержимое файла, если именно это задано success criterion.
+
+Agent execution history нужна для recovery и поэтому хранится полно и технически в
+`agent.db`; Memory нужна для будущего поведения и поэтому хранит только полезный
+эпизод. Значимые failures, discovery, strategy change и verified outcome проходят
+через EventLog, после чего Memory Processor/специализированный agent-experience
+adapter может сформировать bounded episodic Memory. Это сохраняет единый путь
+происхождения и не позволяет Planner записывать удобную ему версию прошлого.
+
+### Canonical scenario
+
+Начальный контрольный workflow должен быть обратимым и полностью локальным. В
+sandbox находятся файлы с данными, а Goal требует найти значения, вычислить
+результат, записать `result.txt` и проверить его. Сценарий намеренно содержит
+неверное первоначальное предположение об имени файла: первый read должен дать
+failure, после чего information-gathering/alternative Action получает преимущество,
+система находит реальные файлы, продолжает работу и подтверждает результат чтением.
+
+В расширенной проверке restart происходит после side effect, но до завершения Goal:
+recovery не повторяет уже подтверждённый write и продолжает с observation/
+verification. После закрытия run значимый опыт превращается в episodic Memory; новый
+похожий Goal должен получить этот опыт через ContextBuilder. Такой сценарий впервые
+проверяет Stage 1–3 совместно с Agent, а не параллельно им.
+
+### Отложенные механизмы Stage 4
+
+Self-generated Goals, unrestricted shell/browser/desktop control, autonomous
+background loops, прямой Planner access к Internal State, автоматическое исполнение
+длинного LLM-плана, полноценный MCP runtime, multi-agent coordination, Fast/Deep
+model routing и generative self-reflection не нужны для baseline. Их возвращаем
+только после измеренного ограничения текущего Agent. Внешние необратимые действия
+требуют отдельной policy/confirmation модели и не доказываются файловым sandbox.
+
+**Definition of Done.** Agent имеет persistent recoverable lifecycle и выполняет
+только зарегистрированные Tools через sandbox Executor; Planner заменяем и не имеет
+прямого execution/write authority; Proposal проходит validation, Candidate adaptation
+и существующий Choice; каждый реальный Action заканчивается Observation, а Goal
+завершается только независимой проверкой success criterion. Execution history
+отделена от долговременной Memory, значимый опыт проходит Event/Memory pipeline,
+restart/replay не дублируют confirmed effects. Deterministic baseline и минимум один
+реальный LLM Planner проходят один и тот же contract/canonical workflow; resource/
+performance baseline записан, а полный regression suite предыдущих стадий остаётся
+зелёным. Точная внутренняя декомпозиция может уточняться по данным тестов без
+изменения этих invariants.
 
 ## Stage 5
 
