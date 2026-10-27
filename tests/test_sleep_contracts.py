@@ -103,6 +103,8 @@ def test_source_ref_validates_supported_kinds_and_id_prefixes():
 def test_event_memory_knowledge_and_asset_use_one_source_contract(tmp_path):
     fixture = _source_fixture(tmp_path)
     registry = fixture["registry"]
+    store = SleepStore(tmp_path / "sleep.db")
+    job = store.create_job()
 
     refs = [
         SourceRef(kind, fixture[kind])
@@ -111,6 +113,20 @@ def test_event_memory_knowledge_and_asset_use_one_source_contract(tmp_path):
 
     assert all(registry.contains(ref) for ref in refs)
     assert [registry.require(ref) for ref in refs] == refs
+
+    items = []
+    for priority, ref in enumerate(refs):
+        item = WorkItem.create(
+            job_id=job["id"],
+            source_ref=ref,
+            processor="contract-test",
+            processor_version="1",
+            priority=priority,
+        )
+        items.append(store.create_work_item(item, source_registry=registry))
+
+    assert items == store.list_work_items(job_id=job["id"])
+    assert [item.source_ref for item in items] == refs
 
 
 def test_source_registry_reports_dangling_and_unregistered_sources(tmp_path):
