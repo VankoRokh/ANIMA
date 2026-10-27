@@ -1,6 +1,6 @@
 import re
 import sqlite3
-from contextlib import contextmanager
+from contextlib import closing, contextmanager
 from datetime import datetime, timezone
 from pathlib import Path
 from uuid import UUID, uuid4
@@ -316,7 +316,7 @@ class AgentStore:
 
     def _initialize(self):
         try:
-            with self._connect() as connection:
+            with closing(self._connect()) as connection, connection:
                 connection.execute(
                     """
                     CREATE TABLE IF NOT EXISTS schema_meta (
@@ -369,7 +369,7 @@ class AgentStore:
             connection.close()
 
     def schema_version(self):
-        with self._connect() as connection:
+        with closing(self._connect()) as connection, connection:
             row = connection.execute(
                 "SELECT value FROM schema_meta WHERE key = 'schema_version'"
             ).fetchone()
@@ -501,7 +501,7 @@ class AgentStore:
 
     def get_run(self, public_id):
         _validate_run_id(public_id)
-        with self._connect() as connection:
+        with closing(self._connect()) as connection, connection:
             row = connection.execute(
                 "SELECT * FROM agent_runs WHERE public_id = ?",
                 (public_id,),
@@ -520,7 +520,7 @@ class AgentStore:
             clauses.append("status = ?")
             values.append(status)
         where = " WHERE " + " AND ".join(clauses) if clauses else ""
-        with self._connect() as connection:
+        with closing(self._connect()) as connection, connection:
             rows = connection.execute(
                 "SELECT * FROM agent_runs" + where + " ORDER BY row_id",
                 tuple(values),
@@ -529,7 +529,7 @@ class AgentStore:
 
     def list_run_transitions(self, public_id):
         _validate_run_id(public_id)
-        with self._connect() as connection:
+        with closing(self._connect()) as connection, connection:
             rows = connection.execute(
                 """
                 SELECT * FROM agent_run_transitions
@@ -697,7 +697,7 @@ class AgentStore:
 
     def get_step(self, public_id):
         _validate_step_id(public_id)
-        with self._connect() as connection:
+        with closing(self._connect()) as connection, connection:
             row = connection.execute(
                 "SELECT * FROM agent_steps WHERE public_id = ?",
                 (public_id,),
@@ -716,7 +716,7 @@ class AgentStore:
             clauses.append("status = ?")
             values.append(status)
         where = " WHERE " + " AND ".join(clauses) if clauses else ""
-        with self._connect() as connection:
+        with closing(self._connect()) as connection, connection:
             rows = connection.execute(
                 "SELECT * FROM agent_steps" + where + " ORDER BY row_id",
                 tuple(values),
@@ -725,7 +725,7 @@ class AgentStore:
 
     def list_step_transitions(self, public_id):
         _validate_step_id(public_id)
-        with self._connect() as connection:
+        with closing(self._connect()) as connection, connection:
             rows = connection.execute(
                 """
                 SELECT * FROM agent_step_transitions
@@ -896,7 +896,7 @@ class AgentStore:
 
     def get_operation(self, public_id):
         _validate_operation_id(public_id)
-        with self._connect() as connection:
+        with closing(self._connect()) as connection, connection:
             row = connection.execute(
                 "SELECT * FROM agent_operations WHERE public_id = ?",
                 (public_id,),
@@ -919,7 +919,7 @@ class AgentStore:
             clauses.append("status = ?")
             values.append(status)
         where = " WHERE " + " AND ".join(clauses) if clauses else ""
-        with self._connect() as connection:
+        with closing(self._connect()) as connection, connection:
             rows = connection.execute(
                 "SELECT * FROM agent_operations" + where + " ORDER BY row_id",
                 tuple(values),

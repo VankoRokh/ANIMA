@@ -1,6 +1,6 @@
 import json
 import sqlite3
-from contextlib import contextmanager
+from contextlib import closing, contextmanager
 from datetime import datetime, timezone
 from pathlib import Path
 from uuid import UUID, uuid4
@@ -346,7 +346,7 @@ class MemoryStore:
 
     def _initialize(self):
         try:
-            with self._connect() as connection:
+            with closing(self._connect()) as connection, connection:
                 connection.executescript(SCHEMA_SQL)
                 connection.execute(
                     "INSERT OR IGNORE INTO schema_meta(key, value) VALUES('schema_version', ?)",
@@ -399,7 +399,7 @@ class MemoryStore:
         }
 
     def schema_version(self):
-        with self._connect() as connection:
+        with closing(self._connect()) as connection, connection:
             row = connection.execute(
                 "SELECT value FROM schema_meta WHERE key = 'schema_version'"
             ).fetchone()
@@ -480,7 +480,7 @@ class MemoryStore:
     def get_memory(self, public_id):
         _validate_memory_id(public_id)
 
-        with self._connect() as connection:
+        with closing(self._connect()) as connection, connection:
             row = connection.execute(
                 "SELECT * FROM memories WHERE public_id = ?",
                 (public_id,),
@@ -489,7 +489,7 @@ class MemoryStore:
         return self._row_to_memory(row)
 
     def list_memories(self):
-        with self._connect() as connection:
+        with closing(self._connect()) as connection, connection:
             rows = connection.execute(
                 "SELECT * FROM memories ORDER BY row_id"
             ).fetchall()
@@ -497,7 +497,7 @@ class MemoryStore:
         return [self._row_to_memory(row) for row in rows]
 
     def count(self):
-        with self._connect() as connection:
+        with closing(self._connect()) as connection, connection:
             row = connection.execute(
                 "SELECT COUNT(*) AS count FROM memories"
             ).fetchone()
@@ -510,7 +510,7 @@ class MemoryStore:
         if limit == 0:
             return []
 
-        with self._connect() as connection:
+        with closing(self._connect()) as connection, connection:
             rows = connection.execute(
                 "SELECT * FROM memories ORDER BY row_id DESC LIMIT ?",
                 (limit,),
@@ -521,7 +521,7 @@ class MemoryStore:
     def source_events(self, public_id):
         _validate_memory_id(public_id)
 
-        with self._connect() as connection:
+        with closing(self._connect()) as connection, connection:
             rows = connection.execute(
                 "SELECT event_id FROM memory_sources WHERE memory_id = ? ORDER BY event_id",
                 (public_id,),
@@ -621,7 +621,7 @@ class MemoryStore:
             raise ValueError("Memory search limit must be a positive integer")
 
         try:
-            with self._connect() as connection:
+            with closing(self._connect()) as connection, connection:
                 rows = connection.execute(
                     """
                     SELECT m.*
@@ -640,7 +640,7 @@ class MemoryStore:
 
     def export_debug(self):
         """Small structured snapshot for tests/debugging; not a backup format."""
-        with self._connect() as connection:
+        with closing(self._connect()) as connection, connection:
             tables = [
                 row["name"]
                 for row in connection.execute(

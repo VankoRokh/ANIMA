@@ -1,6 +1,6 @@
 import json
 import sqlite3
-from contextlib import contextmanager
+from contextlib import closing, contextmanager
 from datetime import datetime, timezone
 from pathlib import Path
 from uuid import UUID, uuid4
@@ -222,7 +222,7 @@ class SleepStore:
 
     def _initialize(self):
         try:
-            with self._connect() as connection:
+            with closing(self._connect()) as connection, connection:
                 connection.execute(
                     """
                     CREATE TABLE IF NOT EXISTS schema_meta (
@@ -284,7 +284,7 @@ class SleepStore:
             connection.close()
 
     def schema_version(self):
-        with self._connect() as connection:
+        with closing(self._connect()) as connection, connection:
             row = connection.execute(
                 "SELECT value FROM schema_meta WHERE key = 'schema_version'"
             ).fetchone()
@@ -384,7 +384,7 @@ class SleepStore:
 
     def get_job(self, public_id):
         _validate_job_id(public_id)
-        with self._connect() as connection:
+        with closing(self._connect()) as connection, connection:
             row = connection.execute(
                 "SELECT * FROM sleep_jobs WHERE public_id = ?",
                 (public_id,),
@@ -394,7 +394,7 @@ class SleepStore:
     def list_jobs(self, *, status=None):
         if status is not None:
             _validate_job_status(status)
-        with self._connect() as connection:
+        with closing(self._connect()) as connection, connection:
             if status is None:
                 rows = connection.execute(
                     "SELECT * FROM sleep_jobs ORDER BY row_id"
@@ -408,7 +408,7 @@ class SleepStore:
 
     def list_transitions(self, public_id):
         _validate_job_id(public_id)
-        with self._connect() as connection:
+        with closing(self._connect()) as connection, connection:
             rows = connection.execute(
                 """
                 SELECT * FROM sleep_job_transitions
@@ -522,7 +522,7 @@ class SleepStore:
 
     def get_work_item(self, public_id):
         _validate_work_item_id(public_id)
-        with self._connect() as connection:
+        with closing(self._connect()) as connection, connection:
             row = connection.execute(
                 "SELECT * FROM work_items WHERE public_id = ?",
                 (public_id,),
@@ -548,7 +548,7 @@ class SleepStore:
         if clauses:
             where = " WHERE " + " AND ".join(clauses)
 
-        with self._connect() as connection:
+        with closing(self._connect()) as connection, connection:
             rows = connection.execute(
                 "SELECT * FROM work_items" + where + " ORDER BY row_id",
                 tuple(values),
@@ -667,7 +667,7 @@ class SleepStore:
 
     def get_checkpoint(self, checkpoint_id):
         _validate_checkpoint_id(checkpoint_id)
-        with self._connect() as connection:
+        with closing(self._connect()) as connection, connection:
             row = connection.execute(
                 "SELECT * FROM work_item_checkpoints WHERE public_id = ?",
                 (checkpoint_id,),
@@ -676,7 +676,7 @@ class SleepStore:
 
     def list_checkpoints(self, public_id):
         _validate_work_item_id(public_id)
-        with self._connect() as connection:
+        with closing(self._connect()) as connection, connection:
             rows = connection.execute(
                 """
                 SELECT * FROM work_item_checkpoints
@@ -689,7 +689,7 @@ class SleepStore:
 
     def get_latest_checkpoint(self, public_id):
         _validate_work_item_id(public_id)
-        with self._connect() as connection:
+        with closing(self._connect()) as connection, connection:
             row = connection.execute(
                 """
                 SELECT * FROM work_item_checkpoints

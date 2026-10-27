@@ -1,6 +1,6 @@
 import math
 import sqlite3
-from contextlib import contextmanager
+from contextlib import closing, contextmanager
 from datetime import datetime, timezone
 from pathlib import Path
 from uuid import UUID, uuid4
@@ -162,7 +162,7 @@ class InternalStateStore:
 
     def _initialize(self):
         try:
-            with self._connect() as connection:
+            with closing(self._connect()) as connection, connection:
                 connection.executescript(SCHEMA_SQL)
                 connection.execute(
                     "INSERT OR IGNORE INTO schema_meta(key, value) VALUES('schema_version', ?)",
@@ -243,14 +243,14 @@ class InternalStateStore:
             connection.close()
 
     def schema_version(self):
-        with self._connect() as connection:
+        with closing(self._connect()) as connection, connection:
             row = connection.execute(
                 "SELECT value FROM schema_meta WHERE key = 'schema_version'"
             ).fetchone()
         return int(row["value"])
 
     def ruleset_version(self):
-        with self._connect() as connection:
+        with closing(self._connect()) as connection, connection:
             row = connection.execute(
                 "SELECT value FROM schema_meta WHERE key = 'ruleset_version'"
             ).fetchone()
@@ -292,7 +292,7 @@ class InternalStateStore:
     def get_state(self, state_name):
         if not isinstance(state_name, str) or not state_name:
             raise ValueError("State name must be a non-empty string")
-        with self._connect() as connection:
+        with closing(self._connect()) as connection, connection:
             row = connection.execute(
                 "SELECT * FROM state_values WHERE name = ?",
                 (state_name,),
@@ -300,7 +300,7 @@ class InternalStateStore:
         return self._row_to_state(row)
 
     def list_states(self):
-        with self._connect() as connection:
+        with closing(self._connect()) as connection, connection:
             rows = connection.execute(
                 "SELECT * FROM state_values ORDER BY name"
             ).fetchall()
@@ -434,7 +434,7 @@ class InternalStateStore:
 
     def get_state_transition(self, public_id):
         _validate_transition_id(public_id)
-        with self._connect() as connection:
+        with closing(self._connect()) as connection, connection:
             row = connection.execute(
                 "SELECT * FROM state_transitions WHERE public_id = ?",
                 (public_id,),
@@ -469,7 +469,7 @@ class InternalStateStore:
             limit_sql = " LIMIT ?"
             values.append(limit)
 
-        with self._connect() as connection:
+        with closing(self._connect()) as connection, connection:
             rows = connection.execute(
                 f"""
                 SELECT * FROM state_transitions
@@ -495,12 +495,12 @@ class InternalStateStore:
             query += " WHERE state_name = ?"
             values = (state_name,)
 
-        with self._connect() as connection:
+        with closing(self._connect()) as connection, connection:
             row = connection.execute(query, values).fetchone()
         return row["count"]
 
     def export_debug(self):
-        with self._connect() as connection:
+        with closing(self._connect()) as connection, connection:
             rows = connection.execute(
                 """
                 SELECT name FROM sqlite_master
