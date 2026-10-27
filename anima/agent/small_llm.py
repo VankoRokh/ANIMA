@@ -193,6 +193,60 @@ SMALL_LLM_RESPONSE_CONTRACT = {
 }
 
 
+def _tool_proposal_schema(descriptor):
+    record = descriptor.to_dict()
+    return {
+        "type": "object",
+        "properties": {
+            "tool": {"const": descriptor.name},
+            "tool_version": {"const": descriptor.version},
+            "arguments": record["input_schema"],
+            "expected_observation": {"type": "string"},
+            "rationale_summary": {"type": "string"},
+        },
+        "required": [
+            "tool",
+            "tool_version",
+            "arguments",
+            "expected_observation",
+            "rationale_summary",
+        ],
+        "additionalProperties": False,
+    }
+
+
+def build_small_llm_response_schema(tools):
+    """Build a tool-aware PlannerDecision schema from authoritative descriptors."""
+    tools = tuple(tools)
+    proposals = {
+        "type": "array",
+        "maxItems": 3,
+    }
+    if tools:
+        proposals["items"] = {
+            "oneOf": [_tool_proposal_schema(descriptor) for descriptor in tools],
+        }
+    else:
+        proposals["maxItems"] = 0
+        proposals["items"] = {"type": "object"}
+
+    return {
+        "type": "object",
+        "properties": {
+            "status": {
+                "type": "string",
+                "enum": ["proposals_available", "cannot_progress"],
+            },
+            "proposals": proposals,
+            # The canonical parser accepts null too. The small-model constrained
+            # path keeps this a string to make the generation grammar simpler.
+            "plan_summary": {"type": "string"},
+        },
+        "required": ["status", "proposals", "plan_summary"],
+        "additionalProperties": False,
+    }
+
+
 @dataclass(frozen=True, slots=True)
 class SmallLLMPromptMetrics:
     system_chars: int
@@ -342,11 +396,20 @@ class SmallModelLLMPlanner(LLMPlanner):
 
     def _decide(self, request):
         system_prompt, user_prompt, metrics = self.profile.build(request)
-        result = self.transport.complete(
-            system_prompt=system_prompt,
-            user_prompt=user_prompt,
-            timeout_seconds=self.timeout_seconds,
-        )
+        complete_structured = getattr(self.transport, "complete_structured", None)
+        if callable(complete_structured):
+            result = complete_structured(
+                system_prompt=system_prompt,
+                user_prompt=user_prompt,
+                timeout_seconds=self.timeout_seconds,
+                response_schema=build_small_llm_response_schema(request.tools),
+            )
+        else:
+            result = self.transport.complete(
+                system_prompt=system_prompt,
+                user_prompt=user_prompt,
+                timeout_seconds=self.timeout_seconds,
+            )
         if not isinstance(result, LLMCallResult):
             raise TypeError("LLMTransport.complete() must return LLMCallResult")
         decision = parse_llm_planner_decision(result.text)
@@ -494,4 +557,5 @@ __all__ = [
     "SmallModelLLMPlanner",
     "SmallModelOpenAICompatibleChatTransport",
     "build_small_llm_planner_prompts",
+    "build_small_llm_response_schema",
 ]
