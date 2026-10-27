@@ -6,7 +6,7 @@
 показывают этот порядок, а не требуют отдельной платы или модели на каждом шаге.
 
 <!-- AUTO:roadmap:START -->
-**Текущая работа:** Stage 4.0 — Agent Specification: зафиксировать AgentRun/AgentStep, Tool/Action/Observation, PlannerAdapter, Goal verification, persistence/recovery boundaries и критерии deterministic/LLM validation до начала production-реализации.
+**Текущая работа:** Stage 4.1 — Agent Storage / Lifecycle: реализовать transactional `agent.db`, persistent AgentRun/AgentStep lifecycle и stable operation identity по принятой Stage 4.0 Specification.
 
 **Фокус:** 4 — Agent (InProgress).
 
@@ -457,8 +457,8 @@ outputs не копируются во все слои и при необход�
 
 | Шаг | Результат | Проверка завершения |
 |---|---|---|
-| **4.0 Specification — InProgress** | Зафиксировать AgentRun/AgentStep, PlannerTurn/ActionProposal, Tool/Action/ExecutionReceipt/Observation/VerificationResult, ownership, lifecycle, storage и recovery boundaries | Документация однозначно отвечает, кто создаёт/изменяет каждую сущность, где проходят atomic/idempotent boundaries, что является observation и кто имеет authority завершить Goal |
-| **4.1 Agent Storage / Lifecycle — Planned** | Transactional `agent.db` для persistent run/step state и operation identity без копирования Memory/Tool payload | Schema/reopen/constraints/rollback проходят; restart сохраняет run identity и последнее допустимое состояние; invalid lifecycle transition определён |
+| **4.0 Specification — Complete** | Зафиксированы AgentRun/AgentStep, PlannerTurn/ActionProposal, Tool/Action/ExecutionReceipt/Observation/VerificationSpec/VerificationResult, ownership, lifecycle, hybrid storage и recovery boundaries; уточнён ADR-008 | Документация однозначно отвечает, кто создаёт/изменяет каждую сущность, где проходят atomic/idempotent boundaries, что является observation и кто имеет authority завершить Goal |
+| **4.1 Agent Storage / Lifecycle — InProgress** | Transactional `agent.db` для persistent run/step state и operation identity без копирования Memory/Tool payload | Schema/reopen/constraints/rollback проходят; restart сохраняет run identity и последнее допустимое состояние; invalid lifecycle transition определён |
 | **4.2 Tool Contract / Registry — Planned** | Версионированные ToolDescriptor и Registry с JSON Schema, side-effect/reversibility/idempotency/timeout/sandbox metadata | Валидный tool регистрируется; duplicate/version/schema/unsupported tool дают явную ошибку; metadata принадлежит системе, а не Planner |
 | **4.3 Action / Observation Contracts — Planned** | Разделены proposal, selected Action, ExecutionReceipt, Observation и verification; данные имеют stable IDs/refs | Tool success не закрывает Goal; observation можно связать с конкретным action/receipt; malformed или dangling refs отклоняются |
 | **4.4 Sandbox Executor / Idempotency — Planned** | Первый обратимый файловый sandbox (`list/read/write`) и при необходимости deterministic calculator; Executor не выходит за разрешённый root и использует operation IDs для side effects | Path escape/unknown tool/invalid args/timeout определены; подтверждённый write не повторяется после replay; read-only операции безопасно повторимы |
@@ -473,6 +473,97 @@ outputs не копируются во все слои и при необход�
 | **4.13 Observability / Budgets — Planned** | Snapshot/trace показывает run/step, Goal, context budget, proposals, Candidate/Choice trace, selected Action, receipt/observation, verifier result и remaining budgets | По trace можно восстановить причину каждого действия; max steps/tool calls/time/model budget останавливают run определённо без повреждения state |
 | **4.14 Performance Baseline — Planned** | Измерить deterministic orchestration/storage/verification отдельно от стоимости LLM и Tool implementation | Baseline зафиксирован без SLA; видна стоимость Agent loop, persistence, Choice/verification и отдельно model/tool latency; bottlenecks записаны до оптимизации |
 | **4.15 Stage Validation — Planned** | Canonical scenario объединяет Goal, Context/Memory, failure, Internal State/Choice, strategy change, sandbox actions, restart, verification и повторное использование опыта; отдельный LLM run проходит тот же contract | Success/failure/cancel/recovery имеют определённые outcomes; replay не повторяет confirmed effect; Goal закрывается только по observation; agent experience доступен следующему сходному Goal; полный regression suite зелёный |
+
+### Specification 4.0: contracts и ownership
+
+Stage 4 использует stable public IDs `prefix + UUIDv4`. Baseline prefixes:
+`ar_` AgentRun, `ast_` AgentStep, `pt_` PlannerTurn, `ap_` ActionProposal,
+`act_` Action, `aop_` AgentOperation, `er_` ExecutionReceipt, `obs_` Observation,
+`vs_` VerificationSpec и `vr_` VerificationResult.
+
+| Contract | Владелец | Минимальная семантика |
+|---|---|---|
+| `AgentRun` | Agent Runtime | конкретная попытка выполнить существующий Goal; goal/planner/verifier refs, budgets, lifecycle/timestamps/terminal reason |
+| `AgentStep` | Agent Runtime | один цикл принятия решения; run/sequence/status и refs/JSON contracts для planning→action→observation→verification |
+| `PlannerTurn` | PlannerAdapter + Agent | planner/version, bounded request snapshot, status, ranked proposals и optional plan summary |
+| `ActionProposal` | Planner | rank, tool/version, arguments, expected observation и краткое rationale; не содержит authoritative safety/success fields |
+| `Action` | Agent | выбранный proposal, validated tool/version/arguments и operation ID; это разрешённое системой намерение, а не suggestion Planner |
+| `AgentOperation` | Agent/Executor boundary | action/request hash, idempotency class, persisted intent и execution/reconciliation state |
+| `ExecutionReceipt` | Executor | технический факт попытки/выполнения, bounded result/error и timing; сам по себе не доказывает Goal success |
+| `Observation` | Observer/environment boundary | фактически наблюдённое состояние/результат со source/action/receipt refs; не интерпретирует Goal |
+| `VerificationSpec` | trusted run creator | verifier/version, criterion kind и trusted parameters для конкретного Run; Planner не может изменять |
+| `VerificationResult` | Verifier | spec/evidence refs, `none/failure/progress/blocked/success`, criterion flag, reason/importance/candidate/timestamp |
+
+`ActionProposal.id` используется как `Candidate.candidate_id`, чтобы proposal,
+Choice trace и последующий GoalObservation ссылались на одну логическую альтернативу.
+PlannerRequest baseline содержит Goal snapshot, bounded ContextBundle, разрешённые
+ToolDescriptors, recent AgentSteps/Observations, run constraints и remaining budget;
+Internal State в PlannerRequest не передаётся. PlannerTurn возвращает
+`proposals_available` или `cannot_progress`; нехватка информации обычно выражается
+через proposal информационного Tool, а не отдельный скрытый state.
+
+ToolDescriptor baseline содержит name/version/description, input/output JSON Schema,
+`effect_class` (`read_only/reversible_write/irreversible`), `idempotency`
+(`repeat_safe/keyed/none`), категориальный effort hint, timeout и sandbox scope.
+Необратимый Tool без idempotency/reconciliation может быть описан, но не исполняется
+автоматически в первом Stage 4 sandbox.
+
+### AgentRun, AgentStep и storage
+
+`AgentRun` — попытка выполнить Goal, а не новый Goal lifecycle. Один Goal может иметь
+несколько последовательных Runs, но одновременно — не более одного non-terminal.
+Run baseline: `queued → running`, далее `interrupted → running` либо terminal
+`completed/failed/cancelled`. Failed Run не отменяет Goal; blocked/completed/cancelled
+Goal остаются authority существующего Stage 2.
+
+Обычный AgentStep проходит `planning → planned → selected → executing → executed →
+observed → verified → completed`. Планирование без Action может завершить Step после
+валидного `cannot_progress`. Tool-level failure вроде `FILE_NOT_FOUND` является
+нормальным Receipt/Observation/Verification outcome и не делает Step технически
+failed; `failed` резервируется для нарушения contract/invariant или unrecoverable
+persistence/recovery ошибки.
+
+Storage baseline hybrid: отдельные transactional records нужны для `agent_runs`,
+`agent_steps`, `planner_turns`, `agent_operations`; остальные contracts имеют stable
+IDs и хранятся как валидированный structured JSON внутри принадлежащего Step/Turn,
+пока benchmark/query/recovery не покажет необходимость нормализации. `agent.db` —
+operational truth для recovery, но не долговременная Memory.
+
+### Verification и интеграция Stage 2
+
+Stage 4 не меняет Goal schema. Human-readable `Goal.success_criterion` остаётся
+каноническим описанием результата, а конкретный AgentRun получает trusted
+`VerificationSpec`. Verifier превращает factual Observation/evidence в
+`VerificationResult`, после чего Agent создаёт существующий `GoalObservation` с
+`source_id = VerificationResult.id` и `candidate_id = ActionProposal.id`.
+`GoalProgressEngine` и RecoveryCoordinator Stage 2 остаются единственным путём
+изменения Goal/Internal State. Tool receipt или assertion Planner не могут закрыть Goal.
+
+### Recovery boundaries
+
+Внутри `agent.db` используется transaction. Между `agent.db`, `internal_state.db`,
+EventLog и будущими tool-owned stores не создаётся общая distributed transaction:
+используются stable identity, persisted intent, canonical request/content hash,
+idempotency и reconciliation.
+
+До side effect Agent commits selected Action и `AgentOperation`. Crash до Tool можно
+безопасно продолжить. Для `repeat_safe` execution допускается repeat; для `keyed` —
+повтор с тем же logical operation ID; `idempotency=none` после неопределённого crash
+не повторяется автоматически и оставляет Run/operation в interrupt/reconciliation
+состоянии. Receipt committed без Observation означает: side effect не повторять,
+а восстановить/получить observation безопасным способом. Observation без
+VerificationResult допускает повтор deterministic verifier. Committed `vr_...`
+повторно передаётся Stage 2 после crash: его existing source-operation ledger не
+должен применять transition дважды.
+
+Для `agent.*` Event заранее резервируются stable `ev_...` и content hash. После crash
+reconciliation различает: Event отсутствует — append; тот же ID/содержание уже есть —
+операция завершена; тот же ID с иным содержанием — integrity error. Этот protocol не
+требует изменения существующего EventLog.
+
+Общий принцип Stage 4.0: **один storage → transaction; разные owners → stable intent +
+hash + idempotency + reconciliation**. Он продолжает уже проверенные подходы Memory,
+Internal State и Sleep вместо введения нового recovery-механизма.
 
 ### Planner и LLM boundary
 
