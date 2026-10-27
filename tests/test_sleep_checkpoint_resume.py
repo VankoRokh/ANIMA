@@ -62,20 +62,21 @@ def _fixture(path):
         processor_version="1",
     )
     item = store.create_work_item(item, source_registry=registry)
-    return store, item
+    return store, item, registry
 
 
-def _executor(store, processor=None):
+def _executor(store, source_registry, processor=None):
     processor = processor or RecordingProcessor()
     registry = ProcessorRegistry().register(processor)
     return SleepChunkExecutor(
         sleep_store=store,
         processor_registry=registry,
+        source_registry=source_registry,
     ), processor
 
 
 def test_checkpoint_commit_persists_checkpoint_and_local_result_atomically(tmp_path):
-    store, item = _fixture(tmp_path)
+    store, item, _ = _fixture(tmp_path)
     store.begin_work_item(item.public_id)
 
     checkpoint = store.commit_work_item_chunk(
@@ -98,7 +99,7 @@ def test_checkpoint_commit_persists_checkpoint_and_local_result_atomically(tmp_p
 
 
 def test_invalid_checkpoint_sequence_does_not_partially_update_work_item(tmp_path):
-    store, item = _fixture(tmp_path)
+    store, item, _ = _fixture(tmp_path)
     store.begin_work_item(item.public_id)
     first = store.commit_work_item_chunk(
         item.public_id,
@@ -120,7 +121,7 @@ def test_invalid_checkpoint_sequence_does_not_partially_update_work_item(tmp_pat
 
 
 def test_work_item_cannot_pause_before_first_committed_chunk(tmp_path):
-    store, item = _fixture(tmp_path)
+    store, item, _ = _fixture(tmp_path)
     store.begin_work_item(item.public_id)
 
     with pytest.raises(ValueError, match="before first committed chunk"):
@@ -136,17 +137,21 @@ def test_interrupted_resume_matches_uninterrupted_and_skips_committed_chunks(
 ):
     chunks = ["alpha", "beta", "gamma"]
 
-    baseline_store, baseline_item = _fixture(tmp_path / "baseline")
-    baseline_executor, baseline_processor = _executor(baseline_store)
+    baseline_store, baseline_item, baseline_sources = _fixture(tmp_path / "baseline")
+    baseline_executor, baseline_processor = _executor(
+        baseline_store,
+        baseline_sources,
+    )
     baseline = baseline_executor.run(baseline_item.public_id, chunks)
 
     assert baseline.status == "completed"
     assert baseline_processor.calls == chunks
     assert baseline.final_result.output == {"values": chunks}
+    assert baseline.final_result.authority == "derived"
 
     resumed_dir = tmp_path / "resumed"
-    first_store, resumed_item = _fixture(resumed_dir)
-    first_executor, first_processor = _executor(first_store)
+    first_store, resumed_item, resumed_sources = _fixture(resumed_dir)
+    first_executor, first_processor = _executor(first_store, resumed_sources)
     interrupted = first_executor.run(
         resumed_item.public_id,
         chunks,
@@ -160,7 +165,7 @@ def test_interrupted_resume_matches_uninterrupted_and_skips_committed_chunks(
     assert first_store.get_work_item(resumed_item.public_id).attempts == 1
 
     reopened = SleepStore(resumed_dir / "sleep.db")
-    second_executor, second_processor = _executor(reopened)
+    second_executor, second_processor = _executor(reopened, resumed_sources)
     completed = second_executor.run(resumed_item.public_id, chunks)
 
     assert completed.status == "completed"
@@ -186,8 +191,8 @@ def test_interrupted_resume_matches_uninterrupted_and_skips_committed_chunks(
 
 def test_resume_after_last_chunk_finalizes_without_reprocessing(tmp_path):
     chunks = ["alpha"]
-    store, item = _fixture(tmp_path)
-    executor, first_processor = _executor(store)
+    store, item, sources = _fixture(tmp_path)
+    executor, first_processor = _executor(store, sources)
 
     interrupted = executor.run(
         item.public_id,
@@ -198,7 +203,7 @@ def test_resume_after_last_chunk_finalizes_without_reprocessing(tmp_path):
     assert first_processor.calls == ["alpha"]
 
     reopened = SleepStore(tmp_path / "sleep.db")
-    resumed_executor, resumed_processor = _executor(reopened)
+    resumed_executor, resumed_processor = _executor(reopened, sources)
     completed = resumed_executor.run(item.public_id, chunks)
 
     assert resumed_processor.calls == []
@@ -207,8 +212,8 @@ def test_resume_after_last_chunk_finalizes_without_reprocessing(tmp_path):
 
 
 def test_executor_rejects_invalid_interrupt_limit_and_terminal_work(tmp_path):
-    store, item = _fixture(tmp_path)
-    executor, _ = _executor(store)
+    store, item, sources = _fixture(tmp_path)
+    executor, _ = _executor(store, sources)
 
     with pytest.raises(ValueError, match="positive integer"):
         executor.run(
@@ -225,7 +230,7 @@ def test_executor_rejects_invalid_interrupt_limit_and_terminal_work(tmp_path):
 
 
 def test_executor_rejects_checkpoint_metadata_without_persisted_checkpoint(tmp_path):
-    store, item = _fixture(tmp_path)
+    store, item, sources = _fixture(tmp_path)
     fake_checkpoint_id = f"wcp_{uuid4()}"
     with store.transaction() as connection:
         connection.execute(
@@ -237,13 +242,13 @@ def test_executor_rejects_checkpoint_metadata_without_persisted_checkpoint(tmp_p
             (fake_checkpoint_id, item.public_id),
         )
 
-    executor, _ = _executor(store)
+    executor, _ = _executor(store, sources)
     with pytest.raises(ValueError, match="without a persisted checkpoint"):
         executor.run(item.public_id, ["alpha"])
 
 
 def test_executor_rejects_checkpoint_ref_that_is_not_latest(tmp_path):
-    store, item = _fixture(tmp_path)
+    store, item, sources = _fixture(tmp_path)
     store.begin_work_item(item.public_id)
     checkpoint = store.commit_work_item_chunk(
         item.public_id,
@@ -260,7 +265,7 @@ def test_executor_rejects_checkpoint_ref_that_is_not_latest(tmp_path):
         )
 
     assert store.get_checkpoint(checkpoint["id"]) == checkpoint
-    executor, _ = _executor(store)
+    executor, _ = _executor(store, sources)
     with pytest.raises(ValueError, match="does not match latest"):
         executor.run(item.public_id, ["alpha", "beta"])
 
@@ -305,6 +310,7 @@ def test_real_text_processor_resume_matches_uninterrupted_output(tmp_path):
         executor = SleepChunkExecutor(
             sleep_store=store,
             processor_registry=ProcessorRegistry().register(processor),
+            source_registry=source_registry,
         )
         return store, item, executor
 
@@ -328,6 +334,7 @@ def test_real_text_processor_resume_matches_uninterrupted_output(tmp_path):
     second_executor = SleepChunkExecutor(
         sleep_store=reopened,
         processor_registry=ProcessorRegistry().register(resumed_processor),
+        source_registry=source_registry,
     )
     completed = second_executor.run(resumed_item.public_id, chunks)
 
