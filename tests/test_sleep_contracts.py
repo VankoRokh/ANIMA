@@ -313,7 +313,7 @@ def test_sleep_store_migrates_v1_database_without_losing_job(tmp_path):
 
     store = SleepStore(database)
 
-    assert store.schema_version() == 2
+    assert store.schema_version() == 3
     assert store.get_job(job_id)["status"] == "checkpointed"
     with sqlite3.connect(database) as connection:
         tables = {
@@ -323,3 +323,4 @@ def test_sleep_store_migrates_v1_database_without_losing_job(tmp_path):
             ).fetchall()
         }
     assert "work_items" in tables
+    assert "work_item_checkpoints" in tables
