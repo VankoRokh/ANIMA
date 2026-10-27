@@ -24,4 +24,5 @@
 | [TV-0015 — Stage 1.12 Performance Baseline](TV-0015.md) | 2026-10-26 | [1](../../ROADMAP/README.md#stage-1) | Passed | [99c59c3](https://github.com/VankoRokh/ANIMA/commit/99c59c3fca78123c6ff1fdb4f70b9b07703b0ec2) |
 | [TV-0016 — Stage 2.12 Decision Performance Baseline](TV-0016.md) | 2026-10-26 | [2](../../ROADMAP/README.md#stage-2) | Passed | [cae4cd0](https://github.com/VankoRokh/ANIMA/commit/cae4cd06178b14df0b60e2298b9b83329066e640) |
 | [TV-0017 — Stage 2.13 End-to-End Validation](TV-0017.md) | 2026-10-26 | [2](../../ROADMAP/README.md#stage-2) | Passed | [36c8d65](https://github.com/VankoRokh/ANIMA/commit/36c8d65248a58d9dfd548c6aa181f9badcdb4b40) |
+| [TV-0018 — Stage 3.1 Sleep Storage / Lifecycle](TV-0018.md) | 2026-10-27 | [3](../../ROADMAP/README.md#stage-3) | Passed | [9101154](https://github.com/VankoRokh/ANIMA/commit/9101154553fccbebaeb139a6fd2898ab10071101) |
 <!-- AUTO:results:END -->

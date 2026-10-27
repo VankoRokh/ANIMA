@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "current_stage": "3",
-  "focus": "Stage 3.1 — Sleep Storage / Lifecycle: реализовать persistent SleepJob storage и lifecycle queued/running/checkpointed/interrupted/completed/failed как основу resumable bounded consolidation.",
+  "focus": "Stage 3.2 — Source / WorkItem Contract: реализовать универсальные SourceRef и WorkItem с source kind/id, work kind, processor/version, priority, cost hint, status и checkpoint reference без embedding тяжёлого payload.",
   "stages": [
     {"id": "D0", "title": "Documentation", "status": "Complete", "depends_on": [], "outcome": "Контекст и процедуры работы восстанавливаются из репозитория"},
     {"id": "0", "title": "Foundation", "status": "Complete", "depends_on": ["D0"], "outcome": "Перенос сохраняет идентичность, историю и возможность продолжения"},

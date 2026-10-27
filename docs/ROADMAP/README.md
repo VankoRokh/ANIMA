@@ -6,7 +6,7 @@
 показывают этот порядок, а не требуют отдельной платы или модели на каждом шаге.
 
 <!-- AUTO:roadmap:START -->
-**Текущая работа:** Stage 3.1 — Sleep Storage / Lifecycle: реализовать persistent SleepJob storage и lifecycle queued/running/checkpointed/interrupted/completed/failed как основу resumable bounded consolidation.
+**Текущая работа:** Stage 3.2 — Source / WorkItem Contract: реализовать универсальные SourceRef и WorkItem с source kind/id, work kind, processor/version, priority, cost hint, status и checkpoint reference без embedding тяжёлого payload.
 
 **Фокус:** 3 — Sleep (InProgress).
 
@@ -324,7 +324,7 @@ WorkItems, а не владеет исходными данными. Raw Event/o
 | Шаг | Результат | Проверка завершения |
 |---|---|---|
 | **3.0 Specification — Complete** | Зафиксированы SleepJob, WorkItem/SourceRef, processor contract, chunk/checkpoint model, provenance, resource budget, large-data readiness и границы cognitive work; принят ADR-007 | Документация однозначно отделяет orchestration от конкретного формата данных и задаёт критерии каждого последующего шага |
-| **3.1 Sleep Storage / Lifecycle** | Transactional `sleep.db` с persistent SleepJob и lifecycle `queued/running/checkpointed/interrupted/completed/failed` | Schema/reopen/constraints/rollback проходят; invalid transitions определены; restart сохраняет job identity и последнее допустимое состояние |
+| **3.1 Sleep Storage / Lifecycle — Complete** | Transactional `sleep.db` с persistent SleepJob и lifecycle `queued/running/checkpointed/interrupted/completed/failed` | Schema/reopen/constraints/rollback прошли; invalid transitions определены; restart сохраняет job identity и последнее допустимое состояние; [TV-0018](../TESTING/Results/TV-0018.md) |
 | **3.2 Source / WorkItem Contract** | Универсальные `SourceRef` и `WorkItem` с source kind/id, work kind, processor/version, priority, cost hint, status и checkpoint reference без embedding тяжёлого payload | Event/Memory/Knowledge и synthetic Asset refs валидируются одинаковым контрактом; dangling/unsupported source дают явную ошибку; payload большого источника не попадает в `sleep.db` |
 | **3.3 Selection / Scheduling** | Deterministic selector формирует bounded queue из eligible sources по priority/cost/budget и фиксированному tie-break | Один вход даёт один порядок WorkItems; max items/cost соблюдаются; неeligible/terminal sources не попадают в работу; повтор selection не размножает queue |
 | **3.4 Processor Interface** | Заменяемый processor contract для source/work kind, chunk processing, checkpoint state и finalize; Sleep orchestration не знает семантику текста/медиа | Deterministic test processor заменяется вторым adapter без изменения scheduler; unsupported kind не получает silent fallback; processor/version сохраняются в trace/result |

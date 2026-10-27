@@ -19,7 +19,7 @@ ANIMA — исследовательский проект модульного �
 
 Текущий фокус: **3 — Sleep** (InProgress).
 
-Stage 3.1 — Sleep Storage / Lifecycle: реализовать persistent SleepJob storage и lifecycle queued/running/checkpointed/interrupted/completed/failed как основу resumable bounded consolidation.
+Stage 3.2 — Source / WorkItem Contract: реализовать универсальные SourceRef и WorkItem с source kind/id, work kind, processor/version, priority, cost hint, status и checkpoint reference без embedding тяжёлого payload.
 
 [Этапы и критерии](docs/ROADMAP/README.md).
 <!-- AUTO:summary:END -->
