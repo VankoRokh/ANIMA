@@ -1,12 +1,10 @@
 import hashlib
 import json
-import sqlite3
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from uuid import NAMESPACE_URL, UUID, uuid5
 
 from anima.memory.memory_store import MemoryStore
-from anima.sleep.contracts import SourceRef
 from anima.sleep.derived import DerivedResult, DerivedResultRepository
 from anima.sleep.store import SleepStore
 
@@ -38,7 +36,7 @@ CREATE TABLE IF NOT EXISTS sleep_operations (
 );
 
 CREATE INDEX IF NOT EXISTS idx_sleep_operations_status
-    ON sleep_operations(status, rowid);
+    ON sleep_operations(status, created_at, operation_key);
 CREATE INDEX IF NOT EXISTS idx_sleep_operations_result
     ON sleep_operations(canonical_result_id);
 """
@@ -133,9 +131,12 @@ def stable_operation_key(result, effect_kind=DEFAULT_EFFECT_KIND):
         _logical_identity(result, effect_kind),
         "Sleep operation identity",
     )
-    value = f"{OPERATION_ID_PREFIX}{uuid5(NAMESPACE_URL, 'anima:sleep:' + identity_json)}"
-    _validate_operation_key(value)
-    return value
+    operation_key = (
+        f"{OPERATION_ID_PREFIX}"
+        f"{uuid5(NAMESPACE_URL, 'anima:sleep:' + identity_json)}"
+    )
+    _validate_operation_key(operation_key)
+    return operation_key
 
 
 @dataclass(frozen=True, slots=True)
@@ -155,11 +156,14 @@ class RecoveryOperation:
 
     def __post_init__(self):
         _validate_operation_key(self.operation_key)
-        _require_non_empty_string(self.canonical_result_id, "canonical_result_id")
-        _require_non_empty_string(self.canonical_output_ref, "canonical_output_ref")
-        _require_non_empty_string(self.work_item_id, "work_item_id")
-        _require_non_empty_string(self.job_id, "job_id")
-        _require_non_empty_string(self.effect_kind, "effect_kind")
+        for value, label in (
+            (self.canonical_result_id, "canonical_result_id"),
+            (self.canonical_output_ref, "canonical_output_ref"),
+            (self.work_item_id, "work_item_id"),
+            (self.job_id, "job_id"),
+            (self.effect_kind, "effect_kind"),
+        ):
+            _require_non_empty_string(value, label)
         if self.status not in OPERATION_STATUSES:
             raise ValueError(f"Unknown Sleep operation status: {self.status!r}")
         if (
@@ -177,6 +181,22 @@ class RecoveryOperation:
         _json_dumps(self.logical_payload, "Sleep operation logical_payload")
         _validate_timestamp(self.created_at, "Sleep operation created_at")
         _validate_timestamp(self.updated_at, "Sleep operation updated_at")
+
+    def to_dict(self):
+        return {
+            "operation_key": self.operation_key,
+            "canonical_result_id": self.canonical_result_id,
+            "canonical_output_ref": self.canonical_output_ref,
+            "work_item_id": self.work_item_id,
+            "job_id": self.job_id,
+            "effect_kind": self.effect_kind,
+            "logical_payload": dict(self.logical_payload),
+            "status": self.status,
+            "attempts": self.attempts,
+            "last_error": self.last_error,
+            "created_at": self.created_at,
+            "updated_at": self.updated_at,
+        }
 
 
 @dataclass(frozen=True, slots=True)
@@ -269,6 +289,12 @@ class RecoveryOperationRepository:
         timestamp = timestamp or _now()
         _validate_timestamp(timestamp, "Sleep operation timestamp")
 
+        persisted = self.derived_results.get(result.public_id)
+        if persisted is None or persisted != result:
+            raise ValueError(
+                "DerivedResult must be persisted unchanged before effect prepare"
+            )
+
         operation_key = stable_operation_key(result, effect_kind)
         logical_payload = _logical_payload(result)
         payload_json = _json_dumps(logical_payload, "Sleep operation logical payload")
@@ -287,15 +313,6 @@ class RecoveryOperationRepository:
                         "Logical Sleep operation produced a different payload"
                     )
                 return self._row_to_operation(existing)
-
-            persisted = connection.execute(
-                "SELECT public_id FROM derived_results WHERE public_id = ?",
-                (result.public_id,),
-            ).fetchone()
-            if persisted is None:
-                raise ValueError(
-                    f"DerivedResult must be persisted before effect prepare: {result.public_id}"
-                )
 
             connection.execute(
                 """
@@ -329,13 +346,32 @@ class RecoveryOperationRepository:
             ).fetchone()
         return self._row_to_operation(row)
 
+    def list_operations(self, *, status=None):
+        if status is not None and status not in OPERATION_STATUSES:
+            raise ValueError(f"Unknown Sleep operation status: {status!r}")
+        with self.sleep_store._connect() as connection:
+            if status is None:
+                rows = connection.execute(
+                    "SELECT * FROM sleep_operations ORDER BY created_at, operation_key"
+                ).fetchall()
+            else:
+                rows = connection.execute(
+                    """
+                    SELECT * FROM sleep_operations
+                    WHERE status = ?
+                    ORDER BY created_at, operation_key
+                    """,
+                    (status,),
+                ).fetchall()
+        return [self._row_to_operation(row) for row in rows]
+
     def list_pending(self):
         with self.sleep_store._connect() as connection:
             rows = connection.execute(
                 """
                 SELECT * FROM sleep_operations
                 WHERE status IN ('prepared', 'failed')
-                ORDER BY rowid
+                ORDER BY created_at, operation_key
                 """
             ).fetchall()
         return [self._row_to_operation(row) for row in rows]
@@ -351,17 +387,16 @@ class RecoveryOperationRepository:
             ).fetchone()
             if row is None:
                 raise ValueError(f"Unknown Sleep operation: {operation_key}")
-            if row["status"] == "applied":
-                return self.get(operation_key)
-            connection.execute(
-                """
-                UPDATE sleep_operations
-                SET attempts = attempts + 1, status = 'prepared',
-                    last_error = NULL, updated_at = ?
-                WHERE operation_key = ?
-                """,
-                (timestamp, operation_key),
-            )
+            if row["status"] != "applied":
+                connection.execute(
+                    """
+                    UPDATE sleep_operations
+                    SET attempts = attempts + 1, status = 'prepared',
+                        last_error = NULL, updated_at = ?
+                    WHERE operation_key = ?
+                    """,
+                    (timestamp, operation_key),
+                )
         return self.get(operation_key)
 
     def mark_failed(self, operation_key, error, *, timestamp=None):
@@ -450,6 +485,16 @@ class CognitiveEffectStore:
             logical_payload=json.loads(row["logical_payload_json"]),
             applied_at=row["applied_at"],
         )
+
+    def schema_version(self):
+        with self.memory_store.transaction() as connection:
+            row = connection.execute(
+                "SELECT value FROM schema_meta WHERE key = ?",
+                (EFFECT_SCHEMA_KEY,),
+            ).fetchone()
+        if row is None:
+            raise ValueError("Sleep effect receipt schema is not initialized")
+        return int(row["value"])
 
     def get(self, operation_key):
         _validate_operation_key(operation_key)
