@@ -1,4 +1,5 @@
 from anima.internal_state.runtime_integration import InternalStateRuntime
+from anima.sleep.runtime_integration import SleepRuntimeIntegration
 
 
 class Runtime:
@@ -17,6 +18,7 @@ class Runtime:
         trace=None,
         metrics=None,
         internal_state=None,
+        sleep_runtime=None,
     ):
         if internal_state is not None and not isinstance(
             internal_state,
@@ -24,6 +26,13 @@ class Runtime:
         ):
             raise TypeError(
                 "Runtime internal_state must be an InternalStateRuntime or null"
+            )
+        if sleep_runtime is not None and not isinstance(
+            sleep_runtime,
+            SleepRuntimeIntegration,
+        ):
+            raise TypeError(
+                "Runtime sleep_runtime must be a SleepRuntimeIntegration or null"
             )
 
         self.trace = trace
@@ -36,6 +45,7 @@ class Runtime:
         self.memory_processor = memory_processor
         self.event_processing = event_processing
         self.internal_state = internal_state
+        self.sleep_runtime = sleep_runtime
         self._recovery_checked = False
 
     def _session_id(self):
@@ -54,6 +64,8 @@ class Runtime:
         self.anima.reconcile_events_processed(
             self.event_processing.finalized_count()
         )
+        if self.sleep_runtime is not None:
+            self.sleep_runtime.recover()
         self._recovery_checked = True
 
     def _process_events(self):
@@ -92,6 +104,8 @@ class Runtime:
 
     def _wake(self):
         self._ensure_recovered()
+        if self.sleep_runtime is not None:
+            self.sleep_runtime.prepare_wake()
         self.anima.wake()
         self.event_bus.emit(
             "system.wake",
@@ -144,10 +158,45 @@ class Runtime:
         )
         processed = self._process_events()
         self.anima.sleep()
+        if self.sleep_runtime is not None:
+            self.sleep_runtime.enter_sleep()
 
         self._trace("runtime: sleeping")
 
         return processed
+
+    def _require_sleep_runtime(self):
+        if self.sleep_runtime is None:
+            raise RuntimeError(
+                "Sleep runtime is not configured"
+            )
+        return self.sleep_runtime
+
+    def activate_sleep_job(self, job_id):
+        return self._measure(
+            "runtime.sleep.activate_job",
+            lambda: self._require_sleep_runtime().activate_job(job_id),
+        )
+
+    def process_sleep_work(
+        self,
+        work_item_id,
+        chunks,
+        *,
+        max_new_chunks=1,
+    ):
+        if self.anima.get()["status"] != "sleeping":
+            raise RuntimeError(
+                "Sleep work can be processed only while ANIMA is sleeping"
+            )
+        return self._measure(
+            "runtime.sleep.process_work",
+            lambda: self._require_sleep_runtime().process_work(
+                work_item_id,
+                chunks,
+                max_new_chunks=max_new_chunks,
+            ),
+        )
 
     def _require_internal_state(self):
         if self.internal_state is None:
@@ -221,6 +270,11 @@ class Runtime:
             "memory": {
                 "count": self.memory.count(),
             },
+            "sleep": (
+                self.sleep_runtime.snapshot()
+                if self.sleep_runtime is not None
+                else None
+            ),
             "internal_state": (
                 self.internal_state.snapshot()
                 if self.internal_state is not None
