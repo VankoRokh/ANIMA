@@ -32,4 +32,5 @@
 | [TV-0023 — Stage 3.6 Chunk / Checkpoint / Resume](TV-0023.md) | 2026-10-27 | [3](../../ROADMAP/README.md#stage-3) | Passed | [ef1c794](https://github.com/VankoRokh/ANIMA/commit/ef1c7942c7130aaf22ca6a4db1fef6fb1e3f3778) |
 | [TV-0024 — Stage 3.7 Derived Results / Provenance](TV-0024.md) | 2026-10-27 | [3](../../ROADMAP/README.md#stage-3) | Passed | [3161585](https://github.com/VankoRokh/ANIMA/commit/3161585ecce5ac1bc1e15bfdbb6705031dd6f53f) |
 | [TV-0025 — Stage 3.8 Recovery / Idempotency](TV-0025.md) | 2026-10-27 | [3](../../ROADMAP/README.md#stage-3) | Passed | [8c4deb4](https://github.com/VankoRokh/ANIMA/commit/8c4deb4b3cb3bcfda521b17ca481c6ca4d69ab40) |
+| [TV-0026 — Stage 3.9 Runtime Integration](TV-0026.md) | 2026-10-27 | [3](../../ROADMAP/README.md#stage-3) | Passed | [155dde6](https://github.com/VankoRokh/ANIMA/commit/155dde6720bbfe57ff38be051b45b77509933bcf) |
 <!-- AUTO:results:END -->
