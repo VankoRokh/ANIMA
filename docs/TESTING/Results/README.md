@@ -41,4 +41,5 @@
 | [TV-0032 — Stage 4.2 Tool Contract / Registry](TV-0032.md) | 2026-10-27 | [4](../../ROADMAP/README.md#stage-4) | Passed | [b3dc112](https://github.com/VankoRokh/ANIMA/commit/b3dc11259b1f867e84efbc194dfd93d7230e9740) |
 | [TV-0033 — Stage 4.3 Action / Observation Contracts](TV-0033.md) | 2026-10-27 | [4](../../ROADMAP/README.md#stage-4) | Passed | [a2a669b](https://github.com/VankoRokh/ANIMA/commit/a2a669bf967286e2973890b8fe6971e0e772b220) |
 | [TV-0034 — Stage 4.4 Sandbox Executor / Idempotency](TV-0034.md) | 2026-10-27 | [4](../../ROADMAP/README.md#stage-4) | Passed | [7f944b6](https://github.com/VankoRokh/ANIMA/commit/7f944b6a5644614fca49f012ec0331f77c98b2a0) |
+| [TV-0035 — Stage 4.5 PlannerAdapter / Deterministic Planner](TV-0035.md) | 2026-10-27 | [4](../../ROADMAP/README.md#stage-4) | Passed | [2c63d88](https://github.com/VankoRokh/ANIMA/commit/2c63d88c006305f4e77b56e7462152fb4af8861c) |
 <!-- AUTO:results:END -->
