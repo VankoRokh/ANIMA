@@ -43,6 +43,14 @@ from .tools import (
     ToolOutputError,
     ToolRegistry,
 )
+from .verification import (
+    DETERMINISTIC_VERIFIER_NAME,
+    DETERMINISTIC_VERIFIER_VERSION,
+    FILE_CONTENT_EQUALS,
+    DeterministicGoalVerifier,
+    GoalVerificationBridge,
+    VerificationApplication,
+)
 
 __all__ = [
     "Action",
@@ -52,9 +60,14 @@ __all__ = [
     "CandidateAdapter",
     "CandidateFeatureTrace",
     "CandidateHistoryEntry",
+    "DETERMINISTIC_VERIFIER_NAME",
+    "DETERMINISTIC_VERIFIER_VERSION",
+    "DeterministicGoalVerifier",
     "DeterministicPlanner",
     "ExecutionReceipt",
     "ExecutionRejectedError",
+    "FILE_CONTENT_EQUALS",
+    "GoalVerificationBridge",
     "Observation",
     "PlannerAdapter",
     "PlannerDecision",
@@ -70,6 +83,7 @@ __all__ = [
     "ToolOutputError",
     "ToolRegistry",
     "UncertainOperationError",
+    "VerificationApplication",
     "VerificationResult",
     "VerificationSpec",
     "action_fingerprint",
