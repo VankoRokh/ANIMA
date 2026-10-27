@@ -35,4 +35,5 @@
 | [TV-0026 — Stage 3.9 Runtime Integration](TV-0026.md) | 2026-10-27 | [3](../../ROADMAP/README.md#stage-3) | Passed | [155dde6](https://github.com/VankoRokh/ANIMA/commit/155dde6720bbfe57ff38be051b45b77509933bcf) |
 | [TV-0027 — Stage 3.10 Observability / Resource Budget](TV-0027.md) | 2026-10-27 | [3](../../ROADMAP/README.md#stage-3) | Passed | [c64dc6e](https://github.com/VankoRokh/ANIMA/commit/c64dc6e4b01a979eea97c84fbd33baee83c96b02) |
 | [TV-0028 — Stage 3.11 Large-data Readiness](TV-0028.md) | 2026-10-27 | [3](../../ROADMAP/README.md#stage-3) | Passed | [5b4ec4f](https://github.com/VankoRokh/ANIMA/commit/5b4ec4fe08f390921fd7349f4b81d8d331c10b6e) |
+| [TV-0029 — Stage 3.12 Performance Baseline](TV-0029.md) | 2026-10-27 | [3](../../ROADMAP/README.md#stage-3) | Passed | [be862fd](https://github.com/VankoRokh/ANIMA/commit/be862fddb4d5dd4de734ad322017b72da2bc6346) |
 <!-- AUTO:results:END -->
