@@ -127,7 +127,8 @@ def test_llm_prompt_contains_only_planner_request_contract_and_tool_metadata():
     system_prompt, user_prompt = build_llm_planner_prompts(request)
     document = json.loads(user_prompt)
 
-    assert "execute tools" not in system_prompt.lower()
+    assert "you never execute tools" in system_prompt.lower()
+    assert "do not provide chain-of-thought" in system_prompt.lower()
     assert set(document) == {"response_contract", "planner_request"}
     planner_request = document["planner_request"]
     assert set(planner_request) == {
