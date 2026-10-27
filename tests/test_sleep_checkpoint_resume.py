@@ -223,6 +223,47 @@ def test_executor_rejects_invalid_interrupt_limit_and_terminal_work(tmp_path):
         executor.run(item.public_id, ["alpha"])
 
 
+def test_executor_rejects_checkpoint_metadata_without_persisted_checkpoint(tmp_path):
+    store, item = _fixture(tmp_path)
+    fake_checkpoint_id = f"wcp_{uuid4()}"
+    with store.transaction() as connection:
+        connection.execute(
+            """
+            UPDATE work_items
+            SET status = 'checkpointed', checkpoint_ref = ?
+            WHERE public_id = ?
+            """,
+            (fake_checkpoint_id, item.public_id),
+        )
+
+    executor, _ = _executor(store)
+    with pytest.raises(ValueError, match="without a persisted checkpoint"):
+        executor.run(item.public_id, ["alpha"])
+
+
+def test_executor_rejects_checkpoint_ref_that_is_not_latest(tmp_path):
+    store, item = _fixture(tmp_path)
+    store.begin_work_item(item.public_id)
+    checkpoint = store.commit_work_item_chunk(
+        item.public_id,
+        sequence=0,
+        checkpoint={"values": ["alpha"]},
+        local_result={"accepted": "alpha"},
+    )
+    store.pause_work_item(item.public_id)
+
+    with store.transaction() as connection:
+        connection.execute(
+            "UPDATE work_items SET checkpoint_ref = ? WHERE public_id = ?",
+            (f"wcp_{uuid4()}", item.public_id),
+        )
+
+    assert store.get_checkpoint(checkpoint["id"]) == checkpoint
+    executor, _ = _executor(store)
+    with pytest.raises(ValueError, match="does not match latest"):
+        executor.run(item.public_id, ["alpha", "beta"])
+
+
 def test_sleep_store_migrates_v2_work_item_to_checkpoint_schema(tmp_path):
     database = tmp_path / "sleep.db"
     job_id = f"sj_{uuid4()}"
