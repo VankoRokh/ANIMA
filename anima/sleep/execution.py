@@ -14,6 +14,7 @@ class ExecutionOutcome:
     processed_chunks: int
     committed_chunks: int
     final_result: DerivedResult | None
+    stop_reason: str | None = None
 
     @property
     def interrupted(self):
@@ -83,8 +84,11 @@ class SleepChunkExecutor:
         chunks,
         *,
         interrupt_after_new_chunks=None,
+        interrupt_only_if_more_work=False,
     ):
         self._validate_interrupt_after(interrupt_after_new_chunks)
+        if type(interrupt_only_if_more_work) is not bool:
+            raise ValueError("interrupt_only_if_more_work must be bool")
         try:
             iterator = iter(chunks)
         except TypeError as error:
@@ -115,6 +119,22 @@ class SleepChunkExecutor:
                     f"expected {next_sequence}, got {sequence}"
                 )
 
+            if (
+                interrupt_only_if_more_work
+                and interrupt_after_new_chunks is not None
+                and processed_chunks >= interrupt_after_new_chunks
+            ):
+                paused = self.sleep_store.pause_work_item(work_item_id)
+                return ExecutionOutcome(
+                    work_item_id=work_item_id,
+                    status=paused.status,
+                    resumed_from_sequence=resumed_from_sequence,
+                    processed_chunks=processed_chunks,
+                    committed_chunks=next_sequence,
+                    final_result=None,
+                    stop_reason="chunk_limit",
+                )
+
             result = processor.process_chunk(
                 work_item,
                 chunk=chunk,
@@ -131,7 +151,8 @@ class SleepChunkExecutor:
             next_sequence += 1
 
             if (
-                interrupt_after_new_chunks is not None
+                not interrupt_only_if_more_work
+                and interrupt_after_new_chunks is not None
                 and processed_chunks >= interrupt_after_new_chunks
             ):
                 paused = self.sleep_store.pause_work_item(work_item_id)
@@ -142,6 +163,7 @@ class SleepChunkExecutor:
                     processed_chunks=processed_chunks,
                     committed_chunks=next_sequence,
                     final_result=None,
+                    stop_reason="chunk_limit",
                 )
 
         processor_result = processor.finalize(
