@@ -128,16 +128,52 @@ class SleepProcessor(ABC):
             )
         return work_item
 
-    @abstractmethod
     def initial_checkpoint(self, work_item):
+        self.require_supported(work_item)
+        checkpoint = self._initial_checkpoint(work_item)
+        _validate_json_value(checkpoint, "Processor initial checkpoint")
+        return checkpoint
+
+    def process_chunk(self, work_item, *, chunk, checkpoint):
+        self.require_supported(work_item)
+        _validate_json_value(checkpoint, "Processor checkpoint input")
+        result = self._process_chunk(
+            work_item,
+            chunk=chunk,
+            checkpoint=checkpoint,
+        )
+        if not isinstance(result, ChunkResult):
+            raise ValueError("Processor process_chunk() must return ChunkResult")
+        return result
+
+    def finalize(self, work_item, *, checkpoint):
+        self.require_supported(work_item)
+        _validate_json_value(checkpoint, "Processor checkpoint input")
+        result = self._finalize(work_item, checkpoint=checkpoint)
+        if not isinstance(result, FinalizeResult):
+            raise ValueError("Processor finalize() must return FinalizeResult")
+        if result.work_item_id != work_item.public_id:
+            raise ValueError("FinalizeResult work_item_id does not match WorkItem")
+        if result.source_ref != work_item.source_ref:
+            raise ValueError("FinalizeResult source_ref does not match WorkItem")
+        if result.processor != work_item.processor:
+            raise ValueError("FinalizeResult processor does not match WorkItem")
+        if result.processor_version != work_item.processor_version:
+            raise ValueError(
+                "FinalizeResult processor_version does not match WorkItem"
+            )
+        return result
+
+    @abstractmethod
+    def _initial_checkpoint(self, work_item):
         """Return JSON-serializable checkpoint state for a new WorkItem."""
 
     @abstractmethod
-    def process_chunk(self, work_item, *, chunk, checkpoint):
+    def _process_chunk(self, work_item, *, chunk, checkpoint):
         """Process one opaque chunk and return ChunkResult."""
 
     @abstractmethod
-    def finalize(self, work_item, *, checkpoint):
+    def _finalize(self, work_item, *, checkpoint):
         """Finalize processing and return FinalizeResult."""
 
 
