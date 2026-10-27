@@ -78,6 +78,24 @@ class SleepChunkExecutor:
             )
         return latest["sequence"] + 1, latest["checkpoint"]
 
+    @staticmethod
+    def _enumerated_chunks(chunks, resumed_from_sequence):
+        iter_from = getattr(chunks, "iter_from", None)
+        if iter_from is not None:
+            if not callable(iter_from):
+                raise ValueError("chunks.iter_from must be callable")
+            try:
+                iterator = iter(iter_from(resumed_from_sequence))
+            except TypeError as error:
+                raise ValueError("chunks.iter_from() must return an iterable") from error
+            return enumerate(iterator, start=resumed_from_sequence), True
+
+        try:
+            iterator = iter(chunks)
+        except TypeError as error:
+            raise ValueError("chunks must be iterable") from error
+        return enumerate(iterator), False
+
     def run(
         self,
         work_item_id,
@@ -89,10 +107,6 @@ class SleepChunkExecutor:
         self._validate_interrupt_after(interrupt_after_new_chunks)
         if type(interrupt_only_if_more_work) is not bool:
             raise ValueError("interrupt_only_if_more_work must be bool")
-        try:
-            iterator = iter(chunks)
-        except TypeError as error:
-            raise ValueError("chunks must be iterable") from error
 
         work_item = self.sleep_store.get_work_item(work_item_id)
         if work_item is None:
@@ -105,13 +119,17 @@ class SleepChunkExecutor:
             latest,
             processor,
         )
+        enumerated, direct_resume = self._enumerated_chunks(
+            chunks,
+            resumed_from_sequence,
+        )
 
         work_item = self.sleep_store.begin_work_item(work_item_id)
         processed_chunks = 0
         next_sequence = resumed_from_sequence
 
-        for sequence, chunk in enumerate(iterator):
-            if sequence < resumed_from_sequence:
+        for sequence, chunk in enumerated:
+            if not direct_resume and sequence < resumed_from_sequence:
                 continue
             if sequence != next_sequence:
                 raise ValueError(
