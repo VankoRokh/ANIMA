@@ -243,10 +243,14 @@ def test_canonical_agent_loop_captures_only_significant_compact_events(tmp_path)
     ]
     assert len(records) == 5
 
-    # Raw file/tool payload is deliberately not copied into compact experience Events.
-    serialized = "\n".join(str(record["payload"]) for record in records)
-    assert "content" not in serialized
-    assert "bytes_written" not in serialized
+    # Raw file/tool payload fields are deliberately not copied into compact Events.
+    for record in records:
+        payload = record["payload"]
+        assert "content" not in payload
+        assert "bytes_written" not in payload
+        assert "output" not in payload
+        assert "arguments" not in payload
+        assert "sha256" not in payload
 
     action_event = next(record for record in records if record["type"] == "agent.action")
     assert action_event["payload"]["tool"] == "fs.write"
