@@ -1,8 +1,8 @@
 """Run the Stage 4.12 canonical Agent task against a real LLM endpoint.
 
 The experiment uses a temporary ANIMA instance and sandbox. It does not touch the
-normal data directory. The endpoint must expose an OpenAI-compatible
-/chat/completions API.
+normal data directory. Generic providers use an OpenAI-compatible endpoint;
+llama.cpp may use its native constrained completion path.
 """
 
 import argparse
@@ -155,6 +155,35 @@ def _sum_known(values):
     return sum(values)
 
 
+def _planner_trace(turn):
+    """Return safe proposal-level diagnostics without raw model reasoning."""
+    planner_turn = turn.planner_turn
+    selected_id = (
+        turn.choice["selected_proposal_id"]
+        if turn.choice is not None
+        else None
+    )
+    proposals = []
+    for proposal in planner_turn.proposals:
+        record = proposal.to_dict()
+        proposals.append(
+            {
+                "rank": record["rank"],
+                "tool": record["tool"],
+                "tool_version": record["tool_version"],
+                "arguments": record["arguments"],
+                "expected_observation": record["expected_observation"],
+                "rationale_summary": record["rationale_summary"],
+                "selected": record["id"] == selected_id,
+            }
+        )
+    return {
+        "status": planner_turn.status,
+        "plan_summary": planner_turn.plan_summary,
+        "proposals": proposals,
+    }
+
+
 def _build_planner(args, api_key):
     common_transport_kwargs = {
         "base_url": args.base_url,
@@ -304,6 +333,7 @@ def run_experiment(args):
                 turn.action.tool if turn.action is not None else None
                 for turn in result.turns
             ],
+            "planner_trace": [_planner_trace(turn) for turn in result.turns],
             "receipt_statuses": [
                 turn.receipt.status if turn.receipt is not None else None
                 for turn in result.turns
