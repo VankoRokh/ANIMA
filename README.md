@@ -19,7 +19,7 @@ ANIMA — исследовательский проект модульного �
 
 Текущий фокус: **3 — Sleep** (InProgress).
 
-Stage 3.2 — Source / WorkItem Contract: реализовать универсальные SourceRef и WorkItem с source kind/id, work kind, processor/version, priority, cost hint, status и checkpoint reference без embedding тяжёлого payload.
+Stage 3.6 — Chunk / Checkpoint / Resume: реализовать persistent chunk checkpoints и безопасный resume, чтобы committed chunk не выполнялся повторно после interruption/restart.
 
 [Этапы и критерии](docs/ROADMAP/README.md).
 <!-- AUTO:summary:END -->
