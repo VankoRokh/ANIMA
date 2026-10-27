@@ -19,7 +19,7 @@ ANIMA — исследовательский проект модульного �
 
 Текущий фокус: **3 — Sleep** (InProgress).
 
-Stage 3.6 — Chunk / Checkpoint / Resume: реализовать persistent chunk checkpoints и безопасный resume, чтобы committed chunk не выполнялся повторно после interruption/restart.
+Stage 3.12 — Performance Baseline: измерить отдельно orchestration, selection, checkpoint/history и provenance на 1k/10k/100k WorkItems и large-source workload, зафиксировав CPU/RAM/storage и bottlenecks без преждевременного SLA.
 
 [Этапы и критерии](docs/ROADMAP/README.md).
 <!-- AUTO:summary:END -->
