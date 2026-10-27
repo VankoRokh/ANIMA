@@ -17,9 +17,9 @@ ANIMA — исследовательский проект модульного �
 <!-- AUTO:summary:START -->
 Версия прототипа: **00.1-alpha** (из кода).
 
-Текущий фокус: **3 — Sleep** (InProgress).
+Текущий фокус: **3 — Sleep** (Complete).
 
-Stage 3.12 — Performance Baseline: измерить отдельно orchestration, selection, checkpoint/history и provenance на 1k/10k/100k WorkItems и large-source workload, зафиксировав CPU/RAM/storage и bottlenecks без преждевременного SLA.
+Stage 3 — Sleep завершён и подтверждён финальной end-to-end валидацией. Следующий этап — Stage 4 — Agent; реализация ещё не начата.
 
 [Этапы и критерии](docs/ROADMAP/README.md).
 <!-- AUTO:summary:END -->
