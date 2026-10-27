@@ -16,6 +16,12 @@ from .contracts import (
     validate_execution_trace,
     validate_verification_trace,
 )
+from .events import (
+    AgentEventPublication,
+    AgentEventPublisher,
+    AgentExperienceCapture,
+    SIGNIFICANT_VERIFICATION_OUTCOMES,
+)
 from .executor import (
     ExecutionRejectedError,
     SandboxExecutor,
@@ -56,6 +62,9 @@ from .verification import (
 __all__ = [
     "Action",
     "ActionProposal",
+    "AgentEventPublication",
+    "AgentEventPublisher",
+    "AgentExperienceCapture",
     "AgentLoop",
     "AgentLoopResult",
     "AgentStore",
@@ -79,6 +88,7 @@ __all__ = [
     "PlannerTurn",
     "ProposalChoiceCoordinator",
     "ProposalDraft",
+    "SIGNIFICANT_VERIFICATION_OUTCOMES",
     "SandboxExecutor",
     "SandboxHandler",
     "SchemaValidationError",
