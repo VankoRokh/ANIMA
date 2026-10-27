@@ -239,16 +239,20 @@ class SleepRuntimeIntegration:
             raise ValueError(
                 "WorkItem does not belong to the active SleepJob"
             )
+        if active["status"] not in {"running", "checkpointed"}:
+            raise RuntimeError(
+                f"SleepJob is not running: {active['status']}"
+            )
 
-        job = self._require_active_running_job()
         decision = self.observability.budget_decision(
-            job["id"],
+            active["id"],
             work_item_id,
             requested_max_new_chunks=max_new_chunks,
         )
         if decision.exhausted:
-            return self._budget_stop_outcome(job, work_item, decision)
+            return self._budget_stop_outcome(active, work_item, decision)
 
+        job = self._require_active_running_job()
         self.observability.clear_stop_reason(job["id"])
         outcome = self.executor.run(
             work_item_id,
