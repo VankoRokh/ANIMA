@@ -5,7 +5,6 @@ from anima.sleep.recovery import SleepRecoveryCoordinator
 from anima.sleep.store import SleepStore
 
 
-TERMINAL_WORK_ITEM_STATUSES = {"completed", "failed", "skipped"}
 TERMINAL_JOB_STATUSES = {"completed", "failed"}
 
 
@@ -114,12 +113,16 @@ class SleepRuntimeIntegration:
         self._trace(f"sleep-runtime: job {job['id']} running")
         return job
 
-    def _require_active_running_job(self):
+    def _require_active_job(self):
         if self._active_job_id is None:
             raise RuntimeError("No active SleepJob")
         job = self.sleep_store.get_job(self._active_job_id)
         if job is None:
             raise ValueError(f"Unknown active SleepJob: {self._active_job_id}")
+        return job
+
+    def _require_active_running_job(self):
+        job = self._require_active_job()
         if job["status"] == "checkpointed":
             job = self.sleep_store.transition_job(
                 job["id"],
@@ -171,16 +174,17 @@ class SleepRuntimeIntegration:
         max_new_chunks=1,
     ):
         self._validate_max_new_chunks(max_new_chunks)
-        job = self._require_active_running_job()
+        active = self._require_active_job()
 
         work_item = self.sleep_store.get_work_item(work_item_id)
         if work_item is None:
             raise ValueError(f"Unknown WorkItem: {work_item_id}")
-        if work_item.job_id != job["id"]:
+        if work_item.job_id != active["id"]:
             raise ValueError(
                 "WorkItem does not belong to the active SleepJob"
             )
 
+        job = self._require_active_running_job()
         outcome = self.executor.run(
             work_item_id,
             chunks,
