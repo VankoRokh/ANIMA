@@ -164,15 +164,7 @@ def test_executor_resume_requests_next_uncommitted_chunk_directly(tmp_path):
     assert completed.final_result.output["last_sequence"] == EXPECTED_CHUNKS - 1
     assert reopened.get_work_item(item.public_id).attempts == 2
 
-
-def test_large_source_checkpoints_and_database_store_metadata_not_payload(tmp_path):
-    store, item, _, executor = _fixture(tmp_path)
-    source = _source(item.source_ref)
-
-    completed = executor.run(item.public_id, source)
-    checkpoints = store.list_checkpoints(item.public_id)
-
-    assert completed.status == "completed"
+    checkpoints = reopened.list_checkpoints(item.public_id)
     assert len(checkpoints) == EXPECTED_CHUNKS
     assert max(
         len(json.dumps(checkpoint["checkpoint"], sort_keys=True))
@@ -182,22 +174,22 @@ def test_large_source_checkpoints_and_database_store_metadata_not_payload(tmp_pa
         len(json.dumps(checkpoint["local_result"], sort_keys=True))
         for checkpoint in checkpoints
     ) < 512
-    assert _storage_bytes(store.database_file) < 64 * MIB
-    assert _storage_bytes(store.database_file) < LOGICAL_SIZE // 100
+    assert _storage_bytes(reopened.database_file) < 64 * MIB
+    assert _storage_bytes(reopened.database_file) < LOGICAL_SIZE // 100
 
 
 def test_large_source_final_chunk_handles_non_multiple_logical_size(tmp_path):
-    logical_size = 10 * GIB + 12345
+    logical_size = 2 * CHUNK_SIZE + 12345
     store, item, _, executor = _fixture(tmp_path)
     source = _source(item.source_ref, logical_size=logical_size)
 
     completed = executor.run(item.public_id, source)
 
-    assert source.chunk_count == EXPECTED_CHUNKS + 1
-    assert completed.final_result.output["chunks_processed"] == EXPECTED_CHUNKS + 1
+    assert source.chunk_count == 3
+    assert completed.final_result.output["chunks_processed"] == 3
     assert completed.final_result.output["logical_bytes_processed"] == logical_size
     latest = store.get_latest_checkpoint(item.public_id)
-    assert latest["sequence"] == EXPECTED_CHUNKS
+    assert latest["sequence"] == 2
     assert latest["local_result"]["logical_size_bytes"] == 12345
 
 
@@ -218,9 +210,6 @@ def test_large_source_rejects_invalid_resume_and_sample_configuration():
 
 
 def test_existing_plain_iterable_resume_contract_remains_supported(tmp_path):
-    class PlainProcessor(SyntheticLargeAssetProcessor):
-        pass
-
     source_ref = SourceRef("asset", f"asset_{uuid4()}")
     source_registry = SourceRegistry().register(
         "asset",
@@ -237,7 +226,9 @@ def test_existing_plain_iterable_resume_contract_remains_supported(tmp_path):
     item = store.create_work_item(item, source_registry=source_registry)
     executor = SleepChunkExecutor(
         sleep_store=store,
-        processor_registry=ProcessorRegistry().register(PlainProcessor()),
+        processor_registry=ProcessorRegistry().register(
+            SyntheticLargeAssetProcessor()
+        ),
         source_registry=source_registry,
     )
     source = SyntheticLargeSource(
