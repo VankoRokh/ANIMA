@@ -1,6 +1,7 @@
 from anima.internal_state.choice_engine import Candidate
 from anima.internal_state.goal_progress import GoalObservation
 from anima.internal_state.transition_engine import StateSignal
+from anima.sleep.observability import SleepResourceBudget
 
 
 class ScenarioRunner:
@@ -59,6 +60,23 @@ class ScenarioRunner:
             verified_continuation=data.get("verified_continuation", 0.0),
         )
 
+    @staticmethod
+    def _sleep_budget(data):
+        if data is None:
+            return None
+        if not isinstance(data, dict):
+            raise ValueError("Sleep budget must be an object or null")
+        allowed = {
+            "max_committed_chunks",
+            "max_cost_units",
+            "max_elapsed_seconds",
+        }
+        unknown = set(data) - allowed
+        if unknown:
+            fields = ", ".join(sorted(unknown))
+            raise ValueError(f"Unknown Sleep budget fields: {fields}")
+        return SleepResourceBudget(**data)
+
     def _run_step(self, step):
         if not isinstance(step, dict):
             raise ValueError(
@@ -102,11 +120,26 @@ class ScenarioRunner:
 
         elif action == "sleep_job_activate":
             job = self.runtime.activate_sleep_job(
-                self._require(step, "job_id", action)
+                self._require(step, "job_id", action),
+                budget=self._sleep_budget(step.get("budget")),
             )
             return {
                 "action": action,
                 "job": dict(job),
+            }
+
+        elif action == "sleep_budget_configure":
+            budget = self._sleep_budget(
+                self._require(step, "budget", action)
+            )
+            configured = self.runtime.configure_sleep_budget(
+                self._require(step, "job_id", action),
+                budget,
+            )
+            return {
+                "action": action,
+                "job_id": step["job_id"],
+                "budget": configured.to_dict(),
             }
 
         elif action == "sleep_process":
@@ -127,6 +160,7 @@ class ScenarioRunner:
                 "resumed_from_sequence": outcome.resumed_from_sequence,
                 "processed_chunks": outcome.processed_chunks,
                 "committed_chunks": outcome.committed_chunks,
+                "stop_reason": outcome.stop_reason,
                 "final_result": (
                     outcome.final_result.to_dict()
                     if outcome.final_result is not None
