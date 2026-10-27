@@ -1,14 +1,14 @@
 {
   "schema_version": 1,
   "current_stage": "3",
-  "focus": "Stage 3.12 — Performance Baseline: измерить отдельно orchestration, selection, checkpoint/history и provenance на 1k/10k/100k WorkItems и large-source workload, зафиксировав CPU/RAM/storage и bottlenecks без преждевременного SLA.",
+  "focus": "Stage 3 — Sleep завершён и подтверждён финальной end-to-end валидацией. Следующий этап — Stage 4 — Agent; реализация ещё не начата.",
   "stages": [
     {"id": "D0", "title": "Documentation", "status": "Complete", "depends_on": [], "outcome": "Контекст и процедуры работы восстанавливаются из репозитория"},
     {"id": "0", "title": "Foundation", "status": "Complete", "depends_on": ["D0"], "outcome": "Перенос сохраняет идентичность, историю и возможность продолжения"},
     {"id": "D1", "title": "Runtime, Tests & Observability", "status": "Complete", "depends_on": ["0"], "outcome": "Один сценарий запускается headless, наблюдается и проверяется изолированно"},
     {"id": "1", "title": "Cognitive Memory", "status": "Complete", "depends_on": ["0", "D1"], "outcome": "Релевантный опыт извлекается с происхождением и ограниченным контекстом"},
     {"id": "2", "title": "Internal State", "status": "Complete", "depends_on": ["1"], "outcome": "Влияние внутреннего состояния на выбор причинно прослеживается"},
-    {"id": "3", "title": "Sleep", "status": "InProgress", "depends_on": ["2"], "outcome": "Консолидация прерывается и возобновляется без потери источников"},
+    {"id": "3", "title": "Sleep", "status": "Complete", "depends_on": ["2"], "outcome": "Консолидация прерывается и возобновляется без потери источников"},
     {"id": "4", "title": "Agent", "status": "Planned", "depends_on": ["3"], "outcome": "Ограниченная задача выполняется инструментом и проверяется наблюдением"},
     {"id": "5", "title": "Virtual ANIMA", "status": "Planned", "depends_on": ["4"], "outcome": "Длительная работа на ПК/VM имеет измеренный ресурсный профиль"},
     {"id": "6", "title": "Cyberdeck", "status": "Planned", "depends_on": ["5"], "outcome": "Измеренная нагрузка переносится на автономное устройство"},
