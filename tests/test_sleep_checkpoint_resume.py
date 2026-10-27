@@ -13,6 +13,7 @@ from anima.sleep.processors import (
     SleepProcessor,
 )
 from anima.sleep.store import SleepStore
+from anima.sleep.text_consolidation import DeterministicTextConsolidationProcessor
 
 
 class RecordingProcessor(SleepProcessor):
@@ -262,6 +263,83 @@ def test_executor_rejects_checkpoint_ref_that_is_not_latest(tmp_path):
     executor, _ = _executor(store)
     with pytest.raises(ValueError, match="does not match latest"):
         executor.run(item.public_id, ["alpha", "beta"])
+
+
+def test_real_text_processor_resume_matches_uninterrupted_output(tmp_path):
+    source = SourceRef("event", f"ev_{uuid4()}")
+    source_registry = SourceRegistry().register(
+        "event",
+        lambda source_id: source_id == source.source_id,
+    )
+    chunks = [
+        {
+            "source": source.to_dict(),
+            "fragments": [
+                {"group": "zeta", "text": " Zed "},
+                {"group": "alpha", "text": "Alpha   beta"},
+            ],
+        },
+        {
+            "source": source.to_dict(),
+            "fragments": [
+                {"group": "alpha", "text": "Alpha beta"},
+                {"group": "alpha", "text": "Gamma"},
+            ],
+        },
+    ]
+
+    def make_work(path):
+        store = SleepStore(path / "sleep.db")
+        job = store.create_job()
+        item = WorkItem.create(
+            job_id=job["id"],
+            source_ref=source,
+            processor="deterministic-text",
+            processor_version="1",
+        )
+        item = store.create_work_item(item, source_registry=source_registry)
+        processor = DeterministicTextConsolidationProcessor(
+            max_items=10,
+            max_chars=100,
+        )
+        executor = SleepChunkExecutor(
+            sleep_store=store,
+            processor_registry=ProcessorRegistry().register(processor),
+        )
+        return store, item, executor
+
+    _, baseline_item, baseline_executor = make_work(tmp_path / "baseline-text")
+    baseline = baseline_executor.run(baseline_item.public_id, chunks)
+
+    resumed_dir = tmp_path / "resumed-text"
+    _, resumed_item, first_executor = make_work(resumed_dir)
+    interrupted = first_executor.run(
+        resumed_item.public_id,
+        chunks,
+        interrupt_after_new_chunks=1,
+    )
+    assert interrupted.status == "checkpointed"
+
+    reopened = SleepStore(resumed_dir / "sleep.db")
+    resumed_processor = DeterministicTextConsolidationProcessor(
+        max_items=10,
+        max_chars=100,
+    )
+    second_executor = SleepChunkExecutor(
+        sleep_store=reopened,
+        processor_registry=ProcessorRegistry().register(resumed_processor),
+    )
+    completed = second_executor.run(resumed_item.public_id, chunks)
+
+    assert completed.final_result.output == baseline.final_result.output
+    assert completed.final_result.output["groups"] == [
+        {"group": "alpha", "items": ["Alpha beta", "Gamma"]},
+        {"group": "zeta", "items": ["Zed"]},
+    ]
+    assert [
+        checkpoint["sequence"]
+        for checkpoint in reopened.list_checkpoints(resumed_item.public_id)
+    ] == [0, 1]
 
 
 def test_sleep_store_migrates_v2_work_item_to_checkpoint_schema(tmp_path):
