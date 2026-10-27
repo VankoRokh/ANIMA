@@ -175,18 +175,11 @@ class SleepSelector:
         ]
         ordered = sorted(active, key=self._sort_key)
 
-        existing = {
-            self._work_key(work_item): work_item
-            for work_item in self.sleep_store.list_work_items(job_id=job_id)
-        }
-
-        selected = []
+        planned = []
         total_cost_units = 0
         skipped_budget = 0
-        reused = 0
-
         for candidate in ordered:
-            if len(selected) >= budget.max_items:
+            if len(planned) >= budget.max_items:
                 skipped_budget += 1
                 continue
 
@@ -195,6 +188,16 @@ class SleepSelector:
                 skipped_budget += 1
                 continue
 
+            planned.append(candidate)
+            total_cost_units += candidate_cost
+
+        existing = {
+            self._work_key(work_item): work_item
+            for work_item in self.sleep_store.list_work_items(job_id=job_id)
+        }
+
+        planned_existing = {}
+        for candidate in planned:
             self.source_registry.require(candidate.source_ref)
             key = self._candidate_work_key(
                 candidate,
@@ -202,6 +205,25 @@ class SleepSelector:
                 processor_version=processor_version,
             )
             work_item = existing.get(key)
+            if work_item is not None and (
+                work_item.priority != candidate.priority
+                or work_item.cost_hint != candidate.cost_hint
+            ):
+                raise ValueError(
+                    "Existing WorkItem metadata conflicts with selection candidate: "
+                    f"{candidate.source_ref.kind}:{candidate.source_ref.source_id}"
+                )
+            planned_existing[key] = work_item
+
+        selected = []
+        reused = 0
+        for candidate in planned:
+            key = self._candidate_work_key(
+                candidate,
+                processor=processor,
+                processor_version=processor_version,
+            )
+            work_item = planned_existing[key]
 
             if work_item is None:
                 work_item = WorkItem.create(
@@ -216,20 +238,10 @@ class SleepSelector:
                     work_item,
                     source_registry=self.source_registry,
                 )
-                existing[key] = work_item
             else:
-                if (
-                    work_item.priority != candidate.priority
-                    or work_item.cost_hint != candidate.cost_hint
-                ):
-                    raise ValueError(
-                        "Existing WorkItem metadata conflicts with selection candidate: "
-                        f"{candidate.source_ref.kind}:{candidate.source_ref.source_id}"
-                    )
                 reused += 1
 
             selected.append(work_item)
-            total_cost_units += candidate_cost
 
         return SelectionResult(
             work_items=tuple(selected),
