@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "current_stage": "4",
-  "focus": "Stage 4.0 — Agent Specification: зафиксировать AgentRun/AgentStep, Tool/Action/Observation, PlannerAdapter, Goal verification, persistence/recovery boundaries и критерии deterministic/LLM validation до начала production-реализации.",
+  "focus": "Stage 4.1 — Agent Storage / Lifecycle: реализовать transactional `agent.db`, persistent AgentRun/AgentStep lifecycle и stable operation identity по принятой Stage 4.0 Specification.",
   "stages": [
     {"id": "D0", "title": "Documentation", "status": "Complete", "depends_on": [], "outcome": "Контекст и процедуры работы восстанавливаются из репозитория"},
     {"id": "0", "title": "Foundation", "status": "Complete", "depends_on": ["D0"], "outcome": "Перенос сохраняет идентичность, историю и возможность продолжения"},
