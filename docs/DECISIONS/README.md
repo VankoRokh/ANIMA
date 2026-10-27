@@ -229,3 +229,71 @@ recovery protocol и дополнительные тесты large-data readines
 длинная работа становится прерываемой, а история преобразований остаётся проверяемой.
 Порядок реализации, проверки и Definition of Done — [Stage 3](../ROADMAP/README.md#stage-3);
 отложенные cognitive механизмы — [Research](../ROADMAP/Research.md#когнитивный-сон).
+
+## ADR-008
+
+**Accepted.** 2026-10-27, архитектура Agent и роль LLM для Stage 4.
+Причина: после Cognitive Memory, Internal State и Sleep системе нужен первый
+проверяемый контур действий во внешней среде. При этом подключение готового
+LLM-agent framework как владельца plan/execute loop скрывало бы работу уже созданных
+Goals, Choice, Memory и recovery-механизмов и не позволило бы понять источник ошибки.
+Stage 4 поэтому строит собственный agent runtime, а языковая модель остаётся
+заменяемым когнитивным компонентом.
+
+Tool system использует собственный версионируемый контракт ANIMA с JSON-Schema
+входа/выхода и системной metadata о side effects, reversibility, idempotency,
+timeout и sandbox scope. Контракт концептуально совместим с MCP, чтобы позднее
+подключать внешние MCP tools через adapter, но MCP не является внутренним ядром
+Agent и не определяет его lifecycle. Tool может быть выполнен только Executor через
+Registry; Planner не вызывает implementation напрямую.
+
+Планирование отделено от исполнения через `PlannerAdapter`. Deterministic planner,
+LLM planner, replay/test planner и будущие Fast/Deep planners должны возвращать один
+и тот же структурированный `PlannerTurn` с ограниченным набором `ActionProposal`.
+Proposal содержит tool/arguments, ожидаемое наблюдение и краткое проверяемое
+обоснование, но не получает authority выполнить действие, завершить Goal или
+изменить Memory/Internal State. Provider-specific function/tool calling остаётся
+внутри adapter и преобразуется в общий contract ANIMA.
+
+LLM предлагает варианты, а не определяет их системную безопасность. `effort_cost`,
+`irreversible_risk`, `repeated_failure`, `information_gain` и другие свойства,
+необходимые существующему Choice Engine, вычисляются ANIMA из ToolDescriptor,
+истории и наблюдаемого контекста. Planner может задавать предпочтение/rank, но не
+самостоятельно объявлять действие безопасным или гарантированно успешным. На первом
+baseline значения Internal State не передаются Planner: их влияние должно оставаться
+отдельно наблюдаемым через Choice, чтобы не применять один и тот же фактор дважды.
+
+Agent использует пошаговый ReAct-подобный цикл, но не передаёт LLM полный контроль:
+`Goal → Context → Planner proposals → validation/Candidates → Choice → one Action →
+ExecutionReceipt → Observation → Goal verification → next turn`. Многошаговый план
+может существовать как гипотеза/summary, однако каждый реальный следующий Action
+проходит новый цикл после фактического Observation. Tool-call success сам по себе
+не означает Goal success; завершение требует независимой проверки success criterion.
+
+Operational execution history и долговременная Memory разделены. Persistent
+`agent.db` должен хранить достаточно `AgentRun`/`AgentStep`, proposal/selection,
+receipt/observation и operation IDs для restart, interruption и idempotency.
+Значимые факты поведения публикуются как компактные `agent.*` Events со ссылками на
+сырой/крупный output, а долговременный опыт создаётся через обычный Event/Memory
+pipeline. Planner и Executor не получают прямого writable-доступа к Memory,
+Knowledge, Goals или Internal State.
+
+Stage 4 сначала должен доказать deterministic Agent на обратимой sandbox-задаче и
+только затем заменить Planner реальной LLM на том же контракте. Финальная стадия
+не зависит от конкретного model provider, но должна включать хотя бы один реальный
+LLM experiment с измерением schema validity, tool/proposal errors, replanning,
+Goal success, количества действий, latency и model/resource cost. Результаты нужны
+для поиска слабых/сильных сторон архитектуры, а не для заранее заданного SLA.
+
+Self-generated Goals, unrestricted shell/browser/desktop control, autonomous
+background loops, прямой доступ Planner к Internal State, автоматическое исполнение
+длинного LLM-плана, свободное сохранение chain-of-thought и полный MCP runtime не
+входят в baseline Stage 4. Возвращаться к ним следует только после проверяемого
+случая, где базовый Agent недостаточен.
+
+Цена решения — дополнительный persistent execution layer, schema validation,
+Tool/Planner adapters, verifier, recovery и больше end-to-end сценариев. Польза —
+модель можно менять без передачи ей владения системой, действие остаётся
+наблюдаемым и проверяемым, а Stage 1–3 впервые проверяются вместе на реальном
+поведенческом цикле. Порядок реализации и критерии —
+[Stage 4](../ROADMAP/README.md#stage-4).
