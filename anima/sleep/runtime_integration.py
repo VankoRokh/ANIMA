@@ -267,6 +267,10 @@ class SleepRuntimeIntegration:
             if post_decision.exhausted:
                 reason = f"budget:{post_decision.reason}"
                 self.observability.mark_stop_reason(job["id"], reason)
+                self._trace(
+                    f"sleep-runtime: budget exhausted job={job['id']} "
+                    f"work={work_item_id} reason={post_decision.reason}"
+                )
                 outcome = ExecutionOutcome(
                     work_item_id=outcome.work_item_id,
                     status=outcome.status,
