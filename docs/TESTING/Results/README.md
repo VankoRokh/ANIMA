@@ -43,4 +43,5 @@
 | [TV-0034 — Stage 4.4 Sandbox Executor / Idempotency](TV-0034.md) | 2026-10-27 | [4](../../ROADMAP/README.md#stage-4) | Passed | [7f944b6](https://github.com/VankoRokh/ANIMA/commit/7f944b6a5644614fca49f012ec0331f77c98b2a0) |
 | [TV-0035 — Stage 4.5 PlannerAdapter / Deterministic Planner](TV-0035.md) | 2026-10-27 | [4](../../ROADMAP/README.md#stage-4) | Passed | [2c63d88](https://github.com/VankoRokh/ANIMA/commit/2c63d88c006305f4e77b56e7462152fb4af8861c) |
 | [TV-0036 — Stage 4.6 Candidate Adaptation / Choice Integration](TV-0036.md) | 2026-10-27 | [4](../../ROADMAP/README.md#stage-4) | Passed | [aa25940](https://github.com/VankoRokh/ANIMA/commit/aa2594058bec8aa0a9d526636761146f702fb58c) |
+| [TV-0037 — Stage 4.7 Goal Verification / Progress](TV-0037.md) | 2026-10-27 | [4](../../ROADMAP/README.md#stage-4) | Passed | [1b47b97](https://github.com/VankoRokh/ANIMA/commit/1b47b97d2b41fa695a22bc62e2104c82aab76c50) |
 <!-- AUTO:results:END -->
