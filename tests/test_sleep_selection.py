@@ -220,7 +220,10 @@ def test_selector_reports_dangling_selected_source_without_partial_insert(tmp_pa
     with pytest.raises(ValueError, match="Dangling source"):
         selector.select(
             job_id=job["id"],
-            candidates=[SelectionCandidate(dangling, priority=10)],
+            candidates=[
+                SelectionCandidate(valid, priority=20),
+                SelectionCandidate(dangling, priority=10),
+            ],
             processor="dangling-test",
             processor_version="1",
             budget=SelectionBudget(max_items=10, max_cost_units=20),
