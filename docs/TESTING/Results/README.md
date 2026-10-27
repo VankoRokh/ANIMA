@@ -39,4 +39,5 @@
 | [TV-0030 — Stage 3.13 End-to-End Validation](TV-0030.md) | 2026-10-27 | [3](../../ROADMAP/README.md#stage-3) | Passed | [f062f8e](https://github.com/VankoRokh/ANIMA/commit/f062f8e91fb7f28a854682d55c0d317846a45bb9) |
 | [TV-0031 — Stage 4.1 Agent Storage / Lifecycle](TV-0031.md) | 2026-10-27 | [4](../../ROADMAP/README.md#stage-4) | Passed | [601949c](https://github.com/VankoRokh/ANIMA/commit/601949c9eea0d80930df9b54088cdb0629ab9c44) |
 | [TV-0032 — Stage 4.2 Tool Contract / Registry](TV-0032.md) | 2026-10-27 | [4](../../ROADMAP/README.md#stage-4) | Passed | [b3dc112](https://github.com/VankoRokh/ANIMA/commit/b3dc11259b1f867e84efbc194dfd93d7230e9740) |
+| [TV-0033 — Stage 4.3 Action / Observation Contracts](TV-0033.md) | 2026-10-27 | [4](../../ROADMAP/README.md#stage-4) | Passed | [a2a669b](https://github.com/VankoRokh/ANIMA/commit/a2a669bf967286e2973890b8fe6971e0e772b220) |
 <!-- AUTO:results:END -->
