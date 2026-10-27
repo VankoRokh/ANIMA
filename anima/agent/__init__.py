@@ -1,3 +1,11 @@
+from .choice_adapter import (
+    CandidateAdaptation,
+    CandidateAdapter,
+    CandidateFeatureTrace,
+    CandidateHistoryEntry,
+    ProposalChoiceCoordinator,
+    action_fingerprint,
+)
 from .contracts import (
     Action,
     ActionProposal,
@@ -40,6 +48,10 @@ __all__ = [
     "Action",
     "ActionProposal",
     "AgentStore",
+    "CandidateAdaptation",
+    "CandidateAdapter",
+    "CandidateFeatureTrace",
+    "CandidateHistoryEntry",
     "DeterministicPlanner",
     "ExecutionReceipt",
     "ExecutionRejectedError",
@@ -48,6 +60,7 @@ __all__ = [
     "PlannerDecision",
     "PlannerRequest",
     "PlannerTurn",
+    "ProposalChoiceCoordinator",
     "ProposalDraft",
     "SandboxExecutor",
     "SandboxHandler",
@@ -59,6 +72,7 @@ __all__ = [
     "UncertainOperationError",
     "VerificationResult",
     "VerificationSpec",
+    "action_fingerprint",
     "action_request_hash",
     "build_sandbox_registry",
     "operation_kind",
