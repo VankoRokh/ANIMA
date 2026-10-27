@@ -172,24 +172,31 @@ SMALL_LLM_SYSTEM_PROMPT = """You are ANIMA's proposal-only Planner.
 Return one JSON object only. Do not use Markdown.
 Choose only listed tools. You do not execute tools or decide safety, risk, effort,
 success, goal completion, or internal state. Propose only the next action.
-If information is missing, prefer a read/list action. Keep all summaries brief.
-Output exactly: status, proposals, plan_summary.
+Use information-gathering tools only when a required action argument or precondition
+is actually unknown. If the goal already supplies concrete values matching a
+reversible tool's required arguments, use those values directly.
+Do not repeat a successful read/list action when its latest observation already
+answers the same question and no new evidence could change the result.
+Keep all summaries brief. Output exactly: status, proposals, plan_summary.
 Each proposal exactly: tool, tool_version, arguments, expected_observation,
 rationale_summary. Use at most 3 proposals. Do not provide chain-of-thought."""
 
 
 SMALL_LLM_RESPONSE_CONTRACT = {
-    "status": "proposals_available|cannot_progress",
-    "proposals": [
-        {
-            "tool": "listed tool name",
-            "tool_version": "listed version",
-            "arguments": {},
-            "expected_observation": "brief factual expectation",
-            "rationale_summary": "brief reason",
-        }
+    "required_top_level_fields": ["status", "proposals", "plan_summary"],
+    "status_values": ["proposals_available", "cannot_progress"],
+    "proposal_fields": [
+        "tool",
+        "tool_version",
+        "arguments",
+        "expected_observation",
+        "rationale_summary",
     ],
-    "plan_summary": "brief summary or null",
+    "arguments_rule": (
+        "Use the required arguments shown for the selected tool. "
+        "Do not use an empty arguments object when that tool has required arguments."
+    ),
+    "max_proposals": 3,
 }
 
 
