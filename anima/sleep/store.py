@@ -5,9 +5,16 @@ from pathlib import Path
 from uuid import UUID, uuid4
 
 from anima.config.paths import get_data_dir
+from anima.sleep.contracts import (
+    WORK_ITEM_ID_PREFIX,
+    WORK_ITEM_STATUSES,
+    SourceRegistry,
+    SourceRef,
+    WorkItem,
+)
 
 
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
 SLEEP_JOB_ID_PREFIX = "sj_"
 SLEEP_JOB_TRANSITION_ID_PREFIX = "sjt_"
 SLEEP_JOB_STATUSES = {
@@ -66,6 +73,38 @@ CREATE TABLE IF NOT EXISTS sleep_job_transitions (
 
 CREATE INDEX IF NOT EXISTS idx_sleep_job_transitions_job_time
     ON sleep_job_transitions(job_id, timestamp, row_id);
+
+CREATE TABLE IF NOT EXISTS work_items (
+    row_id INTEGER PRIMARY KEY,
+    public_id TEXT NOT NULL UNIQUE,
+    job_id TEXT NOT NULL,
+    work_kind TEXT NOT NULL CHECK (work_kind IN ('CONSOLIDATE')),
+    source_kind TEXT NOT NULL CHECK (
+        source_kind IN ('event', 'memory', 'knowledge', 'asset')
+    ),
+    source_id TEXT NOT NULL,
+    processor TEXT NOT NULL,
+    processor_version TEXT NOT NULL,
+    priority INTEGER NOT NULL DEFAULT 0 CHECK (priority >= 0),
+    cost_hint TEXT NOT NULL CHECK (
+        cost_hint IN ('cheap', 'normal', 'expensive')
+    ),
+    status TEXT NOT NULL CHECK (
+        status IN ('queued', 'running', 'checkpointed', 'completed', 'failed', 'skipped')
+    ),
+    attempts INTEGER NOT NULL DEFAULT 0 CHECK (attempts >= 0),
+    checkpoint_ref TEXT,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    FOREIGN KEY (job_id) REFERENCES sleep_jobs(public_id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_work_items_job_status
+    ON work_items(job_id, status, row_id);
+CREATE INDEX IF NOT EXISTS idx_work_items_source
+    ON work_items(source_kind, source_id);
+CREATE INDEX IF NOT EXISTS idx_work_items_priority
+    ON work_items(job_id, priority DESC, row_id);
 """
 
 
@@ -114,6 +153,14 @@ def _validate_job_status(status):
         raise ValueError(f"Unknown SleepJob status: {status!r}")
 
 
+def _validate_work_item_id(public_id):
+    _validate_uuid4_id(
+        public_id,
+        prefix=WORK_ITEM_ID_PREFIX,
+        label="WorkItem public_id",
+    )
+
+
 class SleepStore:
     def __init__(self, database_file=None):
         self.database_file = (
@@ -133,20 +180,47 @@ class SleepStore:
     def _initialize(self):
         try:
             with self._connect() as connection:
-                connection.executescript(SCHEMA_SQL)
                 connection.execute(
-                    "INSERT OR IGNORE INTO schema_meta(key, value) VALUES('schema_version', ?)",
-                    (str(SCHEMA_VERSION),),
+                    """
+                    CREATE TABLE IF NOT EXISTS schema_meta (
+                        key TEXT PRIMARY KEY,
+                        value TEXT NOT NULL
+                    )
+                    """
                 )
                 row = connection.execute(
                     "SELECT value FROM schema_meta WHERE key = 'schema_version'"
                 ).fetchone()
+
+                if row is not None and row["value"] not in {"1", str(SCHEMA_VERSION)}:
+                    raise ValueError(
+                        f"Unsupported Sleep database schema in {self.database_file}"
+                    )
+
+                connection.executescript(SCHEMA_SQL)
+
+                if row is None:
+                    connection.execute(
+                        "INSERT INTO schema_meta(key, value) VALUES('schema_version', ?)",
+                        (str(SCHEMA_VERSION),),
+                    )
+                elif row["value"] == "1":
+                    connection.execute(
+                        "UPDATE schema_meta SET value = ? WHERE key = 'schema_version'",
+                        (str(SCHEMA_VERSION),),
+                    )
+
+                final_row = connection.execute(
+                    "SELECT value FROM schema_meta WHERE key = 'schema_version'"
+                ).fetchone()
+        except ValueError:
+            raise
         except sqlite3.DatabaseError as error:
             raise ValueError(
                 f"Cannot initialize Sleep database {self.database_file}: {error}"
             ) from error
 
-        if row is None or row["value"] != str(SCHEMA_VERSION):
+        if final_row is None or final_row["value"] != str(SCHEMA_VERSION):
             raise ValueError(
                 f"Unsupported Sleep database schema in {self.database_file}"
             )
@@ -195,6 +269,27 @@ class SleepStore:
             "to_status": row["to_status"],
             "reason": row["reason"],
         }
+
+    @staticmethod
+    def _row_to_work_item(row):
+        if row is None:
+            return None
+        return WorkItem(
+            public_id=row["public_id"],
+            job_id=row["job_id"],
+            work_kind=row["work_kind"],
+            source_ref=SourceRef(
+                kind=row["source_kind"],
+                source_id=row["source_id"],
+            ),
+            processor=row["processor"],
+            processor_version=row["processor_version"],
+            priority=row["priority"],
+            cost_hint=row["cost_hint"],
+            status=row["status"],
+            attempts=row["attempts"],
+            checkpoint_ref=row["checkpoint_ref"],
+        )
 
     def create_job(self, *, public_id=None, created_at=None, reason="job created"):
         public_id = public_id or f"{SLEEP_JOB_ID_PREFIX}{uuid4()}"
@@ -310,3 +405,91 @@ class SleepStore:
             )
 
         return self.get_job(public_id)
+
+    def create_work_item(self, work_item, *, source_registry, created_at=None):
+        if not isinstance(work_item, WorkItem):
+            raise ValueError("create_work_item() requires a WorkItem")
+        if not isinstance(source_registry, SourceRegistry):
+            raise ValueError("source_registry must be a SourceRegistry")
+
+        source_registry.require(work_item.source_ref)
+        created_at = created_at or _now()
+        _validate_timestamp(created_at, "WorkItem created_at")
+
+        try:
+            with self.transaction() as connection:
+                job = connection.execute(
+                    "SELECT public_id FROM sleep_jobs WHERE public_id = ?",
+                    (work_item.job_id,),
+                ).fetchone()
+                if job is None:
+                    raise ValueError(f"Unknown SleepJob: {work_item.job_id}")
+
+                connection.execute(
+                    """
+                    INSERT INTO work_items(
+                        public_id, job_id, work_kind,
+                        source_kind, source_id,
+                        processor, processor_version,
+                        priority, cost_hint, status, attempts,
+                        checkpoint_ref, created_at, updated_at
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        work_item.public_id,
+                        work_item.job_id,
+                        work_item.work_kind,
+                        work_item.source_ref.kind,
+                        work_item.source_ref.source_id,
+                        work_item.processor,
+                        work_item.processor_version,
+                        work_item.priority,
+                        work_item.cost_hint,
+                        work_item.status,
+                        work_item.attempts,
+                        work_item.checkpoint_ref,
+                        created_at,
+                        created_at,
+                    ),
+                )
+        except sqlite3.IntegrityError as error:
+            raise ValueError(
+                f"Cannot create WorkItem {work_item.public_id}: {error}"
+            ) from error
+
+        return self.get_work_item(work_item.public_id)
+
+    def get_work_item(self, public_id):
+        _validate_work_item_id(public_id)
+        with self._connect() as connection:
+            row = connection.execute(
+                "SELECT * FROM work_items WHERE public_id = ?",
+                (public_id,),
+            ).fetchone()
+        return self._row_to_work_item(row)
+
+    def list_work_items(self, *, job_id=None, status=None):
+        if job_id is not None:
+            _validate_job_id(job_id)
+        if status is not None and status not in WORK_ITEM_STATUSES:
+            raise ValueError(f"Unknown WorkItem status: {status!r}")
+
+        clauses = []
+        values = []
+        if job_id is not None:
+            clauses.append("job_id = ?")
+            values.append(job_id)
+        if status is not None:
+            clauses.append("status = ?")
+            values.append(status)
+
+        where = ""
+        if clauses:
+            where = " WHERE " + " AND ".join(clauses)
+
+        with self._connect() as connection:
+            rows = connection.execute(
+                "SELECT * FROM work_items" + where + " ORDER BY row_id",
+                tuple(values),
+            ).fetchall()
+        return [self._row_to_work_item(row) for row in rows]
