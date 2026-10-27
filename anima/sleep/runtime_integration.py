@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 
 from anima.sleep.execution import ExecutionOutcome, SleepChunkExecutor
+from anima.sleep.observability import SleepObservability, SleepResourceBudget
 from anima.sleep.recovery import SleepRecoveryCoordinator
 from anima.sleep.store import SleepStore
 
@@ -37,6 +38,7 @@ class SleepRuntimeIntegration:
         sleep_store,
         executor,
         recovery=None,
+        observability=None,
         trace=None,
     ):
         if not isinstance(sleep_store, SleepStore):
@@ -50,9 +52,25 @@ class SleepRuntimeIntegration:
         if recovery is not None and recovery.sleep_store is not sleep_store:
             raise ValueError("recovery must use the same SleepStore")
 
+        memory_store = (
+            recovery.effects.memory_store
+            if recovery is not None
+            else None
+        )
+        if observability is None:
+            observability = SleepObservability(
+                sleep_store=sleep_store,
+                memory_store=memory_store,
+            )
+        if not isinstance(observability, SleepObservability):
+            raise TypeError("observability must be a SleepObservability")
+        if observability.sleep_store is not sleep_store:
+            raise ValueError("observability must use the same SleepStore")
+
         self.sleep_store = sleep_store
         self.executor = executor
         self.recovery = recovery
+        self.observability = observability
         self.trace = trace
         self._active_job_id = None
 
@@ -67,7 +85,9 @@ class SleepRuntimeIntegration:
         if self.trace is not None:
             self.trace.record(message)
 
-    def activate_job(self, job_id):
+    def activate_job(self, job_id, *, budget=None):
+        if budget is not None and not isinstance(budget, SleepResourceBudget):
+            raise TypeError("budget must be a SleepResourceBudget or null")
         job = self.sleep_store.get_job(job_id)
         if job is None:
             raise ValueError(f"Unknown SleepJob: {job_id}")
@@ -82,9 +102,18 @@ class SleepRuntimeIntegration:
                     f"Another SleepJob is already active: {self._active_job_id}"
                 )
 
+        self.observability.ensure_job(job_id, budget=budget)
         self._active_job_id = job_id
         self._trace(f"sleep-runtime: job {job_id} activated")
         return job
+
+    def configure_budget(self, job_id, budget):
+        configured = self.observability.configure_budget(job_id, budget)
+        self._trace(
+            f"sleep-runtime: job {job_id} budget configured "
+            f"{configured.to_dict()}"
+        )
+        return configured
 
     def enter_sleep(self):
         if self._active_job_id is None:
@@ -101,6 +130,7 @@ class SleepRuntimeIntegration:
             self._active_job_id = None
             return job
 
+        self.observability.ensure_job(job["id"])
         if job["status"] in {"queued", "checkpointed", "interrupted"}:
             job = self.sleep_store.transition_job(
                 job["id"],
@@ -166,6 +196,32 @@ class SleepRuntimeIntegration:
             reason=reason,
         )
 
+    def _budget_stop_outcome(self, job, work_item, decision):
+        reason = f"budget:{decision.reason}"
+        self.observability.mark_stop_reason(job["id"], reason)
+        current_job = self.sleep_store.get_job(job["id"])
+        if current_job["status"] == "running":
+            self.sleep_store.transition_job(
+                job["id"],
+                "checkpointed",
+                reason=f"resource budget exhausted: {decision.reason}",
+            )
+        checkpoints = self.sleep_store.list_checkpoints(work_item.public_id)
+        committed = len(checkpoints)
+        self._trace(
+            f"sleep-runtime: budget exhausted job={job['id']} "
+            f"work={work_item.public_id} reason={decision.reason}"
+        )
+        return ExecutionOutcome(
+            work_item_id=work_item.public_id,
+            status=work_item.status,
+            resumed_from_sequence=committed,
+            processed_chunks=0,
+            committed_chunks=committed,
+            final_result=None,
+            stop_reason=reason,
+        )
+
     def process_work(
         self,
         work_item_id,
@@ -185,15 +241,48 @@ class SleepRuntimeIntegration:
             )
 
         job = self._require_active_running_job()
+        decision = self.observability.budget_decision(
+            job["id"],
+            work_item_id,
+            requested_max_new_chunks=max_new_chunks,
+        )
+        if decision.exhausted:
+            return self._budget_stop_outcome(job, work_item, decision)
+
+        self.observability.clear_stop_reason(job["id"])
         outcome = self.executor.run(
             work_item_id,
             chunks,
-            interrupt_after_new_chunks=max_new_chunks,
+            interrupt_after_new_chunks=decision.allowed_new_chunks,
+            interrupt_only_if_more_work=True,
         )
         settled = self._settle_job_after_work(job["id"])
+
+        if outcome.status == "checkpointed":
+            post_decision = self.observability.budget_decision(
+                job["id"],
+                work_item_id,
+                requested_max_new_chunks=max_new_chunks,
+            )
+            if post_decision.exhausted:
+                reason = f"budget:{post_decision.reason}"
+                self.observability.mark_stop_reason(job["id"], reason)
+                outcome = ExecutionOutcome(
+                    work_item_id=outcome.work_item_id,
+                    status=outcome.status,
+                    resumed_from_sequence=outcome.resumed_from_sequence,
+                    processed_chunks=outcome.processed_chunks,
+                    committed_chunks=outcome.committed_chunks,
+                    final_result=outcome.final_result,
+                    stop_reason=reason,
+                )
+            else:
+                self.observability.clear_stop_reason(job["id"])
+
         self._trace(
             "sleep-runtime: work "
-            f"{work_item_id} -> {outcome.status}, job -> {settled['status']}"
+            f"{work_item_id} -> {outcome.status}, job -> {settled['status']}, "
+            f"stop={outcome.stop_reason or 'none'}"
         )
         return outcome
 
@@ -306,17 +395,14 @@ class SleepRuntimeIntegration:
         job = self.sleep_store.get_job(self._active_job_id)
         if job is None:
             raise ValueError(f"Unknown active SleepJob: {self._active_job_id}")
-        work_items = tuple(
-            {
-                "id": item.public_id,
-                "status": item.status,
-                "attempts": item.attempts,
-                "checkpoint_ref": item.checkpoint_ref,
-            }
-            for item in self.sleep_store.list_work_items(job_id=job["id"])
-        )
-        return SleepRuntimeStatus(
-            active_job_id=job["id"],
-            job_status=job["status"],
-            work_items=work_items,
-        ).to_dict()
+        observed = self.observability.snapshot(job["id"])
+        return {
+            "active_job_id": job["id"],
+            "job_status": job["status"],
+            "work_items": observed["work_items"],
+            "queue": observed["queue"],
+            "current_work_item": observed["current_work_item"],
+            "current_chunk": observed["current_chunk"],
+            "budget": observed["budget"],
+            "metrics": observed["metrics"],
+        }
