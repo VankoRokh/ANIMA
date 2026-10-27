@@ -17,9 +17,9 @@ ANIMA — исследовательский проект модульного �
 <!-- AUTO:summary:START -->
 Версия прототипа: **00.1-alpha** (из кода).
 
-Текущий фокус: **3 — Sleep** (Complete).
+Текущий фокус: **4 — Agent** (InProgress).
 
-Stage 3 — Sleep завершён и подтверждён финальной end-to-end валидацией. Следующий этап — Stage 4 — Agent; реализация ещё не начата.
+Stage 4.0 — Agent Specification: зафиксировать AgentRun/AgentStep, Tool/Action/Observation, PlannerAdapter, Goal verification, persistence/recovery boundaries и критерии deterministic/LLM validation до начала production-реализации.
 
 [Этапы и критерии](docs/ROADMAP/README.md).
 <!-- AUTO:summary:END -->
