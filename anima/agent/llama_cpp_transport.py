@@ -3,6 +3,11 @@
 This module keeps backend-specific sampling and JSON-schema constraints outside
 the generic OpenAI-compatible transport. The Planner contract and compact
 PlannerRequest projection remain unchanged.
+
+For constrained Planner output we intentionally use llama-server's native
+/apply-template -> /completion path. The current Stage 4.12 baseline verified
+that /completion + json_schema enforces the schema, while the OpenAI-compatible
+chat endpoint may accept response_format without enforcing it for this build.
 """
 
 import json
@@ -79,11 +84,12 @@ def _probability(value, label):
 
 
 class LlamaCppSmallModelTransport(SmallModelOpenAICompatibleChatTransport):
-    """Small-model transport tuned for llama-server chat/completions.
+    """Small-model transport tuned for llama-server native completion APIs.
 
-    llama.cpp-specific request fields stay here rather than leaking into the
-    generic OpenAI-compatible transport. Reasoning mode is a server concern and
-    should be disabled when starting llama-server for the Stage 4.12 baseline.
+    The transport first asks /apply-template to render the system/user messages
+    with the model's own chat template, explicitly disabling thinking. It then
+    sends that rendered prompt to /completion, where llama.cpp's json_schema
+    field constrains generated tokens before ANIMA performs its own strict parse.
     """
 
     def __init__(
@@ -109,13 +115,82 @@ class LlamaCppSmallModelTransport(SmallModelOpenAICompatibleChatTransport):
         if type(constrain_json) is not bool:
             raise ValueError("constrain_json must be boolean")
 
-        # Parent field request_json_object acts as the existing on/off switch for
-        # structured response_format. Here it means llama.cpp JSON Schema mode.
+        # Parent field request_json_object remains the existing structured-output
+        # switch. In this backend it controls native /completion json_schema.
         super().__init__(request_json_object=constrain_json, **kwargs)
         self.temperature = float(temperature)
         self.top_k = top_k
         self.top_p = top_p
         self.min_p = min_p
+
+    @property
+    def server_root(self):
+        """Return llama-server root even when configured with an OpenAI /v1 URL."""
+        base = self.base_url.rstrip("/")
+        for suffix in (
+            "/v1/chat/completions",
+            "/chat/completions",
+            "/v1/completions",
+            "/completions",
+            "/completion",
+            "/v1",
+        ):
+            if base.endswith(suffix):
+                return base[: -len(suffix)]
+        return base
+
+    @property
+    def apply_template_endpoint(self):
+        return self.server_root + "/apply-template"
+
+    @property
+    def completion_endpoint(self):
+        return self.server_root + "/completion"
+
+    def _post_json(self, endpoint, payload, *, timeout_seconds):
+        headers = {
+            "Content-Type": "application/json",
+            "Accept": "application/json",
+            **self.extra_headers,
+        }
+        if self.api_key is not None:
+            headers["Authorization"] = f"Bearer {self.api_key}"
+
+        request = urllib.request.Request(
+            endpoint,
+            data=_canonical_json(payload).encode("utf-8"),
+            headers=headers,
+            method="POST",
+        )
+        try:
+            with urllib.request.urlopen(
+                request,
+                timeout=float(timeout_seconds),
+            ) as response:
+                raw = response.read(200_000)
+        except urllib.error.HTTPError as error:
+            try:
+                detail = error.read(4096).decode("utf-8", errors="replace")
+            except Exception:
+                detail = ""
+            message = f"llama.cpp HTTP {error.code}"
+            if detail.strip():
+                message += ": " + detail.strip()
+            raise LLMTransportError(message) from error
+        except (urllib.error.URLError, TimeoutError, OSError) as error:
+            raise LLMTransportError(f"llama.cpp transport failed: {error}") from error
+
+        try:
+            document = json.loads(raw.decode("utf-8"))
+        except (UnicodeDecodeError, json.JSONDecodeError) as error:
+            raise LLMTransportError("llama.cpp returned invalid JSON") from error
+        if not isinstance(document, dict):
+            raise LLMTransportError("llama.cpp returned a non-object JSON response")
+        if "error" in document:
+            raise LLMTransportError(
+                "llama.cpp returned an error: " + _canonical_json(document["error"])
+            )
+        return document
 
     def complete(self, *, system_prompt, user_prompt, timeout_seconds):
         if not isinstance(system_prompt, str) or not system_prompt.strip():
@@ -129,83 +204,58 @@ class LlamaCppSmallModelTransport(SmallModelOpenAICompatibleChatTransport):
         ):
             raise ValueError("LLM timeout_seconds must be positive")
 
-        payload = {
-            "model": self.model,
-            "messages": [
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": user_prompt},
-            ],
+        messages = [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_prompt},
+        ]
+        started = time.perf_counter()
+
+        template_document = self._post_json(
+            self.apply_template_endpoint,
+            {
+                "messages": messages,
+                "add_generation_prompt": True,
+                "enable_thinking": False,
+            },
+            timeout_seconds=timeout_seconds,
+        )
+        rendered_prompt = template_document.get("prompt")
+        if not isinstance(rendered_prompt, str) or not rendered_prompt:
+            raise LLMTransportError("llama.cpp /apply-template returned no prompt")
+
+        completion_payload = {
+            "prompt": rendered_prompt,
+            "n_predict": self.max_output_tokens,
             "temperature": self.temperature,
             "top_k": self.top_k,
             "top_p": self.top_p,
             "min_p": self.min_p,
-            "max_tokens": self.max_output_tokens,
+            "stream": False,
         }
         if self.request_json_object:
-            payload["response_format"] = {
-                "type": "json_schema",
-                "schema": LLAMA_CPP_PLANNER_JSON_SCHEMA,
-            }
+            completion_payload["json_schema"] = LLAMA_CPP_PLANNER_JSON_SCHEMA
 
-        headers = {
-            "Content-Type": "application/json",
-            "Accept": "application/json",
-            **self.extra_headers,
-        }
-        if self.api_key is not None:
-            headers["Authorization"] = f"Bearer {self.api_key}"
-
-        request = urllib.request.Request(
-            self.endpoint,
-            data=_canonical_json(payload).encode("utf-8"),
-            headers=headers,
-            method="POST",
+        document = self._post_json(
+            self.completion_endpoint,
+            completion_payload,
+            timeout_seconds=timeout_seconds,
         )
-        started = time.perf_counter()
-        try:
-            with urllib.request.urlopen(
-                request,
-                timeout=float(timeout_seconds),
-            ) as response:
-                raw = response.read(200_000)
-        except urllib.error.HTTPError as error:
-            try:
-                detail = error.read(4096).decode("utf-8", errors="replace")
-            except Exception:
-                detail = ""
-            message = f"LLM HTTP {error.code}"
-            if detail.strip():
-                message += ": " + detail.strip()
-            raise LLMTransportError(message) from error
-        except (urllib.error.URLError, TimeoutError, OSError) as error:
-            raise LLMTransportError(f"LLM transport failed: {error}") from error
         latency_ms = (time.perf_counter() - started) * 1000.0
 
-        try:
-            document = json.loads(raw.decode("utf-8"))
-            choice = document["choices"][0]
-            text = choice["message"]["content"]
-        except (
-            UnicodeDecodeError,
-            json.JSONDecodeError,
-            KeyError,
-            IndexError,
-            TypeError,
-        ) as error:
-            raise LLMTransportError(
-                "llama.cpp returned an unsupported chat/completions response"
-            ) from error
+        text = document.get("content")
         if not isinstance(text, str) or not text.strip():
-            raise LLMTransportError("llama.cpp returned empty message content")
+            raise LLMTransportError("llama.cpp /completion returned empty content")
 
-        usage = document.get("usage") or {}
-        input_tokens = usage.get("prompt_tokens")
-        output_tokens = usage.get("completion_tokens")
+        input_tokens = document.get("tokens_evaluated")
+        output_tokens = document.get("tokens_predicted")
         if not isinstance(input_tokens, int) or isinstance(input_tokens, bool):
             input_tokens = None
         if not isinstance(output_tokens, int) or isinstance(output_tokens, bool):
             output_tokens = None
-        finish_reason = choice.get("finish_reason")
+
+        finish_reason = document.get("stop_type")
+        if finish_reason is None and document.get("stop") is True:
+            finish_reason = "stop"
         if finish_reason is not None and not isinstance(finish_reason, str):
             finish_reason = str(finish_reason)
 
