@@ -18,12 +18,17 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from anima.agent import (
+    LLAMA_CPP_DEFAULT_MIN_P,
+    LLAMA_CPP_DEFAULT_TEMPERATURE,
+    LLAMA_CPP_DEFAULT_TOP_K,
+    LLAMA_CPP_DEFAULT_TOP_P,
     SMALL_LLM_MAX_OUTPUT_TOKENS,
     SMALL_LLM_MAX_PROMPT_CHARS,
     AgentStore,
     DeterministicGoalVerifier,
     GoalVerificationBridge,
     LLMPlanner,
+    LlamaCppSmallModelTransport,
     OpenAICompatibleChatTransport,
     ProposalChoiceCoordinator,
     RecoverableAgentLoop,
@@ -56,7 +61,7 @@ def build_parser():
     parser.add_argument(
         "--base-url",
         default=os.environ.get("ANIMA_LLM_BASE_URL"),
-        help="OpenAI-compatible base URL, e.g. http://localhost:11434/v1",
+        help="OpenAI-compatible base URL, e.g. http://localhost:8080/v1",
     )
     parser.add_argument(
         "--model",
@@ -89,12 +94,20 @@ def build_parser():
     parser.add_argument(
         "--no-response-format",
         action="store_true",
-        help="Do not send response_format=json_object for endpoints that reject it",
+        help="Disable structured response_format for the selected backend",
     )
     parser.add_argument(
         "--small-model-profile",
         action="store_true",
         help="Use the compact bounded Planner projection intended for small local models",
+    )
+    parser.add_argument(
+        "--llama-cpp",
+        action="store_true",
+        help=(
+            "Use the llama.cpp-specific small-model transport with JSON Schema "
+            "constraints and llama.cpp sampling fields"
+        ),
     )
     parser.add_argument(
         "--max-prompt-chars",
@@ -108,6 +121,30 @@ def build_parser():
         default=SMALL_LLM_MAX_OUTPUT_TOKENS,
         help="Completion token budget for --small-model-profile",
     )
+    parser.add_argument(
+        "--temperature",
+        type=float,
+        default=LLAMA_CPP_DEFAULT_TEMPERATURE,
+        help="llama.cpp sampling temperature",
+    )
+    parser.add_argument(
+        "--top-k",
+        type=int,
+        default=LLAMA_CPP_DEFAULT_TOP_K,
+        help="llama.cpp top-k sampling",
+    )
+    parser.add_argument(
+        "--top-p",
+        type=float,
+        default=LLAMA_CPP_DEFAULT_TOP_P,
+        help="llama.cpp top-p sampling",
+    )
+    parser.add_argument(
+        "--min-p",
+        type=float,
+        default=LLAMA_CPP_DEFAULT_MIN_P,
+        help="llama.cpp min-p sampling",
+    )
     return parser
 
 
@@ -119,21 +156,32 @@ def _sum_known(values):
 
 
 def _build_planner(args, api_key):
-    transport_kwargs = {
+    common_transport_kwargs = {
         "base_url": args.base_url,
         "model": args.model,
         "api_key": api_key,
         "provider": args.provider,
-        "request_json_object": not args.no_response_format,
         "input_cost_per_million": args.input_cost_per_million,
         "output_cost_per_million": args.output_cost_per_million,
     }
     if args.small_model_profile:
         profile = SmallLLMPromptProfile(max_prompt_chars=args.max_prompt_chars)
-        transport = SmallModelOpenAICompatibleChatTransport(
-            max_output_tokens=args.max_output_tokens,
-            **transport_kwargs,
-        )
+        if args.llama_cpp:
+            transport = LlamaCppSmallModelTransport(
+                max_output_tokens=args.max_output_tokens,
+                temperature=args.temperature,
+                top_k=args.top_k,
+                top_p=args.top_p,
+                min_p=args.min_p,
+                constrain_json=not args.no_response_format,
+                **common_transport_kwargs,
+            )
+        else:
+            transport = SmallModelOpenAICompatibleChatTransport(
+                max_output_tokens=args.max_output_tokens,
+                request_json_object=not args.no_response_format,
+                **common_transport_kwargs,
+            )
         return SmallModelLLMPlanner(
             transport,
             profile=profile,
@@ -142,7 +190,10 @@ def _build_planner(args, api_key):
             timeout_seconds=args.timeout,
         )
 
-    transport = OpenAICompatibleChatTransport(**transport_kwargs)
+    transport = OpenAICompatibleChatTransport(
+        request_json_object=not args.no_response_format,
+        **common_transport_kwargs,
+    )
     return LLMPlanner(
         transport,
         name="llm-experiment",
@@ -158,11 +209,22 @@ def run_experiment(args):
         raise ValueError("--model or ANIMA_LLM_MODEL is required")
     if args.max_steps <= 0:
         raise ValueError("--max-steps must be positive")
+    if args.llama_cpp and not args.small_model_profile:
+        raise ValueError("--llama-cpp requires --small-model-profile")
     if args.small_model_profile:
         if args.max_prompt_chars <= 0:
             raise ValueError("--max-prompt-chars must be positive")
         if args.max_output_tokens <= 0:
             raise ValueError("--max-output-tokens must be positive")
+    if args.llama_cpp:
+        if args.temperature < 0:
+            raise ValueError("--temperature must be non-negative")
+        if args.top_k < 0:
+            raise ValueError("--top-k must be non-negative")
+        if not 0 <= args.top_p <= 1:
+            raise ValueError("--top-p must be within 0..1")
+        if not 0 <= args.min_p <= 1:
+            raise ValueError("--min-p must be within 0..1")
     api_key = os.environ.get(args.api_key_env)
     planner = _build_planner(args, api_key)
 
@@ -230,6 +292,9 @@ def run_experiment(args):
             "planner_profile": (
                 "small-model" if args.small_model_profile else "full"
             ),
+            "transport_profile": (
+                "llama.cpp" if args.llama_cpp else "openai-compatible"
+            ),
             "completed": result.completed,
             "stop_reason": result.stop_reason,
             "run_status": result.run["status"],
@@ -272,6 +337,15 @@ def run_experiment(args):
                 ),
             },
         }
+        if args.llama_cpp:
+            output["sampling"] = {
+                "temperature": args.temperature,
+                "top_k": args.top_k,
+                "top_p": args.top_p,
+                "min_p": args.min_p,
+                "max_output_tokens": args.max_output_tokens,
+                "json_schema": not args.no_response_format,
+            }
         return output
 
 
