@@ -232,7 +232,7 @@ recovery protocol и дополнительные тесты large-data readines
 
 ## ADR-008
 
-**Accepted.** 2026-10-27, архитектура Agent и роль LLM для Stage 4.
+**Accepted; уточнён 2026-10-27 по Stage 4.0 Specification.** Архитектура Agent и роль LLM для Stage 4.
 Причина: после Cognitive Memory, Internal State и Sleep системе нужен первый
 проверяемый контур действий во внешней среде. При этом подключение готового
 LLM-agent framework как владельца plan/execute loop скрывало бы работу уже созданных
@@ -262,6 +262,8 @@ LLM предлагает варианты, а не определяет их с�
 самостоятельно объявлять действие безопасным или гарантированно успешным. На первом
 baseline значения Internal State не передаются Planner: их влияние должно оставаться
 отдельно наблюдаемым через Choice, чтобы не применять один и тот же фактор дважды.
+`ActionProposal.id` используется как `Candidate.candidate_id`, поэтому одна stable
+identity проходит через Planner, Choice, Action result и последующий GoalObservation.
 
 Agent использует пошаговый ReAct-подобный цикл, но не передаёт LLM полный контроль:
 `Goal → Context → Planner proposals → validation/Candidates → Choice → one Action →
@@ -269,14 +271,60 @@ ExecutionReceipt → Observation → Goal verification → next turn`. Мног�
 может существовать как гипотеза/summary, однако каждый реальный следующий Action
 проходит новый цикл после фактического Observation. Tool-call success сам по себе
 не означает Goal success; завершение требует независимой проверки success criterion.
+Receipt, Observation и VerificationResult имеют разную authority: Receipt фиксирует
+технический результат вызова, Observation — факт среды, VerificationResult — вывод
+доверенного verifier о соответствии фактов критерию.
+
+`AgentRun` является конкретной попыткой выполнить уже существующий Goal, а не самим
+Goal. Один Goal может иметь несколько последовательных Runs после failure/cancel,
+но одновременно допускается не более одного non-terminal Run. Terminal Run не
+переписывается. Failure или budget exhaustion конкретного Run не отменяют Goal;
+существующий Goal lifecycle Stage 2 остаётся каноническим.
+
+Agent storage использует hybrid baseline: отдельные persistent таблицы нужны для
+`AgentRun`, `AgentStep`, `PlannerTurn` и operation ledger, тогда как валидированные
+`ActionProposal`, `Action`, `ExecutionReceipt`, `Observation`, `VerificationSpec` и
+`VerificationResult` могут храниться как структурированные JSON contracts внутри
+принадлежащего им Step/Turn, сохраняя stable public IDs. Вынос отдельного contract
+в собственную таблицу допускается позже только при измеренной потребности в query,
+целостности или recovery. Operational execution history хранится в `agent.db` и не
+подменяет долговременную Memory.
+
+Stage 4 не меняет уже работающую модель Goal. Human-readable `Goal.success_criterion`
+остаётся в Stage 2. Конкретный `AgentRun` получает доверенный `VerificationSpec`,
+который задаёт verifier/version, criterion kind и параметры машинной проверки.
+Planner может видеть Goal и критерий, но не имеет authority изменять VerificationSpec
+или объявлять результат проверенным. `VerifierAdapter` создаёт stable
+`VerificationResult`; его ID используется как `GoalObservation.source_id`, а
+существующий `GoalProgressEngine` и Stage 2 RecoveryCoordinator выполняют изменение
+Goal/Internal State. Так повтор одного `VerificationResult` после crash безопасно
+распознаётся существующим idempotency ledger без общей транзакции `agent.db` и
+`internal_state.db`.
+
+Минимальные public identities Stage 4 используют существующий принцип prefix+UUIDv4:
+`ar_` AgentRun, `ast_` AgentStep, `pt_` PlannerTurn, `ap_` ActionProposal, `act_`
+Action, `aop_` AgentOperation, `er_` ExecutionReceipt, `obs_` Observation, `vs_`
+VerificationSpec и `vr_` VerificationResult. Точные storage columns являются частью
+реализации 4.1–4.3, но semantic ownership и stable identity считаются принятыми.
+
+Recovery следует общему правилу ANIMA: внутри одного storage используется transaction;
+между разными владельцами данных — persisted intent/stable operation identity,
+canonical request/content hash, idempotency и reconciliation. Action и operation ID
+должны быть committed до внешнего side effect. `repeat_safe` operation можно
+повторить; `keyed` — повторить с тем же logical key; операция с `idempotency=none`
+после неопределённого crash автоматически не повторяется и переводится в состояние,
+требующее reconciliation. Такие необратимые tools не входят в первый sandbox.
+Публикация `agent.*` Event в append-only EventLog использует тот же принцип: заранее
+известный Event ID и content hash позволяют после crash различить отсутствующий,
+уже записанный идентичный и конфликтующий Event без изменения EventLog contract.
 
 Operational execution history и долговременная Memory разделены. Persistent
-`agent.db` должен хранить достаточно `AgentRun`/`AgentStep`, proposal/selection,
-receipt/observation и operation IDs для restart, interruption и idempotency.
-Значимые факты поведения публикуются как компактные `agent.*` Events со ссылками на
-сырой/крупный output, а долговременный опыт создаётся через обычный Event/Memory
-pipeline. Planner и Executor не получают прямого writable-доступа к Memory,
-Knowledge, Goals или Internal State.
+`agent.db` хранит run/step state, proposals/selection, receipts/observations,
+verification и operation IDs для restart/interruption/idempotency. Значимые факты
+поведения публикуются как компактные `agent.*` Events со ссылками на сырой/крупный
+output, а долговременный опыт создаётся через обычный Event/Memory pipeline. Planner
+и Executor не получают прямого writable-доступа к Memory, Knowledge, Goals или
+Internal State.
 
 Stage 4 сначала должен доказать deterministic Agent на обратимой sandbox-задаче и
 только затем заменить Planner реальной LLM на том же контракте. Финальная стадия
