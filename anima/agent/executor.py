@@ -23,7 +23,7 @@ from ._executor_impl import (
 class SandboxExecutor(_impl.SandboxExecutor):
     """Public sandbox Executor with bounded worker IPC and recovery semantics."""
 
-    def _invoke(self, action, descriptor, handler):
+    def _run_worker(self, action, descriptor, handler):
         methods = multiprocessing.get_all_start_methods()
         context = multiprocessing.get_context("fork" if "fork" in methods else "spawn")
         receive_connection, send_connection = context.Pipe(duplex=False)
@@ -39,19 +39,12 @@ class SandboxExecutor(_impl.SandboxExecutor):
         except BaseException as error:
             send_connection.close()
             receive_connection.close()
-            self._mark_after_failure(
-                action,
-                descriptor,
-                reason=f"worker start failed: {error}",
-                effect_possible=False,
-            )
-            return self._receipt(
-                action,
-                status="failed",
-                started_at=started_at,
-                code="WORKER_START_FAILED",
-                message=str(error),
-            )
+            return started_at, {
+                "kind": "system_error",
+                "code": "WORKER_START_FAILED",
+                "message": str(error),
+                "effect_possible": False,
+            }
         send_connection.close()
 
         deadline = time.monotonic() + descriptor.timeout_seconds
@@ -63,39 +56,28 @@ class SandboxExecutor(_impl.SandboxExecutor):
             process.join()
             receive_connection.close()
             if alive:
-                effect_possible = descriptor.effect_class != "read_only"
-                self._mark_after_failure(
-                    action,
-                    descriptor,
-                    reason="tool execution timed out",
-                    effect_possible=effect_possible,
-                )
-                return self._receipt(
-                    action,
-                    status="timeout",
-                    started_at=started_at,
-                    code="TIMEOUT",
-                    message=f"tool exceeded {descriptor.timeout_seconds:g}s timeout",
-                )
-            effect_possible = descriptor.effect_class != "read_only"
-            self._mark_after_failure(
-                action,
-                descriptor,
-                reason="worker exited without a result",
-                effect_possible=effect_possible,
-            )
-            return self._receipt(
-                action,
-                status="failed",
-                started_at=started_at,
-                code="WORKER_EXIT",
-                message=f"worker exited with code {process.exitcode}",
-            )
+                return started_at, {
+                    "kind": "timeout",
+                    "code": "TIMEOUT",
+                    "message": f"tool exceeded {descriptor.timeout_seconds:g}s timeout",
+                    "effect_possible": descriptor.effect_class != "read_only",
+                }
+            return started_at, {
+                "kind": "system_error",
+                "code": "WORKER_EXIT",
+                "message": f"worker exited with code {process.exitcode}",
+                "effect_possible": descriptor.effect_class != "read_only",
+            }
 
         try:
             result = receive_connection.recv()
         except EOFError:
-            result = None
+            result = {
+                "kind": "system_error",
+                "code": "WORKER_EXIT",
+                "message": "worker connection closed without a result",
+                "effect_possible": descriptor.effect_class != "read_only",
+            }
         finally:
             receive_connection.close()
 
@@ -104,31 +86,36 @@ class SandboxExecutor(_impl.SandboxExecutor):
         if process.is_alive():
             process.terminate()
             process.join()
+        return started_at, result
 
-        if result is None:
-            effect_possible = descriptor.effect_class != "read_only"
-            self._mark_after_failure(
-                action,
-                descriptor,
-                reason="worker connection closed without a result",
-                effect_possible=effect_possible,
-            )
+    def _invoke(self, action, descriptor, handler, *, mutate_operation=True):
+        started_at, result = self._run_worker(action, descriptor, handler)
+        kind = result.get("kind")
+
+        if kind == "timeout":
+            if mutate_operation:
+                self._mark_after_failure(
+                    action,
+                    descriptor,
+                    reason="tool execution timed out",
+                    effect_possible=bool(result.get("effect_possible")),
+                )
             return self._receipt(
                 action,
-                status="failed",
+                status="timeout",
                 started_at=started_at,
-                code="WORKER_EXIT",
-                message=f"worker exited with code {process.exitcode}",
+                code=result["code"],
+                message=result["message"],
             )
 
-        if result["kind"] == "tool_error":
-            effect_possible = bool(result.get("effect_possible"))
-            self._mark_after_failure(
-                action,
-                descriptor,
-                reason=f"tool error {result['code']}: {result['message']}",
-                effect_possible=effect_possible,
-            )
+        if kind == "tool_error":
+            if mutate_operation:
+                self._mark_after_failure(
+                    action,
+                    descriptor,
+                    reason=f"tool error {result['code']}: {result['message']}",
+                    effect_possible=bool(result.get("effect_possible")),
+                )
             return self._receipt(
                 action,
                 status="failed",
@@ -137,14 +124,14 @@ class SandboxExecutor(_impl.SandboxExecutor):
                 message=result["message"],
             )
 
-        if result["kind"] != "success":
-            effect_possible = descriptor.effect_class != "read_only"
-            self._mark_after_failure(
-                action,
-                descriptor,
-                reason=result.get("message", "worker system error"),
-                effect_possible=effect_possible,
-            )
+        if kind != "success":
+            if mutate_operation:
+                self._mark_after_failure(
+                    action,
+                    descriptor,
+                    reason=result.get("message", "worker system error"),
+                    effect_possible=bool(result.get("effect_possible")),
+                )
             return self._receipt(
                 action,
                 status="failed",
@@ -157,13 +144,13 @@ class SandboxExecutor(_impl.SandboxExecutor):
         try:
             descriptor.validate_output(output)
         except ToolOutputError as error:
-            effect_possible = descriptor.effect_class != "read_only"
-            self._mark_after_failure(
-                action,
-                descriptor,
-                reason=f"invalid tool output: {error}",
-                effect_possible=effect_possible,
-            )
+            if mutate_operation:
+                self._mark_after_failure(
+                    action,
+                    descriptor,
+                    reason=f"invalid tool output: {error}",
+                    effect_possible=descriptor.effect_class != "read_only",
+                )
             return self._receipt(
                 action,
                 status="failed",
@@ -172,11 +159,12 @@ class SandboxExecutor(_impl.SandboxExecutor):
                 message=str(error),
             )
 
-        self.store.transition_operation(
-            action.operation_id,
-            "succeeded",
-            reason="tool execution succeeded",
-        )
+        if mutate_operation:
+            self.store.transition_operation(
+                action.operation_id,
+                "succeeded",
+                reason="tool execution succeeded",
+            )
         return self._receipt(
             action,
             status="succeeded",
@@ -194,8 +182,11 @@ class SandboxExecutor(_impl.SandboxExecutor):
                 if operation is not None and operation["status"] == "succeeded":
                     self._validate_binding(action, descriptor, operation)
                     if descriptor.idempotency == "repeat_safe":
-                        raise ExecutionRejectedError(
-                            "repeat-safe completed operation requires a new AgentOperation in Stage 4.4"
+                        return self._invoke(
+                            action,
+                            descriptor,
+                            handler,
+                            mutate_operation=False,
                         )
         return super().execute(action)
 
