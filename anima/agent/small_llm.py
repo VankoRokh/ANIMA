@@ -18,7 +18,6 @@ from anima.agent.llm_planner import (
     LLMCallRecord,
     LLMCallResult,
     LLMPlanner,
-    LLMPlannerError,
     LLMTransportError,
     MAX_LLM_CALL_HISTORY,
     OpenAICompatibleChatTransport,
@@ -98,6 +97,12 @@ def _compact_value(value, *, string_limit, list_limit=6, dict_limit=12):
             result.append({"_truncated_items": len(items) - list_limit})
         return result
     return _truncate_text(str(value), string_limit)
+
+
+def _tail(items, count):
+    if count <= 0:
+        return ()
+    return items[-count:]
 
 
 def _compact_schema_property(name, schema, required):
@@ -250,11 +255,11 @@ class SmallLLMPromptProfile:
             "tools": [_compact_tool(tool) for tool in request.tools],
             "recent_steps": [
                 _compact_step(item)
-                for item in request.recent_steps[-step_count:]
+                for item in _tail(request.recent_steps, step_count)
             ],
             "recent_observations": [
                 _compact_observation(item)
-                for item in request.recent_observations[-observation_count:]
+                for item in _tail(request.recent_observations, observation_count)
             ],
             "constraints": {
                 "one_action_per_turn": True,
