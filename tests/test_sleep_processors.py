@@ -25,12 +25,10 @@ class CountingProcessor(SleepProcessor):
             )
         )
 
-    def initial_checkpoint(self, work_item):
-        self.require_supported(work_item)
+    def _initial_checkpoint(self, work_item):
         return {"chunks": 0, "items": 0}
 
-    def process_chunk(self, work_item, *, chunk, checkpoint):
-        self.require_supported(work_item)
+    def _process_chunk(self, work_item, *, chunk, checkpoint):
         if not isinstance(chunk, list):
             raise ValueError("CountingProcessor test chunk must be a list")
         next_checkpoint = {
@@ -42,8 +40,7 @@ class CountingProcessor(SleepProcessor):
             local_result={"items": len(chunk)},
         )
 
-    def finalize(self, work_item, *, checkpoint):
-        self.require_supported(work_item)
+    def _finalize(self, work_item, *, checkpoint):
         return FinalizeResult.create(
             work_item=work_item,
             output={
@@ -64,12 +61,10 @@ class TaggedProcessor(SleepProcessor):
             )
         )
 
-    def initial_checkpoint(self, work_item):
-        self.require_supported(work_item)
+    def _initial_checkpoint(self, work_item):
         return {"seen": []}
 
-    def process_chunk(self, work_item, *, chunk, checkpoint):
-        self.require_supported(work_item)
+    def _process_chunk(self, work_item, *, chunk, checkpoint):
         values = list(checkpoint["seen"])
         values.append(str(chunk))
         return ChunkResult(
@@ -77,11 +72,49 @@ class TaggedProcessor(SleepProcessor):
             local_result={"tag": str(chunk)},
         )
 
-    def finalize(self, work_item, *, checkpoint):
-        self.require_supported(work_item)
+    def _finalize(self, work_item, *, checkpoint):
         return FinalizeResult.create(
             work_item=work_item,
             output={"tagged": checkpoint["seen"]},
+        )
+
+
+class BrokenProcessor(SleepProcessor):
+    def __init__(self, mode):
+        self.mode = mode
+        super().__init__(
+            ProcessorDescriptor(
+                name="broken",
+                version="1",
+                work_kind="CONSOLIDATE",
+                source_kinds=frozenset({"event"}),
+            )
+        )
+
+    def _initial_checkpoint(self, work_item):
+        if self.mode == "checkpoint":
+            return object()
+        return {"cursor": 0}
+
+    def _process_chunk(self, work_item, *, chunk, checkpoint):
+        if self.mode == "chunk":
+            return {"checkpoint": checkpoint}
+        return ChunkResult(checkpoint={"cursor": 1})
+
+    def _finalize(self, work_item, *, checkpoint):
+        if self.mode == "finalize_type":
+            return {"output": "bad"}
+        if self.mode == "identity":
+            return FinalizeResult(
+                work_item_id=f"wi_{uuid4()}",
+                source_ref=work_item.source_ref,
+                processor=work_item.processor,
+                processor_version=work_item.processor_version,
+                output={"done": True},
+            )
+        return FinalizeResult.create(
+            work_item=work_item,
+            output={"done": True},
         )
 
 
@@ -202,6 +235,32 @@ def test_finalize_result_keeps_processor_version_source_and_work_identity():
 
     with pytest.raises(ValueError, match="output must be JSON-serializable"):
         FinalizeResult.create(work_item=work_item, output={"bad": object()})
+
+
+def test_public_processor_contract_rejects_invalid_adapter_returns():
+    work_item = _work_item(processor="broken")
+
+    with pytest.raises(ValueError, match="initial checkpoint must be JSON-serializable"):
+        BrokenProcessor("checkpoint").initial_checkpoint(work_item)
+
+    with pytest.raises(ValueError, match="must return ChunkResult"):
+        BrokenProcessor("chunk").process_chunk(
+            work_item,
+            chunk="opaque",
+            checkpoint={"cursor": 0},
+        )
+
+    with pytest.raises(ValueError, match="must return FinalizeResult"):
+        BrokenProcessor("finalize_type").finalize(
+            work_item,
+            checkpoint={"cursor": 0},
+        )
+
+    with pytest.raises(ValueError, match="work_item_id does not match"):
+        BrokenProcessor("identity").finalize(
+            work_item,
+            checkpoint={"cursor": 0},
+        )
 
 
 def test_processor_contract_supports_checkpoint_chunk_and_finalize_cycle():
