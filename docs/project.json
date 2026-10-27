@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "current_stage": "3",
-  "focus": "Stage 3.6 — Chunk / Checkpoint / Resume: реализовать persistent chunk checkpoints и безопасный resume, чтобы committed chunk не выполнялся повторно после interruption/restart.",
+  "focus": "Stage 3.10 — Observability / Resource Budget: сделать Sleep progress, queue, budget и elapsed/CPU/RAM/storage metrics наблюдаемыми и детерминированно приостанавливать работу при исчерпании runtime budget.",
   "stages": [
     {"id": "D0", "title": "Documentation", "status": "Complete", "depends_on": [], "outcome": "Контекст и процедуры работы восстанавливаются из репозитория"},
     {"id": "0", "title": "Foundation", "status": "Complete", "depends_on": ["D0"], "outcome": "Перенос сохраняет идентичность, историю и возможность продолжения"},
