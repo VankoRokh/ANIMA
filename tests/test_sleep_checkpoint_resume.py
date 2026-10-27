@@ -1,3 +1,4 @@
+import sqlite3
 from uuid import uuid4
 
 import pytest
@@ -220,3 +221,84 @@ def test_executor_rejects_invalid_interrupt_limit_and_terminal_work(tmp_path):
 
     with pytest.raises(ValueError, match="Cannot begin WorkItem from status: completed"):
         executor.run(item.public_id, ["alpha"])
+
+
+def test_sleep_store_migrates_v2_work_item_to_checkpoint_schema(tmp_path):
+    database = tmp_path / "sleep.db"
+    job_id = f"sj_{uuid4()}"
+    work_item_id = f"wi_{uuid4()}"
+    source_id = f"ev_{uuid4()}"
+    timestamp = "2026-10-27T12:00:00+00:00"
+
+    with sqlite3.connect(database) as connection:
+        connection.executescript(
+            """
+            CREATE TABLE schema_meta (
+                key TEXT PRIMARY KEY,
+                value TEXT NOT NULL
+            );
+            CREATE TABLE sleep_jobs (
+                row_id INTEGER PRIMARY KEY,
+                public_id TEXT NOT NULL UNIQUE,
+                status TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            );
+            CREATE TABLE work_items (
+                row_id INTEGER PRIMARY KEY,
+                public_id TEXT NOT NULL UNIQUE,
+                job_id TEXT NOT NULL,
+                work_kind TEXT NOT NULL,
+                source_kind TEXT NOT NULL,
+                source_id TEXT NOT NULL,
+                processor TEXT NOT NULL,
+                processor_version TEXT NOT NULL,
+                priority INTEGER NOT NULL,
+                cost_hint TEXT NOT NULL,
+                status TEXT NOT NULL,
+                attempts INTEGER NOT NULL,
+                checkpoint_ref TEXT,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            );
+            """
+        )
+        connection.execute(
+            "INSERT INTO schema_meta(key, value) VALUES('schema_version', '2')"
+        )
+        connection.execute(
+            """
+            INSERT INTO sleep_jobs(public_id, status, created_at, updated_at)
+            VALUES (?, 'queued', ?, ?)
+            """,
+            (job_id, timestamp, timestamp),
+        )
+        connection.execute(
+            """
+            INSERT INTO work_items(
+                public_id, job_id, work_kind, source_kind, source_id,
+                processor, processor_version, priority, cost_hint,
+                status, attempts, checkpoint_ref, created_at, updated_at
+            ) VALUES (?, ?, 'CONSOLIDATE', 'event', ?, 'resume-test', '1',
+                      0, 'normal', 'queued', 0, NULL, ?, ?)
+            """,
+            (work_item_id, job_id, source_id, timestamp, timestamp),
+        )
+
+    store = SleepStore(database)
+
+    assert store.schema_version() == 3
+    restored = store.get_work_item(work_item_id)
+    assert restored.public_id == work_item_id
+    assert restored.status == "queued"
+    assert restored.source_ref == SourceRef("event", source_id)
+    assert store.list_checkpoints(work_item_id) == []
+
+    with sqlite3.connect(database) as connection:
+        tables = {
+            row[0]
+            for row in connection.execute(
+                "SELECT name FROM sqlite_master WHERE type = 'table'"
+            ).fetchall()
+        }
+    assert "work_item_checkpoints" in tables
