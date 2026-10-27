@@ -1,6 +1,8 @@
 from dataclasses import dataclass
 
-from anima.sleep.processors import FinalizeResult, ProcessorRegistry
+from anima.sleep.contracts import SourceRegistry
+from anima.sleep.derived import DerivedResult, DerivedResultRepository
+from anima.sleep.processors import ProcessorRegistry
 from anima.sleep.store import SleepStore
 
 
@@ -11,7 +13,7 @@ class ExecutionOutcome:
     resumed_from_sequence: int
     processed_chunks: int
     committed_chunks: int
-    final_result: FinalizeResult | None
+    final_result: DerivedResult | None
 
     @property
     def interrupted(self):
@@ -21,13 +23,31 @@ class ExecutionOutcome:
 class SleepChunkExecutor:
     """Execute WorkItems in ordered chunks with persistent resume checkpoints."""
 
-    def __init__(self, *, sleep_store, processor_registry):
+    def __init__(
+        self,
+        *,
+        sleep_store,
+        processor_registry,
+        source_registry,
+        derived_results=None,
+    ):
         if not isinstance(sleep_store, SleepStore):
             raise ValueError("sleep_store must be a SleepStore")
         if not isinstance(processor_registry, ProcessorRegistry):
             raise ValueError("processor_registry must be a ProcessorRegistry")
+        if not isinstance(source_registry, SourceRegistry):
+            raise ValueError("source_registry must be a SourceRegistry")
+        if derived_results is None:
+            derived_results = DerivedResultRepository(sleep_store)
+        if not isinstance(derived_results, DerivedResultRepository):
+            raise ValueError("derived_results must be a DerivedResultRepository")
+        if derived_results.sleep_store is not sleep_store:
+            raise ValueError("derived_results must use the same SleepStore")
+
         self.sleep_store = sleep_store
         self.processor_registry = processor_registry
+        self.source_registry = source_registry
+        self.derived_results = derived_results
 
     @staticmethod
     def _validate_interrupt_after(value):
@@ -124,16 +144,21 @@ class SleepChunkExecutor:
                     final_result=None,
                 )
 
-        final_result = processor.finalize(
+        processor_result = processor.finalize(
             work_item,
             checkpoint=checkpoint,
         )
-        completed = self.sleep_store.complete_work_item(work_item_id)
+        derived_result = self.derived_results.commit_final_result(
+            work_item_id,
+            processor_result,
+            source_registry=self.source_registry,
+        )
+        completed = self.sleep_store.get_work_item(work_item_id)
         return ExecutionOutcome(
             work_item_id=work_item_id,
             status=completed.status,
             resumed_from_sequence=resumed_from_sequence,
             processed_chunks=processed_chunks,
             committed_chunks=next_sequence,
-            final_result=final_result,
+            final_result=derived_result,
         )
