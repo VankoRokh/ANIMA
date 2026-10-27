@@ -37,4 +37,5 @@
 | [TV-0028 — Stage 3.11 Large-data Readiness](TV-0028.md) | 2026-10-27 | [3](../../ROADMAP/README.md#stage-3) | Passed | [5b4ec4f](https://github.com/VankoRokh/ANIMA/commit/5b4ec4fe08f390921fd7349f4b81d8d331c10b6e) |
 | [TV-0029 — Stage 3.12 Performance Baseline](TV-0029.md) | 2026-10-27 | [3](../../ROADMAP/README.md#stage-3) | Passed | [be862fd](https://github.com/VankoRokh/ANIMA/commit/be862fddb4d5dd4de734ad322017b72da2bc6346) |
 | [TV-0030 — Stage 3.13 End-to-End Validation](TV-0030.md) | 2026-10-27 | [3](../../ROADMAP/README.md#stage-3) | Passed | [f062f8e](https://github.com/VankoRokh/ANIMA/commit/f062f8e91fb7f28a854682d55c0d317846a45bb9) |
+| [TV-0031 — Stage 4.1 Agent Storage / Lifecycle](TV-0031.md) | 2026-10-27 | [4](../../ROADMAP/README.md#stage-4) | Passed | [601949c](https://github.com/VankoRokh/ANIMA/commit/601949c9eea0d80930df9b54088cdb0629ab9c44) |
 <!-- AUTO:results:END -->
