@@ -29,4 +29,6 @@
 | [TV-0020 — Stage 3.3 Selection / Scheduling](TV-0020.md) | 2026-10-27 | [3](../../ROADMAP/README.md#stage-3) | Passed | [6e914fb](https://github.com/VankoRokh/ANIMA/commit/6e914fb132b7d6ffc2b56e5ca86d61900a858658) |
 | [TV-0021 — Stage 3.4 Processor Interface](TV-0021.md) | 2026-10-27 | [3](../../ROADMAP/README.md#stage-3) | Passed | [586561f](https://github.com/VankoRokh/ANIMA/commit/586561f46988211c765dbc9e97babba6cd6c1203) |
 | [TV-0022 — Stage 3.5 Deterministic Text Consolidation](TV-0022.md) | 2026-10-27 | [3](../../ROADMAP/README.md#stage-3) | Passed | [99d8519](https://github.com/VankoRokh/ANIMA/commit/99d85198e5f444d2e5b5556a0b56be4a2579b289) |
+| [TV-0023 — Stage 3.6 Chunk / Checkpoint / Resume](TV-0023.md) | 2026-10-27 | [3](../../ROADMAP/README.md#stage-3) | Passed | [ef1c794](https://github.com/VankoRokh/ANIMA/commit/ef1c7942c7130aaf22ca6a4db1fef6fb1e3f3778) |
+| [TV-0024 — Stage 3.7 Derived Results / Provenance](TV-0024.md) | 2026-10-27 | [3](../../ROADMAP/README.md#stage-3) | Passed | [3161585](https://github.com/VankoRokh/ANIMA/commit/3161585ecce5ac1bc1e15bfdbb6705031dd6f53f) |
 <!-- AUTO:results:END -->
