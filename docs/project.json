@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "current_stage": "3",
-  "focus": "Stage 3.2 — Source / WorkItem Contract: реализовать универсальные SourceRef и WorkItem с source kind/id, work kind, processor/version, priority, cost hint, status и checkpoint reference без embedding тяжёлого payload.",
+  "focus": "Stage 3.6 — Chunk / Checkpoint / Resume: реализовать persistent chunk checkpoints и безопасный resume, чтобы committed chunk не выполнялся повторно после interruption/restart.",
   "stages": [
     {"id": "D0", "title": "Documentation", "status": "Complete", "depends_on": [], "outcome": "Контекст и процедуры работы восстанавливаются из репозитория"},
     {"id": "0", "title": "Foundation", "status": "Complete", "depends_on": ["D0"], "outcome": "Перенос сохраняет идентичность, историю и возможность продолжения"},
