@@ -192,7 +192,42 @@ class LlamaCppSmallModelTransport(SmallModelOpenAICompatibleChatTransport):
             )
         return document
 
+    def complete_structured(
+        self,
+        *,
+        system_prompt,
+        user_prompt,
+        timeout_seconds,
+        response_schema,
+    ):
+        if not isinstance(response_schema, dict) or not response_schema:
+            raise ValueError("response_schema must be a non-empty JSON Schema object")
+        return self._complete_native(
+            system_prompt=system_prompt,
+            user_prompt=user_prompt,
+            timeout_seconds=timeout_seconds,
+            response_schema=(response_schema if self.request_json_object else None),
+        )
+
     def complete(self, *, system_prompt, user_prompt, timeout_seconds):
+        response_schema = (
+            LLAMA_CPP_PLANNER_JSON_SCHEMA if self.request_json_object else None
+        )
+        return self._complete_native(
+            system_prompt=system_prompt,
+            user_prompt=user_prompt,
+            timeout_seconds=timeout_seconds,
+            response_schema=response_schema,
+        )
+
+    def _complete_native(
+        self,
+        *,
+        system_prompt,
+        user_prompt,
+        timeout_seconds,
+        response_schema,
+    ):
         if not isinstance(system_prompt, str) or not system_prompt.strip():
             raise ValueError("LLM system_prompt must be non-empty")
         if not isinstance(user_prompt, str) or not user_prompt.strip():
@@ -203,6 +238,8 @@ class LlamaCppSmallModelTransport(SmallModelOpenAICompatibleChatTransport):
             or timeout_seconds <= 0
         ):
             raise ValueError("LLM timeout_seconds must be positive")
+        if response_schema is not None and not isinstance(response_schema, dict):
+            raise ValueError("response_schema must be a JSON Schema object or null")
 
         messages = [
             {"role": "system", "content": system_prompt},
@@ -232,8 +269,8 @@ class LlamaCppSmallModelTransport(SmallModelOpenAICompatibleChatTransport):
             "min_p": self.min_p,
             "stream": False,
         }
-        if self.request_json_object:
-            completion_payload["json_schema"] = LLAMA_CPP_PLANNER_JSON_SCHEMA
+        if response_schema is not None:
+            completion_payload["json_schema"] = response_schema
 
         document = self._post_json(
             self.completion_endpoint,
