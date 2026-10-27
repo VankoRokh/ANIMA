@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "current_stage": "3",
-  "focus": "Stage 3.6 — Chunk / Checkpoint / Resume: реализовать persistent chunk checkpoints и безопасный resume, чтобы committed chunk не выполнялся повторно после interruption/restart.",
+  "focus": "Stage 3.12 — Performance Baseline: измерить отдельно orchestration, selection, checkpoint/history и provenance на 1k/10k/100k WorkItems и large-source workload, зафиксировав CPU/RAM/storage и bottlenecks без преждевременного SLA.",
   "stages": [
     {"id": "D0", "title": "Documentation", "status": "Complete", "depends_on": [], "outcome": "Контекст и процедуры работы восстанавливаются из репозитория"},
     {"id": "0", "title": "Foundation", "status": "Complete", "depends_on": ["D0"], "outcome": "Перенос сохраняет идентичность, историю и возможность продолжения"},
