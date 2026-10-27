@@ -32,6 +32,14 @@ from .executor import (
     operation_kind,
     sandbox_tool_descriptors,
 )
+from .llama_cpp_transport import (
+    LLAMA_CPP_DEFAULT_MIN_P,
+    LLAMA_CPP_DEFAULT_TEMPERATURE,
+    LLAMA_CPP_DEFAULT_TOP_K,
+    LLAMA_CPP_DEFAULT_TOP_P,
+    LLAMA_CPP_PLANNER_JSON_SCHEMA,
+    LlamaCppSmallModelTransport,
+)
 from .llm_planner import (
     DEFAULT_LLM_TIMEOUT_SECONDS,
     LLMCallRecord,
@@ -127,12 +135,18 @@ __all__ = [
     "ExecutionRejectedError",
     "FILE_CONTENT_EQUALS",
     "GoalVerificationBridge",
+    "LLAMA_CPP_DEFAULT_MIN_P",
+    "LLAMA_CPP_DEFAULT_TEMPERATURE",
+    "LLAMA_CPP_DEFAULT_TOP_K",
+    "LLAMA_CPP_DEFAULT_TOP_P",
+    "LLAMA_CPP_PLANNER_JSON_SCHEMA",
     "LLMCallRecord",
     "LLMCallResult",
     "LLMPlanner",
     "LLMPlannerError",
     "LLMTransport",
     "LLMTransportError",
+    "LlamaCppSmallModelTransport",
     "Observation",
     "OpenAICompatibleChatTransport",
     "PLANNER_RESPONSE_SCHEMA",
