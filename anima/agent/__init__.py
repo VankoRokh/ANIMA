@@ -32,6 +32,15 @@ from .executor import (
     operation_kind,
     sandbox_tool_descriptors,
 )
+from .memory_integration import (
+    AGENT_MEMORY_EVENT_TYPES,
+    AGENT_MEMORY_IMPORTANCE,
+    AGENT_MEMORY_PROCESSOR_NAME,
+    AGENT_MEMORY_PROCESSOR_VERSION,
+    AgentExperienceMemoryProcessor,
+    AgentMemoryIntegration,
+    AgentMemoryIntegrationResult,
+)
 from .planner import (
     DeterministicPlanner,
     PlannerAdapter,
@@ -60,13 +69,20 @@ from .verification import (
 )
 
 __all__ = [
+    "AGENT_MEMORY_EVENT_TYPES",
+    "AGENT_MEMORY_IMPORTANCE",
+    "AGENT_MEMORY_PROCESSOR_NAME",
+    "AGENT_MEMORY_PROCESSOR_VERSION",
     "Action",
     "ActionProposal",
     "AgentEventPublication",
     "AgentEventPublisher",
     "AgentExperienceCapture",
+    "AgentExperienceMemoryProcessor",
     "AgentLoop",
     "AgentLoopResult",
+    "AgentMemoryIntegration",
+    "AgentMemoryIntegrationResult",
     "AgentStore",
     "AgentTurnResult",
     "CandidateAdaptation",
