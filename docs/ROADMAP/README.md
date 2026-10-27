@@ -6,9 +6,9 @@
 показывают этот порядок, а не требуют отдельной платы или модели на каждом шаге.
 
 <!-- AUTO:roadmap:START -->
-**Текущая работа:** Stage 3.12 — Performance Baseline: измерить отдельно orchestration, selection, checkpoint/history и provenance на 1k/10k/100k WorkItems и large-source workload, зафиксировав CPU/RAM/storage и bottlenecks без преждевременного SLA.
+**Текущая работа:** Stage 3 — Sleep завершён и подтверждён финальной end-to-end валидацией. Следующий этап — Stage 4 — Agent; реализация ещё не начата.
 
-**Фокус:** 3 — Sleep (InProgress).
+**Фокус:** 3 — Sleep (Complete).
 
 | Этап | Проверяемый результат | Статус | Зависимости |
 |---|---|---|---|
@@ -17,7 +17,7 @@
 | [D1 — Runtime, Tests & Observability](#d1) | Один сценарий запускается headless, наблюдается и проверяется изолированно | Complete | [0](#stage-0) |
 | [1 — Cognitive Memory](#stage-1) | Релевантный опыт извлекается с происхождением и ограниченным контекстом | Complete | [0](#stage-0), [D1](#d1) |
 | [2 — Internal State](#stage-2) | Влияние внутреннего состояния на выбор причинно прослеживается | Complete | [1](#stage-1) |
-| [3 — Sleep](#stage-3) | Консолидация прерывается и возобновляется без потери источников | InProgress | [2](#stage-2) |
+| [3 — Sleep](#stage-3) | Консолидация прерывается и возобновляется без потери источников | Complete | [2](#stage-2) |
 | [4 — Agent](#stage-4) | Ограниченная задача выполняется инструментом и проверяется наблюдением | Planned | [3](#stage-3) |
 | [5 — Virtual ANIMA](#stage-5) | Длительная работа на ПК/VM имеет измеренный ресурсный профиль | Planned | [4](#stage-4) |
 | [6 — Cyberdeck](#stage-6) | Измеренная нагрузка переносится на автономное устройство | Planned | [5](#stage-5) |
@@ -220,7 +220,7 @@ Goal содержит стабильный ID, `source`, `priority`, `status`, �
 |---|---|---|---|
 | `fatigue` | awake duration + workload; recovery/Sleep снижает | растёт относительно настраиваемого `awake_work_period`; восстановление при отдыхе | штрафует дорогие/трудоёмкие варианты, но не отменяет Goal |
 | `uncertainty` | недостаток/противоречие информации повышает; подтверждение снижает с учётом importance/quality | пассивно не меняется | повышает ценность information gain и осторожность к необратимому риску |
-| `frustration` | повторные неудачи одной стратегии усиливают рост; прогресс/смена стратегии снижают | постепенно возвращается к baseline | снижает склонность повторять подтверждённо неудачный путь и поддерживает альтернативу |
+| `frustration` | повторные неудачи одной стратегии усиливают рост; прогресс/смена стратегии снижает | постепенно возвращается к baseline | снижает склонность повторять подтверждённо неудачный путь и поддерживает альтернативу |
 | `satisfaction` | только проверенный прогресс/успех; importance усиливает, однотипные повторы дают diminishing returns | постепенно затухает к baseline | даёт небольшой бонус продолжению доказавшей эффективность стратегии |
 
 Для `fatigue` time component зависит от доли текущего awake-периода относительно
@@ -335,8 +335,8 @@ WorkItems, а не владеет исходными данными. Raw Event/o
 | **3.9 Runtime Integration — Complete** | Lifecycle Runtime различает inactive sleep, active SleepJob, safe interruption и возврат к wake без смешивания обычного `sleep()` с незавершённой консолидацией | Headless scenario проходит `wake → sleep processing → checkpoint/interruption → resume/complete → wake`; запрос wake прерывает работу на безопасной границе и не повреждает данные; [TV-0026](../TESTING/Results/TV-0026.md) |
 | **3.10 Observability / Resource Budget — Complete** | Snapshot/trace показывает job, queue, текущий WorkItem/chunk, processed/skipped/failed counts, budget и elapsed/CPU/RAM/storage metrics | По snapshot можно восстановить причину выбора и текущий progress; budget exhaustion завершает/приостанавливает работу определённо; метрики не требуют GUI; [TV-0027](../TESTING/Results/TV-0027.md) |
 | **3.11 Large-data Readiness — Complete** | Synthetic large-source adapter имитирует многогигабайтный Asset и тысячи chunks без реального media-файла; payload читается лениво через тот же processor contract | Источник логического размера ≥10 GB проходит bounded chunk iteration; interruption на произвольном chunk возобновляется с следующего; DB хранит refs/checkpoints, а не полный payload; память не зависит линейно от общего размера источника; [TV-0028](../TESTING/Results/TV-0028.md) |
-| **3.12 Performance Baseline** | Измерены orchestration/selection/checkpoint/provenance latency, CPU/RAM/storage на 1k/10k/100k WorkItems и large-source chunk workload | Baseline зафиксирован без SLA; отдельно видна стоимость scheduler, checkpoint/history и processor; найденные bottlenecks записаны до оптимизации |
-| **3.13 Stage Validation** | End-to-end canonical Sleep scenarios объединяют raw/Memory/Knowledge sources, bounded selection, consolidation, interruption/restart, provenance и large-source contract | Uninterrupted и interrupted/resumed runs дают эквивалентный допустимый итог; replay не создаёт дублей; provenance полный; Stage 0–2 regression suite зелёный |
+| **3.12 Performance Baseline — Complete** | Измерены orchestration/selection/checkpoint/provenance latency, CPU/RAM/storage на 1k/10k/100k WorkItems и large-source chunk workload | Baseline зафиксирован без SLA; selection определён как основной scaling bottleneck, checkpoint/provenance остаются стабильными; [TV-0029](../TESTING/Results/TV-0029.md) |
+| **3.13 Stage Validation — Complete** | End-to-end canonical Sleep scenarios объединяют raw/Memory/Knowledge sources, bounded selection, consolidation, interruption/restart, provenance и large-source contract | Uninterrupted и interrupted/resumed runs дают эквивалентный допустимый итог; replay не создаёт дублей; provenance полный; полный regression suite зелёный; [TV-0030](../TESTING/Results/TV-0030.md) |
 
 ### Storage, WorkItem и resource boundary
 
@@ -387,23 +387,24 @@ large-source доказывает, что scheduler/checkpoints/provenance не 
 
 ### Валидация и доказательства
 
-Canonical corpus Stage 3 должен включать raw observations, CLOSED Memories с
-provenance, CONFIRMED Knowledge, duplicates, неeligible/terminal records, несколько
-priority/cost классов и минимум один synthetic large source. Контрольные сценарии:
-обычный complete run; budget exhaustion; interruption на разных checkpoints;
-crash до и после output commit; reopen/resume; replay того же Job; processor failure;
-unsupported source; wake request; missing provenance; large-source resume.
+Canonical corpus Stage 3 включает raw observations, CLOSED Memories с provenance,
+CONFIRMED Knowledge, неeligible records и synthetic large source. Контрольные
+сценарии покрывают complete run, budget exhaustion, interruption/checkpoint,
+reopen/resume, replay, wake/recovery, missing/unsupported source и large-source resume.
 
-Обязательные свойства: deterministic selection/order; bounded queue и chunk size;
-исходники не изменяются скрыто; every derived result имеет processor/version и
-полный provenance; completed chunk/job не применяется повторно; failed/pending
-работа видима; uninterrupted и resumed results эквивалентны по содержательному
-результату; full regression предыдущих стадий остаётся зелёным.
+Обязательные свойства подтверждены: deterministic selection/order; bounded queue и
+chunk size; исходники не изменяются скрыто; derived result имеет processor/version и
+provenance; completed chunk/job не применяется повторно; interrupted/resumed run
+эквивалентен допустимому uninterrupted результату; полный regression предыдущих
+стадий остаётся зелёным. Финальная проверка — [TV-0030](../TESTING/Results/TV-0030.md).
 
-Performance baseline измеряет orchestration отдельно от содержательной стоимости
-processor. Для 1k/10k/100k WorkItems фиксируются selection/scheduling/checkpoint/
-provenance latency, throughput, CPU, peak RSS и storage; synthetic large-source
-отдельно показывает стоимость chunk/resume. SLA заранее не задаётся.
+Performance baseline [TV-0029](../TESTING/Results/TV-0029.md) измерен на 1k/10k/100k
+WorkItems. Selection p95 вырос примерно от 15 ms до 1.775 s и достиг 252 MB peak RSS
+на 100k, поэтому это текущий основной scaling bottleneck. Checkpoint commit и
+provenance finalize сохранились примерно в диапазонах 0.54–0.61 ms и 1.23–1.34 ms;
+storage вырос примерно линейно до 47.9 MB на 100k. Synthetic 10 GiB large-source
+завершился после interruption/reopen/direct resume; его current/peak RSS
+135.652/170.273 MB сохранён как будущая цель profiling, а не блокер Stage 3.
 
 **Definition of Done.** Sleep имеет persistent lifecycle и bounded deterministic
 queue; source/work contracts не привязаны к тексту; deterministic text consolidation
@@ -411,8 +412,9 @@ queue; source/work contracts не привязаны к тексту; determinis
 recovery/replay не создают повторных эффектов; provenance проходит до исходного
 опыта; runtime безопасно прерывает работу для wake; large-source contract доказан
 synthetic test; resource/performance baseline записан; canonical end-to-end scenarios
-и полный regression suite проходят. Reflection/Simulation/Dreaming не требуются
-для завершения Stage 3 и остаются в [Research](Research.md#когнитивный-сон).
+и полный regression suite проходят. Stage 3 завершён; доказательства собраны в
+[TV-0018 — TV-0030](../TESTING/Results/README.md). Reflection/Simulation/Dreaming
+не требуются для завершения Stage 3 и остаются в [Research](Research.md#когнитивный-сон).
 
 ## Stage 4
 
