@@ -219,7 +219,7 @@ def test_recovery_replays_same_verification_source_after_cross_store_crash(
         loop.run(run["id"], spec, max_steps=4)
 
     assert (sandbox / "result.txt").read_text(encoding="utf-8") == "42"
-    assert internal.goal_store.get_goal(goal["id"])["status"] == "completed"
+    assert internal.goals.get_goal(goal["id"])["status"] == "completed"
 
     journal = AgentRecoveryJournal(store)
     recovery_rows = journal.list_steps(run["id"])
@@ -236,7 +236,7 @@ def test_recovery_replays_same_verification_source_after_cross_store_crash(
     result = reopened_loop.resume(run["id"], max_steps=4)
 
     assert result.completed is True
-    transitions = reopened_internal.goal_store.list_goal_transitions(
+    transitions = reopened_internal.goals.list_goal_transitions(
         goal_id=goal["id"]
     )
     completed = [
