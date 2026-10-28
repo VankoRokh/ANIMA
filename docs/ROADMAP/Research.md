@@ -227,6 +227,12 @@ acknowledgement/order/conflict rules, совместимость обновле�
 что железо сможет обучать модель. Покупки и полный корпус следуют Stage 5/6;
 автономные приводы — контрактам, диагностике и safety loop.
 
+## Stage 4.12: small-model Planner baseline
+
+Экспериментальное finding, а не новое принятое архитектурное правило: локальная Qwen3-0.6B установила small-model baseline; существующая Agent/Tool/Choice/Verifier архитектура прошла end-to-end, но надёжность модели осталась ограниченной. В пятизапусковом baseline завершены 2/5 Goals. Временный candidate C с text bounds улучшил structural completion, но также завершил 2/5 Goals и часто обрезал advisory text; он отклонён. Это не статистическое сравнение моделей. Показательные условия и ограничения сохранены в [TV-0042](../TESTING/Results/TV-0042.md).
+
+Будущее сравнение с более крупными Planner models теперь обосновано: сравнивать их следует на той же Agent/Tool/Choice/Verifier архитектуре, сохраняя independent verification и отдельно измеряя planning quality и structured-output reliability.
+
 ## EXP-001
 
 **Planned, результата нет.** Гипотеза: внутренние оценки улучшают отбор полезного

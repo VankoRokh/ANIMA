@@ -19,7 +19,7 @@ ANIMA — исследовательский проект модульного �
 
 Текущий фокус: **4 — Agent** (InProgress).
 
-Stage 4.1 — Agent Storage / Lifecycle: реализовать transactional `agent.db`, persistent AgentRun/AgentStep lifecycle и stable operation identity по принятой Stage 4.0 Specification.
+Stage 4.13 — Observability / Budgets: snapshot/trace показывает run/step, Goal, context budget, proposals, Candidate/Choice trace, selected Action, receipt/observation, verifier result и remaining budgets; max steps/tool calls/time/model budget останавливают run определённо без повреждения state.
 
 [Этапы и критерии](docs/ROADMAP/README.md).
 <!-- AUTO:summary:END -->

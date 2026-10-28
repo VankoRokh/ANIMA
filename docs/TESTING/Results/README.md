@@ -48,4 +48,5 @@
 | [TV-0039 — Stage 4.9 Agent Events / Experience Capture](TV-0039.md) | 2026-10-27 | [4](../../ROADMAP/README.md#stage-4) | Passed | [a39615e](https://github.com/VankoRokh/ANIMA/commit/a39615ee1faf89a82ece78718cce7117a4bcc86b) |
 | [TV-0040 — Stage 4.10 Memory Integration](TV-0040.md) | 2026-10-27 | [4](../../ROADMAP/README.md#stage-4) | Passed | [5c0afb9](https://github.com/VankoRokh/ANIMA/commit/5c0afb98b816ba9cdd7a8b6de4d418c93e28f18e) |
 | [TV-0041 — Stage 4.11 Recovery / Interruption / Replay](TV-0041.md) | 2026-10-27 | [4](../../ROADMAP/README.md#stage-4) | Passed | [c823932](https://github.com/VankoRokh/ANIMA/commit/c823932bbdb50ccdf05b80ec2ea22b63ad2ca27b) |
+| [TV-0042 — Stage 4.12 LLM Planner Experiment](TV-0042.md) | 2026-10-29 | [4](../../ROADMAP/README.md#stage-4) | Passed | [efa8242](https://github.com/VankoRokh/ANIMA/commit/efa82428e986f976fefff803ae41a9db8f9555b2) |
 <!-- AUTO:results:END -->

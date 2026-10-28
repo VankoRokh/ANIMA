@@ -51,6 +51,14 @@
 [TV-0016](../TESTING/Results/TV-0016.md),
 [TV-0017](../TESTING/Results/TV-0017.md).
 
+## Agent и Planner boundary
+
+[PlannerAdapter](../../anima/agent/planner.py) допускает deterministic и real-LLM реализации; [LLM Planner](../../anima/agent/llm_planner.py) и [small-model profile](../../anima/agent/small_llm.py) возвращают только proposals. Choice остаётся authoritative при выборе Candidate; [Executor](../../anima/agent/_executor_impl.py) и ToolDescriptor отвечают за проверку input и sandbox execution. [Verifier](../../anima/agent/verification.py) независимо определяет Goal completion: успешный write receipt не заменяет matching independent readback. Контур и его границы проверяются [AgentLoop tests](../../tests/test_agent_loop.py) и [LLM Planner tests](../../tests/test_agent_llm_planner.py).
+
+[llama.cpp transport](../../anima/agent/llama_cpp_transport.py) использует отдельную non-mutating generation-schema projection: только известный несовместимый path pattern `^[^/].*$` исключается из grammar input. Authoritative ToolDescriptor, sandbox validation и model-visible path guidance сохраняются; остальные constraints остаются в generation schema. Status-discriminated small-model schema связывает status с cardinality proposals, а Python PlannerDecision независимо проверяет результат. См. [schema tests](../../tests/test_llama_cpp_dynamic_schema.py).
+
+Deterministic file-content verifier v2 трактует unavailable target readback как recoverable failure, а не доказательство Goal BLOCKED. Bridge, Goal lifecycle и остановка по настоящему trusted blocker сохраняют свои правила. Persisted v1 verification artifacts не переписываются и при replay не переинтерпретируются; v2 не принимает v1 spec для новой проверки. См. [verification](../../tests/test_agent_verification.py), [recovery](../../tests/test_agent_recovery.py) и интеграционное подтверждение [TV-0042](../TESTING/Results/TV-0042.md).
+
 ## Рабочий путь записи
 
 Runtime создаёт Event и сначала пишет его в append-only `events.jsonl`.
@@ -397,11 +405,11 @@ identity, session/event history, Cognitive Memory и Internal State/Goal history
 - EventProcessing raw identity check и DEEP provenance используют повторные полные
   сканирования `events.jsonl`; на 100k это даёт 0.41 batch events/s и около 23.4 s
   p95 DEEP Context. Оптимизация отложена после фиксации baseline.
-- Raw Events не преобразуются автоматически в StateSignal/GoalObservation; смысл
-  должен быть задан явным consumer до Stage 4 Agent semantics.
-- Internal State не создаёт Goals/Candidates. Planner, self-generated goals и
-  authority policy отсутствуют; Candidates задаёт внешний consumer/scenario.
+- Произвольные Raw Events не преобразуются автоматически в StateSignal/GoalObservation;
+  Agent использует явный trusted verification consumer для Goal progress.
+- Internal State не создаёт Goals/Candidates самостоятельно. Agent адаптирует Planner
+  proposals в Candidates; self-generated goals и общая authority policy не реализованы.
 - ExpressionProfile пока не привязан к конкретному text/voice/UI renderer, а fatigue
   не использует реальные CPU/GPU/power signals.
-- Sleep consolidation, Deep/LLM Composer, embeddings, vector/graph DB и distributed
-  memory не реализованы; Sleep consolidation является текущей задачей Stage 3.
+- Deep/LLM Composer, embeddings, vector/graph DB и distributed memory не реализованы.
+  Persistent bounded Sleep consolidation подтверждена [Stage 3 validation](../TESTING/Results/TV-0030.md).
