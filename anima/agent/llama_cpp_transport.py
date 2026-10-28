@@ -10,6 +10,7 @@ that /completion + json_schema enforces the schema, while the OpenAI-compatible
 chat endpoint may accept response_format without enforcing it for this build.
 """
 
+from copy import deepcopy
 import json
 import time
 import urllib.error
@@ -71,6 +72,37 @@ def _canonical_json(value):
         sort_keys=True,
         separators=(",", ":"),
     )
+
+
+def _project_llama_cpp_schema(response_schema):
+    """Copy the generation schema, omitting the known unsafe path regex only.
+
+    This llama.cpp converter emits raw regex characters inside JSON quotes for
+    ^[^/].*$, allowing invalid JSON and bypassing maxLength. Leave authoritative
+    ToolDescriptor validation and model-visible metadata unchanged; generation
+    uses the ordinary JSON string rule with the remaining length constraints.
+    """
+    projected = deepcopy(response_schema)
+
+    def visit(node):
+        if not isinstance(node, dict):
+            return
+        for name, child in node.get("properties", {}).items():
+            if (
+                name == "path"
+                and isinstance(child, dict)
+                and child.get("type") == "string"
+                and child.get("pattern") == r"^[^/].*$"
+            ):
+                del child["pattern"]
+            visit(child)
+        visit(node.get("items"))
+        for keyword in ("oneOf", "anyOf", "allOf"):
+            for child in node.get(keyword, ()):
+                visit(child)
+
+    visit(projected)
+    return projected
 
 
 def _probability(value, label):
@@ -270,7 +302,7 @@ class LlamaCppSmallModelTransport(SmallModelOpenAICompatibleChatTransport):
             "stream": False,
         }
         if response_schema is not None:
-            completion_payload["json_schema"] = response_schema
+            completion_payload["json_schema"] = _project_llama_cpp_schema(response_schema)
 
         document = self._post_json(
             self.completion_endpoint,

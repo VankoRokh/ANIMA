@@ -17,6 +17,13 @@ MAX_LIST_ENTRIES = 512
 MAX_FILE_BYTES = 1_000_000
 STANDARD_TOOL_VERSION = "1"
 
+SANDBOX_RELATIVE_PATH_PATTERN = r"^[^/].*$"
+SANDBOX_PATH_DESCRIPTION = (
+    "Sandbox-relative path. Use '.' for the sandbox root when listing, "
+    "or a path such as 'result.txt' for files. Never prefix the path "
+    "with '/' or 'sandbox/'."
+)
+
 
 class ExecutionRejectedError(ValueError):
     """The Action cannot cross the Executor trust boundary."""
@@ -286,7 +293,13 @@ def sandbox_tool_descriptors():
             input_schema={
                 "type": "object",
                 "properties": {
-                    "path": {"type": "string", "minLength": 1, "maxLength": MAX_PATH_CHARS},
+                    "path": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": MAX_PATH_CHARS,
+                        "pattern": SANDBOX_RELATIVE_PATH_PATTERN,
+                        "description": SANDBOX_PATH_DESCRIPTION,
+                    },
                 },
                 "required": [],
                 "additionalProperties": False,
@@ -318,7 +331,13 @@ def sandbox_tool_descriptors():
             input_schema={
                 "type": "object",
                 "properties": {
-                    "path": {"type": "string", "minLength": 1, "maxLength": MAX_PATH_CHARS},
+                    "path": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": MAX_PATH_CHARS,
+                        "pattern": SANDBOX_RELATIVE_PATH_PATTERN,
+                        "description": SANDBOX_PATH_DESCRIPTION,
+                    },
                 },
                 "required": ["path"],
                 "additionalProperties": False,
@@ -347,7 +366,13 @@ def sandbox_tool_descriptors():
             input_schema={
                 "type": "object",
                 "properties": {
-                    "path": {"type": "string", "minLength": 1, "maxLength": MAX_PATH_CHARS},
+                    "path": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": MAX_PATH_CHARS,
+                        "pattern": SANDBOX_RELATIVE_PATH_PATTERN,
+                        "description": SANDBOX_PATH_DESCRIPTION,
+                    },
                     "content": {"type": "string"},
                 },
                 "required": ["path", "content"],

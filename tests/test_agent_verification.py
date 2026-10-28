@@ -1,3 +1,4 @@
+from dataclasses import replace
 from uuid import uuid4
 
 import pytest
@@ -179,16 +180,23 @@ def test_wrong_file_content_is_failure_but_does_not_cancel_goal(tmp_path):
     assert anima.internal_state.goals.get_goal(goal["id"])["status"] == "active"
 
 
-def test_unavailable_required_evidence_blocks_goal(tmp_path):
+@pytest.mark.parametrize("error_code", ["NOT_FOUND", "NOT_FILE", "FILE_TOO_LARGE", "UNSUPPORTED_ENCODING"])
+@pytest.mark.parametrize("path, expected", [("result.txt", "42"), ("answer.txt", "hello")])
+def test_unavailable_target_readback_is_failure_and_keeps_goal_active(tmp_path, error_code, path, expected):
     anima, goal, _, _, step, spec, verifier, bridge = _setup(tmp_path)
-    evidence = (_observation("file.unavailable", {"path": "result.txt", "reason": "denied"}),)
+    spec = replace(spec, parameters={"path": path, "expected": expected})
+    evidence = (_observation("file.unavailable", {"path": path, "error_code": error_code}),)
 
     result = _verify(verifier, spec, step, evidence)
     application = bridge.apply(spec=spec, result=result, observations=evidence)
 
-    assert result.outcome == "blocked"
-    assert application.progress_result.goal["status"] == "blocked"
-    assert anima.internal_state.goals.get_goal(goal["id"])["status"] == "blocked"
+    assert result.outcome == "failure"
+    assert result.criterion_satisfied is False
+    assert "readback is unavailable" in result.reason
+    assert application.goal_observation.kind == "failure"
+    assert application.progress_result.goal_transition is None
+    assert application.progress_result.goal["status"] == "active"
+    assert anima.internal_state.goals.get_goal(goal["id"])["status"] == "active"
 
 
 def test_verifier_uses_stronger_content_evidence_before_exists_signal(tmp_path):
@@ -312,3 +320,11 @@ def test_verifier_rejects_wrong_verifier_and_criterion_contract(tmp_path):
     )
     with pytest.raises(ValueError, match="Unsupported deterministic criterion"):
         _verify(verifier, wrong_criterion, step, ())
+
+
+def test_verifier_v2_rejects_version1_spec_instead_of_reinterpreting_it(tmp_path):
+    _, _, _, _, step, spec, verifier, _ = _setup(tmp_path)
+    assert verifier.version == DETERMINISTIC_VERIFIER_VERSION == "2"
+    legacy_spec = replace(spec, verifier_version="1", parameters=dict(spec.parameters))
+    with pytest.raises(ValueError, match="does not target"):
+        _verify(verifier, legacy_spec, step, ())

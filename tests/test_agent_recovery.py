@@ -1,3 +1,4 @@
+from dataclasses import replace
 from pathlib import Path
 
 import pytest
@@ -14,6 +15,7 @@ from anima.agent import (
     RecoverableAgentLoop,
     SandboxExecutor,
     VerificationSpec,
+    VerificationResult,
     build_sandbox_registry,
 )
 from anima.agent.verification import (
@@ -289,3 +291,107 @@ def test_recovery_journal_is_persistent_and_artifacts_are_immutable(tmp_path):
 
     with pytest.raises(ValueError, match="cannot be replaced"):
         reopened.save_action(selected.step_id, Action.from_dict(changed))
+
+
+@pytest.mark.parametrize("path, expected", [("result.txt", "42"), ("answer.txt", "hello")])
+@pytest.mark.parametrize("checkpoint", [
+    "after_observation_persisted", "after_verification_persisted",
+    "after_goal_applied", "after_step_completed", "cross_store",
+])
+def test_missing_target_failure_survives_recovery_and_replay(
+    tmp_path, monkeypatch, path, expected, checkpoint,
+):
+    def strategy(request):
+        if not request.recent_observations:
+            tool, arguments = "fs.read", {"path": path}
+        elif request.recent_observations[-1]["kind"] == "file.unavailable":
+            assert request.recent_observations[-1]["data"]["error_code"] == "NOT_FOUND"
+            tool, arguments = "fs.write", {"path": path, "content": expected}
+        else:
+            tool, arguments = "fs.read", {"path": path}
+        return PlannerDecision(
+            status="proposals_available",
+            proposals=(_proposal(tool, arguments, "recover and verify target"),),
+        )
+
+    _, store, internal, bridge, loop, goal, run, spec = _new_run(tmp_path)
+    spec = replace(spec, parameters={"path": path, "expected": expected})
+    loop.planner = DeterministicPlanner(strategy)
+    if checkpoint == "cross_store":
+        original_apply = bridge.apply
+
+        def apply_then_crash(**kwargs):
+            original_apply(**kwargs)
+            raise RuntimeError("simulated cross-store failure crash")
+
+        monkeypatch.setattr(bridge, "apply", apply_then_crash)
+    else:
+        loop.fault_hook = CrashAt(checkpoint)
+
+    with pytest.raises(RuntimeError, match="simulated"):
+        loop.run(run["id"], spec, max_steps=4)
+    assert internal.goals.get_goal(goal["id"])["status"] == "active"
+
+    sandbox, reopened_store, reopened_internal, reopened_bridge, resumed = _open_runtime(tmp_path)
+    resumed.planner = DeterministicPlanner(strategy)
+    result = resumed.resume(run["id"], max_steps=4)
+    assert result.completed is True
+    assert (sandbox / path).read_text(encoding="utf-8") == expected
+    assert [turn.action.tool for turn in result.turns] == ["fs.read", "fs.write", "fs.read"]
+    assert [turn.verification_result.outcome for turn in result.turns] == ["failure", "failure", "success"]
+    assert len(reopened_store.list_operations(run_id=run["id"])) == 3
+    first = AgentRecoveryJournal(reopened_store).list_steps(run["id"])[0]
+    assert first.goal_applied is True
+    assert first.observation.data["path"] == path
+    assert first.verification_result.outcome == "failure"
+    assert reopened_internal.recovery.ledger.get(first.verification_result.public_id)["status"] == "done"
+
+    before = reopened_internal.store.transition_count()
+    transitions = reopened_internal.goals.list_goal_transitions(goal_id=goal["id"])
+    reopened_bridge.apply(spec=spec, result=first.verification_result, observations=(first.observation,))
+    assert reopened_internal.store.transition_count() == before
+    assert reopened_internal.goals.list_goal_transitions(goal_id=goal["id"]) == transitions
+    assert resumed.resume(run["id"], max_steps=4).completed is True
+
+
+@pytest.mark.parametrize("checkpoint", ["after_verification_persisted", "after_goal_applied"])
+def test_persisted_v1_blocker_is_replayed_without_v2_reinterpretation(tmp_path, checkpoint):
+    class LegacyVerifierFixture:
+        name = DETERMINISTIC_VERIFIER_NAME
+        version = "1"
+
+        def verify(self, spec, *, observations, **kwargs):
+            assert spec.verifier_version == "1"
+            return VerificationResult.create(
+                run_id=spec.run_id, verification_spec_id=spec.public_id,
+                observation_ids=[item.public_id for item in observations],
+                outcome="blocked", criterion_satisfied=False,
+                reason="legacy unavailable readback classification", importance=1,
+                **kwargs,
+            )
+
+    _, store, _, _, loop, goal, run, spec = _new_run(tmp_path, fault_hook=CrashAt(checkpoint))
+    spec = replace(spec, verifier_version="1", parameters=dict(spec.parameters))
+    loop.verifier = LegacyVerifierFixture()
+    loop.planner = DeterministicPlanner(lambda request: PlannerDecision(
+        status="proposals_available",
+        proposals=(_proposal("fs.read", {"path": "result.txt"}, "legacy target read"),),
+    ))
+    with pytest.raises(RuntimeError, match="simulated crash"):
+        loop.run(run["id"], spec, max_steps=4)
+    original = AgentRecoveryJournal(store).list_steps(run["id"])[0].verification_result.to_dict()
+
+    _, reopened_store, internal, _, resumed = _open_runtime(tmp_path)
+    result = resumed.resume(run["id"], max_steps=4)
+    assert resumed.verifier.version == "2"
+    assert result.stop_reason == "goal_blocked"
+    assert result.goal["status"] == "blocked"
+    assert result.run["status"] == "interrupted"
+    journal = AgentRecoveryJournal(reopened_store)
+    assert journal.get_verification_spec(run["id"]).verifier_version == "1"
+    assert journal.list_steps(run["id"])[0].verification_result.to_dict() == original
+    before = internal.store.transition_count()
+    assert resumed.resume(run["id"], max_steps=4).stop_reason == "goal_blocked"
+    assert internal.store.transition_count() == before
+    with pytest.raises(ValueError, match="cannot change"):
+        journal.ensure_run(replace(spec, verifier_version="2", parameters=dict(spec.parameters)))

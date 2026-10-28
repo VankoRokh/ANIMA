@@ -1,11 +1,21 @@
 import json
 from uuid import uuid4
 
+import pytest
+
+from anima.agent.tools import ToolInputError
+
 from anima.agent.executor import build_sandbox_registry
-from anima.agent.llm_planner import LLMCallResult, LLMTransport
+from anima.agent.llm_planner import (
+    LLMCallResult,
+    LLMPlannerError,
+    LLMTransport,
+    parse_llm_planner_decision,
+)
 from anima.agent.planner import PlannerRequest
 from anima.agent.small_llm import (
     SmallModelLLMPlanner,
+    SmallLLMPromptProfile,
     build_small_llm_response_schema,
 )
 
@@ -68,8 +78,16 @@ def _request():
     )
 
 
+def _branch(schema, status):
+    return next(
+        item for item in schema["oneOf"]
+        if item["properties"]["status"]["const"] == status
+    )
+
+
 def _variant(schema, tool_name):
-    variants = schema["properties"]["proposals"]["items"]["oneOf"]
+    available = _branch(schema, "proposals_available")
+    variants = available["properties"]["proposals"]["items"]["oneOf"]
     return next(
         item for item in variants
         if item["properties"]["tool"]["const"] == tool_name
@@ -98,6 +116,91 @@ def test_small_model_planner_passes_tool_aware_schema_to_capable_transport():
     turn = planner.plan(_request())
 
     assert turn.proposals[0].arguments == {"path": "result.txt", "content": "42"}
-    assert transport.response_schema is not None
+    assert transport.response_schema == build_small_llm_response_schema(_request().tools)
     write = _variant(transport.response_schema, "fs.write")
     assert write["properties"]["arguments"]["required"] == ["path", "content"]
+
+
+@pytest.mark.parametrize("tool", ["fs.list", "fs.read", "fs.write"])
+def test_authoritative_path_pattern_and_dynamic_schema_remain_enforced(tool):
+    registry = build_sandbox_registry()
+    descriptor = registry.get(tool, "1")
+    path = descriptor.to_dict()["input_schema"]["properties"]["path"]
+    assert path["pattern"] == r"^[^/].*$"
+    schema = build_small_llm_response_schema(registry.list_descriptors())
+    arguments = _variant(schema, tool)["properties"]["arguments"]
+    assert arguments["properties"]["path"] == path
+    values = {"path": "/outside.txt"}
+    if tool == "fs.write":
+        values["content"] = "payload"
+    with pytest.raises(ToolInputError, match="does not match pattern"):
+        descriptor.validate_input(values)
+
+
+@pytest.mark.parametrize("tool", ["fs.list", "fs.read", "fs.write"])
+def test_compact_tool_metadata_keeps_authoritative_path_guidance(tool):
+    request = _request()
+    _, user_prompt, _ = SmallLLMPromptProfile().build(request)
+    metadata = next(item for item in json.loads(user_prompt)["tools"] if item["tool"] == tool)
+    path = next(item for item in metadata["arguments"] if item["name"] == "path")
+    authoritative = request.tool_descriptor(tool, "1").to_dict()["input_schema"]["properties"]["path"]
+    assert path["pattern"] == authoritative["pattern"] == r"^[^/].*$"
+    assert path["description"] == authoritative["description"]
+    assert "Sandbox-relative path" in path["description"]
+    assert "Never prefix" in path["description"]
+
+
+def test_small_model_schema_discriminates_status_and_proposal_cardinality():
+    tools = build_sandbox_registry().list_descriptors()
+    schema = build_small_llm_response_schema(iter(tools))
+    assert set(schema) == {"oneOf"}
+    assert len(schema["oneOf"]) == 2
+    available = _branch(schema, "proposals_available")
+    cannot = _branch(schema, "cannot_progress")
+    for branch in (available, cannot):
+        assert branch["type"] == "object"
+        assert set(branch["properties"]) == {"status", "proposals", "plan_summary"}
+        assert branch["required"] == ["status", "proposals", "plan_summary"]
+        assert branch["additionalProperties"] is False
+        assert branch["properties"]["plan_summary"] == {"type": "string"}
+    proposals = available["properties"]["proposals"]
+    assert proposals["type"] == "array"
+    assert proposals["minItems"] == 1
+    assert proposals["maxItems"] == 3
+    assert len(proposals["items"]["oneOf"]) == len(tools)
+    for tool in tools:
+        proposal = _variant(schema, tool.name)
+        assert proposal["additionalProperties"] is False
+        assert proposal["properties"]["arguments"] == tool.to_dict()["input_schema"]
+        assert proposal["properties"]["expected_observation"] == {"type": "string"}
+        assert proposal["properties"]["rationale_summary"] == {"type": "string"}
+    assert cannot["properties"]["proposals"] == {
+        "type": "array", "minItems": 0, "maxItems": 0,
+        "items": {"type": "object"},
+    }
+
+
+def test_small_model_schema_with_no_tools_only_exposes_cannot_progress():
+    schema = build_small_llm_response_schema(iter(()))
+    assert len(schema["oneOf"]) == 1
+    branch = _branch(schema, "cannot_progress")
+    assert branch["properties"]["proposals"]["maxItems"] == 0
+    assert branch["additionalProperties"] is False
+    assert branch["required"] == ["status", "proposals", "plan_summary"]
+    assert branch["properties"]["plan_summary"] == {"type": "string"}
+
+
+@pytest.mark.parametrize("status, count, message", [
+    ("proposals_available", 0, "requires at least one proposal"),
+    ("cannot_progress", 1, "cannot contain proposals"),
+])
+def test_python_planner_validation_independently_rejects_contradictions(status, count, message):
+    proposal = {
+        "tool": "fs.read", "tool_version": "1", "arguments": {"path": "answer.txt"},
+        "expected_observation": "file content", "rationale_summary": "check content",
+    }
+    response = json.dumps({
+        "status": status, "proposals": [proposal] * count, "plan_summary": "next action",
+    })
+    with pytest.raises(LLMPlannerError, match=message):
+        parse_llm_planner_decision(response)

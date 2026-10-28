@@ -18,6 +18,7 @@ from anima.agent.llm_planner import (
     LLMCallRecord,
     LLMCallResult,
     LLMPlanner,
+    LLMPlannerError,
     LLMTransportError,
     MAX_LLM_CALL_HISTORY,
     OpenAICompatibleChatTransport,
@@ -30,7 +31,7 @@ SMALL_LLM_MAX_PROMPT_CHARS = 4_800
 SMALL_LLM_MAX_TOOLS = 8
 SMALL_LLM_RECENT_STEPS = 3
 SMALL_LLM_RECENT_OBSERVATIONS = 3
-SMALL_LLM_MAX_OUTPUT_TOKENS = 256
+SMALL_LLM_MAX_OUTPUT_TOKENS = 512
 SMALL_LLM_CONTEXT_STRING_CHARS = 192
 SMALL_LLM_OBSERVATION_STRING_CHARS = 384
 SMALL_LLM_TOOL_DESCRIPTION_CHARS = 160
@@ -115,6 +116,13 @@ def _compact_schema_property(name, schema, required):
         result["enum"] = list(schema["enum"])
     if "maxLength" in schema:
         result["max_length"] = schema["maxLength"]
+    if "description" in schema:
+        result["description"] = _truncate_text(
+            schema["description"],
+            SMALL_LLM_TOOL_DESCRIPTION_CHARS,
+        )
+    if "pattern" in schema:
+        result["pattern"] = schema["pattern"]
     return result
 
 
@@ -223,35 +231,39 @@ def _tool_proposal_schema(descriptor):
 
 
 def build_small_llm_response_schema(tools):
-    """Build a tool-aware PlannerDecision schema from authoritative descriptors."""
+    """Build status-discriminated decisions from authoritative Tool descriptors."""
     tools = tuple(tools)
-    proposals = {
-        "type": "array",
-        "maxItems": 3,
-    }
-    if tools:
-        proposals["items"] = {
-            "oneOf": [_tool_proposal_schema(descriptor) for descriptor in tools],
-        }
-    else:
-        proposals["maxItems"] = 0
-        proposals["items"] = {"type": "object"}
 
-    return {
-        "type": "object",
-        "properties": {
-            "status": {
-                "type": "string",
-                "enum": ["proposals_available", "cannot_progress"],
+    def decision_branch(status, proposals):
+        return {
+            "type": "object",
+            "properties": {
+                "status": {"const": status},
+                "proposals": proposals,
+                # Keep the existing constrained string contract, without text limits.
+                "plan_summary": {"type": "string"},
             },
-            "proposals": proposals,
-            # The canonical parser accepts null too. The small-model constrained
-            # path keeps this a string to make the generation grammar simpler.
-            "plan_summary": {"type": "string"},
-        },
-        "required": ["status", "proposals", "plan_summary"],
-        "additionalProperties": False,
-    }
+            "required": ["status", "proposals", "plan_summary"],
+            "additionalProperties": False,
+        }
+
+    branches = []
+    if tools:
+        branches.append(decision_branch("proposals_available", {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 3,
+            "items": {
+                "oneOf": [_tool_proposal_schema(descriptor) for descriptor in tools],
+            },
+        }))
+    branches.append(decision_branch("cannot_progress", {
+        "type": "array",
+        "minItems": 0,
+        "maxItems": 0,
+        "items": {"type": "object"},
+    }))
+    return {"oneOf": branches}
 
 
 @dataclass(frozen=True, slots=True)
@@ -419,7 +431,6 @@ class SmallModelLLMPlanner(LLMPlanner):
             )
         if not isinstance(result, LLMCallResult):
             raise TypeError("LLMTransport.complete() must return LLMCallResult")
-        decision = parse_llm_planner_decision(result.text)
         prompt_material = system_prompt + "\n" + user_prompt
         record = LLMCallRecord(
             provider=result.provider,
@@ -438,7 +449,19 @@ class SmallModelLLMPlanner(LLMPlanner):
         self._prompt_metrics.append(metrics)
         if len(self._prompt_metrics) > MAX_LLM_CALL_HISTORY:
             del self._prompt_metrics[:-MAX_LLM_CALL_HISTORY]
-        return decision
+
+        try:
+            return parse_llm_planner_decision(result.text)
+        except LLMPlannerError as error:
+            stripped = result.text.strip()
+            raise LLMPlannerError(
+                f"{error}; finish_reason={result.finish_reason!r}; "
+                f"output_tokens={result.output_tokens}; "
+                f"response_chars={len(result.text)}; "
+                f"starts_with_object={stripped.startswith('{')}; "
+                f"ends_with_object={stripped.endswith('}')}; "
+                f"response_hash={record.response_hash}"
+            ) from error
 
 
 class SmallModelOpenAICompatibleChatTransport(OpenAICompatibleChatTransport):

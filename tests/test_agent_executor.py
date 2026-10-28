@@ -4,7 +4,14 @@ from uuid import uuid4
 
 import pytest
 
-from anima.agent import Action, ActionProposal, AgentStore, ToolDescriptor, ToolRegistry
+from anima.agent import (
+    Action,
+    ActionProposal,
+    AgentStore,
+    ToolDescriptor,
+    ToolInputError,
+    ToolRegistry,
+)
 from anima.agent.executor import (
     MAX_FILE_BYTES,
     MAX_LIST_ENTRIES,
@@ -182,16 +189,32 @@ def test_missing_file_is_normal_tool_failure_not_executor_exception(agent_env):
     assert store.get_operation(action.operation_id)["status"] == "failed"
 
 
-@pytest.mark.parametrize("path", ["../outside.txt", "/tmp/outside.txt"])
-def test_path_escape_is_rejected_inside_execution_boundary(agent_env, path):
+def test_parent_traversal_is_rejected_inside_execution_boundary(agent_env):
     _, store, registry, executor = agent_env
-    action = _make_action(store, registry, tool="fs.read", arguments={"path": path})
+    action = _make_action(
+        store,
+        registry,
+        tool="fs.read",
+        arguments={"path": "../outside.txt"},
+    )
 
     receipt = executor.execute(action)
 
     assert receipt.status == "failed"
     assert receipt.error_code == "SANDBOX_ESCAPE"
     assert store.get_operation(action.operation_id)["status"] == "failed"
+
+
+def test_absolute_path_is_rejected_by_tool_contract(agent_env):
+    _, store, registry, _ = agent_env
+
+    with pytest.raises(ToolInputError, match="does not match pattern"):
+        _make_action(
+            store,
+            registry,
+            tool="fs.read",
+            arguments={"path": "/tmp/outside.txt"},
+        )
 
 
 def test_read_symlink_cannot_escape_sandbox(agent_env, tmp_path):

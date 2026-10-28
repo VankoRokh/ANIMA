@@ -216,7 +216,7 @@ def test_llm_planner_accepts_explicit_cannot_progress_without_proposals():
     assert turn.proposals == ()
 
 
-def _build_loop(tmp_path, responses):
+def _build_loop(tmp_path, responses, *, path="result.txt", expected="42"):
     data_dir = Path(tmp_path)
     sandbox = data_dir / "sandbox"
     sandbox.mkdir()
@@ -252,8 +252,8 @@ def _build_loop(tmp_path, responses):
     goal = internal.create_goal(
         source="test",
         priority=1.0,
-        description="write 42 to result.txt and verify it",
-        success_criterion="result.txt content equals 42",
+        description=f"write {expected!r} to {path} and verify it",
+        success_criterion=f"{path} content equals {expected!r}",
         reason="Stage 4.12 LLM planner contract test",
     )
     run = loop.start_run(goal["id"])
@@ -262,33 +262,34 @@ def _build_loop(tmp_path, responses):
         verifier=DETERMINISTIC_VERIFIER_NAME,
         verifier_version=DETERMINISTIC_VERIFIER_VERSION,
         criterion_kind=FILE_CONTENT_EQUALS,
-        parameters={"path": "result.txt", "expected": "42"},
+        parameters={"path": path, "expected": expected},
     )
     return sandbox, planner, loop, run, spec
 
 
-def test_llm_planner_uses_same_agent_contract_for_failure_replan_write_and_readback(tmp_path):
+@pytest.mark.parametrize("path, expected", [("result.txt", "42"), ("answer.txt", "hello")])
+def test_llm_planner_uses_same_agent_contract_for_failure_replan_write_and_readback(tmp_path, path, expected):
     responses = [
         _decision(
             tool="fs.read",
-            arguments={"path": "missing-input.txt"},
+            arguments={"path": path},
         ),
         _decision(
             tool="fs.write",
-            arguments={"path": "result.txt", "content": "42"},
+            arguments={"path": path, "content": expected},
         ),
         _decision(
             tool="fs.read",
-            arguments={"path": "result.txt"},
+            arguments={"path": path},
         ),
     ]
-    sandbox, planner, loop, run, spec = _build_loop(tmp_path, responses)
+    sandbox, planner, loop, run, spec = _build_loop(tmp_path, responses, path=path, expected=expected)
 
     result = loop.run(run["id"], spec, max_steps=5)
 
     assert result.completed is True
     assert result.stop_reason == "goal_completed"
-    assert (sandbox / "result.txt").read_text(encoding="utf-8") == "42"
+    assert (sandbox / path).read_text(encoding="utf-8") == expected
     assert [turn.action.tool for turn in result.turns] == [
         "fs.read",
         "fs.write",
@@ -300,8 +301,8 @@ def test_llm_planner_uses_same_agent_contract_for_failure_replan_write_and_readb
         "succeeded",
     ]
     assert [turn.verification_result.outcome for turn in result.turns] == [
-        "none",
-        "none",
+        "failure",
+        "failure",
         "success",
     ]
     assert len(planner.call_history) == 3
@@ -313,3 +314,6 @@ def test_llm_planner_uses_same_agent_contract_for_failure_replan_write_and_readb
         "planner_request"
     ]
     assert third_request["recent_observations"][-1]["kind"] == "file.write"
+
+    assert second_request["recent_observations"][-1]["data"]["path"] == path
+    assert second_request["recent_observations"][-1]["data"]["error_code"] == "NOT_FOUND"

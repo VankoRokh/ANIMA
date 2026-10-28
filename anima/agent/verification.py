@@ -17,7 +17,7 @@ from anima.internal_state.recovery import RecoveryCoordinator
 
 
 DETERMINISTIC_VERIFIER_NAME = "deterministic.file_content"
-DETERMINISTIC_VERIFIER_VERSION = "1"
+DETERMINISTIC_VERIFIER_VERSION = "2"
 FILE_CONTENT_EQUALS = "file.content_equals"
 
 _OUTCOME_TO_GOAL_KIND = {
@@ -118,7 +118,7 @@ class DeterministicGoalVerifier:
 
         path, expected = _require_file_content_parameters(spec)
         matching_content = []
-        matching_blocked = []
+        matching_unavailable = []
         matching_exists = []
 
         for observation in observations:
@@ -130,7 +130,7 @@ class DeterministicGoalVerifier:
             ):
                 matching_content.append(observation)
             elif observation.kind == "file.unavailable":
-                matching_blocked.append(observation)
+                matching_unavailable.append(observation)
             elif observation.kind == "file.exists" and data.get("exists") is True:
                 matching_exists.append(observation)
 
@@ -145,10 +145,11 @@ class DeterministicGoalVerifier:
                 outcome = "failure"
                 criterion_satisfied = False
                 reason = f"observed content at {path} does not satisfy criterion"
-        elif matching_blocked:
-            outcome = "blocked"
+        elif matching_unavailable:
+            # An unsuccessful readback does not establish a Goal-level blocker.
+            outcome = "failure"
             criterion_satisfied = False
-            reason = f"required file evidence is unavailable at {path}"
+            reason = f"target readback is unavailable at {path}"
         elif matching_exists:
             outcome = "progress"
             criterion_satisfied = False

@@ -413,7 +413,11 @@ def parse_llm_planner_decision(text):
     try:
         record = json.loads(text)
     except json.JSONDecodeError as error:
-        raise LLMPlannerError("LLM planner response is not valid JSON") from error
+        raise LLMPlannerError(
+            "LLM planner response is not valid JSON "
+            f"(line={error.lineno}, column={error.colno}, "
+            f"char={error.pos}, response_chars={len(text)})"
+        ) from error
 
     _require_exact_fields(
         record,
@@ -507,7 +511,6 @@ class LLMPlanner(PlannerAdapter):
         )
         if not isinstance(result, LLMCallResult):
             raise TypeError("LLMTransport.complete() must return LLMCallResult")
-        decision = parse_llm_planner_decision(result.text)
         prompt_material = system_prompt + "\n" + user_prompt
         record = LLMCallRecord(
             provider=result.provider,
@@ -523,7 +526,19 @@ class LLMPlanner(PlannerAdapter):
         self._call_history.append(record)
         if len(self._call_history) > MAX_LLM_CALL_HISTORY:
             del self._call_history[:-MAX_LLM_CALL_HISTORY]
-        return decision
+
+        try:
+            return parse_llm_planner_decision(result.text)
+        except LLMPlannerError as error:
+            stripped = result.text.strip()
+            raise LLMPlannerError(
+                f"{error}; finish_reason={result.finish_reason!r}; "
+                f"output_tokens={result.output_tokens}; "
+                f"response_chars={len(result.text)}; "
+                f"starts_with_object={stripped.startswith('{')}; "
+                f"ends_with_object={stripped.endswith('}')}; "
+                f"response_hash={record.response_hash}"
+            ) from error
 
 
 __all__ = [
