@@ -232,13 +232,14 @@ recovery protocol и дополнительные тесты large-data readines
 
 ## ADR-008
 
-**Accepted; уточнён 2026-10-27 по Stage 4.0 Specification.** Архитектура Agent и роль LLM для Stage 4.
+**Stopped for further development; cognition-specific parts superseded by ADR-009.** 2026-10-29. Изначально Accepted 2026-10-27 для Stage 4.
+
 Причина: после Cognitive Memory, Internal State и Sleep системе нужен первый
 проверяемый контур действий во внешней среде. При этом подключение готового
 LLM-agent framework как владельца plan/execute loop скрывало бы работу уже созданных
 Goals, Choice, Memory и recovery-механизмов и не позволило бы понять источник ошибки.
-Stage 4 поэтому строит собственный agent runtime, а языковая модель остаётся
-заменяемым когнитивным компонентом.
+Stage 4 поэтому строил собственный agent runtime, а языковая модель оставалась
+заменяемым компонентом.
 
 Tool system использует собственный версионируемый контракт ANIMA с JSON-Schema
 входа/выхода и системной metadata о side effects, reversibility, idempotency,
@@ -247,101 +248,79 @@ timeout и sandbox scope. Контракт концептуально совме
 Agent и не определяет его lifecycle. Tool может быть выполнен только Executor через
 Registry; Planner не вызывает implementation напрямую.
 
-Планирование отделено от исполнения через `PlannerAdapter`. Deterministic planner,
-LLM planner, replay/test planner и будущие Fast/Deep planners должны возвращать один
-и тот же структурированный `PlannerTurn` с ограниченным набором `ActionProposal`.
-Proposal содержит tool/arguments, ожидаемое наблюдение и краткое проверяемое
-обоснование, но не получает authority выполнить действие, завершить Goal или
-изменить Memory/Internal State. Provider-specific function/tool calling остаётся
-внутри adapter и преобразуется в общий contract ANIMA.
+Stage 4 отделил планирование от исполнения через `PlannerAdapter`. Deterministic
+planner, LLM planner, replay/test planner и будущие Fast/Deep planners должны были
+возвращать единый `PlannerTurn` с `ActionProposal`. Именно трактовка FAST/DEEP как
+вариантов Planner позднее признана неверной границей ответственности. Остальные
+проверенные свойства Stage 4 — Tool/Executor/Observation/Verification/recovery —
+остаются полезным исполнительным фундаментом и не отменяются ADR-009.
 
-LLM предлагает варианты, а не определяет их системную безопасность. `effort_cost`,
-`irreversible_risk`, `repeated_failure`, `information_gain` и другие свойства,
-необходимые существующему Choice Engine, вычисляются ANIMA из ToolDescriptor,
-истории и наблюдаемого контекста. Planner может задавать предпочтение/rank, но не
-самостоятельно объявлять действие безопасным или гарантированно успешным. На первом
-baseline значения Internal State не передаются Planner: их влияние должно оставаться
-отдельно наблюдаемым через Choice, чтобы не применять один и тот же фактор дважды.
-`ActionProposal.id` используется как `Candidate.candidate_id`, поэтому одна stable
-identity проходит через Planner, Choice, Action result и последующий GoalObservation.
-
-Agent использует пошаговый ReAct-подобный цикл, но не передаёт LLM полный контроль:
-`Goal → Context → Planner proposals → validation/Candidates → Choice → one Action →
-ExecutionReceipt → Observation → Goal verification → next turn`. Многошаговый план
-может существовать как гипотеза/summary, однако каждый реальный следующий Action
-проходит новый цикл после фактического Observation. Tool-call success сам по себе
-не означает Goal success; завершение требует независимой проверки success criterion.
-Receipt, Observation и VerificationResult имеют разную authority: Receipt фиксирует
-технический результат вызова, Observation — факт среды, VerificationResult — вывод
-доверенного verifier о соответствии фактов критерию.
-
-`AgentRun` является конкретной попыткой выполнить уже существующий Goal, а не самим
-Goal. Один Goal может иметь несколько последовательных Runs после failure/cancel,
-но одновременно допускается не более одного non-terminal Run. Terminal Run не
-переписывается. Failure или budget exhaustion конкретного Run не отменяют Goal;
-существующий Goal lifecycle Stage 2 остаётся каноническим.
-
-Agent storage использует hybrid baseline: отдельные persistent таблицы нужны для
-`AgentRun`, `AgentStep`, `PlannerTurn` и operation ledger, тогда как валидированные
-`ActionProposal`, `Action`, `ExecutionReceipt`, `Observation`, `VerificationSpec` и
-`VerificationResult` могут храниться как структурированные JSON contracts внутри
-принадлежащего им Step/Turn, сохраняя stable public IDs. Вынос отдельного contract
-в собственную таблицу допускается позже только при измеренной потребности в query,
-целостности или recovery. Operational execution history хранится в `agent.db` и не
-подменяет долговременную Memory.
-
-Stage 4 не меняет уже работающую модель Goal. Human-readable `Goal.success_criterion`
-остаётся в Stage 2. Конкретный `AgentRun` получает доверенный `VerificationSpec`,
-который задаёт verifier/version, criterion kind и параметры машинной проверки.
-Planner может видеть Goal и критерий, но не имеет authority изменять VerificationSpec
-или объявлять результат проверенным. `VerifierAdapter` создаёт stable
-`VerificationResult`; его ID используется как `GoalObservation.source_id`, а
-существующий `GoalProgressEngine` и Stage 2 RecoveryCoordinator выполняют изменение
-Goal/Internal State. Так повтор одного `VerificationResult` после crash безопасно
-распознаётся существующим idempotency ledger без общей транзакции `agent.db` и
-`internal_state.db`.
-
-Минимальные public identities Stage 4 используют существующий принцип prefix+UUIDv4:
-`ar_` AgentRun, `ast_` AgentStep, `pt_` PlannerTurn, `ap_` ActionProposal, `act_`
-Action, `aop_` AgentOperation, `er_` ExecutionReceipt, `obs_` Observation, `vs_`
-VerificationSpec и `vr_` VerificationResult. Точные storage columns являются частью
-реализации 4.1–4.3, но semantic ownership и stable identity считаются принятыми.
-
-Recovery следует общему правилу ANIMA: внутри одного storage используется transaction;
-между разными владельцами данных — persisted intent/stable operation identity,
-canonical request/content hash, idempotency и reconciliation. Action и operation ID
-должны быть committed до внешнего side effect. `repeat_safe` operation можно
-повторить; `keyed` — повторить с тем же logical key; операция с `idempotency=none`
-после неопределённого crash автоматически не повторяется и переводится в состояние,
-требующее reconciliation. Такие необратимые tools не входят в первый sandbox.
-Публикация `agent.*` Event в append-only EventLog использует тот же принцип: заранее
-известный Event ID и content hash позволяют после crash различить отсутствующий,
-уже записанный идентичный и конфликтующий Event без изменения EventLog contract.
+Agent использует пошаговый ReAct-подобный цикл `Goal → Context → Planner proposals →
+validation/Candidates → Choice → Action → ExecutionReceipt → Observation → Goal
+verification`. Этот цикл остаётся реализованным и покрытым тестами, но больше не
+считается каноническим главным cognitive/runtime loop ANIMA.
 
 Operational execution history и долговременная Memory разделены. Persistent
 `agent.db` хранит run/step state, proposals/selection, receipts/observations,
 verification и operation IDs для restart/interruption/idempotency. Значимые факты
-поведения публикуются как компактные `agent.*` Events со ссылками на сырой/крупный
-output, а долговременный опыт создаётся через обычный Event/Memory pipeline. Planner
-и Executor не получают прямого writable-доступа к Memory, Knowledge, Goals или
-Internal State.
+поведения публикуются как `agent.*` Events и могут проходить обычный Memory pipeline.
 
-Stage 4 сначала должен доказать deterministic Agent на обратимой sandbox-задаче и
-только затем заменить Planner реальной LLM на том же контракте. Финальная стадия
-не зависит от конкретного model provider, но должна включать хотя бы один реальный
-LLM experiment с измерением schema validity, tool/proposal errors, replanning,
-Goal success, количества действий, latency и model/resource cost. Результаты нужны
-для поиска слабых/сильных сторон архитектуры, а не для заранее заданного SLA.
+Stage 4 дошёл до 4.12 LLM Planner Experiment. 4.13–4.15 остановлены после
+архитектурного аудита. Реализованные результаты и Validation Reports сохраняются как
+история эксперимента и источник кода для будущей Cognitive Integration.
 
-Self-generated Goals, unrestricted shell/browser/desktop control, autonomous
-background loops, прямой доступ Planner к Internal State, автоматическое исполнение
-длинного LLM-плана, свободное сохранение chain-of-thought и полный MCP runtime не
-входят в baseline Stage 4. Возвращаться к ним следует только после проверяемого
-случая, где базовый Agent недостаточен.
+## ADR-009
 
-Цена решения — дополнительный persistent execution layer, schema validation,
-Tool/Planner adapters, verifier, recovery и больше end-to-end сценариев. Польза —
-модель можно менять без передачи ей владения системой, действие остаётся
-наблюдаемым и проверяемым, а Stage 1–3 впервые проверяются вместе на реальном
-поведенческом цикле. Порядок реализации и критерии —
-[Stage 4](../ROADMAP/README.md#stage-4).
+**Accepted.** 2026-10-29, возврат к исходной когнитивной архитектуре и Stage 5 FAST.
+
+Причина: аудит ранних концептуальных документов показал, что исходная ANIMA не
+предполагала LLM главным циклом или Planner. Постоянно существуют системные сервисы
+событий, памяти, задач, рабочего контекста, проверки и исполнения; Fast/Deep —
+сменяемые когнитивные механизмы, вызываемые для осмысления ситуации. Stage 4
+сместил эту границу, сделав LLM генератором структурированных Planner/Tool proposals.
+Эксперименты с Qwen подтвердили, что существенная часть model budget тратится на
+служебный contract, а не на смысловую обработку.
+
+Stage 5 возвращает исходное разделение ответственности. FAST — первый реальный
+cognitive consumer ANIMA. Он получает текущий текстовый input и ограниченный
+релевантный `ContextBundle` через ANIMA Cognitive Interface (ACI) и возвращает
+когнитивный результат: ответ, смысловую интерпретацию/предложение для памяти либо
+запрос дополнительного контекста. FAST не является владельцем EventLog, Memory,
+Knowledge, Identity, Goals, Internal State, Sleep или executor state.
+
+Cognitive Memory остаётся независимым системным владельцем опыта. Запись проходит
+через существующий Event/Memory processing path; чтение — через Retrieval и
+ContextBuilder. FAST не получает прямого SQL/file write к памяти. Его интерпретация
+может стать входом для системного memory processor/adapter только с сохранением
+source Event и provenance. Модель не может сама повысить собственный вывод до
+подтверждённого Knowledge.
+
+Первый Stage 5 baseline намеренно текстовый: `conversation.user` Events, существующая
+Cognitive Memory, bounded context и одна локальная FAST LLM через сменяемый backend.
+Internal State, Sleep, DEEP, Tools, AgentLoop и физическая периферия остаются
+реализованными или запланированными подсистемами, но не участвуют в baseline. Это
+позволяет проверить границу cognition↔memory без смешивания нескольких механизмов.
+
+Первый основной критерий — cross-session recall без model chat history: информация
+сохраняется ANIMA в одной сессии, модель/сеанс полностью меняется или перезапускается,
+после чего новый запрос получает релевантный опыт только через
+`memory.db → Retrieval → ContextBuilder → ACI → FAST`. Ответ и использованные
+источники должны быть наблюдаемы и прослеживаемы до raw Event.
+
+После read path FAST может участвовать в формировании памяти как semantic interpreter,
+но не как storage authority. Новый текст может породить memory candidate, изменение
+или противоречие; системный слой сохраняет историю и provenance и решает lifecycle.
+Замена FAST-модели не должна требовать миграции личности или стирать накопленный
+опыт.
+
+Stage 4 код не удаляется: Tool contracts, Executor, Observation, Verification,
+recovery и operational storage могут быть повторно подключены на последующем этапе
+Cognitive Integration. Не переносится только архитектурное предположение, что
+FAST/DEEP должны реализовывать `PlannerAdapter` и что Goal-driven AgentRun является
+главным циклом ANIMA.
+
+Цена решения — временно отложенная интеграция уже готовых Internal State/Sleep/Agent
+подсистем и необходимость нового ACI/FAST contract. Польза — возвращение LLM к роли,
+для которой она нужна: адаптивное reasoning над изменяющимися внутренними, внешними
+и смысловыми данными, тогда как рутинные операции остаются детерминированными
+сервисами ANIMA. Порядок реализации — [Stage 5](../ROADMAP/README.md#stage-5).
