@@ -1,3 +1,9 @@
 # Optional dependency for the Stage 5 Qwen-Agent tool-calling experiment.
 # Kept separate from ANIMA core so the runtime remains standard-library-first.
 qwen-agent==0.0.34
+
+# Required by eager imports in Qwen-Agent 0.0.34, even for text-only use.
+numpy
+soundfile
+tqdm
+python-dateutil
