@@ -158,11 +158,12 @@ def benchmark_cases() -> tuple[BenchmarkCase, ...]:
             title="Retrieval followed by simple reasoning",
             query=(
                 "Учитывая мои сохранённые предпочтения в кофе, что логичнее приготовить сейчас: "
-                "эспрессо или чай? Кратко объясни основание."
+                "эспрессо или чай? Ответ начни точно с «Выбор: Эспрессо.» или «Выбор: Чай.», "
+                "затем кратко объясни основание."
             ),
             required_tools=("memory_search",),
             expected_search_ids=(M_COFFEE,),
-            required_all_terms=("эспрессо",),
+            required_all_terms=("выбор: эспрессо.",),
         ),
         BenchmarkCase(
             id="T09_sequential_search_get",
