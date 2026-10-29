@@ -23,6 +23,8 @@ Harness создаёт данные в tmp_path; subprocess-тесты явно 
 
 Обычный pytest suite проверяет deterministic contracts и fake-LLM сценарии; real-model experiments в него не входят. Они запускаются opt-in через [LLM experiment runner](../../scripts/run_llm_planner_experiment.py) и требуют явно доступных локальных backend и model. Наличие модели или работающего сервера не предполагается; обычные проверки не запускают inference и не загружают модели.
 
+Для сравнения лёгких локальных моделей с tool/function calling используется отдельный [ANIMA Tool Model Benchmark v1](Tool_Model_Benchmark.md): фиксированные 10 рабочих сценариев, одинаковые временные Memory/Internal State fixtures, раздельные quality-метрики и измерения latency/ресурсов. Real-model прогоны benchmark остаются opt-in и не входят в regression pytest suite.
+
 Representative saved evidence оформляется отдельным TV report с implementation snapshot, условиями, canonical scenario, измеренными результатами и границами доказанного. Пример — [TV-0042](Results/TV-0042.md): integration Passed отделён от model reliability. Временные captures не заменяют сохраняемый проектный отчёт; каждый диагностический запуск копировать не требуется.
 
 ## Наблюдать процесс
