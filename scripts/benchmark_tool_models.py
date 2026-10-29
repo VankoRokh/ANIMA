@@ -10,6 +10,7 @@ from __future__ import annotations
 import argparse
 from dataclasses import asdict
 from datetime import datetime, timezone
+import hashlib
 import json
 from pathlib import Path
 import shutil
@@ -35,6 +36,7 @@ from anima.benchmarks.tool_models import (
     write_json_report,
 )
 from anima.benchmarks.tool_model_corpus import (
+    BENCHMARK_STATE_CONFIG,
     BENCHMARK_SYSTEM_PROMPT,
     BENCHMARK_VERSION,
     MEMORY_FIXTURES,
@@ -43,6 +45,7 @@ from anima.benchmarks.tool_model_corpus import (
 from anima.cognition.qwen_agent_tools import (
     AnimaReadOnlyToolGateway,
     QwenAgentToolLoop,
+    QwenToolProtocolError,
     build_qwen_agent_chat_model,
 )
 from anima.internal_state.runtime_integration import InternalStateRuntime
@@ -66,13 +69,74 @@ def seed_memory(store: MemoryStore) -> None:
         )
 
 
-def build_gateway(root: Path) -> AnimaReadOnlyToolGateway:
+def _canonical_state_config() -> str:
+    return json.dumps(
+        BENCHMARK_STATE_CONFIG,
+        ensure_ascii=False,
+        sort_keys=True,
+        separators=(",", ":"),
+    )
+
+
+def benchmark_fixture_metadata() -> dict:
+    canonical = _canonical_state_config()
+    return {
+        "state_config": BENCHMARK_STATE_CONFIG,
+        "state_config_sha256": hashlib.sha256(canonical.encode("utf-8")).hexdigest(),
+        "memory_fixture_count": len(MEMORY_FIXTURES),
+    }
+
+
+def _write_state_config(root: Path) -> Path:
+    path = root / "internal_state_config.json"
+    path.write_text(
+        json.dumps(
+            BENCHMARK_STATE_CONFIG,
+            ensure_ascii=False,
+            indent=2,
+            sort_keys=True,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    return path
+
+
+class BenchmarkTracingGateway(AnimaReadOnlyToolGateway):
+    """Gateway that preserves successfully executed tool calls for error evidence."""
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.executed_calls: list[ToolCallObservation] = []
+
+    def reset_trace(self) -> None:
+        self.executed_calls.clear()
+
+    def execute(self, name, arguments):
+        raw_result = super().execute(name, arguments)
+        result = json.loads(raw_result)
+        self.executed_calls.append(
+            ToolCallObservation(
+                round_index=0,
+                name=name,
+                arguments=dict(arguments),
+                result=result,
+            )
+        )
+        return raw_result
+
+
+def build_gateway(root: Path) -> BenchmarkTracingGateway:
     memory_store = MemoryStore(root / "memory.db")
     links = LinkStore(memory_store)
     seed_memory(memory_store)
     retrieval = RetrievalEngine(memory_store=memory_store, link_store=links)
 
-    state_store = InternalStateStore(root / "internal_state.db")
+    state_config = _write_state_config(root)
+    state_store = InternalStateStore(
+        root / "internal_state.db",
+        config_file=state_config,
+    )
     state_runtime = InternalStateRuntime(state_store)
     state_runtime.create_goal(
         source="benchmark",
@@ -86,9 +150,21 @@ def build_gateway(root: Path) -> AnimaReadOnlyToolGateway:
         transition_id="gt_99999999-9999-4999-8999-999999999999",
     )
 
-    return AnimaReadOnlyToolGateway(
+    return BenchmarkTracingGateway(
         retrieval=retrieval,
         internal_state_runtime=state_runtime,
+    )
+
+
+def qwen_records_to_observations(records) -> tuple[ToolCallObservation, ...]:
+    return tuple(
+        ToolCallObservation(
+            round_index=call.round_index,
+            name=call.name,
+            arguments=dict(call.arguments),
+            result=dict(call.result),
+        )
+        for call in records
     )
 
 
@@ -96,16 +172,14 @@ def qwen_turn_to_benchmark(turn) -> BenchmarkTurn:
     return BenchmarkTurn(
         response_text=turn.response_text,
         rounds=turn.rounds,
-        tool_calls=tuple(
-            ToolCallObservation(
-                round_index=call.round_index,
-                name=call.name,
-                arguments=dict(call.arguments),
-                result=dict(call.result),
-            )
-            for call in turn.tool_calls
-        ),
+        tool_calls=qwen_records_to_observations(turn.tool_calls),
     )
+
+
+def classify_run_error(error: Exception) -> str:
+    if isinstance(error, QwenToolProtocolError):
+        return "model_protocol"
+    return "infrastructure"
 
 
 def check_server(base_url: str, timeout: float = 3.0) -> None:
@@ -191,15 +265,25 @@ def _gpu_memory_mib(pid: int) -> float | None:
 
 
 class ServerResourceMonitor:
-    def __init__(self, pid: int | None, interval=0.25):
+    """Sample server resources without claiming per-scenario exact peaks."""
+
+    def __init__(
+        self,
+        pid: int | None,
+        *,
+        rss_interval=0.25,
+        gpu_interval=1.0,
+    ):
         self.pid = pid
-        self.interval = interval
+        self.rss_interval = float(rss_interval)
+        self.gpu_interval = float(gpu_interval)
         self.rss_before_mib = None
-        self.rss_peak_mib = None
+        self.rss_sampled_max_mib = None
         self.vmhwm_mib = None
-        self.gpu_vram_peak_mib = None
+        self.gpu_vram_sampled_max_mib = None
         self._stop = threading.Event()
-        self._thread = None
+        self._memory_thread = None
+        self._gpu_thread = None
 
     def _sample_memory(self):
         if self.pid is None:
@@ -208,28 +292,34 @@ class ServerResourceMonitor:
         rss = memory["rss_mib"]
         hwm = memory["vmhwm_mib"]
         if rss is not None:
-            self.rss_peak_mib = (
-                rss if self.rss_peak_mib is None else max(self.rss_peak_mib, rss)
+            self.rss_sampled_max_mib = (
+                rss
+                if self.rss_sampled_max_mib is None
+                else max(self.rss_sampled_max_mib, rss)
             )
         if hwm is not None:
             self.vmhwm_mib = (
                 hwm if self.vmhwm_mib is None else max(self.vmhwm_mib, hwm)
             )
 
-    def sample_gpu(self):
+    def _sample_gpu(self):
         if self.pid is None:
             return
         gpu = _gpu_memory_mib(self.pid)
         if gpu is not None:
-            self.gpu_vram_peak_mib = (
+            self.gpu_vram_sampled_max_mib = (
                 gpu
-                if self.gpu_vram_peak_mib is None
-                else max(self.gpu_vram_peak_mib, gpu)
+                if self.gpu_vram_sampled_max_mib is None
+                else max(self.gpu_vram_sampled_max_mib, gpu)
             )
 
-    def _run(self):
-        while not self._stop.wait(self.interval):
+    def _run_memory(self):
+        while not self._stop.wait(self.rss_interval):
             self._sample_memory()
+
+    def _run_gpu(self):
+        while not self._stop.wait(self.gpu_interval):
+            self._sample_gpu()
 
     def start(self):
         if self.pid is None:
@@ -238,26 +328,31 @@ class ServerResourceMonitor:
         self.rss_before_mib = initial["rss_mib"]
         self.vmhwm_mib = initial["vmhwm_mib"]
         self._sample_memory()
-        self.sample_gpu()
-        self._thread = threading.Thread(target=self._run, daemon=True)
-        self._thread.start()
+        self._sample_gpu()
+        self._memory_thread = threading.Thread(target=self._run_memory, daemon=True)
+        self._gpu_thread = threading.Thread(target=self._run_gpu, daemon=True)
+        self._memory_thread.start()
+        self._gpu_thread.start()
 
     def stop(self):
         if self.pid is None:
             return
         self._stop.set()
-        if self._thread is not None:
-            self._thread.join(timeout=max(1.0, self.interval * 4))
+        for thread in (self._memory_thread, self._gpu_thread):
+            if thread is not None:
+                thread.join(timeout=max(1.0, self.gpu_interval * 2))
         self._sample_memory()
-        self.sample_gpu()
+        self._sample_gpu()
 
     def as_dict(self):
         return {
             "server_pid": self.pid,
             "rss_before_mib": self.rss_before_mib,
-            "rss_peak_mib": self.rss_peak_mib,
+            "rss_sampled_max_mib": self.rss_sampled_max_mib,
             "vmhwm_mib": self.vmhwm_mib,
-            "gpu_vram_peak_mib": self.gpu_vram_peak_mib,
+            "gpu_vram_sampled_max_mib": self.gpu_vram_sampled_max_mib,
+            "rss_sample_interval_s": self.rss_interval if self.pid is not None else None,
+            "gpu_sample_interval_s": self.gpu_interval if self.pid is not None else None,
         }
 
 
@@ -292,6 +387,11 @@ def main() -> None:
         if args.server_pid is not None
         else discover_llama_server_pid()
     )
+    pid_source = (
+        "explicit"
+        if args.server_pid is not None
+        else ("auto-single-process" if server_pid is not None else "unavailable")
+    )
 
     llm = build_qwen_agent_chat_model(
         model=args.model,
@@ -322,13 +422,24 @@ def main() -> None:
                     started = time.perf_counter()
                     turn = None
                     error_text = None
+                    error_kind = None
+                    gateway.reset_trace()
                     try:
                         qwen_turn = loop.run(case.query)
                         turn = qwen_turn_to_benchmark(qwen_turn)
                     except Exception as error:
                         error_text = f"{type(error).__name__}: {error}"
+                        error_kind = classify_run_error(error)
                     latency_ms = (time.perf_counter() - started) * 1000.0
-                    evaluation = evaluate_case(case, turn, error=error_text)
+                    partial_calls = (
+                        tuple(gateway.executed_calls) if turn is None else ()
+                    )
+                    evaluation = evaluate_case(
+                        case,
+                        turn,
+                        error=error_text,
+                        error_kind=error_kind,
+                    )
                     observation = RunObservation(
                         case_id=case.id,
                         repeat=repeat,
@@ -336,26 +447,31 @@ def main() -> None:
                         turn=turn,
                         evaluation=evaluation,
                         error=error_text,
+                        error_kind=error_kind,
+                        partial_tool_calls=partial_calls,
                     )
                     observations.append(observation)
+                    visible_calls = (
+                        turn.tool_calls if turn is not None else partial_calls
+                    )
                     tools = (
                         "—"
-                        if turn is None or not turn.tool_calls
-                        else ">".join(call.name for call in turn.tool_calls)
+                        if not visible_calls
+                        else ">".join(call.name for call in visible_calls)
                     )
-                    status = "PASS" if evaluation.passed else "FAIL"
                     print(
-                        f"[{status}] {case.id} repeat={repeat}/{args.repeats} "
+                        f"[{evaluation.status}] {case.id} "
+                        f"repeat={repeat}/{args.repeats} "
                         f"latency={latency_ms:.1f}ms tools={tools}"
                     )
                     if error_text:
-                        print(f"        error: {error_text}")
-                    resource_monitor.sample_gpu()
+                        print(f"        {error_kind}: {error_text}")
     finally:
         resource_monitor.stop()
 
     summary = summarize_observations(observations)
     resources = resource_monitor.as_dict()
+    resources["server_pid_source"] = pid_source
     resources["model_size_bytes"] = model_file["size_bytes"]
     resources["model_size_mib"] = model_file["size_mib"]
     resources["model_file"] = model_file["path"]
@@ -377,6 +493,7 @@ def main() -> None:
             "max_tokens": args.max_tokens,
         },
         "repeats": args.repeats,
+        "fixtures": benchmark_fixture_metadata(),
         "cases": [asdict(case) for case in benchmark_cases()],
         "summary": summary,
         "resources": resources,
