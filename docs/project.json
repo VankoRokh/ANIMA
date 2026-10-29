@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "current_stage": "4",
-  "focus": "Stage 4.13 — Observability / Budgets: snapshot/trace показывает run/step, Goal, context budget, proposals, Candidate/Choice trace, selected Action, receipt/observation, verifier result и remaining budgets; max steps/tool calls/time/model budget останавливают run определённо без повреждения state.",
+  "current_stage": "5",
+  "focus": "Stage 5.0 — FAST Cognition & Memory Integration: зафиксировать границу FAST/ACI и первый текстовый цикл Event → Cognitive Memory → Retrieval/Context → FAST → response; Internal State, Sleep, DEEP и Tools не входят в baseline.",
   "stages": [
     {"id": "D0", "title": "Documentation", "status": "Complete", "depends_on": [], "outcome": "Контекст и процедуры работы восстанавливаются из репозитория"},
     {"id": "0", "title": "Foundation", "status": "Complete", "depends_on": ["D0"], "outcome": "Перенос сохраняет идентичность, историю и возможность продолжения"},
@@ -9,9 +9,11 @@
     {"id": "1", "title": "Cognitive Memory", "status": "Complete", "depends_on": ["0", "D1"], "outcome": "Релевантный опыт извлекается с происхождением и ограниченным контекстом"},
     {"id": "2", "title": "Internal State", "status": "Complete", "depends_on": ["1"], "outcome": "Влияние внутреннего состояния на выбор причинно прослеживается"},
     {"id": "3", "title": "Sleep", "status": "Complete", "depends_on": ["2"], "outcome": "Консолидация прерывается и возобновляется без потери источников"},
-    {"id": "4", "title": "Agent", "status": "InProgress", "depends_on": ["3"], "outcome": "Ограниченная задача выполняется инструментом и проверяется наблюдением"},
-    {"id": "5", "title": "Virtual ANIMA", "status": "Planned", "depends_on": ["4"], "outcome": "Длительная работа на ПК/VM имеет измеренный ресурсный профиль"},
-    {"id": "6", "title": "Cyberdeck", "status": "Planned", "depends_on": ["5"], "outcome": "Измеренная нагрузка переносится на автономное устройство"},
-    {"id": "7", "title": "Modular embodiment", "status": "Planned", "depends_on": ["6"], "outcome": "Узлы диагностируются и заменяются без потери данных экземпляра"}
+    {"id": "4", "title": "Agent / LLM Planner Experiment", "status": "Stopped", "depends_on": ["3"], "outcome": "Проверен recoverable action loop, но роль LLM Planner признана архитектурным отклонением; результаты 4.0–4.12 сохранены"},
+    {"id": "5", "title": "FAST Cognition & Memory Integration", "status": "InProgress", "depends_on": ["1", "D1"], "outcome": "FAST использует ограниченный контекст Cognitive Memory и участвует в текстовом цикле без владения памятью или системным состоянием"},
+    {"id": "6", "title": "Cognitive Integration", "status": "Planned", "depends_on": ["5", "2", "3"], "outcome": "FAST, DEEP, routing, Tasks, Goals и исполнительный слой объединяются вокруг работающего когнитивного контура"},
+    {"id": "7", "title": "Virtual ANIMA", "status": "Planned", "depends_on": ["6"], "outcome": "Непрерывная система работает в виртуальной среде и имеет измеренный ресурсный профиль"},
+    {"id": "8", "title": "Cyberdeck", "status": "Planned", "depends_on": ["7"], "outcome": "Измеренная нагрузка переносится на автономное устройство"},
+    {"id": "9", "title": "Modular embodiment", "status": "Planned", "depends_on": ["8"], "outcome": "Узлы диагностируются и заменяются без потери данных экземпляра"}
   ]
 }
