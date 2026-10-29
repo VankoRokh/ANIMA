@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "current_stage": "5",
-  "focus": "Stage 5.2 — Memory read bridge: преобразовать текущий текстовый запрос в bounded Retrieval/ContextBundle для FAST и сохранить provenance и контекстные budgets.",
+  "focus": "Stage 5.3 — Local FAST LLM: подключить реальную локальную модель через ACI к уже проверенному bounded ContextBundle, не передавая модели владение Memory или системной оркестрацией.",
   "stages": [
     {"id": "D0", "title": "Documentation", "status": "Complete", "depends_on": [], "outcome": "Контекст и процедуры работы восстанавливаются из репозитория"},
     {"id": "0", "title": "Foundation", "status": "Complete", "depends_on": ["D0"], "outcome": "Перенос сохраняет идентичность, историю и возможность продолжения"},
