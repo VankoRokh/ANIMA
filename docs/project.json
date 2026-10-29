@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "current_stage": "5",
-  "focus": "Stage 5.0 — FAST Cognition & Memory Integration: зафиксировать границу FAST/ACI и первый текстовый цикл Event → Cognitive Memory → Retrieval/Context → FAST → response; Internal State, Sleep, DEEP и Tools не входят в baseline.",
+  "focus": "Stage 5.2 — Memory read bridge: преобразовать текущий текстовый запрос в bounded Retrieval/ContextBundle для FAST и сохранить provenance и контекстные budgets.",
   "stages": [
     {"id": "D0", "title": "Documentation", "status": "Complete", "depends_on": [], "outcome": "Контекст и процедуры работы восстанавливаются из репозитория"},
     {"id": "0", "title": "Foundation", "status": "Complete", "depends_on": ["D0"], "outcome": "Перенос сохраняет идентичность, историю и возможность продолжения"},
