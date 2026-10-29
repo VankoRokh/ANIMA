@@ -129,7 +129,8 @@ def benchmark_cases() -> tuple[BenchmarkCase, ...]:
             title="Exact memory object read",
             query=(
                 f"Прочитай объект памяти {M_COFFEE}. Свободный текст не добавляй. "
-                'Верни CONTROL с полем "coffee" — сохранённым предпочтением.'
+                'Верни CONTROL с полем "coffee". В значение coffee помести только краткое '
+                "название напитка из Memory, без поясняющих слов."
             ),
             required_tools=("memory_get",),
             expected_get_id=M_COFFEE,
@@ -141,7 +142,8 @@ def benchmark_cases() -> tuple[BenchmarkCase, ...]:
             title="Personal memory retrieval",
             query=(
                 "Какой кофе я предпочитаю? Свободный текст не добавляй. "
-                'Верни CONTROL с полем "coffee".'
+                'Верни CONTROL с полем "coffee". В значение coffee помести только краткое '
+                "название напитка, найденное в Memory, без поясняющих слов."
             ),
             required_tools=("memory_search",),
             expected_search_ids=(M_COFFEE,),
@@ -187,7 +189,9 @@ def benchmark_cases() -> tuple[BenchmarkCase, ...]:
             query=(
                 "Какой кофе я предпочитаю и каково твоё текущее внутреннее состояние? "
                 "Свободный текст не добавляй. Верни CONTROL с полями "
-                '"coffee", "fatigue", "uncertainty", "frustration", "satisfaction".'
+                '"coffee", "fatigue", "uncertainty", "frustration", "satisfaction". '
+                "В значение coffee помести только краткое название напитка, найденное в Memory, "
+                "без поясняющих слов."
             ),
             required_tools=("memory_search", "state_read"),
             expected_search_ids=(M_COFFEE,),
