@@ -10,7 +10,7 @@ import sys
 
 
 ROOT = Path(__file__).resolve().parents[1]
-STAGE_STATUSES = {"Planned", "InProgress", "Complete", "Blocked"}
+STAGE_STATUSES = {"Planned", "InProgress", "Complete", "Blocked", "Stopped"}
 RESULT_STATUSES = {"Passed", "Failed", "Inconclusive"}
 REPORT_SECTIONS = (
     "Цель", "Условия", "Сценарий и входные данные", "Ожидаемый результат",
@@ -59,7 +59,7 @@ def load_project(root):
         registry[stage_id] = stage
     current = project["current_stage"]
     require(isinstance(current, str) and current in registry, "Unknown current stage")
-    require(registry[current]["status"] != "Complete", "Current stage is already Complete")
+    require(registry[current]["status"] not in {"Complete", "Stopped"}, "Current stage is already terminal")
     visiting, visited = set(), set()
 
     def visit(stage_id):
