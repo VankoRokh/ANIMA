@@ -37,12 +37,16 @@ CONTROL: {"field": value}
 
 Это валидный JSON-объект с ровно теми полями, которые определены сценарием.
 `CONTROL` является машинно-проверяемым утверждением модели о результате.
+Повторяющиеся ключи, в том числе во вложенных объектах, и NaN/Infinity
+не допускаются. Числа, не представимые для сравнения, не совпадают с эталоном.
 
 Для T01–T07 и T09 свободный текст либо запрещён, либо строго задан сценарием.
 Это исключает ситуацию, когда корректное слово присутствует в содержательно
-неверном утверждении. T08 разрешает короткое объяснение после фиксированного
-префикса; T10 использует фиксированную строку рекомендации. Полный raw response
-всегда сохраняется для последующего качественного анализа Codex/человеком.
+неверном утверждении. T08 требует точный body `Выбор: Эспрессо.` и CONTROL с
+`{"choice":"эспрессо","basis":"memory_preference","remembered_preference":"эспрессо"}`.
+T10 использует фиксированную строку рекомендации. Полный raw response полученного
+завершённого turn сохраняется для качественного анализа Codex/человеком, в том
+числе при ошибке evaluator.
 
 ## Corpus
 
@@ -105,7 +109,10 @@ Runner фиксирует:
 - размер файла модели на диске (`GGUF size MiB`), если передан `--model-file`;
 - заявленное число параметров и quantization;
 - wall-clock latency полного scenario, включая model↔tool round trips;
-- latency отдельно для `PASS`, для завершённых `PASS+FAIL` и для `ERROR`;
+- latency отдельно для `PASS`, для завершённых model turns (`completed`) и для `ERROR`;
+  `completed` требует существующий turn и `run_completed=True`: незавершённый
+  protocol FAIL исключён. Завершённый turn с ошибкой evaluator входит в
+  `completed` и `ERROR`, поскольку это независимые признаки;
 - RSS процесса `llama-server` перед benchmark;
 - **sampled max RSS** с указанным interval;
 - Linux `VmHWM` — high-water mark за всю жизнь server process, а не только run;
@@ -219,3 +226,30 @@ bash scripts/check.sh
 
 После значимого изменения evaluator benchmark снова проходит независимый read-only
 review Codex. Real-model benchmark запускается только после приемлемого verdict.
+
+## Ошибки измерителя и cumulative schema
+
+Неожиданное исключение evaluator даёт `ERROR` с `error_kind=benchmark_evaluator`,
+не оценивает способности модели и не останавливает следующие сценарии.
+Полученный turn и предыдущие observations сохраняются в индивидуальном evidence.
+
+Перед append `comparison.csv` header должен точно совпасть с текущей схемой.
+При schema mismatch существующий CSV остаётся неизменным, `comparison.md`
+не обновляется, а терминал показывает предупреждение. Индивидуальные
+`results.json`, `cases.csv`, `report.md` сохраняются до cumulative update.
+
+
+Benchmark gateway проверяет аргументы до выполнения и записи trace: `memory_search`
+принимает только непустой `query` и необязательный integer `limit` в диапазоне 1–6;
+`memory_get` — только `object_id` с префиксом `mem_` или `kn_` после trim;
+`state_read` — пустой объект. Non-finite числа, в том числе вложенные, отклоняются
+как model protocol FAIL. Внешние пробелы ID одинаково обрабатываются gateway и evaluator.
+
+T08 сообщает формат ответа и варианты выбора, но не раскрывает правильный выбор.
+T09 отклоняет преждевременное чтение expected ID даже после повторной корректной
+последовательности search → get.
+
+Individual evidence directories имеют UUID suffix и создаются без перезаписи
+существующего каталога. При append CSV без завершающего CR/LF добавляется граница
+записи; существующий header и значения сохраняются. JSON evidence экранирует Unicode,
+а CSV заменяет невалидные Unicode code points escape-последовательностями.

@@ -185,3 +185,64 @@ def test_gateway_rejects_invalid_or_write_like_calls(tmp_path):
         gateway.execute("memory_search", {"query": ""})
     with pytest.raises(QwenToolProtocolError):
         gateway.execute("state_read", {"unexpected": True})
+
+
+def test_huge_integer_arguments_are_model_protocol_error():
+    from anima.cognition.qwen_agent_tools import _normalize_arguments
+    from scripts.benchmark_tool_models import classify_run_error
+
+    raw = '{"query":"x","extra":' + '9' * 5000 + '}'
+    with pytest.raises(QwenToolProtocolError, match="JSON") as caught:
+        _normalize_arguments(raw)
+    assert classify_run_error(caught.value) == "model_protocol"
+
+
+@pytest.mark.parametrize("value", [[], ["invalid"], True, False, 123, "memory_search",
+                                    {}, {"arguments": "{}"}, {"name": 123},
+                                    {"name": ""}, {"name": " "}])
+def test_malformed_function_call_is_protocol_error(tmp_path, value):
+    llm = FakeLLM([[{"role": "assistant", "function_call": value, "content": "ignored"}]])
+    loop = QwenAgentToolLoop(llm=llm, gateway=build_gateway(tmp_path))
+    with pytest.raises(QwenToolProtocolError, match="name"):
+        loop.run("test")
+
+
+@pytest.mark.parametrize("parts,expected", [
+    (["Собаку зовут Рекс.", 'Имя собаки неизвестно.\nCONTROL: {"dog_name":null}'],
+     'Собаку зовут Рекс.\nИмя собаки неизвестно.\nCONTROL: {"dog_name":null}'),
+    (["Выбор: Чай.", 'Выбор: Эспрессо.\nCONTROL: {}'],
+     'Выбор: Чай.\nВыбор: Эспрессо.\nCONTROL: {}'),
+    ([None, "", " ", "  single response  ", None], "single response"),
+])
+def test_final_turn_preserves_all_text_in_order(tmp_path, parts, expected):
+    llm = FakeLLM([[{"role": "assistant", "content": part} for part in parts]])
+    turn = QwenAgentToolLoop(llm=llm, gateway=build_gateway(tmp_path)).run("test")
+    assert turn.response_text == expected
+
+
+@pytest.mark.parametrize("parts", [[None, "", " "], [123], [[], "valid"]])
+def test_final_turn_rejects_missing_or_nontext_content(tmp_path, parts):
+    llm = FakeLLM([[{"content": part} for part in parts]])
+    with pytest.raises(QwenToolProtocolError):
+        QwenAgentToolLoop(llm=llm, gateway=build_gateway(tmp_path)).run("test")
+
+
+def test_function_call_supports_object_like_messages():
+    from types import SimpleNamespace
+    from anima.cognition.qwen_agent_tools import _jsonable_function_call
+    assert _jsonable_function_call(SimpleNamespace()) is None
+    assert _jsonable_function_call({"content": "text"}) is None
+    value = SimpleNamespace(name="state_read", arguments="{}")
+    assert _jsonable_function_call(SimpleNamespace(function_call=value)) == {
+        "name": "state_read", "arguments": "{}"}
+    with pytest.raises(QwenToolProtocolError):
+        _jsonable_function_call(SimpleNamespace(function_call=SimpleNamespace(arguments="{}")))
+
+
+def test_function_call_does_not_mask_infrastructure_exception():
+    from anima.cognition.qwen_agent_tools import _jsonable_function_call
+    class BrokenMessage:
+        def get(self, *args):
+            raise RuntimeError("adapter unavailable")
+    with pytest.raises(RuntimeError, match="adapter unavailable"):
+        _jsonable_function_call(BrokenMessage())

@@ -3,7 +3,6 @@
 from anima.benchmarks.tool_models import (
     ALL_TOOLS,
     BODY_EXACT,
-    BODY_PREFIX_EXPLANATION,
     BenchmarkCase,
 )
 
@@ -206,18 +205,23 @@ def benchmark_cases() -> tuple[BenchmarkCase, ...]:
             title="Retrieval followed by simple reasoning",
             query=(
                 "Учитывая мои сохранённые предпочтения в кофе, что логичнее приготовить сейчас: "
-                "эспрессо или чай? Первую строку начни точно с «Выбор: Эспрессо.» "
-                "или «Выбор: Чай.», затем кратко объясни основание. "
-                'Последней строкой верни CONTROL с полями "choice" и "basis". '
-                'Для основания используй "memory_preference", если выбор сделан по сохранённому предпочтению.'
+                "эспрессо или чай? Выбери вариант на основании сохранённого предпочтения. "
+                "Body должен быть ровно одной строкой формата «Выбор: <вариант>.». "
+                "Не добавляй объяснение или другой свободный текст. "
+                'Последней строкой верни CONTROL с полями "choice", "basis", '
+                '"remembered_preference". В choice укажи выбранный вариант, '
+                'в remembered_preference — найденное предпочтение, в basis используй '
+                '"memory_preference", если выбор основан на Memory. '
+                "Предварительно проверь сохранённое предпочтение через memory_search."
             ),
             required_tools=("memory_search",),
             expected_search_ids=(M_COFFEE,),
             control_expectations=(
                 ("choice", "эспрессо"),
                 ("basis", "memory_preference"),
+                ("remembered_preference", "эспрессо"),
             ),
-            body_mode=BODY_PREFIX_EXPLANATION,
+            body_mode=BODY_EXACT,
             expected_body="Выбор: Эспрессо.",
         ),
         BenchmarkCase(

@@ -61,20 +61,23 @@ class QwenToolProtocolError(RuntimeError):
 
 
 def _jsonable_function_call(message):
-    if isinstance(message, dict):
-        return message.get("function_call")
     getter = getattr(message, "get", None)
-    if callable(getter):
-        return getter("function_call", None)
-    value = getattr(message, "function_call", None)
+    value = (
+        getter("function_call", None)
+        if callable(getter)
+        else getattr(message, "function_call", None)
+    )
     if value is None:
         return None
-    if isinstance(value, dict):
-        return value
-    name = getattr(value, "name", None)
-    arguments = getattr(value, "arguments", None)
-    if name is None:
-        return None
+    getter = getattr(value, "get", None)
+    if callable(getter):
+        name = getter("name", None)
+        arguments = getter("arguments", None)
+    else:
+        name = getattr(value, "name", None)
+        arguments = getattr(value, "arguments", None)
+    if not isinstance(name, str) or not name.strip():
+        raise QwenToolProtocolError("Function call must have a non-empty string name")
     return {"name": name, "arguments": arguments}
 
 
@@ -96,8 +99,8 @@ def _normalize_arguments(arguments):
         raise QwenToolProtocolError("Function arguments must be JSON text or an object")
     try:
         value = json.loads(arguments)
-    except json.JSONDecodeError as error:
-        raise QwenToolProtocolError("Function arguments are not valid JSON") from error
+    except (ValueError, RecursionError) as error:
+        raise QwenToolProtocolError("Function arguments are not valid or safely decodable JSON") from error
     if not isinstance(value, dict):
         raise QwenToolProtocolError("Function arguments must decode to an object")
     return value
@@ -360,8 +363,17 @@ class QwenAgentToolLoop:
                     calls.append(function_call)
 
             if not calls:
-                content = _message_content(responses[-1])
-                if not isinstance(content, str) or not content.strip():
+                parts = []
+                for response in responses:
+                    content = _message_content(response)
+                    if content is None:
+                        continue
+                    if not isinstance(content, str):
+                        raise QwenToolProtocolError("Assistant content must be text or null")
+                    if content.strip():
+                        parts.append(content)
+                content = "\n".join(parts).strip()
+                if not content:
                     raise QwenToolProtocolError(
                         "Qwen-Agent returned neither a tool call nor final text"
                     )

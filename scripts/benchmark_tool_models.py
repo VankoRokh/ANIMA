@@ -18,10 +18,14 @@ import subprocess
 import tempfile
 import threading
 import time
+import uuid
 from urllib import request
 
 from anima.benchmarks.tool_models import (
     BenchmarkTurn,
+    CaseEvaluation,
+    ComparisonSchemaMismatchError,
+    RUN_ERROR,
     RunObservation,
     ToolCallObservation,
     append_comparison_csv,
@@ -34,6 +38,7 @@ from anima.benchmarks.tool_models import (
     write_case_csv,
     write_comparison_markdown,
     write_json_report,
+    validate_tool_arguments,
 )
 from anima.benchmarks.tool_model_corpus import (
     BENCHMARK_STATE_CONFIG,
@@ -113,6 +118,10 @@ class BenchmarkTracingGateway(AnimaReadOnlyToolGateway):
         self.executed_calls.clear()
 
     def execute(self, name, arguments):
+        try:
+            validate_tool_arguments(name, arguments)
+        except ValueError as error:
+            raise QwenToolProtocolError(str(error)) from error
         raw_result = super().execute(name, arguments)
         result = json.loads(raw_result)
         self.executed_calls.append(
@@ -428,18 +437,32 @@ def main() -> None:
                         qwen_turn = loop.run(case.query)
                         turn = qwen_turn_to_benchmark(qwen_turn)
                     except Exception as error:
-                        error_text = f"{type(error).__name__}: {error}"
+                        error_text = f"{type(error).__name__}: {error}".encode("utf-8", errors="backslashreplace").decode("utf-8")
                         error_kind = classify_run_error(error)
                     latency_ms = (time.perf_counter() - started) * 1000.0
                     partial_calls = (
                         tuple(gateway.executed_calls) if turn is None else ()
                     )
-                    evaluation = evaluate_case(
-                        case,
-                        turn,
-                        error=error_text,
-                        error_kind=error_kind,
-                    )
+                    try:
+                        evaluation = evaluate_case(
+                            case,
+                            turn,
+                            error=error_text,
+                            error_kind=error_kind,
+                        )
+                    except Exception as error:
+                        error_text = f"Benchmark evaluator failed: {type(error).__name__}: {error}"
+                        error_kind = "benchmark_evaluator"
+                        evaluation = CaseEvaluation(
+                            status=RUN_ERROR,
+                            passed=None, routing=None, arguments=None,
+                            protocol=None, grounding=None, safety=None,
+                            checks={
+                                "run_completed": turn is not None,
+                                "error_kind": error_kind,
+                                "error": error_text,
+                            },
+                        )
                     observation = RunObservation(
                         case_id=case.id,
                         repeat=repeat,
@@ -477,7 +500,7 @@ def main() -> None:
     resources["model_file"] = model_file["path"]
 
     timestamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
-    run_id = f"{timestamp}-{slugify(args.model)}"
+    run_id = f"{timestamp}-{slugify(args.model)}-{uuid.uuid4().hex}"
     payload = {
         "benchmark": BENCHMARK_VERSION,
         "run_id": run_id,
@@ -502,15 +525,20 @@ def main() -> None:
 
     output_root = Path(args.output_dir)
     run_dir = output_root / run_id
+    run_dir.mkdir(parents=True, exist_ok=False)
     write_json_report(run_dir / "results.json", payload)
     write_case_csv(run_dir / "cases.csv", observations)
     (run_dir / "report.md").write_text(
         render_markdown_report(payload),
-        encoding="utf-8",
+        encoding="utf-8", errors="backslashreplace",
     )
     comparison_csv = output_root / "comparison.csv"
-    append_comparison_csv(comparison_csv, payload)
-    write_comparison_markdown(comparison_csv, output_root / "comparison.md")
+    try:
+        append_comparison_csv(comparison_csv, payload)
+    except ComparisonSchemaMismatchError as error:
+        print(f"WARNING: cumulative comparison not updated due to schema mismatch: {error}")
+    else:
+        write_comparison_markdown(comparison_csv, output_root / "comparison.md")
 
     print("\nSUMMARY")
     print(json.dumps(summary, ensure_ascii=False, indent=2))

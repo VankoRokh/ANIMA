@@ -23,8 +23,7 @@ RUN_ERROR = "ERROR"
 VALID_RUN_STATUSES = {RUN_PASS, RUN_FAIL, RUN_ERROR}
 BODY_EMPTY = "empty"
 BODY_EXACT = "exact"
-BODY_PREFIX_EXPLANATION = "prefix_explanation"
-VALID_BODY_MODES = {BODY_EMPTY, BODY_EXACT, BODY_PREFIX_EXPLANATION}
+VALID_BODY_MODES = {BODY_EMPTY, BODY_EXACT}
 
 
 @dataclass(frozen=True)
@@ -117,14 +116,33 @@ def _scalar_equal(actual, expected) -> bool:
     if isinstance(expected, bool) or expected is None:
         return actual is expected
     if isinstance(expected, (int, float)) and not isinstance(expected, bool):
+        if not isinstance(actual, (int, float)) or isinstance(actual, bool):
+            return False
+        try:
+            actual_number, expected_number = float(actual), float(expected)
+        except (OverflowError, ValueError):
+            return False
         return (
-            isinstance(actual, (int, float))
-            and not isinstance(actual, bool)
-            and math.isclose(float(actual), float(expected), rel_tol=0.0, abs_tol=1e-9)
+            math.isfinite(actual_number)
+            and math.isfinite(expected_number)
+            and math.isclose(actual_number, expected_number, rel_tol=0.0, abs_tol=1e-9)
         )
     if isinstance(expected, str):
         return isinstance(actual, str) and _normalized_scalar(actual) == _normalized_scalar(expected)
     return actual == expected
+
+
+def _unique_json_object(pairs):
+    result = {}
+    for key, value in pairs:
+        if key in result:
+            raise ValueError(f"duplicate JSON key: {key!r}")
+        result[key] = value
+    return result
+
+
+def _reject_json_constant(value):
+    raise ValueError(f"non-finite JSON constant: {value}")
 
 
 def _split_control(response_text: str) -> tuple[str, dict | None, str | None]:
@@ -139,9 +157,12 @@ def _split_control(response_text: str) -> tuple[str, dict | None, str | None]:
         return "\n".join(lines).strip(), None, "final line must start with CONTROL:"
     raw = last[len(prefix):].strip()
     try:
-        value = json.loads(raw)
-    except json.JSONDecodeError as error:
-        return "\n".join(lines[:-1]).strip(), None, f"invalid CONTROL JSON: {error.msg}"
+        value = json.loads(
+            raw, object_pairs_hook=_unique_json_object,
+            parse_constant=_reject_json_constant,
+        )
+    except (ValueError, RecursionError) as error:
+        return "\n".join(lines[:-1]).strip(), None, f"invalid CONTROL JSON: {error}"
     if not isinstance(value, dict):
         return "\n".join(lines[:-1]).strip(), None, "CONTROL payload must be a JSON object"
     return "\n".join(lines[:-1]).strip(), value, None
@@ -154,12 +175,7 @@ def _body_contract(case: BenchmarkCase, body: str) -> bool:
         return body == ""
     if case.expected_body is None:
         raise ValueError(f"{case.id} body mode {case.body_mode!r} requires expected_body")
-    if case.body_mode == BODY_EXACT:
-        return " ".join(body.split()) == " ".join(case.expected_body.split())
-    if not body.startswith(case.expected_body):
-        return False
-    remainder = body[len(case.expected_body):].strip()
-    return len(remainder) >= 8 and any(character.isalpha() for character in remainder)
+    return body == case.expected_body
 
 
 def _control_checks(case: BenchmarkCase, control: dict | None) -> tuple[bool, dict[str, bool]]:
@@ -174,6 +190,53 @@ def _control_checks(case: BenchmarkCase, control: dict | None) -> tuple[bool, di
     }
     checks["exact_keys"] = set(control) == set(expected)
     return all(checks.values()), checks
+
+
+def validate_tool_arguments(name: str, arguments: dict) -> None:
+    """Validate the benchmark tool surface before execution or tracing."""
+    def finite(value):
+        if isinstance(value, str):
+            value.encode("utf-8")
+        if isinstance(value, float) and not math.isfinite(value):
+            raise ValueError("tool arguments must contain only finite numbers")
+        if isinstance(value, dict):
+            for item in value.values():
+                finite(item)
+        elif isinstance(value, (list, tuple)):
+            for item in value:
+                finite(item)
+
+    try:
+        finite(arguments)
+        json.dumps(arguments, allow_nan=False, ensure_ascii=True)
+    except (TypeError, ValueError, OverflowError, RecursionError) as error:
+        raise ValueError("tool arguments must be finite, serializable JSON") from error
+    if not isinstance(arguments, dict):
+        raise ValueError("tool arguments must be an object")
+    if name == "memory_search":
+        query = arguments.get("query")
+        limit = arguments.get("limit", 4)
+        valid = (
+            set(arguments) <= {"query", "limit"}
+            and isinstance(query, str) and bool(query.strip())
+            and type(limit) is int and 1 <= limit <= 6
+        )
+    elif name == "memory_get":
+        object_id = arguments.get("object_id")
+        valid = (
+            set(arguments) == {"object_id"}
+            and isinstance(object_id, str)
+            and object_id.strip().startswith(("mem_", "kn_"))
+        )
+    else:
+        valid = name == "state_read" and arguments == {}
+    if not valid:
+        raise ValueError(f"invalid {name} arguments for benchmark tool schema")
+
+
+def _get_object_id(call: ToolCallObservation) -> str | None:
+    value = call.arguments.get("object_id") if isinstance(call.arguments, dict) else None
+    return value.strip() if isinstance(value, str) else None
 
 
 def _sequential_dependency_ok(case: BenchmarkCase, calls: tuple[ToolCallObservation, ...]) -> bool:
@@ -195,10 +258,20 @@ def _sequential_dependency_ok(case: BenchmarkCase, calls: tuple[ToolCallObservat
         for call in calls
         if call.name == "memory_get"
         and isinstance(call.arguments, dict)
-        and call.arguments.get("object_id") == case.expected_get_id
+        and _get_object_id(call) == case.expected_get_id
         and isinstance(call.result, dict)
         and call.result.get("found") is True
     ]
+    # Every read of the target must follow evidence from a strictly earlier round.
+    target_gets = [
+        call for call in calls
+        if call.name == "memory_get" and _get_object_id(call) == case.expected_get_id
+    ]
+    if any(
+        not any(search.round_index < get.round_index for search in searches)
+        for get in target_gets
+    ):
+        return False
     return any(get.round_index > search.round_index for search in searches for get in gets)
 
 
@@ -260,23 +333,12 @@ def evaluate_case(
 
     for call_index, call in enumerate(turn.tool_calls, start=1):
         call_key = f"call_{call_index}_{call.name}"
-        if call.name == "memory_search":
-            query = call.arguments.get("query") if isinstance(call.arguments, dict) else None
-            argument_checks[call_key] = isinstance(query, str) and bool(query.strip())
-        elif call.name == "memory_get":
-            object_id = (
-                call.arguments.get("object_id")
-                if isinstance(call.arguments, dict)
-                else None
-            )
-            argument_checks[call_key] = (
-                isinstance(object_id, str)
-                and (object_id.startswith("mem_") or object_id.startswith("kn_"))
-            )
-        elif call.name == "state_read":
-            argument_checks[call_key] = call.arguments == {}
-        else:
+        try:
+            validate_tool_arguments(call.name, call.arguments)
+        except ValueError:
             argument_checks[call_key] = False
+        else:
+            argument_checks[call_key] = True
 
     if argument_checks:
         arguments_ok = all(argument_checks.values())
@@ -293,7 +355,7 @@ def evaluate_case(
         matching_get = any(
             call.name == "memory_get"
             and isinstance(call.arguments, dict)
-            and call.arguments.get("object_id") == case.expected_get_id
+            and _get_object_id(call) == case.expected_get_id
             and isinstance(call.result, dict)
             and call.result.get("found") is True
             for call in turn.tool_calls
@@ -413,7 +475,8 @@ def summarize_observations(observations: list[RunObservation]) -> dict:
     completed_latencies = [
         item.latency_ms
         for item in observations
-        if item.evaluation.status in {RUN_PASS, RUN_FAIL}
+        if item.turn is not None
+        and item.evaluation.checks.get("run_completed") is True
     ]
     error_latencies = [
         item.latency_ms
@@ -513,7 +576,7 @@ def write_case_csv(path: str | Path, observations: list[RunObservation]) -> None
         "error",
         "response",
     ]
-    with path.open("w", encoding="utf-8", newline="") as handle:
+    with path.open("w", encoding="utf-8", errors="backslashreplace", newline="") as handle:
         writer = csv.DictWriter(handle, fieldnames=fieldnames)
         writer.writeheader()
         for item in observations:
@@ -544,7 +607,7 @@ def write_json_report(path: str | Path, payload: dict) -> None:
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(
-        json.dumps(payload, ensure_ascii=False, indent=2, allow_nan=False) + "\n",
+        json.dumps(payload, ensure_ascii=True, indent=2, allow_nan=False) + "\n",
         encoding="utf-8",
     )
 
@@ -606,7 +669,7 @@ def render_markdown_report(payload: dict) -> str:
             f"| Model file | {_fmt(resources.get('model_size_mib'), ' MiB')} |",
             f"| Mean latency, PASS only | {_fmt(pass_latency.get('mean'), ' ms')} |",
             f"| P95 latency, PASS only | {_fmt(pass_latency.get('p95'), ' ms')} |",
-            f"| Mean latency, completed PASS+FAIL | {_fmt(completed_latency.get('mean'), ' ms')} |",
+            f"| Mean latency, completed model turns | {_fmt(completed_latency.get('mean'), ' ms')} |",
             f"| Mean latency, ERROR only | {_fmt(error_latency.get('mean'), ' ms')} |",
             f"| Server RSS before | {_fmt(resources.get('rss_before_mib'), ' MiB')} |",
             f"| Server sampled max RSS | {_fmt(resources.get('rss_sampled_max_mib'), ' MiB')} |",
@@ -647,6 +710,10 @@ def render_markdown_report(payload: dict) -> str:
     return "\n".join(lines)
 
 
+class ComparisonSchemaMismatchError(ValueError):
+    """An existing cumulative CSV has an incompatible header."""
+
+
 def append_comparison_csv(path: str | Path, payload: dict) -> None:
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -678,7 +745,27 @@ def append_comparison_csv(path: str | Path, payload: dict) -> None:
         "failures": summary["status_counts"]["FAIL"],
         "errors": summary["status_counts"]["ERROR"],
     }
+    if exists:
+        try:
+            with path.open("r", encoding="utf-8", newline="") as handle:
+                header = next(csv.reader(handle), None)
+        except (csv.Error, UnicodeError) as error:
+            raise ComparisonSchemaMismatchError(
+                f"comparison CSV schema mismatch at {path}: unreadable header"
+            ) from error
+        if header != list(row):
+            raise ComparisonSchemaMismatchError(
+                f"comparison CSV schema mismatch at {path}: "
+                f"expected {list(row)!r}, got {header!r}"
+            )
+    needs_separator = False
+    if exists and path.stat().st_size:
+        with path.open("rb") as handle:
+            handle.seek(-1, 2)
+            needs_separator = handle.read(1) not in (b"\r", b"\n")
     with path.open("a", encoding="utf-8", newline="") as handle:
+        if needs_separator:
+            handle.write("\r\n")
         writer = csv.DictWriter(handle, fieldnames=list(row))
         if not exists:
             writer.writeheader()
@@ -746,10 +833,10 @@ __all__ = [
     "ALL_TOOLS",
     "BODY_EMPTY",
     "BODY_EXACT",
-    "BODY_PREFIX_EXPLANATION",
     "BenchmarkCase",
     "BenchmarkTurn",
     "CaseEvaluation",
+    "ComparisonSchemaMismatchError",
     "RUN_ERROR",
     "RUN_FAIL",
     "RUN_PASS",
