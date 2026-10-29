@@ -7,7 +7,7 @@ Roadmap описывает только цель, границы и провер
 [Testing Results](../TESTING/Results/README.md).
 
 <!-- AUTO:roadmap:START -->
-**Текущая работа:** Stage 5.0 — FAST Cognition & Memory Integration: зафиксировать границу FAST/ACI и первый текстовый цикл Event → Cognitive Memory → Retrieval/Context → FAST → response; Internal State, Sleep, DEEP и Tools не входят в baseline.
+**Текущая работа:** Stage 5.2 — Memory read bridge: преобразовать текущий текстовый запрос в bounded Retrieval/ContextBundle для FAST и сохранить provenance и контекстные budgets.
 
 **Фокус:** 5 — FAST Cognition & Memory Integration (InProgress).
 
@@ -147,9 +147,9 @@ FAST result
 
 | Шаг | Результат | Проверка завершения |
 |---|---|---|
-| **5.0 Architecture / ACI — InProgress** | Зафиксированы ответственность FAST, минимальные `FASTRequest/FASTResult`, граница ACI и ownership данных | Документация однозначно отвечает, что знает/возвращает FAST и чего модель не имеет права изменять напрямую |
-| **5.1 Deterministic FAST harness** | Простая заменяемая test-реализация FAST проходит тот же ACI без LLM | Можно проверить Event → Context → FASTResult независимо от model/provider |
-| **5.2 Memory read bridge** | Текущий текстовый запрос преобразуется в bounded Retrieval/ContextBundle для FAST | FAST получает только выбранный контекст; provenance и `max_items/max_chars` сохраняются |
+| **5.0 Architecture / ACI — Complete** | Зафиксированы ответственность FAST, минимальные `FASTRequest/FASTResult`, граница ACI и ownership данных | Код и документация отделяют FAST от Agent/System ownership; граница подтверждена targeted tests и полным regression suite |
+| **5.1 Deterministic FAST harness — Complete** | Простая заменяемая test-реализация FAST проходит тот же ACI без LLM | `tests/test_fast_cognition.py`: 5 passed; полный regression suite: 662 passed на Python 3.14.4 |
+| **5.2 Memory read bridge — InProgress** | Текущий текстовый запрос преобразуется в bounded Retrieval/ContextBundle для FAST | FAST получает только выбранный контекст; provenance и `max_items/max_chars` сохраняются |
 | **5.3 Local FAST LLM** | Реальная локальная модель подключена через ACI; transport не определяет архитектуру cognition | Модель отвечает на текущий текст, используя переданный ContextBundle; backend можно заменить без изменения Memory |
 | **5.4 Cross-session recall** | Информация из прошлой сессии используется после полного нового model call/session | Модель без chat-history правильно отвечает только благодаря `memory.db → Retrieval → Context`; источник ответа прослеживается до Event |
 | **5.5 Memory interpretation** | FAST может выделить из нового текста смысловой memory candidate/interpretation | Результат FAST остаётся proposal; системный Memory path валидирует и сохраняет его с source Event/provenance |
@@ -157,6 +157,11 @@ FAST result
 | **5.7 Model replacement** | Один и тот же экземпляр ANIMA продолжает recall после restart и смены FAST backend/model | Identity/Memory сохраняются; новая модель получает тот же ACI/context contract и не требует миграции личности |
 | **5.8 Observability / performance** | Видны input, selected memory context, FAST result, latency/tokens и memory effects | Можно отделить ошибки retrieval, context assembly, model reasoning и memory processing; baseline сохранён без SLA |
 | **5.9 Stage validation** | Канонический текстовый сценарий объединяет ingest, recall, restart, update/conflict и model replacement | ANIMA накапливает и повторно использует опыт через внешнюю память; полный regression suite предыдущих этапов остаётся зелёным |
+
+5.0–5.1 подтверждены на snapshot `260a5bd`: документационные проверки прошли,
+`tests/test_fast_cognition.py` дал 5 passed, полный regression suite — 662 passed.
+Отдельный Validation Report не создаётся: это обычное успешное закрытие рабочего
+шага, а не показательный stage-level эксперимент.
 
 ### Первый канонический сценарий
 
