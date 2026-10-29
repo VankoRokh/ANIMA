@@ -20,7 +20,7 @@ ANIMA — исследовательский проект модульного �
 
 Текущий фокус: **5 — FAST Cognition & Memory Integration** (InProgress).
 
-Stage 5.0 — FAST Cognition & Memory Integration: зафиксировать границу FAST/ACI и первый текстовый цикл Event → Cognitive Memory → Retrieval/Context → FAST → response; Internal State, Sleep, DEEP и Tools не входят в baseline.
+Stage 5.2 — Memory read bridge: преобразовать текущий текстовый запрос в bounded Retrieval/ContextBundle для FAST и сохранить provenance и контекстные budgets.
 
 [Этапы и критерии](docs/ROADMAP/README.md).
 <!-- AUTO:summary:END -->
