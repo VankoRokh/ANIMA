@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Run the ANIMA Tool Model Benchmark against a local Qwen-Agent backend.
 
-The benchmark uses temporary ANIMA data and writes local evidence under
-.benchmarks/. It never touches the normal ANIMA data directory.
+The benchmark uses temporary Memory/Internal State data and writes local evidence
+under .benchmarks/. It never touches the normal ANIMA data directory.
 """
 
 from __future__ import annotations
@@ -80,6 +80,7 @@ def build_gateway(root: Path) -> AnimaReadOnlyToolGateway:
         description="Evaluate tool-model candidates",
         success_criterion="Complete the fixed ten-scenario benchmark",
         reason="Benchmark fixture",
+        source_id="benchmark:tool-model-v1",
         timestamp="2026-10-29T13:00:00+00:00",
         public_id="goal_88888888-8888-4888-8888-888888888888",
         transition_id="gt_99999999-9999-4999-8999-999999999999",
@@ -200,7 +201,7 @@ class ServerResourceMonitor:
         self._stop = threading.Event()
         self._thread = None
 
-    def _sample(self):
+    def _sample_memory(self):
         if self.pid is None:
             return
         memory = _read_proc_memory(self.pid)
@@ -214,6 +215,10 @@ class ServerResourceMonitor:
             self.vmhwm_mib = (
                 hwm if self.vmhwm_mib is None else max(self.vmhwm_mib, hwm)
             )
+
+    def sample_gpu(self):
+        if self.pid is None:
+            return
         gpu = _gpu_memory_mib(self.pid)
         if gpu is not None:
             self.gpu_vram_peak_mib = (
@@ -224,7 +229,7 @@ class ServerResourceMonitor:
 
     def _run(self):
         while not self._stop.wait(self.interval):
-            self._sample()
+            self._sample_memory()
 
     def start(self):
         if self.pid is None:
@@ -232,7 +237,8 @@ class ServerResourceMonitor:
         initial = _read_proc_memory(self.pid)
         self.rss_before_mib = initial["rss_mib"]
         self.vmhwm_mib = initial["vmhwm_mib"]
-        self._sample()
+        self._sample_memory()
+        self.sample_gpu()
         self._thread = threading.Thread(target=self._run, daemon=True)
         self._thread.start()
 
@@ -242,7 +248,8 @@ class ServerResourceMonitor:
         self._stop.set()
         if self._thread is not None:
             self._thread.join(timeout=max(1.0, self.interval * 4))
-        self._sample()
+        self._sample_memory()
+        self.sample_gpu()
 
     def as_dict(self):
         return {
@@ -343,6 +350,7 @@ def main() -> None:
                     )
                     if error_text:
                         print(f"        error: {error_text}")
+                    resource_monitor.sample_gpu()
     finally:
         resource_monitor.stop()
 
