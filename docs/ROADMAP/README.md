@@ -7,7 +7,7 @@ Roadmap описывает только цель, границы и провер
 [Testing Results](../TESTING/Results/README.md).
 
 <!-- AUTO:roadmap:START -->
-**Текущая работа:** Stage 5.2 — Memory read bridge: преобразовать текущий текстовый запрос в bounded Retrieval/ContextBundle для FAST и сохранить provenance и контекстные budgets.
+**Текущая работа:** Stage 5.3 — Local FAST LLM: подключить реальную локальную модель через ACI к уже проверенному bounded ContextBundle, не передавая модели владение Memory или системной оркестрацией.
 
 **Фокус:** 5 — FAST Cognition & Memory Integration (InProgress).
 
@@ -149,8 +149,8 @@ FAST result
 |---|---|---|
 | **5.0 Architecture / ACI — Complete** | Зафиксированы ответственность FAST, минимальные `FASTRequest/FASTResult`, граница ACI и ownership данных | Код и документация отделяют FAST от Agent/System ownership; граница подтверждена targeted tests и полным regression suite |
 | **5.1 Deterministic FAST harness — Complete** | Простая заменяемая test-реализация FAST проходит тот же ACI без LLM | `tests/test_fast_cognition.py`: 5 passed; полный regression suite: 662 passed на Python 3.14.4 |
-| **5.2 Memory read bridge — InProgress** | Текущий текстовый запрос преобразуется в bounded Retrieval/ContextBundle для FAST | FAST получает только выбранный контекст; provenance и `max_items/max_chars` сохраняются |
-| **5.3 Local FAST LLM** | Реальная локальная модель подключена через ACI; transport не определяет архитектуру cognition | Модель отвечает на текущий текст, используя переданный ContextBundle; backend можно заменить без изменения Memory |
+| **5.2 Memory read bridge — Complete** | Текущий текстовый запрос преобразуется в bounded Retrieval/ContextBundle для FAST | Реальный MemoryStore/Retrieval/ContextBuilder передаёт релевантную Memory в `FastRequest`; FAST budget и provenance сохраняются |
+| **5.3 Local FAST LLM — InProgress** | Реальная локальная модель подключена через ACI; transport не определяет архитектуру cognition | Модель отвечает на текущий текст, используя переданный ContextBundle; backend можно заменить без изменения Memory |
 | **5.4 Cross-session recall** | Информация из прошлой сессии используется после полного нового model call/session | Модель без chat-history правильно отвечает только благодаря `memory.db → Retrieval → Context`; источник ответа прослеживается до Event |
 | **5.5 Memory interpretation** | FAST может выделить из нового текста смысловой memory candidate/interpretation | Результат FAST остаётся proposal; системный Memory path валидирует и сохраняет его с source Event/provenance |
 | **5.6 Revision / contradiction** | Новый текст может уточнить или оспорить прошлую информацию без скрытой перезаписи истории | Старая и новая информация остаются прослеживаемыми; FAST не получает authority молча заменить Knowledge |
@@ -160,8 +160,10 @@ FAST result
 
 5.0–5.1 подтверждены на snapshot `260a5bd`: документационные проверки прошли,
 `tests/test_fast_cognition.py` дал 5 passed, полный regression suite — 662 passed.
-Отдельный Validation Report не создаётся: это обычное успешное закрытие рабочего
-шага, а не показательный stage-level эксперимент.
+5.2 подтверждён на snapshot `bb7e8a8`: `tests/test_fast_memory_read_bridge.py` —
+3 passed, объединённые FAST tests — 8 passed, полный regression suite — 665 passed.
+Отдельный Validation Report не создаётся: это обычные успешные рабочие проверки, а
+не показательный stage-level эксперимент.
 
 ### Первый канонический сценарий
 
