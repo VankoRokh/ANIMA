@@ -20,7 +20,7 @@ ANIMA — исследовательский проект модульного �
 
 Текущий фокус: **5 — FAST Cognition & Memory Integration** (InProgress).
 
-Stage 5.2 — Memory read bridge: преобразовать текущий текстовый запрос в bounded Retrieval/ContextBundle для FAST и сохранить provenance и контекстные budgets.
+Stage 5.3 — Local FAST LLM: подключить реальную локальную модель через ACI к уже проверенному bounded ContextBundle, не передавая модели владение Memory или системной оркестрацией.
 
 [Этапы и критерии](docs/ROADMAP/README.md).
 <!-- AUTO:summary:END -->
