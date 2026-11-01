@@ -27,6 +27,14 @@ Harness создаёт данные в tmp_path; subprocess-тесты явно 
 
 Representative saved evidence оформляется отдельным TV report с implementation snapshot, условиями, canonical scenario, измеренными результатами и границами доказанного. Пример — [TV-0042](Results/TV-0042.md): integration Passed отделён от model reliability. Временные captures не заменяют сохраняемый проектный отчёт; каждый диагностический запуск копировать не требуется.
 
+Для текущего Stage 5 pipeline доступен отдельный [Benchmark v2](Stage5_Benchmark_v2.md):
+восемь bounded scenarios на том же inventory моделей; Benchmark v1 сохраняется отдельно.
+Завершённый one-pass прогон документирован там только как preliminary / exploratory
+evidence архитектурной границы, не как официальный рейтинг, reliability estimate
+или решение о preferred FAST backend. До выбора модели нужны repeated runs с
+paraphrased/equivalent scenarios; проценты v1/v2 напрямую не сопоставимы.
+Raw captures остаются локальными ignored experimental artifacts.
+
 ## Opt-in Stage 5 projected smoke
 
 [Runner](../../scripts/run_stage5_smoke.py) проверяет production
