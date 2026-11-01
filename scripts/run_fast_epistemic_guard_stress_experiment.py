@@ -69,11 +69,14 @@ PROJECT_HISTORY = (
 
 # Proper-name/property questions may refer to a private entity (for example a pet)
 # or to a public entity. v1 therefore refuses to guess and marks them AMBIGUOUS.
+# Keep the entity token case-sensitive so sentence capitalization does not turn any
+# arbitrary noun into a "named entity"; only the interrogative's first letter is
+# allowed to vary in case.
 NAMED_ENTITY_PROPERTY = (
-    re.compile(r"^какого\s+цвета\s+[А-ЯA-Z][\w-]+\??$"),
-    re.compile(r"^что\s+любит\s+[А-ЯA-Z][\w-]+\??$"),
-    re.compile(r"^когда\s+[А-ЯA-Z][\w-]+\s+обычно\s+ест\??$"),
-    re.compile(r"^какой\s+у\s+[А-ЯA-Z][\w-]+\s+характер\??$"),
+    re.compile(r"^[Кк]акого\s+цвета\s+[А-ЯA-Z][\w-]+\??$"),
+    re.compile(r"^[Чч]то\s+любит\s+[А-ЯA-Z][\w-]+\??$"),
+    re.compile(r"^[Кк]огда\s+[А-ЯA-Z][\w-]+\s+обычно\s+ест\??$"),
+    re.compile(r"^[Кк]акой\s+у\s+[А-ЯA-Z][\w-]+\s+характер\??$"),
 )
 
 VAGUE_CONTEXT_REFERENCE = (
