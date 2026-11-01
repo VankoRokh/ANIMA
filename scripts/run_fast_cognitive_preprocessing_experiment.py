@@ -70,7 +70,7 @@ _TASK_INDEX = {task["task_id"]: task for task in TASKS}
 CASES = tuple(_TASK_INDEX[task_id] for task_id in TARGET_IDS)
 
 _RESULT_PATTERN = re.compile(
-    r"^\s*RESULT\s*=\s*(?:<\s*(?P<bracketed>[^<>]+?)\s*>|(?P<plain>[^\r\n]+?))\s*$",
+    r"^\s*RESULT\s*=\s*(?:<\s*(?P<bracketed>[^<>]+?)\s*>|(?P<plain>[^\s<>]+))\s*$",
     re.IGNORECASE,
 )
 
