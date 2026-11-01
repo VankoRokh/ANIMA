@@ -166,7 +166,8 @@ def test_llama_cpp_transport_passes_thinking_flag_without_json_schema():
     apply_endpoint, apply_payload, _ = transport.requests[0]
     completion_endpoint, completion_payload, _ = transport.requests[1]
     assert apply_endpoint.endswith("/apply-template")
-    assert apply_payload["enable_thinking"] is True
+    assert apply_payload["chat_template_kwargs"] == {"enable_thinking": True}
+    assert "enable_thinking" not in apply_payload
     assert completion_endpoint.endswith("/completion")
     assert completion_payload["n_predict"] == 512
     assert "json_schema" not in completion_payload
@@ -181,4 +182,5 @@ def test_llama_cpp_transport_can_disable_thinking():
         timeout_seconds=30.0,
     )
 
-    assert transport.requests[0][1]["enable_thinking"] is False
+    assert transport.requests[0][1]["chat_template_kwargs"] == {"enable_thinking": False}
+    assert "enable_thinking" not in transport.requests[0][1]

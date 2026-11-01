@@ -2,6 +2,7 @@ from dataclasses import dataclass
 from typing import Protocol, runtime_checkable
 
 from anima.core.event_bus import Event
+from .contracts import CognitiveView
 
 
 @dataclass(frozen=True)
@@ -41,10 +42,32 @@ class FastResult:
 
 
 @dataclass(frozen=True)
+class ProjectedFastRequest:
+    """Explicit projected-task variant; never passed to legacy FastBackend.complete."""
+
+    input_source_id: str
+    cognitive_view: CognitiveView
+    input_event_id: str | None = None
+    input_text: str | None = None
+    context_bundle: dict | None = None
+
+    def __post_init__(self):
+        if not isinstance(self.input_source_id, str) or not self.input_source_id.strip():
+            raise ValueError("Projected FAST request requires input_source_id")
+        if not isinstance(self.cognitive_view, CognitiveView):
+            raise TypeError("Projected FAST request requires CognitiveView")
+        if self.input_event_id is None:
+            if self.input_text is not None or self.context_bundle is not None:
+                raise ValueError("Structured FAST request carries projection without text context")
+        else:
+            FastRequest(self.input_event_id, self.input_text, self.context_bundle)
+
+
+@dataclass(frozen=True)
 class FastTurn:
     """Observable request/result pair for one FAST cognition call."""
 
-    request: FastRequest
+    request: FastRequest | ProjectedFastRequest
     result: FastResult
 
 
@@ -53,6 +76,14 @@ class FastBackend(Protocol):
     """Replaceable cognitive backend used by the FAST path."""
 
     def complete(self, request: FastRequest) -> FastResult:
+        ...
+
+
+@runtime_checkable
+class ProjectedFastBackend(Protocol):
+    """Explicit capability for a backend that consumes projected tasks."""
+
+    def complete_projected(self, request: ProjectedFastRequest) -> FastResult:
         ...
 
 

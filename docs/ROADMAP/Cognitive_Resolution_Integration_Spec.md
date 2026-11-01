@@ -1,8 +1,24 @@
 # Cognitive Resolution Integration Specification
 
-> Статус: **approved for implementation**. Это спецификация следующей production-интеграции, а не описание уже реализованной архитектуры.
+> **Утверждённый контракт Stage 5.** Реализованные детали и остающиеся closure checks отделены от требований ниже. Динамический статус/focus хранится только в [project.json](../project.json); документ не объявляет Stage завершённым.
 >
 > Основание: экспериментальная серия Structured Request / Semantic Memory / Adaptive IR / Deterministic Resolution (Tests H–M1) на ветке `work/context-grounding-v0`.
+
+## 0. Явное уточнение приоритетов и scope
+
+Исходный [Stage 5 roadmap](README.md#stage-5) планировал после read path semantic
+interpretation-to-write и revision/contradiction. Одобренный после H–M1 приоритет —
+сначала стабилизировать Canonical IR, exact deterministic resolution, epistemic
+handling, projected cognition, legacy/projected ACI и audit этой границы.
+Это изменение плана сохраняет исходный intent как
+[отложенную работу](README.md#отложенный-исходный-scope-stage-5); semantic persistence,
+write/update/revision и temporal fact lifecycle не являются closure gate Stage 5.
+Не требуется Runtime/CLI, Agent/Planner или executor integration.
+
+Принятые уточнения реализации: Canonical IR находится на уровне ANIMA (`anima/ir.py`);
+`process_task(CanonicalTask)` не требует text retrieval; unknown candidates отличаются
+от known-empty universe. При полных данных отсутствие admissible action — typed
+`DETERMINISTIC_RESULT / NO_ADMISSIBLE_ACTION`, а не insufficient data.
 
 ## 1. Цель
 
@@ -78,7 +94,7 @@ IR хранит достаточно полную внутреннюю инфо�
 - subject/entity references, если они уже разрешены;
 - requested field / predicate, если он уже разрешён;
 - relevant evidence/facts;
-- current state / constraints / candidates, когда применимо;
+- current state / constraints / candidates, когда применимо; unknown candidate universe (`None`) отличается от явно известного пустого (`()`);
 - formal policies, когда применимо;
 - raw input как provenance/fallback, а не как основной внутренний протокол;
 - requested/allowed output contract.
@@ -105,7 +121,7 @@ Resolver применяет только явно определённые, ма
 Разрешено:
 
 - exact lookup по уже разрешённому structured evidence;
-- арифметика и сравнения;
+- точная арифметика и сравнения: accepted decimal literals не проходят через binary float, runtime не округляет произвольно; non-terminating decimal result безопасно покидает deterministic path;
 - deterministic derived values;
 - hard constraints;
 - candidate elimination;
@@ -143,7 +159,7 @@ COGNITIVE_REQUIRED
 
 `DETERMINISTIC_RESULT`:
 
-- содержит однозначный value/result;
+- содержит однозначный value/result либо typed `NO_ADMISSIBLE_ACTION` с `value=None`, когда complete known candidate universe исключён hard constraints или явно пуст;
 - не вызывает FAST;
 - может содержать derived trace.
 
@@ -243,7 +259,10 @@ DEEP не реализуется в этой интеграции.
 - FAST не владеет Identity, Goals, Internal State или system orchestration;
 - модель может быть заменена без потери экземпляра ANIMA.
 
-Существующие `FastRequest`, `FastResult`, `FastBackend`, `FastCognition` не должны ломаться без доказанной необходимости.
+Существующие `FastRequest`, `FastResult`, `FastBackend`, `FastCognition` сохраняют legacy
+non-null text/context assumptions. Projected requests используют отдельные
+`ProjectedFastRequest` / `ProjectedFastBackend.complete_projected`; неподдерживаемая
+capability отклоняется до вызова. LLM backend может явно поддерживать оба интерфейса.
 
 Допустима backward-compatible эволюция ACI или новый adapter над ним, если существующие Stage 5.1/5.2 тесты продолжают проходить.
 
@@ -280,13 +299,14 @@ Codex должен реализовать минимальный production slic
 4. hard-constraint candidate filtering;
 5. минимальный Formal Policy `ACTION_PRIORITY`;
 6. adaptive model-facing projection;
-7. cognitive route, который на Stage 5 вызывает FAST только для `COGNITIVE_REQUIRED`;
+7. cognitive route, который на Stage 5 вызывает FAST только для supported `COGNITIVE_REQUIRED` с допустимым output;
 8. observability, позволяющая увидеть:
    - route;
    - deterministic reason;
    - rejected/remaining candidates;
    - applied policy IDs;
-   - whether model was called;
+   - backend attempts отдельно от successful completions (successful `call_history` не является счётчиком attempts);
+   - terminal backend failure, bounded failure classification и task/source identity, с сохранением exception propagation без retry/fallback;
    - projected model view;
    - final result.
 
@@ -413,7 +433,10 @@ Production tests must cover at least:
 - missing deterministic input → `INSUFFICIENT_DATA`;
 - single action after hard constraints → deterministic;
 - multiple valid actions without policy → `COGNITIVE_REQUIRED`;
-- no valid action → safe non-cognitive failure/insufficient route according to chosen typed contract;
+- known-empty/all hard-rejected candidates при полных данных → typed deterministic `NO_ADMISSIBLE_ACTION`;
+- omitted/unknown candidate universe → `INSUFFICIENT_DATA`;
+- unsupported rules/policies не стирают известные missing requirements;
+- unverified-only cognitive request без admissible output не вызывает backend и не выдаётся за доказанную infeasibility;
 - unsupported/open operation → `COGNITIVE_REQUIRED`;
 - zero false-deterministic cases in the canonical boundary corpus.
 
@@ -440,10 +463,10 @@ Mixed corpus must prove:
 
 - deterministic result → zero model calls;
 - insufficient data → zero model calls;
-- cognitive task → exactly one FAST call;
+- supported cognitive task с admissible output → exactly one FAST call; заведомо unsatisfiable constrained request не вызывает backend;
 - final response retains route/model-call trace;
 - model backend remains replaceable;
-- model call count is observable;
+- backend attempts, successful completions и terminal failures/classification различимы и наблюдаемы с task/source identity;
 - restart/backend replacement does not mutate Memory/Identity ownership.
 
 Use fake/deterministic FAST backends for normal CI. Real Qwen validation remains an explicit manual/benchmark test and must not be required for unit CI.

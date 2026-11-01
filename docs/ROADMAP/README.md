@@ -7,9 +7,9 @@ Roadmap описывает только цель, границы и провер
 [Testing Results](../TESTING/Results/README.md).
 
 <!-- AUTO:roadmap:START -->
-**Текущая работа:** Stage 5.3 — Local FAST LLM: подключить реальную локальную модель через ACI к уже проверенному bounded ContextBundle, не передавая модели владение Memory или системной оркестрацией.
+**Текущая работа:** Stage 5 завершён: принят scope canonical IR → deterministic resolution → projected cognition → FAST integration; representative acceptance evidence — TV-0043, real-model projected smoke прошёл все семь acceptance cases. Unrestricted text output остаётся semantic, не byte-exact. Stage 6 запланирован, работа не начата. Semantic persistence/write lifecycle, DEEP, Agent/Planner, execution, Sleep, Internal State integration, broader parsing/data acquisition/rendering остаются будущей работой.
 
-**Фокус:** 5 — FAST Cognition & Memory Integration (InProgress).
+**Фокус:** 6 — Cognitive Integration (Planned).
 
 | Этап | Проверяемый результат | Статус | Зависимости |
 |---|---|---|---|
@@ -20,7 +20,7 @@ Roadmap описывает только цель, границы и провер
 | [2 — Internal State](#stage-2) | Влияние внутреннего состояния на выбор причинно прослеживается | Complete | [1](#stage-1) |
 | [3 — Sleep](#stage-3) | Консолидация прерывается и возобновляется без потери источников | Complete | [2](#stage-2) |
 | [4 — Agent / LLM Planner Experiment](#stage-4) | Проверен recoverable action loop, но роль LLM Planner признана архитектурным отклонением; результаты 4.0–4.12 сохранены | Stopped | [3](#stage-3) |
-| [5 — FAST Cognition & Memory Integration](#stage-5) | FAST использует ограниченный контекст Cognitive Memory и участвует в текстовом цикле без владения памятью или системным состоянием | InProgress | [1](#stage-1), [D1](#d1) |
+| [5 — FAST Cognition & Memory Integration](#stage-5) | FAST использует ограниченный контекст Cognitive Memory и участвует в текстовом цикле без владения памятью или системным состоянием | Complete | [1](#stage-1), [D1](#d1) |
 | [6 — Cognitive Integration](#stage-6) | FAST, DEEP, routing, Tasks, Goals и исполнительный слой объединяются вокруг работающего когнитивного контура | Planned | [5](#stage-5), [2](#stage-2), [3](#stage-3) |
 | [7 — Virtual ANIMA](#stage-7) | Непрерывная система работает в виртуальной среде и имеет измеренный ресурсный профиль | Planned | [6](#stage-6) |
 | [8 — Cyberdeck](#stage-8) | Измеренная нагрузка переносится на автономное устройство | Planned | [7](#stage-7) |
@@ -104,92 +104,107 @@ Verification/recovery сохраняется для последующей Cogni
 
 ## Stage 5
 
-**FAST Cognition & Memory Integration — Current.**
+**FAST Cognition & Memory Integration.** Текущий статус и фокус берутся только из
+[project.json](../project.json); этот раздел задаёт scope и критерии, а не второй
+реестр статусов. Авторитетный контракт —
+[Cognitive Resolution Integration Spec](Cognitive_Resolution_Integration_Spec.md).
 
-### Цель
+### Эволюция scope
 
-Создать первый настоящий когнитивный модуль ANIMA: небольшую сменяемую FAST-модель,
-которая получает текущий текстовый вход и ограниченный релевантный контекст из
-Cognitive Memory, формирует ответ/интерпретацию и может предлагать смысловые
-кандидаты для памяти, не получая прямого владения Memory или системным состоянием.
+Исходный план 5.0–5.9 включал read path, затем semantic interpretation-to-write,
+revision/contradiction и объединённый сценарий записи/обновления памяти.
+Экспериментальная серия H–M1 и последующие одобренные архитектурные уточнения
+изменили приоритет: сначала стабилизируется model-independent read/resolution/
+projected-cognition boundary. Это явное изменение плана, а не признание исходных
+write/revision целей выполненными. Исторические цели 5.5/5.6 сохранены ниже как
+[отложенная работа](#отложенный-исходный-scope-stage-5).
 
-Первый рабочий контур:
+### Утверждённый production slice
 
 ```text
-conversation.user Event
-        ↓
-Event / Memory pipeline
-        ↓
-Retrieval + Context Builder
-        ↓
-ANIMA Cognitive Interface
-        ↓
-FAST
-        ↓
-FAST result
-        ├─ response
-        ├─ memory interpretation/candidate
-        └─ request for more context
+conversation.user → conservative frontend → CanonicalTask + bounded context
+structured CanonicalTask ────────────────────────────────┘
+                              ↓
+                    deterministic resolution
+                    ├─ deterministic value / no admissible action
+                    ├─ insufficient data / missing requirements
+                    └─ supported cognitive remainder → projection → FAST
 ```
 
-### Границы baseline
+В scope входят Canonical IR (`anima/ir.py`), exact structured evidence lookup,
+точная арифметика и constraints, insufficient-data handling, machine-readable
+`ACTION_PRIORITY`, projected cognition, uniform allowed-output validation и
+наблюдаемость этой границы. Frontend не угадывает intent/entity/fact.
 
-- только текстовые `conversation.user` Events;
-- существующие EventLog, MemoryProcessor, Retrieval, ContextBuilder и provenance;
-- одна локальная FAST LLM через заменяемый backend/adapter;
-- FAST не пишет напрямую в `memory.db`, `events.jsonl` или другие stores;
-- FAST не меняет Identity, Knowledge authority, Goals или Internal State напрямую;
-- модель можно перезапустить/заменить, а накопленный опыт остаётся у ANIMA;
-- Internal State, Sleep, DEEP, Tools, AgentLoop и физическая периферия не участвуют
-  в baseline и не нужны для завершения Stage 5.
+Event path использует существующий `ContextBuilder` ровно один раз, сохраняя FAST
+budget и provenance. Structured task сразу поступает в resolution без FTS,
+фиктивного текста или Event ID. `FastRequest`/`FastBackend.complete` остаются legacy
+ACI; `ProjectedFastRequest`/`ProjectedFastBackend.complete_projected` задают явную
+новую capability. FAST не владеет Memory, Identity, Goals, routing или Runtime.
 
-### Рабочая декомпозиция Stage 5
+### Проверяемые результаты Stage 5
 
-| Шаг | Результат | Проверка завершения |
+| Исходный шаг / уточнение | Результат в текущем scope | Критерий acceptance |
 |---|---|---|
-| **5.0 Architecture / ACI — Complete** | Зафиксированы ответственность FAST, минимальные `FASTRequest/FASTResult`, граница ACI и ownership данных | Код и документация отделяют FAST от Agent/System ownership; граница подтверждена targeted tests и полным regression suite |
-| **5.1 Deterministic FAST harness — Complete** | Простая заменяемая test-реализация FAST проходит тот же ACI без LLM | `tests/test_fast_cognition.py`: 5 passed; полный regression suite: 662 passed на Python 3.14.4 |
-| **5.2 Memory read bridge — Complete** | Текущий текстовый запрос преобразуется в bounded Retrieval/ContextBundle для FAST | Реальный MemoryStore/Retrieval/ContextBuilder передаёт релевантную Memory в `FastRequest`; FAST budget и provenance сохраняются |
-| **5.3 Local FAST LLM — InProgress** | Реальная локальная модель подключена через ACI; transport не определяет архитектуру cognition | Модель отвечает на текущий текст, используя переданный ContextBundle; backend можно заменить без изменения Memory |
-| **5.4 Cross-session recall** | Информация из прошлой сессии используется после полного нового model call/session | Модель без chat-history правильно отвечает только благодаря `memory.db → Retrieval → Context`; источник ответа прослеживается до Event |
-| **5.5 Memory interpretation** | FAST может выделить из нового текста смысловой memory candidate/interpretation | Результат FAST остаётся proposal; системный Memory path валидирует и сохраняет его с source Event/provenance |
-| **5.6 Revision / contradiction** | Новый текст может уточнить или оспорить прошлую информацию без скрытой перезаписи истории | Старая и новая информация остаются прослеживаемыми; FAST не получает authority молча заменить Knowledge |
-| **5.7 Model replacement** | Один и тот же экземпляр ANIMA продолжает recall после restart и смены FAST backend/model | Identity/Memory сохраняются; новая модель получает тот же ACI/context contract и не требует миграции личности |
-| **5.8 Observability / performance** | Видны input, selected memory context, FAST result, latency/tokens и memory effects | Можно отделить ошибки retrieval, context assembly, model reasoning и memory processing; baseline сохранён без SLA |
-| **5.9 Stage validation** | Канонический текстовый сценарий объединяет ingest, recall, restart, update/conflict и model replacement | ANIMA накапливает и повторно использует опыт через внешнюю память; полный regression suite предыдущих этапов остаётся зелёным |
+| 5.0–5.2 Architecture / harness / Memory read | Legacy ACI и authoritative Memory read path сохраняются | Backend replacement, bounded context и source provenance проходят regression |
+| 5.3 Local FAST LLM | Локальная модель поддерживает явную projected capability | Opt-in production-pipeline smoke подтверждает доставку projected information и ровно один call для supported cognitive task |
+| Canonical IR / deterministic boundary | Общий IR отделён от resolver и модели; правила машинно проверяемы | Exact decimals/constraints, policy agreement/conflict, missing requirements, unknown/empty candidates и output contracts проверены |
+| 5.4 Cross-session recall | Новая сессия/чистый backend получает прошлый опыт из Memory | Selected evidence прослеживается до Event, без model chat history |
+| 5.7 Backend replacement | Замена backend не меняет Memory/Identity ownership | Read stack/backend реконструируются с сохранением данных и provenance |
+| 5.8 Observability | Видны route, context/view, attempts, completions, failure classification и final result | Zero-call paths, successful call и terminal backend exception различимы; нет retry/fallback |
+| 5.9 Stage validation | Канонический read/resolution/cognition сценарий и его failure cases | Targeted и полный обычный pytest, integrity, representative acceptance report и projected real-model smoke проходят |
 
-5.0–5.1 подтверждены на snapshot `260a5bd`: документационные проверки прошли,
-`tests/test_fast_cognition.py` дал 5 passed, полный regression suite — 662 passed.
-5.2 подтверждён на snapshot `bb7e8a8`: `tests/test_fast_memory_read_bridge.py` —
-3 passed, объединённые FAST tests — 8 passed, полный regression suite — 665 passed.
-Отдельный Validation Report не создаётся: это обычные успешные рабочие проверки, а
-не показательный stage-level эксперимент.
+5.0–5.1 исторически подтверждены на snapshot `260a5bd`: FAST tests — 5 passed,
+полный suite — 662 passed. 5.2 подтверждён на `bb7e8a8`: Memory bridge — 3 passed,
+объединённые FAST tests — 8 passed, полный suite — 665 passed. Это условия прошлых
+проверок, а не текущие счётчики или повторяющиеся статусы. Для тех рабочих проверок
+отдельный TV report не создавался; закрытие всего Stage требует representative
+report по [правилам Testing](../TESTING/README.md).
 
-### Первый канонический сценарий
+### Канонический сценарий текущего scope
 
-1. В сессии A пользователь сообщает простой устойчивый факт/отношение.
-2. Event и существующий Memory pipeline сохраняют опыт с provenance.
-3. FAST/model process завершается; никакая скрытая chat history не переносится.
-4. В сессии B пользователь задаёт вопрос, требующий этого прошлого опыта.
-5. Retrieval/Context Builder находят релевантную Memory и передают её FAST.
-6. FAST формирует корректный ответ; trace показывает использованный memory ID и
-   source Event.
-7. Позже пользователь уточняет или меняет исходную информацию; новая запись не
-   уничтожает старое происхождение.
+1. Существующий системный Memory path сохраняет опыт с source Event/provenance.
+2. В новой сессии реконструированный read stack получает bounded relevant context.
+3. ANIMA нормализует только безопасно распознанный input и применяет strict rules.
+4. Deterministic/insufficient routes не вызывают backend; неподдержанный constrained
+   request без admissible output также не вызывает заведомо бесполезный backend.
+5. Supported cognitive remainder проходит projection и один вызов FAST.
+6. Allowed-output validation проверяет final value независимо от его источника.
+7. Successful completion и terminal failure наблюдаемы; Memory/Identity сохраняются
+   после реконструкции backend. Update/write/revision сценарий здесь не требуется.
 
-**Definition of Done.** FAST является сменяемым cognitive consumer ANIMA, а не
-владельцем памяти или главным runtime loop; cross-session recall зависит от
-Cognitive Memory, а не model chat history; FAST может предлагать семантическую
-интерпретацию нового опыта через контролируемый memory path; provenance сохраняется;
-restart и замена модели не уничтожают опыт; ошибки retrieval/model/memory processing
-различимы по trace.
+**Definition of Done.** Завершён именно утверждённый read/resolution/projected-
+cognition slice: IR и ownership boundaries соблюдены, exact rules не дают false
+deterministic results, missing information не выдумывается моделью, hard constraints
+предшествуют policies, conflicting/malformed policies не выбирают deterministic
+winner. Подтверждены bounded Memory/provenance, cross-session read, explicit backend
+capabilities, uniform output validation и failure audit. Пройдены production tests,
+обычный full regression и небольшой real-model projected smoke; сохранён stage-level
+report и согласованы документы. Runtime/CLI integration, semantic writes и соседние
+подсистемы не являются условием закрытия этого slice.
+
+### Отложенный исходный scope Stage 5
+
+| Историческое намерение | Явно отложенная будущая работа |
+|---|---|
+| 5.5 Memory interpretation | Semantic interpretation-to-write adapter, проверка и сохранение предложенных facts/candidates системным Memory owner |
+| 5.6 Revision / contradiction | Semantic write/update/revision lifecycle, temporal fact lifecycle, conflict write policy и сохранение истории изменений |
+| Write/update часть исходного 5.9 | Отдельная будущая интеграционная проверка после проектирования persistence/lifecycle |
+
+Semantic persistence/schema, write/update/revision и temporal lifecycle возвращаются
+в план отдельным решением после стабильного read pipeline. Исторический intent
+сохраняется; он не реализован и не считается пройденным в Stage 5. Полезные границы
+из [ADR-009](../DECISIONS/README.md#adr-009) сохраняются без возврата LLM Planner.
 
 ## Stage 6
 
 **Cognitive Integration — Planned.** После доказанного FAST возвращаем DEEP,
 reasoning routing, persistent Tasks, Goals/Internal State, Sleep cognition и полезные
 части Stage 4 исполнительного слоя. Их объединяем вокруг уже работающего cognition,
-а не заставляем LLM владеть системной оркестрацией.
+а не заставляем LLM владеть системной оркестрацией. Semantic persistence/write,
+interpretation-to-write и temporal revision lifecycle остаются отдельно планируемой
+[отложенной работой](#отложенный-исходный-scope-stage-5), а не неявным обязательством
+текущего Stage. Начало следующего этапа требует отдельного решения.
 
 ## Stage 7
 

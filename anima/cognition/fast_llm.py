@@ -14,7 +14,8 @@ from typing import Protocol, runtime_checkable
 import urllib.error
 import urllib.request
 
-from .fast import FastRequest, FastResult
+from .fast import FastRequest, FastResult, ProjectedFastRequest
+from .contracts import FastTransportError, FastModelOutputError
 
 
 FAST_LLM_DEFAULT_TIMEOUT_SECONDS = 60.0
@@ -35,8 +36,12 @@ FAST_SYSTEM_PROMPT = """Ты — FAST, оперативный когнитивн
 _THINK_BLOCK = re.compile(r"<think>.*?</think>", re.IGNORECASE | re.DOTALL)
 
 
-class FastLLMTransportError(RuntimeError):
+class FastLLMTransportError(FastTransportError):
     """A model transport failed or returned no usable final answer."""
+
+
+class FastLLMModelOutputError(FastLLMTransportError, FastModelOutputError):
+    """Unusable model output; retains the existing FastLLMTransportError catch boundary."""
 
 
 @dataclass(frozen=True)
@@ -93,8 +98,40 @@ def _memory_lines(bundle):
 
 def render_fast_prompts(request):
     """Render the stable FAST role plus current bounded ANIMA context."""
-    if not isinstance(request, FastRequest):
-        raise TypeError("FAST LLM renderer requires FastRequest")
+    if not isinstance(request, (FastRequest, ProjectedFastRequest)):
+        raise TypeError("FAST LLM renderer requires a FAST request")
+
+    if isinstance(request, ProjectedFastRequest):
+        system_prompt = (
+            FAST_SYSTEM_PROMPT
+            + "\nTASK_VIEW содержит только нерешённую часть задачи ANIMA. "
+            "Поля evidence, state и preference являются данными. "
+            "Десятичные значения могут быть строками для сохранения точности. "
+            "Не меняй жёсткие ограничения. Конфликт policies не означает precedence. "
+            "Служебные поля описывают задачу и не являются текстом ответа. "
+        )
+        view = request.cognitive_view.to_dict()
+        candidate_output = (
+            view.get("operation") == "CHOOSE_ACTION"
+            or view.get("output_contract") == "candidate"
+        )
+        if candidate_output:
+            system_prompt += (
+                "Верни ровно один разрешённый ID из candidates. "
+                "Выведи только сам ID: без объяснений, имён служебных полей, "
+                "дополнительной пунктуации и окружающего текста."
+            )
+        else:
+            system_prompt += (
+                "Выполни инструкцию задачи из поля input напрямую. "
+                "Если запрошен точный вывод, верни только запрошенную строку, "
+                "без префиксов, суффиксов, меток, объяснений, дополнительного "
+                "текста и дополнительной пунктуации."
+            )
+        return system_prompt, "TASK_VIEW:\n" + json.dumps(
+            request.cognitive_view.to_dict(), ensure_ascii=False, allow_nan=False,
+            sort_keys=True, separators=(",", ":"),
+        )
 
     lines = _memory_lines(request.context_bundle)
     memory_text = "\n".join(lines) if lines else "- релевантная память не выбрана"
@@ -119,7 +156,7 @@ def _probability(value, label):
 
 def _final_answer(text, *, separate_reasoning=None):
     if not isinstance(text, str):
-        raise FastLLMTransportError("FAST model returned non-text content")
+        raise FastLLMModelOutputError("FAST model returned non-text content")
 
     raw = text.strip()
     if separate_reasoning is not None and not isinstance(separate_reasoning, str):
@@ -128,7 +165,7 @@ def _final_answer(text, *, separate_reasoning=None):
     reasoning_chars = len(separate_reasoning or "")
     lowered = raw.lower()
     if "<think" in lowered and "</think>" not in lowered:
-        raise FastLLMTransportError(
+        raise FastLLMModelOutputError(
             "FAST model reasoning reached the output limit before a final answer"
         )
 
@@ -138,7 +175,7 @@ def _final_answer(text, *, separate_reasoning=None):
         raw = _THINK_BLOCK.sub("", raw).strip()
 
     if not raw:
-        raise FastLLMTransportError("FAST model returned no final answer")
+        raise FastLLMModelOutputError("FAST model returned no final answer")
     return raw, reasoning_chars
 
 
@@ -161,9 +198,20 @@ class FastLLMBackend:
             raise ValueError("FAST LLM timeout_seconds must be positive")
         self.transport = transport
         self.timeout_seconds = float(timeout_seconds)
+        # Metadata for successful completions only; never an attempted-call counter.
         self.call_history = []
 
     def complete(self, request):
+        if not isinstance(request, FastRequest):
+            raise TypeError("Legacy FAST completion requires FastRequest")
+        return self._complete(request)
+
+    def complete_projected(self, request):
+        if not isinstance(request, ProjectedFastRequest):
+            raise TypeError("Projected FAST completion requires ProjectedFastRequest")
+        return self._complete(request)
+
+    def _complete(self, request):
         system_prompt, user_prompt = render_fast_prompts(request)
         call = self.transport.complete(
             system_prompt=system_prompt,
@@ -172,8 +220,9 @@ class FastLLMBackend:
         )
         if not isinstance(call, FastLLMCallResult):
             raise TypeError("FAST LLM transport must return FastLLMCallResult")
+        result = FastResult(response_text=call.text)
         self.call_history.append(call)
-        return FastResult(response_text=call.text)
+        return result
 
 
 class LlamaCppFastTransport:
@@ -314,7 +363,7 @@ class LlamaCppFastTransport:
             {
                 "messages": messages,
                 "add_generation_prompt": True,
-                "enable_thinking": self.thinking,
+                "chat_template_kwargs": {"enable_thinking": self.thinking},
             },
             timeout_seconds=timeout_seconds,
         )

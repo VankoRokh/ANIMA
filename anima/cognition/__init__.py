@@ -4,7 +4,11 @@ from .fast import (
     FastRequest,
     FastResult,
     FastTurn,
+    ProjectedFastRequest,
+    ProjectedFastBackend,
 )
+from .pipeline import CognitivePipeline, CognitiveTurn
+from .contracts import CognitiveView
 from .fast_llm import (
     FAST_LLM_DEFAULT_MAX_OUTPUT_TOKENS,
     FAST_LLM_DEFAULT_MIN_P,
@@ -29,6 +33,9 @@ __all__ = [
     "FAST_LLM_DEFAULT_TOP_K",
     "FAST_LLM_DEFAULT_TOP_P",
     "FAST_SYSTEM_PROMPT",
+    "CognitivePipeline",
+    "CognitiveTurn",
+    "CognitiveView",
     "FastBackend",
     "FastCognition",
     "FastLLMBackend",
@@ -38,6 +45,8 @@ __all__ = [
     "FastResult",
     "FastTextTransport",
     "FastTurn",
+    "ProjectedFastRequest",
+    "ProjectedFastBackend",
     "LlamaCppFastTransport",
     "render_fast_prompts",
 ]

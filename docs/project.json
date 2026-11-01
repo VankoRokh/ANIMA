@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "current_stage": "5",
-  "focus": "Stage 5.3 — Local FAST LLM: подключить реальную локальную модель через ACI к уже проверенному bounded ContextBundle, не передавая модели владение Memory или системной оркестрацией.",
+  "current_stage": "6",
+  "focus": "Stage 5 завершён: принят scope canonical IR → deterministic resolution → projected cognition → FAST integration; representative acceptance evidence — TV-0043, real-model projected smoke прошёл все семь acceptance cases. Unrestricted text output остаётся semantic, не byte-exact. Stage 6 запланирован, работа не начата. Semantic persistence/write lifecycle, DEEP, Agent/Planner, execution, Sleep, Internal State integration, broader parsing/data acquisition/rendering остаются будущей работой.",
   "stages": [
     {"id": "D0", "title": "Documentation", "status": "Complete", "depends_on": [], "outcome": "Контекст и процедуры работы восстанавливаются из репозитория"},
     {"id": "0", "title": "Foundation", "status": "Complete", "depends_on": ["D0"], "outcome": "Перенос сохраняет идентичность, историю и возможность продолжения"},
@@ -10,7 +10,7 @@
     {"id": "2", "title": "Internal State", "status": "Complete", "depends_on": ["1"], "outcome": "Влияние внутреннего состояния на выбор причинно прослеживается"},
     {"id": "3", "title": "Sleep", "status": "Complete", "depends_on": ["2"], "outcome": "Консолидация прерывается и возобновляется без потери источников"},
     {"id": "4", "title": "Agent / LLM Planner Experiment", "status": "Stopped", "depends_on": ["3"], "outcome": "Проверен recoverable action loop, но роль LLM Planner признана архитектурным отклонением; результаты 4.0–4.12 сохранены"},
-    {"id": "5", "title": "FAST Cognition & Memory Integration", "status": "InProgress", "depends_on": ["1", "D1"], "outcome": "FAST использует ограниченный контекст Cognitive Memory и участвует в текстовом цикле без владения памятью или системным состоянием"},
+    {"id": "5", "title": "FAST Cognition & Memory Integration", "status": "Complete", "depends_on": ["1", "D1"], "outcome": "FAST использует ограниченный контекст Cognitive Memory и участвует в текстовом цикле без владения памятью или системным состоянием"},
     {"id": "6", "title": "Cognitive Integration", "status": "Planned", "depends_on": ["5", "2", "3"], "outcome": "FAST, DEEP, routing, Tasks, Goals и исполнительный слой объединяются вокруг работающего когнитивного контура"},
     {"id": "7", "title": "Virtual ANIMA", "status": "Planned", "depends_on": ["6"], "outcome": "Непрерывная система работает в виртуальной среде и имеет измеренный ресурсный профиль"},
     {"id": "8", "title": "Cyberdeck", "status": "Planned", "depends_on": ["7"], "outcome": "Измеренная нагрузка переносится на автономное устройство"},

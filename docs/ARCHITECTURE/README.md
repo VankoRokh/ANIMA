@@ -26,6 +26,8 @@
 | Knowledge Layer | [KnowledgeLayer](../../anima/memory/knowledge.py): CLOSED evidence, provisional/confirmed/challenged/superseded/rejected lifecycle и history | [knowledge lifecycle](../../tests/test_knowledge.py), [evidence/state machine](../../tests/test_knowledge_evidence.py) |
 | Retrieval | [RetrievalEngine](../../anima/memory/retrieval.py): exact ID, structured filters, Entity anchors, FTS5, 1-hop Relations и explainable ranking | [retrieval corpus](../../tests/test_retrieval.py) |
 | Context Builder | [ContextBuilder](../../anima/memory/context_builder.py): FAST/DEEP read policies, exact/Knowledge/Memory priority, provenance Events и strict item/character budget | [context corpus](../../tests/test_context_builder.py) |
+| Canonical IR / Resolution | [ANIMA IR](../../anima/ir.py), [resolver](../../anima/resolution/resolver.py) и [ACTION_PRIORITY](../../anima/resolution/policy.py): typed task/evidence, строгие правила, constraints перед policies; без LLM и persistence | [production boundary corpus](../../tests/test_resolution.py) |
+| Cognitive Projection / Stage 5 Routing | [projection](../../anima/cognition/projection.py) выбирает unresolved view; [pipeline](../../anima/cognition/pipeline.py) вызывает заменяемый FAST только для `COGNITIVE_REQUIRED` | [projection/frontend](../../tests/test_cognitive_projection.py), [pipeline/ownership](../../tests/test_cognitive_pipeline.py), [FAST ACI](../../tests/test_fast_cognition.py) |
 | Internal State Store / History | [InternalStateStore](../../anima/internal_state/store.py): `internal_state.db`, current values, causal transitions, Goals и source-operation ledger | [storage](../../tests/test_internal_state_storage.py), [history](../../tests/test_state_history.py) |
 | State Variables / Transitions | [TransitionEngine](../../anima/internal_state/transition_engine.py) применяет bounded event/result rules к fatigue/uncertainty/frustration/satisfaction | [variables](../../tests/test_state_variables.py), [transition engine](../../tests/test_transition_engine.py) |
 | Goals / Progress / Arbitration | [GoalStore](../../anima/internal_state/goals.py) хранит lifecycle; progress и arbitration отделяют verified result от порядка активных Goals | [goal model](../../tests/test_goal_model.py), [progress/arbitration](../../tests/test_goal_progress_arbitration.py) |
@@ -50,6 +52,121 @@
 [TV-0015](../TESTING/Results/TV-0015.md),
 [TV-0016](../TESTING/Results/TV-0016.md),
 [TV-0017](../TESTING/Results/TV-0017.md).
+
+## Stage 5: deterministic resolution и cognitive routing
+
+Реализован минимальный production slice по
+[спецификации интеграции](../ROADMAP/Cognitive_Resolution_Integration_Spec.md) и
+[Issue #3](https://github.com/VankoRokh/ANIMA/issues/3), с уточнёнными границами:
+Canonical IR принадлежит `anima/ir.py`; structured task не требует text retrieval;
+отсутствие допустимого действия при полных данных — deterministic outcome.
+
+`CognitivePipeline` предоставляет два отдельных входа:
+
+- `process_event(event)` принимает `conversation.user`, сохраняет исходный текст,
+  распознаёт только целое ограниченное арифметическое выражение и один раз вызывает
+  существующий `ContextBuilder.build(text, consumer="FAST")`.
+- `process_task(canonical_task)` сразу вызывает resolution: ContextBuilder, FTS,
+  искусственный текст и Event ID не требуются.
+
+Canonical task/evidence и projected view имеют immutable nested snapshots.
+Структурированные facts передаются явно в памяти процесса. Извлечённые Memory и
+Knowledge statements остаются текстовыми evidence с исходными record IDs для
+provenance; они не становятся subject/predicate facts через FTS score или parsing.
+FAST budget `6 items / 1200 content chars`, selection stats и отсутствие raw Events
+сохраняются. Budget ContextBuilder не является лимитом всего сериализованного prompt.
+
+Resolver поддерживает exact structured lookup, scalar arithmetic/comparison,
+formal power compatibility и три явных action constraint rules:
+`PRESERVE_ACTIVE_TASK`, `CHARGER_AVAILABLE`, `BATTERY_ABOVE_THRESHOLD`.
+Состояние для них поступает в task, без обращения к Internal State. Action
+constraints/policies допустимы только для `CHOOSE_ACTION`; неизвестное правило
+не даёт разрешения выбрать действие. Missing operands не заменяются defaults.
+Decimal literals хранятся как `Decimal`, арифметика и сравнения выполняются через
+exact rational values без зависимости от ambient Decimal precision. Finite float
+inputs интерпретируются по их shortest decimal representation; ранее потерянные
+вызывающим кодом цифры восстановить нельзя. Non-terminating decimal division
+покидает deterministic path без произвольного округления. В model-facing JSON
+точные Decimal передаются строками, без потери цифр.
+
+`candidates=None` означает неизвестный/непереданный universe, а `candidates=()` —
+известный пустой. Missing candidate universe даёт `INSUFFICIENT_DATA`. Resolver
+сначала собирает все известные missing requirements, даже при unsupported rules
+или malformed policies. После проверки constraints различаются hard-rejected,
+verified remaining и unverified candidates; неизвестное правило не делает
+кандидата admissible и не стирает уже доказанный rejection.
+
+Три route имеют отдельные значения:
+
+- `DETERMINISTIC_RESULT`: typed value либо `NO_ADMISSIBLE_ACTION` с
+  `reason="no_admissible_action"`, `value=None`; ноль backend calls.
+- `INSUFFICIENT_DATA`: genuinely missing requirements/evidence, optional next-source
+  hint; ноль backend calls. Это отсутствие в supplied context, а не утверждение об
+  отсутствии факта во всей Memory. Data acquisition остаётся внешней ответственностью.
+- `COGNITIVE_REQUIRED`: Stage 5 router выбирает FAST; projector выбирает relevant
+  view без вычисления решения. Supported request с допустимым output вызывает
+  backend ровно один раз. Если constrained cognitive request не содержит ни одного
+  verified admissible candidate, возвращается observable `no_admissible_candidates`
+  без backend call; это не выдаётся за доказанный `NO_ADMISSIBLE_ACTION`.
+
+Task-local `FormalPolicy` поддерживает только machine-readable `ACTION_PRIORITY`:
+unique policy ID, ordered unique action IDs, полное покрытие surviving candidates.
+Hard constraints применяются первыми. Несколько policies дают deterministic winner
+только при согласии; malformed/incomplete policies, duplicate IDs и конфликт winners
+сохраняют cognitive route. Ноль/один survivor уже разрешены hard constraints и не
+требуют policy authority. Natural-language preference не становится Formal Policy.
+
+Существующий `FastBackend.complete(FastRequest) -> FastResult` сохранён вместе с
+non-null text/context/Event contract. Projected requests используют отдельные
+`ProjectedFastRequest` и capability
+`ProjectedFastBackend.complete_projected(request) -> FastResult`; pipeline требует
+эту capability при создании и не передаёт nullable request legacy backend.
+`FastLLMBackend` явно поддерживает оба интерфейса. `CognitiveView` находится в
+[dependency-light contracts](../../anima/cognition/contracts.py), без импорта projector
+из FAST ACI. Для structured projection Event/text/context не требуются; для Event
+path исходный bounded bundle остаётся в projected request для audit.
+FAST renderer использует только projected view без повторного добавления bundle.
+Projector сохраняет unresolved raw input наряду с goal/preference и не отбрасывает
+relevant textual evidence из-за наличия resolved subject/predicate.
+Legacy `FastCognition` и legacy prompt rendering сохраняются как compatibility path;
+новая интеграционная точка — явно создаваемый `CognitivePipeline`, не Runtime wiring.
+
+`CognitiveTurn` содержит IR, typed resolution, rejected/remaining candidates,
+policy evaluations/IDs, projected view, FAST request/result, model-call count и final
+result. Optional `DiagnosticTrace` отражает boundary, view и result. Allowed-output validation применяется к final result всех routes с value, включая
+exact deterministic fact. Ответ вне allowed candidates отклоняется с
+`invalid_output_candidate`, без выбора замены и retry; исходный resolution value
+сохраняется для audit. Typed `NO_ADMISSIBLE_ACTION` запрещает nonempty remaining
+или unverified candidates.
+`CognitivePipeline.backend_audits` хранит immutable snapshots projected attempts,
+включая вызовы, завершившиеся exception: task/source identity, `backend_attempts`,
+`backend_completions`, `terminal_failure`, bounded `failure_classification`.
+Запись attempt появляется до backend invocation; completion фиксируется отдельно
+после получения valid FastResult. При exception terminal failure записывается до
+повторного выбрасывания того же исключения, без retry/fallback. Classification:
+`TRANSPORT`, `MODEL_OUTPUT`, `INVALID_BACKEND_RESULT`, `BACKEND`; error payload в audit
+не копируется. Успешный `CognitiveTurn` ссылается на audit; zero-call turn имеет нули.
+`FastLLMBackend.call_history` содержит metadata только успешных completions и не
+используется как attempted-call counter. Проверки:
+[terminal audit](../../tests/test_projected_backend_audit.py).
+
+Acceptance counterexamples покрыты
+[focused regressions](../../tests/test_stage5_acceptance.py): exact decimals,
+threshold equality, missing + unsupported requirements, omitted/empty candidates,
+uniform output validation, sufficient projection и explicit backend capability.
+Production tests используют fake backends/transports; real Qwen validation не входит
+в unit CI. Read-stack reconstruction и backend replacement проверяются с неизменными
+Memory/Identity и сохранённым provenance. Текущий статус/focus Stage 5 определяется
+только [project.json](../project.json). Реальный projected smoke прошёл все семь
+cases; evidence, параметры и ограничения зафиксированы в
+[TV-0043](../TESTING/Results/TV-0043.md). Free-text `output_contract="text"`
+проверяет semantic delivery task content, а не byte-exact форматирование:
+`COBALT47.` допустим. Candidate-mode требует точного разрешённого ID;
+`CONTINUE.` отклоняется. Byte-exact гарантия unrestricted text потребовала бы
+будущего explicit output contract или constrained decoding, вне текущего scope.
+Проверки завершены; переход статуса Stage 5 остаётся отдельным решением.
+Не добавлены semantic persistence/write, DEEP, policy precedence, широкий language
+frontend, Agent/Planner, execution, Sleep или Internal State decision integration.
 
 ## Agent и Planner boundary
 

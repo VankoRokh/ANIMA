@@ -2,13 +2,13 @@
 
 import json
 from pathlib import Path
-import shutil
 import subprocess
 
 import pytest
 
 from scripts.check_project import check_documentation, check_sources
 from scripts.update_docs import BLOCKS, load_project, update
+from tests.source_tree import copy_source_tree
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -17,10 +17,7 @@ ROOT = Path(__file__).resolve().parents[1]
 @pytest.fixture
 def repo(tmp_path):
     destination = tmp_path / "repo"
-    shutil.copytree(
-        ROOT, destination,
-        ignore=shutil.ignore_patterns(".git", ".venv", "__pycache__", ".pytest_cache", "data"),
-    )
+    copy_source_tree(ROOT, destination)
     return destination
 
 

@@ -18,9 +18,9 @@ ANIMA — исследовательский проект модульного �
 <!-- AUTO:summary:START -->
 Версия прототипа: **00.1-alpha** (из кода).
 
-Текущий фокус: **5 — FAST Cognition & Memory Integration** (InProgress).
+Текущий фокус: **6 — Cognitive Integration** (Planned).
 
-Stage 5.3 — Local FAST LLM: подключить реальную локальную модель через ACI к уже проверенному bounded ContextBundle, не передавая модели владение Memory или системной оркестрацией.
+Stage 5 завершён: принят scope canonical IR → deterministic resolution → projected cognition → FAST integration; representative acceptance evidence — TV-0043, real-model projected smoke прошёл все семь acceptance cases. Unrestricted text output остаётся semantic, не byte-exact. Stage 6 запланирован, работа не начата. Semantic persistence/write lifecycle, DEEP, Agent/Planner, execution, Sleep, Internal State integration, broader parsing/data acquisition/rendering остаются будущей работой.
 
 [Этапы и критерии](docs/ROADMAP/README.md).
 <!-- AUTO:summary:END -->
