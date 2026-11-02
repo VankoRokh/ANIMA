@@ -19,6 +19,32 @@ Check — быстрая проверка метаданных/генериру�
 Pytest проверяет функции, Foundation/D1, CLI/headless и саму систему документации.
 Harness создаёт данные в tmp_path; subprocess-тесты явно задают временный ANIMA_DATA_DIR.
 
+## Stage 7 semantic conformance
+
+Принятый pre-training/read-only semantic boundary проверяется отдельным
+[Stage 7 Semantic Conformance v0](Stage7_Conformance_v0.md).
+
+До model training порядок такой:
+
+```text
+accepted semantic boundary
+→ owner-reviewed semantic root fixtures
+→ deterministic evaluator
+→ constrained renderer / grammar
+→ vanilla model evaluation
+→ measure semantic residual
+→ only then LoRA/SFT decision
+```
+
+Для первого corpus нужно не меньше 30 root situations; целевой диапазон — 40–50.
+Все deterministic-decidable reviewed cases должны проходить с backend model call
+count = 0. Partial CONTENT/REVISION results, Evidence replay/dependence,
+Unknown/Unbounded time, incomplete coverage, protocol failures и adversarial source
+text проверяются отдельно. Shape validity не считается semantic accuracy.
+
+Старые FAST/DEEP audit labels остаются historical regression evidence и не являются
+новым untouched training/evaluation gold.
+
 ## Реальные локальные модели
 
 Обычный pytest suite проверяет deterministic contracts и fake-LLM сценарии; real-model experiments в него не входят. Они запускаются opt-in через [LLM experiment runner](../../scripts/run_llm_planner_experiment.py) и требуют явно доступных локальных backend и model. Наличие модели или работающего сервера не предполагается; обычные проверки не запускают inference и не загружают модели.
@@ -133,7 +159,7 @@ Synthetic SQLite seed нужен только для воспроизводим�
 До реализации этапа задаются Goal, Observable result, условия старта, Required
 work, Test scenarios, Regression scope, Acceptance criteria и Evidence.
 Критерии конкретных этапов — в [Roadmap](../ROADMAP/README.md), эксперименты —
-в [Research](../ROADMAP/Research.md#mini-experiments). Список функций не заменяет проверяемый
+в [Research](../ROADMAP/Research.md). Список функций не заменяет проверяемый
 результат. Если свойство нельзя наблюдать, сначала создаётся наблюдаемость.
 
 ## Показательные отчёты
