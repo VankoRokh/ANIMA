@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from anima.agent.tools import ToolRegistry
 from anima.cognition.action_choice import ActionChoiceTurn
 from anima.diagnostics.trace import DiagnosticTrace
+from anima.internal_state.goals import GoalStore
 from anima.tasks.store import TaskStore
 from .contracts import ActionSpec, ExecutionAction, ExecutionReceipt
 from .sandbox import SandboxExecutor
@@ -28,6 +29,7 @@ class ExecutionCoordinator:
         self,
         *,
         task_store,
+        goal_store,
         execution_store,
         registry,
         executor,
@@ -35,6 +37,8 @@ class ExecutionCoordinator:
     ):
         if not isinstance(task_store, TaskStore):
             raise TypeError("ExecutionCoordinator task_store must be TaskStore")
+        if not isinstance(goal_store, GoalStore):
+            raise TypeError("ExecutionCoordinator goal_store must be GoalStore")
         if not isinstance(execution_store, ExecutionStore):
             raise TypeError("ExecutionCoordinator execution_store must be ExecutionStore")
         if not isinstance(registry, ToolRegistry):
@@ -46,6 +50,7 @@ class ExecutionCoordinator:
         if trace is not None and not isinstance(trace, DiagnosticTrace):
             raise TypeError("ExecutionCoordinator trace must be DiagnosticTrace or null")
         self.task_store = task_store
+        self.goal_store = goal_store
         self.execution_store = execution_store
         self.registry = registry
         self.executor = executor
@@ -71,6 +76,16 @@ class ExecutionCoordinator:
             )
         return {spec.candidate_id: spec for spec in specs}
 
+    def _require_active_goal(self, goal_id, *, boundary):
+        goal = self.goal_store.get_goal(goal_id)
+        if goal is None:
+            raise ValueError(f"Unknown Goal: {goal_id}")
+        if goal["status"] != "active":
+            raise ValueError(
+                f"Execution requires active Goal at {boundary}, got {goal['status']!r}"
+            )
+        return goal
+
     def prepare(self, choice_turn, specs, *, created_at):
         mapping = self._validate_specs(choice_turn, specs)
         persistent = self.task_store.get_task(choice_turn.persistent_task_id)
@@ -82,6 +97,7 @@ class ExecutionCoordinator:
             )
         if persistent.goal_id != choice_turn.goal_id:
             raise ValueError("Execution Task/Choice Goal mismatch")
+        self._require_active_goal(choice_turn.goal_id, boundary="prepare boundary")
         selected = mapping[choice_turn.selected_candidate_id]
         action = ExecutionAction.from_spec(
             selected,
@@ -115,6 +131,7 @@ class ExecutionCoordinator:
             )
         if persistent.goal_id != action.goal_id:
             raise ValueError("ExecutionAction no longer matches Task Goal")
+        self._require_active_goal(action.goal_id, boundary="side-effect boundary")
         receipt = self.executor.execute(action)
         self._trace(
             "execution: receipt "
