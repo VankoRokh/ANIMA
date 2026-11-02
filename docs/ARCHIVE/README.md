@@ -69,7 +69,7 @@ D0 на Python 3.12.14 зафиксировал 48 страниц, 282 ссыл�
 | `docs/06_ROADMAP/Stage_7_Embodiment.md` | [Каноническое место](../ROADMAP/README.md#stage-7) |
 | `docs/06_ROADMAP/Stage_D0_Documentation.md` | [Каноническое место](../ROADMAP/README.md#d0) |
 | `docs/06_ROADMAP/Stage_D1_Runtime_Observability.md` | [Каноническое место](../ROADMAP/README.md#d1) |
-| `docs/07_EXPERIMENTS/README.md` | [Каноническое место](../ROADMAP/Research.md#exp-001) |
+| `docs/07_EXPERIMENTS/README.md` | [Каноническое место](../ROADMAP/Research.md#mini-experiments) |
 | `docs/07_EXPERIMENTS/Test_Results.md` | [Каноническое место](../TESTING/Results/README.md) |
 | `docs/07_EXPERIMENTS/Test_Strategy.md` | [Каноническое место](../TESTING/README.md) |
 | `docs/08_DECISIONS/ADR-000-documentation-system.md` | [Каноническое место](../DECISIONS/README.md#adr-000) |
