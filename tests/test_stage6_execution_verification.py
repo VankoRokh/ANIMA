@@ -126,6 +126,15 @@ def _environment(tmp_path):
     }
 
 
+def _apply(env, turn, result, observation):
+    return GoalVerificationBridge(env["runtime"]).apply(
+        spec=env["verification"],
+        action=turn.action,
+        result=result,
+        observations=(observation,),
+    )
+
+
 def test_execution_uses_task_goal_operation_not_agent_run_or_step(tmp_path):
     env = _environment(tmp_path)
     action = env["coordinator"].prepare(
@@ -194,7 +203,7 @@ def test_environment_change_after_success_causes_verification_failure(tmp_path):
     assert observation.kind == "file.content"
     assert result.outcome == "failure"
     assert result.criterion_satisfied is False
-    application = GoalVerificationBridge(env["runtime"]).apply(result)
+    application = _apply(env, turn, result, observation)
     assert application.applied is True
     assert env["runtime"].goals.get_goal(env["goal"]["id"])["status"] == "active"
 
@@ -219,7 +228,7 @@ def test_independent_observation_can_confirm_goal_success(tmp_path):
 
     assert result.outcome == "success"
     assert result.criterion_satisfied is True
-    application = GoalVerificationBridge(env["runtime"]).apply(result)
+    application = _apply(env, turn, result, observation)
     assert application.applied is True
     assert application.progress_result.goal["status"] == "completed"
     assert env["runtime"].goals.get_goal(env["goal"]["id"])["status"] == "completed"
