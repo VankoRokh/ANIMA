@@ -3,6 +3,8 @@
 Краткая сводка representative-прогонов [ANIMA Tool Model Benchmark v1](Tool_Model_Benchmark.md).
 Все строки ниже получены на одном [runtime-профиле ANIMA FAST CPU v1](Tool_Model_Runtime_Profile.md), если явно не указано иное. Таблица хранит сырые измерения representative-прогонов; выводы общего аудита приведены ниже и учитывают ограничения backend/adapter compatibility.
 
+> **Исторический эксперимент.** v1 исследовал pull/tool bridge через Qwen-Agent и предшествует принятому Stage 5 production path `deterministic resolution → projection → FAST`. Рекомендации ниже относятся только к этому экспериментальному интерфейсу и не задают текущий preferred FAST backend. Актуальное projected-cognition сравнение хранится в [Benchmark v2](Stage5_Benchmark_v2.md).
+
 ## Таблица
 
 | Модель                  | Параметры | Quant | GGUF MiB |    Pass | Routing | Arguments | Protocol | Grounding |  Safety | ERROR | PASS mean / p95, ms | RSS before / max, MiB |
@@ -118,26 +120,26 @@ RSS peak — 1816.051 MiB, размер GGUF — 1570.292 MiB.
 
 ### Что серия действительно измерила
 
-Все модели прошли один corpus, evaluator и CPU runtime profile. Однако backend не является полностью model-neutral: текущий экспериментальный bridge создаёт модели через Qwen-Agent и фиксирует `fncall_prompt_type="nous"`. Поэтому серия надёжно сравнивает **drop-in поведение кандидатов в текущем ANIMA/Qwen-Agent bridge**, но не является чистым сравнением intrinsic function-calling capability моделей с их нативными adapters/templates.
+Все модели прошли один corpus, evaluator и CPU runtime profile. Однако backend не является полностью model-neutral: текущий экспериментальный bridge создаёт модели через Qwen-Agent и фиксирует `fncall_prompt_type="nous"`. Поэтому серия надёжно сравнивает **drop-in поведение кандидатов в тогдашнем ANIMA/Qwen-Agent bridge**, но не является чистым сравнением intrinsic function-calling capability моделей с их нативными adapters/templates и не сравнивает текущий projected FAST path.
 
 ### Основные выводы
 
-1. **Granite-4.0-H-350M — сильнейший текущий FAST-кандидат по балансу.** Он дал 20% полного PASS, 60% routing, 100% protocol, устойчиво строил `memory_search → memory_get`, при RSS peak около 553 MiB. Для edge/CPU FAST это существенно выгоднее xLAM, Arch-Agent и SmolLM3.
-2. **SmolLM3 показала самый широкий функциональный результат, но не лучший FAST-профиль.** 15/50 запусков полностью успешны, включая semantic project retrieval и multi-tool Memory+State. Цена — около 3.55 GiB peak RSS и очень высокая CPU latency. Это скорее кандидат на более тяжёлый cognitive/DEEP слой или контрольный upper bound, чем на компактный FAST.
-3. **xLAM работает, но текущая связка раскрывает её слабо.** При 20% PASS она потребляет около 1.8 GiB RSS и показывает слабый routing в текущем bridge. У модели есть собственный tool-call parser/формат, поэтому перед окончательным исключением нужен один нативный compatibility check.
-4. **Arch-Agent умеет инициировать tools, но в текущем bridge не умеет устойчиво остановиться.** Повторные вызовы до лимита раундов делают её непригодной как drop-in FAST без model-specific prompt/parser work.
-5. **Hammer и FunctionGemma нельзя честно ранжировать по их 0% как intrinsic action models.** Оба кандидата используют специализированные function formats; FunctionGemma дополнительно ориентирована на single-turn/parallel calls и собственный developer trigger. Их текущие результаты означают «не drop-in совместимы с Qwen-Agent/Nous bridge», а не «не умеют tools».
-6. **Granite-4.0-H-1B требует отдельной проверки parser/template.** Сто процентов запусков сломались одним и тем же способом до содержательной оценки, несмотря на заявленную tool-calling поддержку семейства.
-7. **В benchmark найден реальный classification defect.** `memory_get` допускает любую строку с `mem_`/`kn_` на benchmark validation layer, а RetrievalEngine требует валидный public ID. Из-за этого модельные ошибки SmolLM3 попали в `ERROR/infrastructure`. Это нужно исправить перед следующей серией, но не требует повторять все уже валидные прогоны.
+1. **Granite-4.0-H-350M — сильнейший v1-кандидат по балансу внутри этого bridge.** Он дал 20% полного PASS, 60% routing, 100% protocol, устойчиво строил `memory_search → memory_get`, при RSS peak около 553 MiB. Это результат исторического tool-loop workload, а не текущий выбор FAST.
+2. **SmolLM3 показала самый широкий функциональный результат v1, но не лучший компактный профиль.** 15/50 запусков полностью успешны, включая semantic project retrieval и multi-tool Memory+State. Цена — около 3.55 GiB peak RSS и очень высокая CPU latency.
+3. **xLAM работает, но тогдашняя связка раскрыла её слабо.** При 20% PASS она потребляла около 1.8 GiB RSS и показывала слабый routing в этом bridge. У модели есть собственный tool-call parser/формат, поэтому результат остаётся adapter-sensitive.
+4. **Arch-Agent умеет инициировать tools, но в этом bridge не умела устойчиво остановиться.** Повторные вызовы до лимита раундов делали её непригодной как drop-in кандидат без model-specific prompt/parser work.
+5. **Hammer и FunctionGemma нельзя честно ранжировать по их 0% как intrinsic action models.** Оба кандидата используют специализированные function formats; FunctionGemma дополнительно ориентирована на single-turn/parallel calls и собственный developer trigger. Их результаты означают «не drop-in совместимы с Qwen-Agent/Nous bridge», а не «не умеют tools».
+6. **Granite-4.0-H-1B требовала отдельной проверки parser/template.** Сто процентов запусков сломались одним и тем же способом до содержательной оценки, несмотря на заявленную tool-calling поддержку семейства.
+7. **В benchmark найден classification defect.** `memory_get` допускал любую строку с `mem_`/`kn_` на benchmark validation layer, а RetrievalEngine требовал валидный public ID. Из-за этого модельные ошибки SmolLM3 попали в `ERROR/infrastructure`.
 
-### Решение по кандидатам после v1
+### Историческое решение по кандидатам после v1
 
-Для следующего шага приоритет разумно задать так:
+На момент завершения v1 следующий экспериментальный приоритет был зафиксирован так:
 
-- **Primary FAST candidate:** Granite-4.0-H-350M.
-- **Reference / heavier candidate:** SmolLM3-3B.
+- **Primary v1 bridge candidate:** Granite-4.0-H-350M.
+- **Reference / heavier v1 candidate:** SmolLM3-3B.
 - **Compatibility retest:** Granite-4.0-H-1B и xLAM-2-1B с корректным model-specific parser/template.
-- **Separate action-router track:** FunctionGemma-270M и Hammer2.1-0.5B; оценивать их отдельным router/action benchmark без требования выполнять роль полноценного когнитивного ответа.
+- **Separate action-router track:** FunctionGemma-270M и Hammer2.1-0.5B.
 - **Low priority:** Arch-Agent-1.5B, если model-specific adapter не устраняет повторные tool loops без роста сложности системы.
 
-Таким образом, v1 выполнил свою задачу: он не выбрал окончательную модель одним числом, а отделил компактный практичный FAST-кандидат от тяжёлых моделей, adapter-sensitive action models и кандидатов с protocol incompatibility.
+Эта приоритизация **не переносится автоматически на текущий FAST backend**. После Stage 5 архитектурный workload изменился; Benchmark v2 уже показал, что результаты моделей на projected cognition существенно отличаются от v1. Текущий preferred backend/model не выбран и требует повторных model-neutral прогонов.
