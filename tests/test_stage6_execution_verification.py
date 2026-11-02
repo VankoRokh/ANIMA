@@ -377,7 +377,7 @@ def test_stale_goal_is_rechecked_before_side_effect(tmp_path):
     assert env["execution_store"].get_operation(action.operation_id)["status"] == "prepared"
 
 
-def test_execution_store_reopens_with_operation_state(tmp_path):
+def test_execution_store_reopens_with_operation_and_validated_action(tmp_path):
     env = _environment(tmp_path)
     action = env["coordinator"].prepare(
         env["choice"],
@@ -388,6 +388,10 @@ def test_execution_store_reopens_with_operation_state(tmp_path):
 
     reopened = ExecutionStore(tmp_path / "execution.db")
     operation = reopened.get_operation(action.operation_id)
-    assert reopened.schema_version() == 1
+    restored_action = reopened.load_action(action.operation_id)
+
+    assert reopened.schema_version() == 2
     assert operation["status"] == "succeeded"
     assert operation["request_hash"] == action_request_hash(action)
+    assert restored_action == action
+    assert restored_action.to_dict() == action.to_dict()
