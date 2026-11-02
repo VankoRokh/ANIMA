@@ -33,7 +33,7 @@
 | [TV-0024 — Stage 3.7 Derived Results / Provenance](TV-0024.md) | 2026-10-27 | [3](../../ROADMAP/README.md#stage-3) | Passed | [3161585](https://github.com/VankoRokh/ANIMA/commit/3161585ecce5ac1bc1e15bfdbb6705031dd6f53f) |
 | [TV-0025 — Stage 3.8 Recovery / Idempotency](TV-0025.md) | 2026-10-27 | [3](../../ROADMAP/README.md#stage-3) | Passed | [8c4deb4](https://github.com/VankoRokh/ANIMA/commit/8c4deb4b3cb3bcfda521b17ca481c6ca4d69ab40) |
 | [TV-0026 — Stage 3.9 Runtime Integration](TV-0026.md) | 2026-10-27 | [3](../../ROADMAP/README.md#stage-3) | Passed | [155dde6](https://github.com/VankoRokh/ANIMA/commit/155dde6720bbfe57ff38be051b45b77509933bcf) |
-| [TV-0027 — Stage 3.10 Observability / Resource Budget](TV-0027.md) | 2026-10-27 | [3](../../ROADMAP/README.md#stage-3) | Passed | [c64dc6e](https://github.com/VankoRokh/ANIMA/commit/c64dc6e4b01a979eea97c84fbd33baee83c96b02) |
+| [TV-0027 — Stage 3.10 Observability / Resource Budget](TV-0027.md) | 2026-10-27 | [3](../../ROADMAP/README.md#stage-3) | Passed | [c64dc6](https://github.com/VankoRokh/ANIMA/commit/c64dc6e4b01a979eea97c84fbd33baee83c96b02) |
 | [TV-0028 — Stage 3.11 Large-data Readiness](TV-0028.md) | 2026-10-27 | [3](../../ROADMAP/README.md#stage-3) | Passed | [5b4ec4f](https://github.com/VankoRokh/ANIMA/commit/5b4ec4fe08f390921fd7349f4b81d8d331c10b6e) |
 | [TV-0029 — Stage 3.12 Performance Baseline](TV-0029.md) | 2026-10-27 | [3](../../ROADMAP/README.md#stage-3) | Passed | [be862fd](https://github.com/VankoRokh/ANIMA/commit/be862fddb4d5dd4de734ad322017b72da2bc6346) |
 | [TV-0030 — Stage 3.13 End-to-End Validation](TV-0030.md) | 2026-10-27 | [3](../../ROADMAP/README.md#stage-3) | Passed | [f062f8e](https://github.com/VankoRokh/ANIMA/commit/f062f8e91fb7f28a854682d55c0d317846a45bb9) |
@@ -50,4 +50,12 @@
 | [TV-0041 — Stage 4.11 Recovery / Interruption / Replay](TV-0041.md) | 2026-10-27 | [4](../../ROADMAP/README.md#stage-4) | Passed | [c823932](https://github.com/VankoRokh/ANIMA/commit/c823932bbdb50ccdf05b80ec2ea22b63ad2ca27b) |
 | [TV-0042 — Stage 4.12 LLM Planner Experiment](TV-0042.md) | 2026-10-29 | [4](../../ROADMAP/README.md#stage-4) | Passed | [efa8242](https://github.com/VankoRokh/ANIMA/commit/efa82428e986f976fefff803ae41a9db8f9555b2) |
 | [TV-0043 — Stage 5 Resolution and Projected Cognition Acceptance](TV-0043.md) | 2026-11-01 | [5](../../ROADMAP/README.md#stage-5) | Passed | не записан |
+| [TV-0044 — Stage 6.0 Persistent Task Foundation](TV-0044.md) | 2026-11-02 | [6](../../ROADMAP/README.md#stage-6) | Passed | [aa3349b](https://github.com/VankoRokh/ANIMA/commit/aa3349b8ad97bbb6826128a65221e554e0b1c870) |
+| [TV-0045 — Stage 6.1–6.2b Coordinator, FAST/DEEP routing and first DEEP backend](TV-0045.md) | 2026-11-02 | [6](../../ROADMAP/README.md#stage-6) | Passed | [fc3f56c](https://github.com/VankoRokh/ANIMA/commit/fc3f56c28fa9da9aca5fdaa44dd8e31cdeae0e64) |
+| [TV-0046 — Stage 6.3 Goals, Internal State and Action Choice](TV-0046.md) | 2026-11-02 | [6](../../ROADMAP/README.md#stage-6) | Passed | [f388d87](https://github.com/VankoRokh/ANIMA/commit/f388d87feb89caf1032df9bba73cebff3104be61) |
+| [TV-0047 — Stage 6.4 Execution and Independent Verification](TV-0047.md) | 2026-11-02 | [6](../../ROADMAP/README.md#stage-6) | Passed | [cdba3e9](https://github.com/VankoRokh/ANIMA/commit/cdba3e90122bf5183377e78559e2baa391c40ea5) |
+| [TV-0048 — Stage 6.5 Sleep Lifecycle Integration](TV-0048.md) | 2026-11-02 | [6](../../ROADMAP/README.md#stage-6) | Passed | [207bc42](https://github.com/VankoRokh/ANIMA/commit/207bc42ed10128036050dd9c1b11c58e55d167d4) |
+| [TV-0049 — Stage 6.6 Recovery and Unified Trace](TV-0049.md) | 2026-11-02 | [6](../../ROADMAP/README.md#stage-6) | Passed | [010949a](https://github.com/VankoRokh/ANIMA/commit/010949a1b8ff2cf223af7d706d2529d1adfc7836) |
+| [TV-0050 — Stage 6.7 Mini Experiments](TV-0050.md) | 2026-11-02 | [6](../../ROADMAP/README.md#stage-6) | Passed | [26edff6](https://github.com/VankoRokh/ANIMA/commit/26edff6c950b37de218e6dd62db9b7d5e56b5204) |
+| [TV-0051 — Stage 6 Cognitive Integration Core Final Acceptance](TV-0051.md) | 2026-11-02 | [6](../../ROADMAP/README.md#stage-6) | Passed | [123374b](https://github.com/VankoRokh/ANIMA/commit/123374b7eabf03fe1f65e9101626c2b26412dc08) |
 <!-- AUTO:results:END -->
