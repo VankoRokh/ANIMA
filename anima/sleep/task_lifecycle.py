@@ -16,13 +16,13 @@ from anima.tasks.store import TaskStore
 
 SCHEMA_VERSION = 1
 LINK_ID_PREFIX = "tsl_"
-LINK_STATUSES = {"attached", "sleeping", "wake_ready", "resumed", "failed"}
-TERMINAL_LINK_STATUSES = {"resumed", "failed"}
+LINK_STATUSES = {"attached", "sleeping", "awake", "closed", "failed"}
+TERMINAL_LINK_STATUSES = {"closed", "failed"}
 ALLOWED_LINK_TRANSITIONS = {
-    "attached": {"sleeping", "wake_ready", "failed"},
-    "sleeping": {"wake_ready", "failed"},
-    "wake_ready": {"resumed", "failed"},
-    "resumed": set(),
+    "attached": {"sleeping", "awake", "failed"},
+    "sleeping": {"awake", "closed", "failed"},
+    "awake": {"sleeping", "closed", "failed"},
+    "closed": set(),
     "failed": set(),
 }
 UNSAFE_EXECUTION_STATUSES = {"prepared", "executing", "uncertain"}
@@ -40,16 +40,16 @@ CREATE TABLE IF NOT EXISTS task_sleep_links (
     goal_id TEXT NOT NULL,
     sleep_job_id TEXT NOT NULL UNIQUE,
     status TEXT NOT NULL CHECK (
-        status IN ('attached', 'sleeping', 'wake_ready', 'resumed', 'failed')
+        status IN ('attached', 'sleeping', 'awake', 'closed', 'failed')
     ),
     status_reason TEXT NOT NULL,
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL
 );
 
-CREATE UNIQUE INDEX IF NOT EXISTS idx_task_sleep_one_active_per_task
+CREATE UNIQUE INDEX IF NOT EXISTS idx_task_sleep_one_open_per_task
     ON task_sleep_links(task_id)
-    WHERE status IN ('attached', 'sleeping', 'wake_ready');
+    WHERE status IN ('attached', 'sleeping', 'awake');
 CREATE INDEX IF NOT EXISTS idx_task_sleep_status
     ON task_sleep_links(status, created_at, row_id);
 """
@@ -116,7 +116,8 @@ class TaskSleepLink:
     def __post_init__(self):
         _validate_link_id(self.public_id)
         validate_task_id(self.task_id)
-        validate_goal_id(self.goal_id)
+        if validate_goal_id(self.goal_id) is None:
+            raise ValueError("TaskSleepLink goal_id must be a Goal UUIDv4")
         _validate_sleep_job_id(self.sleep_job_id)
         if self.status not in LINK_STATUSES:
             raise ValueError(f"Unknown TaskSleepLink status: {self.status!r}")
@@ -222,7 +223,8 @@ class TaskSleepLinkStore:
         public_id=None,
     ):
         validate_task_id(task_id)
-        validate_goal_id(goal_id)
+        if validate_goal_id(goal_id) is None:
+            raise ValueError("TaskSleepLink goal_id must be a Goal UUIDv4")
         _validate_sleep_job_id(sleep_job_id)
         reason = _require_text(reason, "TaskSleepLink creation reason")
         timestamp = _validate_timestamp(timestamp or _now(), "TaskSleepLink timestamp")
@@ -269,13 +271,13 @@ class TaskSleepLinkStore:
             ).fetchone()
         return self._row(row)
 
-    def get_active_for_task(self, task_id):
+    def get_open_for_task(self, task_id):
         validate_task_id(task_id)
         with closing(self._connect()) as connection:
             row = connection.execute(
                 """
                 SELECT * FROM task_sleep_links
-                WHERE task_id = ? AND status IN ('attached', 'sleeping', 'wake_ready')
+                WHERE task_id = ? AND status IN ('attached', 'sleeping', 'awake')
                 ORDER BY row_id DESC LIMIT 1
                 """,
                 (task_id,),
@@ -291,12 +293,12 @@ class TaskSleepLinkStore:
             ).fetchone()
         return self._row(row)
 
-    def list_active(self):
+    def list_open(self):
         with closing(self._connect()) as connection:
             rows = connection.execute(
                 """
                 SELECT * FROM task_sleep_links
-                WHERE status IN ('attached', 'sleeping', 'wake_ready')
+                WHERE status IN ('attached', 'sleeping', 'awake')
                 ORDER BY created_at, row_id
                 """
             ).fetchall()
@@ -320,6 +322,8 @@ class TaskSleepLinkStore:
                 raise ValueError(
                     f"Invalid TaskSleepLink transition: {current} -> {to_status}"
                 )
+            if datetime.fromisoformat(timestamp) < datetime.fromisoformat(row["updated_at"]):
+                raise ValueError("TaskSleepLink transition cannot move backward in time")
             cursor = connection.execute(
                 """
                 UPDATE task_sleep_links
@@ -389,7 +393,8 @@ class TaskSleepCoordinator:
             raise ValueError(f"Unknown Goal: {task.goal_id}")
         return task, goal
 
-    def _require_active_goal(self, goal):
+    @staticmethod
+    def _require_active_goal(goal):
         if goal["status"] != "active":
             raise ValueError(
                 f"Sleep lifecycle requires active Goal, got {goal['status']!r}"
@@ -412,8 +417,6 @@ class TaskSleepCoordinator:
         job = self.runtime.sleep_runtime.sleep_store.get_job(job_id)
         if job is None:
             raise ValueError(f"Unknown SleepJob: {job_id}")
-        if job["status"] in {"completed", "failed"}:
-            raise ValueError(f"Cannot attach terminal SleepJob: {job['status']}")
         return job
 
     def _turn(self, link):
@@ -435,18 +438,38 @@ class TaskSleepCoordinator:
         job = self._sleep_job(sleep_job_id)
         if self.runtime.anima.get()["status"] == "sleeping":
             raise RuntimeError("Cannot attach Task to Sleep while ANIMA is already sleeping")
-        if self.link_store.get_active_for_task(task.public_id) is not None:
-            raise RuntimeError("Task already has an active Sleep lifecycle link")
-        if self.link_store.get_by_job(job["id"]) is not None:
-            raise RuntimeError("SleepJob is already bound to a Task lifecycle")
 
-        link = self.link_store.create_link(
-            task_id=task.public_id,
-            goal_id=task.goal_id,
-            sleep_job_id=job["id"],
-            reason="Stage 6 sleep intent committed",
-            timestamp=timestamp,
-        )
+        open_link = self.link_store.get_open_for_task(task.public_id)
+        by_job = self.link_store.get_by_job(job["id"])
+        if open_link is None:
+            if by_job is not None:
+                raise RuntimeError("SleepJob is already bound to another lifecycle")
+            if job["status"] != "queued":
+                raise ValueError(
+                    f"New Task/Sleep link requires queued SleepJob, got {job['status']!r}"
+                )
+            link = self.link_store.create_link(
+                task_id=task.public_id,
+                goal_id=task.goal_id,
+                sleep_job_id=job["id"],
+                reason="Stage 6 sleep intent committed",
+                timestamp=timestamp,
+            )
+        else:
+            link = open_link
+            if link.sleep_job_id != job["id"] or link.goal_id != task.goal_id:
+                raise RuntimeError("Task already has a different open Sleep lifecycle")
+            if link.status != "awake":
+                raise RuntimeError(
+                    f"Task Sleep lifecycle cannot re-enter from {link.status!r}"
+                )
+            if by_job is None or by_job.public_id != link.public_id:
+                raise RuntimeError("SleepJob lifecycle binding is inconsistent")
+            if job["status"] != "interrupted":
+                raise ValueError(
+                    f"Sleep resume requires interrupted SleepJob, got {job['status']!r}"
+                )
+
         self.task_store.transition_task(
             task.public_id,
             "interrupted",
@@ -470,9 +493,11 @@ class TaskSleepCoordinator:
         return self._turn(link)
 
     def wake(self, task_id, *, timestamp=None):
-        link = self.link_store.get_active_for_task(task_id)
+        link = self.link_store.get_open_for_task(task_id)
         if link is None:
-            raise ValueError(f"Task has no active Sleep lifecycle: {task_id}")
+            raise ValueError(f"Task has no open Sleep lifecycle: {task_id}")
+        if link.status != "sleeping":
+            raise RuntimeError(f"Wake requires sleeping lifecycle, got {link.status!r}")
         task, goal = self._task_goal(task_id)
         if task.goal_id != link.goal_id:
             raise ValueError("Task Goal no longer matches Sleep lifecycle link")
@@ -484,14 +509,6 @@ class TaskSleepCoordinator:
         else:
             self.runtime.sleep_runtime.prepare_wake()
 
-        link = self.link_store.get_link(link.public_id)
-        if link.status in {"attached", "sleeping"}:
-            link = self.link_store.transition(
-                link.public_id,
-                "wake_ready",
-                reason="runtime wake boundary reached",
-                timestamp=timestamp,
-            )
         task = self.task_store.get_task(task.public_id)
         if task.status != "interrupted":
             raise ValueError(
@@ -504,16 +521,26 @@ class TaskSleepCoordinator:
             source_id=link.public_id,
             timestamp=timestamp,
         )
+        job = self._sleep_job(link.sleep_job_id)
+        if job["status"] == "completed":
+            target = "closed"
+            reason = "SleepJob completed; Task resumed"
+        elif job["status"] == "failed":
+            target = "failed"
+            reason = "SleepJob failed; Task resumed without Sleep result"
+        else:
+            target = "awake"
+            reason = "Task awake; SleepJob remains resumable"
         link = self.link_store.transition(
             link.public_id,
-            "resumed",
-            reason="Task resumed after wake",
+            target,
+            reason=reason,
             timestamp=timestamp,
         )
         self._trace(
-            "task-sleep: resumed "
+            "task-sleep: wake "
             f"link={link.public_id} task={task.public_id} goal={task.goal_id} "
-            f"job={link.sleep_job_id}"
+            f"job={link.sleep_job_id} link_status={link.status}"
         )
         return self._turn(link)
 
@@ -521,16 +548,14 @@ class TaskSleepCoordinator:
         """Recover Stage 3 sleep state and reconnect persistent Task/Sleep links."""
         sleep_recovery = self.runtime.sleep_runtime.recover()
         restored = 0
-        resumed = 0
-        for link in self.link_store.list_active():
+        normalized_awake = 0
+        for link in self.link_store.list_open():
             task, goal = self._task_goal(link.task_id)
             if task.goal_id != link.goal_id:
                 raise ValueError("Recovered Task Goal does not match Sleep lifecycle link")
-            job = self.runtime.sleep_runtime.sleep_store.get_job(link.sleep_job_id)
-            if job is None:
-                raise ValueError(f"Recovered SleepJob missing: {link.sleep_job_id}")
-
+            job = self._sleep_job(link.sleep_job_id)
             anima_status = self.runtime.anima.get()["status"]
+
             if link.status == "attached":
                 if task.status == "active":
                     self.task_store.transition_task(
@@ -543,7 +568,7 @@ class TaskSleepCoordinator:
                 if anima_status == "sleeping":
                     if job["status"] not in {"completed", "failed"}:
                         self.runtime.sleep_runtime.activate_job(job["id"])
-                    link = self.link_store.transition(
+                    self.link_store.transition(
                         link.public_id,
                         "sleeping",
                         reason="recovered committed Sleep state",
@@ -555,40 +580,51 @@ class TaskSleepCoordinator:
                         self.runtime.sleep_runtime.activate_job(job["id"])
                     restored += 1
                 else:
-                    link = self.link_store.transition(
+                    self._require_active_goal(goal)
+                    if task.status == "interrupted":
+                        self.task_store.transition_task(
+                            task.public_id,
+                            "active",
+                            reason=f"recover wake lifecycle {link.public_id}",
+                            source_id=link.public_id,
+                        )
+                    elif task.status != "active":
+                        raise ValueError(
+                            "Recovered sleeping link with awake Runtime has unsupported "
+                            f"Task status: {task.status!r}"
+                        )
+                    target = (
+                        "closed"
+                        if job["status"] == "completed"
+                        else "failed"
+                        if job["status"] == "failed"
+                        else "awake"
+                    )
+                    self.link_store.transition(
                         link.public_id,
-                        "wake_ready",
-                        reason="recovery found runtime already awake",
+                        target,
+                        reason="recovery found Runtime already awake",
                     )
-            if link.status == "wake_ready":
-                self._require_active_goal(goal)
-                task = self.task_store.get_task(task.public_id)
-                if task.status == "interrupted":
-                    self.task_store.transition_task(
-                        task.public_id,
-                        "active",
-                        reason=f"recover sleep lifecycle {link.public_id}",
-                        source_id=link.public_id,
+                    normalized_awake += 1
+            elif link.status == "awake":
+                if anima_status != "awake":
+                    raise RuntimeError(
+                        "Open awake TaskSleepLink conflicts with sleeping Runtime state"
                     )
-                elif task.status != "active":
+                if task.status != "active":
                     raise ValueError(
-                        f"Recovered wake_ready link has unsupported Task status: {task.status!r}"
+                        f"Open awake TaskSleepLink requires active Task, got {task.status!r}"
                     )
-                self.link_store.transition(
-                    link.public_id,
-                    "resumed",
-                    reason="recovery completed Task wake resume",
-                )
-                resumed += 1
 
         self._trace(
             "task-sleep: recovery "
-            f"sleep_jobs={sleep_recovery['jobs']} restored={restored} resumed={resumed}"
+            f"sleep_jobs={sleep_recovery['jobs']} restored={restored} "
+            f"normalized_awake={normalized_awake}"
         )
         return {
             "sleep": sleep_recovery,
             "restored": restored,
-            "resumed": resumed,
+            "normalized_awake": normalized_awake,
         }
 
     def _trace(self, message):
