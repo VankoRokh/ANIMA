@@ -102,7 +102,13 @@ def run_all():
         initial_max_items=1,
         initial_max_chars=128,
     )
-    routing = run_routing_policy_experiment()
+    # Stage 5 Benchmark v2 quality evidence must use positive model checks only:
+    # Qwen3-0.6B 4/4 and SmolLM3-3B 4/4. The overall 8/8 includes scaffold cases.
+    routing = run_routing_policy_experiment(
+        fast_benchmark_passes=4,
+        deep_benchmark_passes=4,
+        benchmark_cases=4,
+    )
     with TemporaryDirectory(prefix="anima-stage6-exp-") as tmp:
         internal_state = run_internal_state_choice_experiment(
             Path(tmp) / "internal_state.db"
@@ -114,6 +120,10 @@ def run_all():
             "EXP-004_request_more_context": request_context.to_dict(),
             "EXP-005_fast_deep_routing": routing.to_dict(),
             "EXP-009_internal_state_choice_effect": internal_state.to_dict(),
+        },
+        "evidence_notes": {
+            "routing_quality_basis": "Stage 5 Benchmark v2 positive model checks only (4/4 vs 4/4)",
+            "request_context_quality": "coverage proxy only; real LLM answer quality remains unmeasured",
         },
         "production_changes_enabled": {
             "request_more_context": False,
