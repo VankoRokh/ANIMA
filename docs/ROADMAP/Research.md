@@ -1,264 +1,352 @@
 # Будущие механизмы и открытые вопросы
 
-Это планы и гипотезы. Принятый принцип обозначен **Accepted**; конкретный дизайн
-без такого обозначения — **Draft**, проверяемая гипотеза — **Experiment**.
-Они не входят в описание работающей [архитектуры](../ARCHITECTURE/README.md).
-Порядок реализации и приёмка находятся в [Roadmap](README.md).
+Этот документ хранит идеи, которые ещё не являются подтверждённой работающей
+архитектурой. Порядок реализации и stage-level acceptance находятся в
+[Roadmap](README.md); реализованные границы — в
+[Architecture](../ARCHITECTURE/README.md), причины принятых решений — в
+[ADR](../DECISIONS/README.md).
 
-## Память и данные
+## Статусы идей
 
-**Accepted для Stage 1:** долговременная память разделяет подробный Event,
-компактный Memory и актуализированный Knowledge. Entity служит устойчивым якорем,
-Relation — явной связью; Topic не хранится отдельным объектом и собирается как
-динамическая область связанных данных. Путь записи проходит через Memory Processor,
-путь чтения — через Retrieval и Context Builder. Причины и границы выбора —
-[ADR-005](../DECISIONS/README.md#adr-005), порядок реализации —
-[Stage 1](README.md#stage-1).
+- **Accepted** — архитектурный принцип уже принят и должен сохраняться, пока его не
+  пересмотрит отдельное решение.
+- **Planned** — направление включено в будущий roadmap, но конкретный дизайн ещё
+  может меняться.
+- **Draft** — один из возможных дизайнов; обязательств по реализации нет.
+- **Experiment** — проверяемая гипотеза. Положительный результат сам по себе не
+  переводит её в production architecture.
 
-Первый baseline намеренно прост: append-only `events.jsonl`, SQLite `memory.db`,
-FTS5, явные metadata/entities/relations, детерминированные Association и Composer,
-ограниченный `ContextBundle`. Релевантность важнее importance; противоречие не
-затирает прошлое. До измеренного недостатка baseline не вводятся embeddings,
-vector/graph DB или LLM-зависимые решения.
+Отдельно используются два масштаба исследовательской работы:
 
-Архив, сжатие и удаление остаются разными операциями. Необратимое удаление требует
-отдельного критерия восстановления и не должно скрывать provenance. Лимит/ротация
-журналов, защита нескольких писателей, ветвление копий и распределённое владение
-данными не входят в Stage 1, пока локальный однопроцессный baseline не доказан.
+- **Research Track** — долгоживущий вопрос, пересекающий несколько Stage;
+- **Mini Experiment** — ограниченная проверка одной гипотезы с явным результатом
+  `Accepted / Rejected / Inconclusive` и ссылкой на evidence.
 
-## Отложенные механизмы памяти Stage 1
+## Матрица будущих направлений
 
-Эти идеи признаны совместимыми с выбранной архитектурой, но сознательно не входят
-в обязательную первую реализацию. Возвращаем их только после измеренной потребности
-или на соответствующем следующем этапе.
+| Идея | Статус | Возможный этап |
+|---|---|---|
+| FAST/DEEP routing | Planned | Stage 6 |
+| `request_more_context` без прямого доступа модели к Memory | Experiment | Stage 6 |
+| Persistent Tasks + Goals + State в общем cognitive loop | Planned | Stage 6 |
+| Возврат bounded Executor/Verification из Stage 4 | Planned | Stage 6 |
+| Semantic interpretation-to-write | Planned | Stage 7 |
+| Write/update/revision/contradiction lifecycle | Planned | Stage 7 |
+| Temporal validity и semantic history | Planned | Stage 7 |
+| Bootstrap Knowledge | Planned | конец Stage 7 |
+| Self-generated Goals | Draft / Experiment | Stage 7+ |
+| Interest / novelty drive | Draft / Experiment | Stage 7+ / Stage 8 |
+| Synthetic memories тестового экземпляра | Planned test mechanism | Stage 8 |
+| 2D Virtual World | Planned | Stage 8 |
+| Noise/repetition/contradiction world scenarios | Planned test mechanism | Stage 8 |
+| PC ↔ Raspberry Pi 5 workload comparison | Planned | Stage 9 |
+| Pico watchdog/telemetry/realtime I/O | Draft | Stage 9 |
+| Camera / microphone / audio output pipeline | Planned | Stage 10 |
+| Dedicated cameras, microphone array, IMU, actuators | Draft | Stage 11+ |
+| Separate personality module | Research Track | не назначено |
+| Distributed memory / multiple compute nodes | Research Track | Stage 11+ только при измеренной необходимости |
 
-| Механизм | Когда возвращаться |
-|---|---|
-| LLM/Deep Memory Composer | После deterministic Composer и размеченного corpus, чтобы сравнить качество/стоимость |
-| Fast preliminary composition | После стабильного общего Processor; затем проверить пользу оперативной черновой Memory |
-| Полноценный Sleep и batch consolidation | Stage 3; Processor должен сначала работать независимо от режима сна |
-| Глубокое обобщение множества Memories | После доказанного provenance и lifecycle Knowledge; выполнять как derived record без удаления источников |
-| Semantic embeddings | Если FTS/entities/relations показывают измеренный провал retrieval |
-| Vector DB | Только если semantic index нужен в масштабе, где простой локальный индекс недостаточен |
-| Graph DB | Только после benchmark, показывающего реальное ограничение SQLite relations |
-| Graph traversal глубже 1–2 hops | Для конкретного reasoning/retrieval сценария с измеренной пользой |
-| LLM entity extraction / NER | После canonical name + aliases baseline и размеченной ошибки Entity Resolution |
-| Сложный Entity Resolution | Когда дубликаты Entities реально мешают; ошибочное слияние считается опаснее дубликата |
-| Memory SPLIT | После доказанной работы Create/Update/Merge и появления реального случая смешанного эпизода |
-| Автоматический числовой confidence | Если статусы и supporting/contradicting sources перестанут быть достаточными |
-| Importance decay и сложная автооценка importance | После появления данных о пользе/вреде накопления; EXP-001 отдельно исследует внутренний вес |
-| Token-aware Context Builder | При подключении конкретной модели/tokenizer; Stage 1 использует item/char budget |
-| LLM reranking / query expansion | Только против deterministic retrieval baseline на одинаковом corpus |
-| Отдельная сущность Topic | Не планируется без доказанной необходимости; тема сейчас является view над связями |
-| Полный Asset Processor | При появлении perception/media pipeline; Stage 1 предусматривает только references/schema |
-| Анализ изображений/аудио/видео | Будущие perception/agent этапы после базовой памяти |
-| Distributed memory и sync нескольких устройств | Ближе к Virtual ANIMA/Cyberdeck после локальной idempotency/recovery |
-| Сложная temporal graph logic | Если базовых lifecycle/status/validity недостаточно для реальных сценариев |
-| Миграция старого `memories.jsonl` | Не требуется: текущие тестовые записи не представляют ценности |
-| Производительная оптимизация Stage 1 | Только после baseline 1k/10k/100k и найденного bottleneck |
+## Research Track: Memory и данные
 
-Перспективное направление: Deep во время Sleep получает группу закрытых Memories,
-создаёт более высокий derived Memory или Knowledge и сохраняет ссылки на все
-источники. Это кандидат на настоящее накопительное переосмысление опыта, но не
-условие работоспособности Stage 1.
+**Accepted:** долговременная память разделяет подробный Event, компактный Memory и
+актуализированный Knowledge. Entity служит устойчивым якорем, Relation — явной
+связью. Путь записи принадлежит системному Memory owner; путь чтения проходит через
+Retrieval и Context Builder. Противоречие не должно молча стирать прошлое.
 
-## Fast и Deep
+Текущий baseline остаётся намеренно простым: append-only Events, SQLite/FTS,
+metadata/entities/relations и bounded Context. Embeddings, vector/graph DB и
+LLM-зависимый retrieval вводятся только после измеренного провала baseline.
 
-**Accepted:** разные логические роли и автономный переносимый Fast
-([ADR-002](../DECISIONS/README.md#adr-002); прежние COG-01/02, HW-01/02).
-Fast получает событие, рабочий контекст, состояние и ограничения; предлагает
-ответ/действие или запрос Deep и сохраняет опыт. Deep получает запрос, память,
-цели и бюджет; возвращает анализ, план или обобщение с источниками/статусом подтверждения.
+### Planned для Stage 7
 
-Начальный стенд — ноутбук; один вычислитель может совмещать роли. Дальнее
-направление — самостоятельные узлы со своим хранением. Проверка Fast: работа без
-Deep и повторяемая синхронизация без потерь/дубликатов. Проверка Deep: контрольная
-задача в бюджете без блокирования быстрого контура.
+- cognition создаёт semantic proposal, а не прямую запись;
+- системная validation/persistence;
+- create/update/revision/contradiction;
+- temporal validity;
+- history/provenance при изменении знания;
+- derived consolidation без удаления sources;
+- Bootstrap Knowledge через тот же lifecycle.
 
-Модели, процессы, маршрутизация, RAM/latency limits, транспорт и резерв питания
-не выбраны. Обновление контекста, изменение правил, замена модели и обучение
-весов — разные операции. Анализ Deep сам по себе не обучает Fast.
+### Draft / conditional
 
-## Внутренние оценки и цели
+- LLM/DEEP Memory Composer — только против deterministic baseline на одинаковом corpus;
+- semantic embeddings — если FTS/entities/relations дают измеренный retrieval gap;
+- vector DB — если semantic index нужен в масштабе, где SQLite недостаточен;
+- graph DB — только после benchmark реального ограничения текущих relations;
+- deep graph traversal — для конкретного multi-hop сценария;
+- LLM entity extraction / NER — после размеченных ошибок текущего Entity Resolution;
+- Memory SPLIT — после доказанных Create/Update/Merge и реального смешанного эпизода;
+- numerical confidence — если source/status model станет недостаточной;
+- importance decay — после данных о накоплении шума и стоимости хранения;
+- token-aware Context Builder — при доказанной пользе для конкретных моделей;
+- LLM reranking/query expansion — только против deterministic retrieval baseline;
+- Asset Processor — после появления perception pipeline;
+- distributed memory/sync — не раньше физического расширения и только после
+  доказанной idempotency/recovery на одном узле.
 
-**Accepted для Stage 2:** внутренний регулирующий слой и зависимое внешнее
-выражение; причины и границы выбора — [ADR-006](../DECISIONS/README.md#adr-006),
-порядок реализации — [Stage 2](README.md#stage-2). Internal State не создаёт
-цели или варианты и не принимает решение сам: он даёт ограниченные модификаторы
-при сравнении Candidates в контексте активных Goals.
+## Research Track: FAST / DEEP / Context
 
-Первый deterministic baseline содержит `fatigue`, `uncertainty`, `frustration`
-и `satisfaction` в диапазоне `0.0..1.0`. `fatigue` растёт от времени в `awake`
-относительно настраиваемого рабочего периода и от workload и снижается при
-recovery/Sleep. `uncertainty` меняется по качеству и важности информации и не
-исчезает пассивно со временем. `frustration` прежде всего препятствует повторению
-неудачной стратегии: серия сходных failures усиливает прирост, прогресс или смена
-подхода его снижают, со временем значение восстанавливается. `satisfaction`
-возникает только после проверенного прогресса; важность влияет на прирост, а
-повторяющиеся однотипные successes дают diminishing returns и затем затухают.
+**Accepted:** FAST и DEEP — логические когнитивные роли, а не отдельные личности.
+LLM остаётся сменяемым cognitive component. Memory, routing authority, Tasks,
+verification и execution принадлежат системным сервисам.
 
-Все изменения имеют причинный Transition с `before/delta/after`, source, rule и
-reason; при необходимости сохраняются importance, repetition factor, elapsed time,
-Goal и Candidate. Временные эффекты считаются по elapsed time, а в тестах время
-инъецируется. Версионированные правила/коэффициенты отделены от живого состояния;
-текущее состояние, его история и lifecycle Goals планируются в отдельном
-transactional `internal_state.db`.
+**Planned для Stage 6:** первый реальный DEEP role, bounded routing FAST ↔ DEEP и
+общий trace причин вызова.
 
-Goal имеет источник, приоритет, статус, проверяемый критерий результата и отмену.
-Минимальный lifecycle Stage 2 — `ACTIVE/BLOCKED/COMPLETED/CANCELLED`.
-Самогенерируемые цели пока не нужны; их нельзя вводить способом, который молча
-переопределяет внешнюю задачу. Изменение внутренней оценки, достижение цели и
-объективная проверка результата остаются разными событиями.
+### Experiment: `request_more_context`
 
-Внешний Expression отображает Internal State в тон, голос или визуальные сигналы;
-без отдельного явного правила он не влияет обратно на внутренний слой. Отдельная
-плата эмоций не утверждена; выделение аппаратного модуля должно оправдываться
-задержкой, надёжностью, энергией или самостоятельностью.
+Гипотеза: FAST иногда должен иметь возможность сообщить, что bounded context
+недостаточен, но не получать произвольный tool-level доступ к Memory.
 
-### Отложенные механизмы Internal State
+Кандидатный контракт:
 
-| Механизм | Когда возвращаться |
-|---|---|
-| Interest / novelty drive | Когда появится сценарий, где relevance и uncertainty не объясняют полезное исследовательское поведение |
-| Tension / caution как отдельные state | Только если вычисляемых производных от risk/uncertainty/fatigue недостаточно |
-| Saturation | После наблюдаемого случая, который не покрывается diminishing returns satisfaction |
-| Scoped state вместо общего значения | Когда глобальный frustration/satisfaction начнёт смешивать независимые Goals или strategies |
-| Self-generated Goals | После появления Agent и явных правил authority/conflict с внешними целями |
-| Автоматическая калибровка коэффициентов | После стабильного deterministic baseline и размеченных сценариев; не должна скрывать причинность |
-| LLM-зависимые state transitions | Только как сравниваемый адаптер против deterministic rules |
-| Реальные power/thermal/workload сигналы для fatigue | Stage 5/6 после измерения ресурсов ноутбука и аппаратной платформы |
+```text
+FAST
+  ↓
+RequestMoreContext(query / need / budget)
+  ↓
+System Retrieval
+  ↓
+new bounded context
+  ↓
+FAST or DEEP
+```
 
-Принцип локального подкрепления остаётся в
-[ADR-003](../DECISIONS/README.md#adr-003): глобальная reward-функция не заменяет
-Goals, Internal State и независимую проверку результата.
+Проверить: качество ответа, количество дополнительных retrieval, latency, budget,
+циклы/зацикливание и сохранение provenance. Прямой DB/tool ownership модели не
+является целью эксперимента.
 
-## Когнитивный сон
+### Experiment: FAST/DEEP routing
 
-**Accepted для Stage 3:** Sleep является persistent orchestration для bounded,
-прерываемой и воспроизводимой переработки опыта; причины и границы решения —
-[ADR-007](../DECISIONS/README.md#adr-007), порядок реализации —
-[Stage 3](README.md#stage-3). Оркестратор работает с `SourceRef`/`WorkItem`, а
-конкретный текстовый, аудио-, видео- или telemetry payload остаётся у источника и
-читается заменяемым processor adapter по chunks.
+Сравнить простые deterministic/bounded правила маршрутизации по complexity,
+uncertainty и resource budget с более адаптивными вариантами. Проверять качество,
+latency, число DEEP calls и возможность объяснить route из trace.
 
-Обязательный baseline реализует только cognitive work `CONSOLIDATE`: raw
-Events/observations, CLOSED Memories с provenance и CONFIRMED Knowledge с evidence
-отбираются deterministic scheduler в bounded workload. Первый processor текстовый:
-фильтрация, grouping/sorting/deduplication и bounded derived report/result. Исходные
-записи не удаляются и не получают новый authority только потому, что прошли Sleep.
-Derived output хранит processor/version и полное происхождение.
+Анализ DEEP сам по себе не означает обучение FAST. Обновление контекста, правил,
+модели и весов остаются разными операциями.
 
-Persistent SleepJob/WorkItems/checkpoints планируются в отдельном `sleep.db`.
-Lifecycle Job: `queued/running/checkpointed/interrupted/completed/failed`.
-Большие sources никогда не обязаны помещаться в RAM целиком: checkpoint cursor
-фиксирует уже committed chunk, restart продолжает следующий. Реальный media pipeline
-на Stage 3 не нужен; synthetic large source проверяет тот же контракт на логическом
-многогигабайтном объёме и тысячах chunks.
+## Research Track: Internal State, Goals и autonomy
 
-Фиксированное расписание сна не утверждено. Scheduler использует явные eligibility,
-priority, cost/resource budget и deterministic tie-break. Запрос wake имеет
-приоритет и останавливает batch work на безопасной checkpoint-границе. Отказ одного
-processor/WorkItem не должен уничтожать уже committed результаты или препятствовать
-диагностике и восстановлению.
+**Accepted:** Internal State не создаёт варианты и не принимает решение сам.
+`fatigue`, `uncertainty`, `frustration`, `satisfaction` и будущие состояния являются
+ограниченными причинными факторами. Goal имеет источник, приоритет, lifecycle и
+проверяемый критерий результата.
 
-### Отложенные cognitive механизмы Sleep
+### Planned для Stage 6
 
-| Механизм | Когда возвращаться |
-|---|---|
-| Retrospective `REFLECT` | После накопления многодневной истории и размеченных случаев, где новая информация действительно меняет интерпретацию старого опыта |
-| Replay прошлых решений | После Agent, когда появится достаточно реальных `Goal → Candidates → Choice → observation/result` цепочек для объективной проверки пользы |
-| Counterfactual `SIMULATE` | После replay baseline и способа сравнивать predicted outcome с последующими реальными observations; simulation никогда не является фактом сама по себе |
-| Generative `GENERATE` / dreaming | После строгого разделения real/derived/hypothetical и метрики полезности; свободная генерация не должна загрязнять Memory/Knowledge |
-| Deep/LLM Sleep Processor | Только как сравниваемый adapter против deterministic consolidation на одинаковом corpus и resource budget |
-| Реальные Audio/Video processors | После появления Asset/perception pipeline; Scheduler/WorkItem/checkpoint contract при этом не меняется |
-| Анализ дневных internal reports/telemetry | Когда такие источники появятся и будут иметь стабильный schema/source ownership |
-| Автоматическое удаление/архивирование originals | Только после отдельной retention/recovery политики; consolidation сама по себе ничего необратимо не удаляет |
-| Адаптация/обучение Fast во сне | Отдельный [EXP-002](#exp-002) после стабильной консолидации и независимого evaluation set |
+Вернуть Goals/Internal State в общий cognitive loop и проверить реальное причинное
+влияние на Choice/route без передачи decision authority LLM.
 
-Ключевое правило будущих reflection/simulation/dreaming: новая интерпретация или
-гипотеза хранится как derived/hypothetical record со ссылками на реальные sources,
-а не переписывает прошлое и не становится `CONFIRMED Knowledge` без отдельного
-реального evidence path. Это позволяет в будущем «извлекать опыт из опыта», не
-смешивая воспоминание о произошедшем с тем, что система только предположила.
+### Draft / Experiment
+
+- scoped frustration/satisfaction для независимых Goals;
+- Interest / novelty drive, если relevance + uncertainty не объясняют полезное
+  исследовательское поведение;
+- tension/caution как отдельные state только при недостатке вычисляемых производных;
+- автоматическая калибровка коэффициентов после стабильного baseline;
+- LLM-dependent state transitions только как сравниваемый adapter;
+- self-generated Goals только после явных authority/conflict rules с внешними
+  целями и возможности объективно проверять результат.
+
+Self-generated Goal не должен молча переопределять пользовательскую или системную
+цель. Это отдельный уровень автономии, а не побочный эффект генерации текста.
+
+## Research Track: Sleep и consolidation
+
+**Accepted:** Sleep — persistent bounded orchestration с checkpoint/resume,
+provenance и безопасным wake. Derived output не становится автоматически
+CONFIRMED Knowledge.
+
+### Planned
+
+Stage 6 возвращает Sleep в общий lifecycle. Stage 7 может добавить DEEP-assisted
+semantic consolidation при сохранении system-owned persistence.
+
+### Draft / Experiment
+
+- retrospective `REFLECT` после накопления многодневной истории;
+- replay реальных `Goal → Choice → observation/result` цепочек;
+- counterfactual `SIMULATE`, если predicted outcomes можно сравнить с реальностью;
+- generative `GENERATE` / dreaming только при строгом разделении
+  real / derived / hypothetical;
+- Deep/LLM Sleep Processor только против deterministic consolidation;
+- адаптация/обучение FAST во сне — отдельный эксперимент, не следствие Sleep.
+
+Ключевое правило: hypothesis/derived memory всегда хранит ссылки на реальные
+sources и не переписывает историю как факт.
+
+## Research Track: Virtual ANIMA
+
+**Planned для Stage 8.** Виртуальная среда должна быть одновременно sandbox,
+тестовым полигоном и источником воспроизводимого workload для Stage 9.
+
+Разделяются:
+
+- **Ground truth** мира;
+- **Synthetic history** тестового экземпляра;
+- **Live events** после запуска.
+
+Synthetic memories предназначены именно для тестов и демонстраций. Они не входят
+в настоящую биографию production ANIMA и должны иметь явную маркировку происхождения.
+
+### Planned scenario families
+
+- значимые и незначимые события;
+- шум и мусорные observations;
+- повторения;
+- устаревающие факты;
+- прямые противоречия;
+- delayed consequences;
+- causal chains;
+- multi-hop relations;
+- false synthetic memory против наблюдаемого ground truth;
+- restart/recovery;
+- fault injection;
+- разные скорости виртуального времени.
+
+Виртуальный мир не должен останавливаться на время inference.
+
+## Research Track: Hardware и переносимость
+
+**Accepted:** физический носитель не определяет личность ANIMA. Hardware выбирается
+по измеренному workload, а не наоборот.
+
+### Planned для Stage 9
+
+Первый hardware target — имеющийся Raspberry Pi 5. Reference — PC. Pico может
+использоваться для realtime/telemetry/watchdog/GPIO, но не как искусственный хост
+для FAST/DEEP/Memory ради модульности.
+
+Сравниваются одинаковые workload/scenario/data conditions. Измерять:
+
+- CPU/RAM;
+- storage I/O;
+- temperature/throttling;
+- FAST/DEEP/retrieval latency;
+- Active/Standby/Sleep profile;
+- restart/error rate;
+- persistent data growth;
+- endurance: short → medium → representative 12–24h soak.
+
+### Draft после Stage 9
+
+- отдельные вычислительные узлы;
+- distributed sync;
+- removable identity/storage carrier;
+- автономное питание/UPS;
+- backplane / Ethernet / other transport;
+- dedicated cooling/case.
+
+Конкретные CM5/Zero/accelerator решения не являются roadmap requirement до
+измеренной необходимости.
+
+## Research Track: Perception & Interaction
+
+**Planned для Stage 10:** начать с уже имеющихся laptop camera, microphone и audio
+output. Устройства должны подключаться через стабильные source/output interfaces.
+
+Visual/audio raw streams не становятся Memory автоматически. Perception pipeline
+должен формировать bounded observations/events с provenance и quality/confidence.
+
+### Draft для Stage 11+
+
+- dedicated camera;
+- stereo/dual camera;
+- microphone array;
+- speakers;
+- IMU/accelerometer/gyro;
+- pan/tilt;
+- physical actuators;
+- specialised peripheral nodes.
+
+Покупка конкретного hardware должна следовать измеренным требованиям Stage 9–10.
+
+## Research Track: Identity и personality
+
+**Accepted:** continuity определяется переносимой Identity + Memory + rules/state,
+а не одной моделью или prompt.
+
+**Research:** отдельный `personality module` пока не утверждён. Наблюдаемая
+индивидуальность может формироваться из Identity, accumulated Memory, Goals,
+Internal State, policies и semantic history. Если отдельный personality package
+появится, он должен иметь чёткий ownership и переживать замену FAST/DEEP.
+
+Не следует превращать personality в большой скрытый system prompt, который
+фактически становится вторым неаудируемым хранилищем состояния.
 
 ## Интерфейсы и действия
 
-Голос (IF-02): один законченный сценарий STT/TTS на ноутбуке с измерением
-задержки, точности, шума, ложной активации, эха и энергии; движки и режим активации
-не выбраны. Событие распознанного текста сохраняет происхождение.
+**Planned:** предложение действия и фактический результат остаются разными
+событиями. Выполнение должно иметь independent observation/verification; текст
+«успешно» от модели не является evidence исполнения.
 
-Инструменты (IF-03): предложение действия/аргументы/ограничения → независимое
-наблюдение результата или ошибки. Начать с обратимой задачи до общего планировщика.
-Факт вызова и текст «успешно» не подтверждают фактическое выполнение.
+Stage 6 может вернуть безопасные обратимые элементы Executor/Verification из
+Stage 4. Более широкие реальные interfaces появляются после Virtual ANIMA.
 
-## Контракты независимых узлов
+Для независимых узлов до выбора транспорта нужны versioned contracts: sender,
+receiver, schema, units, timeout, errors, retry/idempotency, ordering/conflicts и
+minimal behavior при отказе узла. Общий mutable state не становится сетевым
+контрактом автоматически.
 
-До выбора транспорта определяются отправитель/получатель, схема, единицы,
-версия, срок ответа, ошибки, retry и нагрузка. Обмениваемся наблюдениями,
-предложениями и результатами с происхождением; общий изменяемый state не
-становится сетевым контрактом автоматически.
+## Mini Experiments
 
-Нужны владелец записи/merge, IDs и идемпотентность, offline journal и лимит,
-acknowledgement/order/conflict rules, совместимость обновлений и откат,
-минимальное поведение при отказе Deep. Приёмка: повторная передача, disconnect,
-восстановление очереди, несовместимая версия и отказ узла. Зрение сообщает
-неопределённость, движение — фактическое положение/ошибку, питание — измеренный ресурс.
+### EXP-001 — Internal weight for memory selection
 
-## Аппаратные направления
+**Experiment / Planned, результата нет.** Гипотеза: внутренние оценки могут
+улучшать отбор полезного опыта при ограниченном memory budget. Сравнить обычный
+retrieval/selection с дополнительным state-derived weighting на одном corpus.
 
-Принципы переносимого Fast и сменного носителя **Accepted**; комплектация,
-схемы, напряжения, размеры и транспорт — **Draft**. Собранного стенда нет.
-Каталог Python не задаёт физическую плату.
+### EXP-002 — Selected experience improves FAST
 
-| Прежний ID | Направление и ближайшая проверка | Нерешённые детали |
-|---|---|---|
-| HW-01 | Основной Core/Deep: контрольный workload, RAM/latency/power и повторное развёртывание | CM5 — вариант; RAM, ускорители, ОС и энергосбережение выбираются по измерениям |
-| HW-02 | Переносимый Fast: offline и возврат опыта до выбора платы | Источник истины, конфликты, своё хранение/питание |
-| HW-03 | Сменный носитель identity/state/memory/settings: перенос и отдельная копия | Разъём, hot-unplug, потеря питания, версии модели/схем |
-| HW-04 | Питание/резерв: измерить режимы, корректное сохранение при переключении | Цилиндрические батареи и около 30 минут резерва — пожелания; ёмкость, защита, зарядка и автономность требуют расчёта |
-| HW-05 | Зрение: неподвижная камера, контрольные сцены, ошибка/latency и обнаружение отказа | Периферийный вычислитель, интерфейс/калибровка, локальная обработка, хранение кадров |
-| HW-06 | Звук: один канал записи/вывода, затем отдельный модуль | Микрофоны/динамики, шум/эхо, расположение, latency и энергия |
-| HW-07 | Движение: один привод с диапазоном/скоростью и feedback; камера на двух осях — вариант | Нагрузка, люфт, точность, локальный предел/остановка при потере связи |
-| HW-08 | Корпус/охлаждение: длительная нагрузка в тепловом бюджете | Форма «черепа» и жидкостное охлаждение — идеи; сравнить массу, шум, обслуживание, энергию, материал и размеры |
-| HW-09 | Связь: программный reconnect/retry до выбора физического соединения | Backplane, Ethernet, Wi-Fi/VPN, оптоволокно, hot-plug — варианты |
+**Experiment / Planned, результата нет.** Отдельно сравнивать context/rule updates
+и обучение весов. Нужны фиксированная модель, независимый evaluation set, rollback
+и измерение quality/latency/RAM/energy/regressions.
 
-Дополнительное/аварийное распределение свободной нагрузки — отдельная гипотеза,
-а не условие автономности модулей. Другой профиль задач во сне не гарантирует,
-что железо сможет обучать модель. Покупки и полный корпус следуют Stage 5/6;
-автономные приводы — контрактам, диагностике и safety loop.
+### EXP-003 — Local reinforcement for peripheral task
 
-## Stage 4.12: small-model Planner baseline
+**Experiment / Planned, результата нет.** Проверить локальное подкрепление на одной
+ограниченной задаче simulation/peripheral control. Глобальная reward-функция для
+личности не вводится.
 
-Экспериментальное finding, а не новое принятое архитектурное правило: локальная Qwen3-0.6B установила small-model baseline; существующая Agent/Tool/Choice/Verifier архитектура прошла end-to-end, но надёжность модели осталась ограниченной. В пятизапусковом baseline завершены 2/5 Goals. Временный candidate C с text bounds улучшил structural completion, но также завершил 2/5 Goals и часто обрезал advisory text; он отклонён. Это не статистическое сравнение моделей. Показательные условия и ограничения сохранены в [TV-0042](../TESTING/Results/TV-0042.md).
+### EXP-004 — Request more context
 
-Будущее сравнение с более крупными Planner models теперь обосновано: сравнивать их следует на той же Agent/Tool/Choice/Verifier архитектуре, сохраняя independent verification и отдельно измеряя planning quality и structured-output reliability.
+**Experiment / кандидат Stage 6.** Проверить system-mediated дополнительный
+retrieval по запросу FAST/DEEP без прямого Memory tool ownership.
 
-## EXP-001
+### EXP-005 — FAST/DEEP routing baseline
 
-**Planned, результата нет.** Гипотеза: внутренние оценки улучшают отбор полезного
-опыта при ограниченной памяти. Старт: корректное чтение, фиксированный корпус и
-минимальные внутренние переменные. Метод: одинаковые набор/лимит; сравнить простой
-отбор с эмоциональным весом. Метрики: размеченные retrieval queries, provenance,
-объём и стоимость. Риск: усиление ошибок и нерелевантного опыта.
+**Experiment / кандидат Stage 6.** Сравнить bounded deterministic routing с более
+адаптивными вариантами на одинаковом наборе задач и resource budget.
 
-## EXP-002
+### EXP-006 — Semantic conflict lifecycle
 
-**Planned, результата нет.** Гипотеза: отобранный опыт улучшает Fast. Старт:
-выбранная и фиксированная базовая модель, независимый контрольный набор.
-Отдельно сравниваются обновление контекста/правил и обучение весов. Метрики:
-качество на новых примерах, latency, RAM, энергия, время обновления и регрессии.
-Есть откат; ошибки Deep и затраты могут превышать пользу.
+**Experiment / кандидат Stage 7.** Проверить create → contradiction → revision →
+retrieval, сохраняя обе source histories и не назначая winner без authority rule.
 
-## EXP-003
+### EXP-007 — Virtual memory/noise corpus
 
-**Planned, результата нет.** Гипотеза: локальное подкрепление помогает одной
-задаче периферии. Старт: выбранная задача и симуляция/ограниченный стенд.
-Сравнить простое управление с оптимизацией на одинаковых сценариях; измерять
-ошибку, время, ресурс и отказ. Глобальная награда для личности не вводится.
+**Experiment / кандидат Stage 8.** Проверить память на контролируемой смеси важного,
+мусорного, повторяющегося, устаревающего и противоречивого опыта с известным ground
+truth.
 
-## Отложенные задачи
+### EXP-008 — PC/Pi endurance parity
 
-Независимый backup реального экземпляра, лицензия проекта и права на модели
-требуют отдельного решения. Открытая публикация кода не заменяет лицензию.
-Полноценный сайт документации оправдан, если Markdown-навигация станет узким
-местом; небольшой генератор сводок не требует перехода на сайт.
+**Experiment / кандидат Stage 9.** Один фиксированный Virtual ANIMA workload
+выполнить на PC и Pi 5, затем сравнить correctness, latency, resources и endurance.
+
+## Исторический Stage 4 small-model finding
+
+Qwen3-0.6B показала, что старый Agent/Tool/Choice/Verifier loop технически работает,
+но Planner ownership оказался архитектурно неверным, а model reliability —
+ограниченной. Результат сохранён как историческое evidence, а не как основание
+возвращать LLM Planner. См. [TV-0042](../TESTING/Results/TV-0042.md).
+
+Текущие model benchmarks Stage 5 исследуют уже другой workload: prepared projected
+cognition после deterministic resolution. Их нельзя напрямую трактовать как
+процентное улучшение над Planner benchmark.
+
+## Отложенные проектные задачи
+
+Независимый backup реального экземпляра, лицензия проекта и права на модели требуют
+отдельного решения. Открытая публикация кода не заменяет лицензию. Полноценный сайт
+документации оправдан только если Markdown-навигация станет реальным bottleneck.
