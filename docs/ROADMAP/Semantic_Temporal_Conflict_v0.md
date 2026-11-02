@@ -1,236 +1,105 @@
-# Semantic Temporal Conflict v0
+# Semantic Temporal Conflict v0 — historical compatibility note
 
-Status: **pre-Stage 7 design baseline; not yet a proven production contract**.
+Status: **superseded as the current semantic contract by [Stage 7 Semantic Boundary v0](Stage_7_Semantic_Boundary_v0.md).**
 
-This document fixes the first minimal rules for distinguishing a true semantic contradiction from a temporal change or correction. It complements `Semantic_Candidate_v0.md` and `Semantic_Verification_v0.md`.
+The original document established an important principle that remains accepted:
 
-## Core principle
+a different value does not automatically invalidate an older value. ANIMA must distinguish content incompatibility, temporal succession, source-declared correction, missing scope and entity/context mismatch while preserving source history.
 
-A new value that differs from existing Knowledge must not automatically invalidate the old value.
+The detailed original proposal is preserved in Git history. The current terminology and time model were revised during owner review on 2026-11-03.
 
-Before deciding that two claims conflict, ANIMA must first ask whether they describe:
+## Current accepted temporal model
 
-- the same entity;
-- the same predicate/meaning;
-- the same relevant time interval;
-- the same context/qualifiers.
-
-Only then may the difference be classified.
-
-## Minimal time model v0
-
-The initial temporal model distinguishes:
-
-- `observed_at` — when ANIMA received/observed the evidence;
-- `valid_from` — when the claim became true, if known;
-- `valid_until` — when the claim stopped being true, if known.
-
-`observed_at` must not be silently treated as `valid_from`.
-
-Unknown temporal bounds remain unknown; the system must not invent dates.
-
-## Four classification outcomes
-
-### `TEMPORAL_CHANGE`
-
-Both old and new values may be true, but at different times.
-
-Example:
+Separate:
 
 ```text
-old: bar.closing_time = 23:00
-new: bar.closing_time = 00:00
-valid_from(new) = 2026-11-02
+observed_at  — when the source observed/measured the event/state
+asserted_at  — when the source made the assertion/report
+received_at  — when ANIMA first received the occurrence
+created_at   — when an internal record/interpretation was created
+validity     — world-valid scope of the Claim
 ```
 
-Expected interpretation:
+None of the first four timestamps automatically establishes Claim validity.
+
+World-valid scope is:
 
 ```text
-old valid_until = change boundary
-new valid_from  = change boundary
+UnknownScope | Instant | Interval
 ```
 
-Old history remains valid for its historical interval.
-
-### `CORRECTION`
-
-The previous representation was wrong for the interval in which it claimed to be true.
-
-Typical evidence:
-
-- explicit source statement such as "I was wrong" / "correction";
-- stronger direct evidence showing the old claim was mistaken;
-- a stable property whose apparent change is implausible without entity replacement or prior error.
-
-The original Event/evidence is never deleted; the semantic interpretation is marked as corrected/invalidated.
-
-### `CONTRADICTION`
-
-Two sufficiently strong claims disagree about the same entity, predicate, context and overlapping time interval.
-
-Example:
+Each interval boundary is:
 
 ```text
-20:00 sensor_A: door = open
-20:00 sensor_B: door = closed
+Known | Unknown | Unbounded
 ```
 
-Neither claim should be silently selected as truth merely because one producer is FAST/DEEP or because one was processed later.
-
-The conflict may trigger normal verification policy.
-
-### `UNRESOLVED`
-
-Available evidence is insufficient to distinguish temporal change, correction, entity mismatch or true contradiction.
-
-`UNRESOLVED` is a valid system state and must not be converted into a guessed fact for database cleanliness.
-
-It can later lead to:
-
-- `VERIFY NOW`;
-- `VERIFY LATER`;
-- `CONSERVATIVE ACTION + VERIFY`;
-- `KEEP AMBIGUOUS`.
-
-## Classification cues v0
-
-The system should consider at least four simple questions.
-
-### 1. Same entity?
-
-Before comparing values, verify that the claims refer to the same canonical entity.
-
-An apparent capacity change from 512 GB to 1 TB may actually mean two different SSDs or incorrect entity resolution.
-
-### 2. Explicit correction signal?
-
-Statements such as:
+Accepted interval convention:
 
 ```text
-"I was wrong"
-"that earlier value was incorrect"
-"it was always 1 TB"
+[valid_from, valid_until)
 ```
 
-strongly support `CORRECTION` rather than temporal change.
+`Unknown` is not `Unbounded`; missing time never defaults to infinity or `now`.
 
-### 3. Explicit change boundary?
+Two point observations at different times do not establish a continuous interval or exact transition boundary between them.
 
-Statements such as:
+## Current relation terminology
+
+### TEMPORAL_SUCCESSION
+
+The legacy model-facing term `TEMPORAL_CHANGE` is replaced by `TEMPORAL_SUCCESSION` in the accepted Stage 7 slice.
+
+It means supplied Claims describe an ordered, compatible succession of locally incompatible states under known temporal/context/cardinality preconditions.
+
+It does **not** prove:
+
+- a world-change event;
+- truth of both Claims;
+- continuous history between observations;
+- an exact change boundary.
+
+### CORRECTION
+
+`CORRECTION` now means a bounded source fragment explicitly declares a correction and the target is identifiable.
+
+It does **not** mean:
+
+- the old Claim has been proven false;
+- the new Claim has been accepted as truth;
+- Knowledge should automatically be revised.
+
+A pair may therefore have both:
 
 ```text
-"from Monday"
-"since 2026-11-02"
-"now"
-"after replacement"
+CONTENT = CONTRADICTION
+REVISION = CORRECTION
 ```
 
-support `TEMPORAL_CHANGE` when the property can legitimately change.
+### CONTRADICTION
 
-### 4. Can the property naturally change?
+Content incompatibility can be established without deciding which Claim is true or whether accepted Knowledge should change.
 
-Common time-varying properties:
+### COMPATIBLE_DISTINCT
 
-```text
-temperature
-location
-battery charge
-online/offline
-opening hours
-preferences
-current task/job
-```
+Comparable Claims that can coexist but do not support the same proposition use `COMPATIBLE_DISTINCT`, not `NOT_COMPARABLE`.
 
-Typically stable properties:
+### INSUFFICIENT / NOT_COMPARABLE / UNSUPPORTED
 
-```text
-serial number
-hardware model
-factory capacity of the same physical device
-date of birth
-fixed-version file hash
-```
+These are distinct:
 
-A surprising change in a stable property should raise suspicion of correction, entity replacement/mismatch or bad evidence rather than be accepted as an ordinary temporal update.
+- `INSUFFICIENT`: supported question, missing/unclear required information;
+- `NOT_COMPARABLE`: proven outside the common atomic comparison domain;
+- `UNSUPPORTED`: required semantics/capability is not implemented by the profile.
 
-## Historical preservation
+There is no universal `RESOLVED/UNRESOLVED` axis in the new contract.
 
-No classification deletes the raw source history.
+## Lifecycle boundary
 
-The semantic layer may change which Knowledge item is current/valid, but the system must preserve:
+Relation classification is not a lifecycle command. Accepted actions, source authority/correction rights and Knowledge read-state mapping remain open DP-08/09/10b/11.
 
-```text
-what was believed
-why it was believed
-which evidence supported it
-when it was considered valid
-what later changed or challenged it
-```
+Use the current canonical documents:
 
-This allows ANIMA to distinguish:
-
-```text
-world changed
-```
-
-from:
-
-```text
-ANIMA's previous understanding was wrong
-```
-
-## Important distinction
-
-A claim may stop being the current truth in two fundamentally different ways:
-
-```text
-SUPERSEDED BY CHANGE
-```
-
-The old claim was historically valid but later ceased to be current.
-
-```text
-INVALIDATED BY CORRECTION
-```
-
-The old semantic interpretation was wrong for the interval it claimed.
-
-These outcomes must not collapse into one generic "updated" status.
-
-## Relationship to verification
-
-When classification is uncertain or evidence remains in real conflict, use the normal verification policy instead of guessing.
-
-Conceptual flow:
-
-```text
-new value differs
-      ↓
-same entity/context/time?
-      ↓
-TEMPORAL_CHANGE / CORRECTION / CONTRADICTION / UNRESOLVED
-      ↓
-if needed: verification policy
-      ↓
-VERIFY NOW / VERIFY LATER /
-CONSERVATIVE ACTION + VERIFY / KEEP AMBIGUOUS
-```
-
-## Validation cases required before production lock
-
-At minimum test:
-
-1. clear temporal succession;
-2. explicit correction;
-3. simultaneous conflicting sensors;
-4. ambiguous entity identity;
-5. stable property with incompatible new value;
-6. retroactive correction of a derived claim;
-7. late discovery where `observed_at != valid_from`;
-8. unknown validity boundary without invented timestamp;
-9. overlapping validity intervals;
-10. restart/replay without duplicate semantic transitions.
-
-## Design rule
-
-> A different value is not automatically a contradiction. First determine whether the world changed, the previous understanding was wrong, strong evidence truly conflicts, or the system simply does not yet know. Preserve history in every case.
+- [Stage 7 Semantic Boundary v0](Stage_7_Semantic_Boundary_v0.md);
+- [ADR-010](../DECISIONS/ADR-010_Stage_7_Semantic_Boundary.md);
+- [Stage 7 Semantic Conformance v0](../TESTING/Stage7_Conformance_v0.md).
