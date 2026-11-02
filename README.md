@@ -19,9 +19,9 @@ lifecycle и виртуальная среда; физическое вопло�
 <!-- AUTO:summary:START -->
 Версия прототипа: **00.1-alpha** (из кода).
 
-Текущий фокус: **6 — Cognitive Integration Core** (Planned).
+Текущий фокус: **7 — Semantic Lifecycle & Refinement** (Planned).
 
-Stage 5 завершён. Перед началом реализации Stage 6 будущая дорожная карта пересмотрена: Stage 6 — Cognitive Integration Core; Stage 7 — Semantic Lifecycle & Refinement; Stage 8 — Virtual ANIMA; Stage 9 — Raspberry Pi Validation; Stage 10 — Perception & Interaction; Stage 11 — Physical Expansion. Stage 6 остаётся Planned и ещё не начат. Research tracks и mini experiments ведутся параллельно и не считаются принятой архитектурой без отдельного решения.
+Stage 6 Cognitive Integration Core завершён и подтверждён TV-0051. Для Stage 7 принят pre-training semantic boundary v0: immutable qualified/time-scoped Claim, отдельные Evidence/Source/Producer/provenance, typed Value v0, explicit temporal semantics, независимые CONTENT/REVISION results и read-only classify_relation/0.1 с deterministic-first processing. Stage 7 implementation остаётся Planned; DP-08, DP-09, полная dependency policy DP-10 и production integration DP-11 открыты. До model training обязательны conformance corpus и измерение реального model residual; LoRA/SFT не начаты.
 
 [Этапы и критерии](docs/ROADMAP/README.md).
 <!-- AUTO:summary:END -->
