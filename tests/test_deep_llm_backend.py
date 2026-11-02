@@ -11,7 +11,7 @@ from anima.cognition.deep_llm import (
     build_llama_cpp_deep_backend,
     render_deep_prompts,
 )
-from anima.cognition.fast_llm import FastLLMCallResult
+from anima.cognition.llm_transport import LLMCallResult, LlamaCppTransport
 from anima.cognition.proposals import ProposalKind, RoutedCognitiveRequest
 from anima.cognition.routing import CognitiveRole
 
@@ -30,7 +30,7 @@ class StubTransport:
                 "timeout_seconds": timeout_seconds,
             }
         )
-        return FastLLMCallResult(
+        return LLMCallResult(
             provider="stub",
             model=self.model,
             text=self.text,
@@ -171,6 +171,7 @@ def test_llama_cpp_builder_keeps_model_in_profile_not_deep_contract():
     )
 
     assert backend.timeout_seconds == 42.0
+    assert isinstance(backend.transport, LlamaCppTransport)
     assert backend.transport.model == "replacement-model"
     assert backend.transport.base_url == "http://127.0.0.1:9123"
     assert backend.transport.thinking is True
