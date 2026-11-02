@@ -97,7 +97,7 @@ def run_all():
     request_context = run_request_more_context_experiment(
         context_builder=context_builder,
         backend=MarkerBackend(),
-        initial_query="What is the verified marker?",
+        initial_query="What is the verified code?",
         coverage_score=coverage_score,
         initial_max_items=1,
         initial_max_chars=128,
