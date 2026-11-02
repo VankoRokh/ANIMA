@@ -11,7 +11,7 @@ from anima.agent.tools import ToolRegistry
 from .contracts import ExecutionAction, thaw
 
 
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
 OPERATION_STATUSES = {
     "prepared",
     "executing",
@@ -63,6 +63,15 @@ CREATE INDEX IF NOT EXISTS idx_execution_operations_goal
     ON execution_operations(goal_id, row_id);
 CREATE INDEX IF NOT EXISTS idx_execution_operations_status
     ON execution_operations(status, created_at, row_id);
+
+CREATE TABLE IF NOT EXISTS execution_actions (
+    operation_id TEXT PRIMARY KEY,
+    action_id TEXT NOT NULL UNIQUE,
+    action_json TEXT NOT NULL,
+    FOREIGN KEY (operation_id)
+        REFERENCES execution_operations(public_id)
+        ON DELETE CASCADE
+);
 """
 
 
@@ -85,6 +94,52 @@ def _validate_timestamp(value, label):
     if parsed.tzinfo is None or parsed.utcoffset() is None:
         raise ValueError(f"{label} must include a UTC offset")
     return value
+
+
+def _action_json(action):
+    if not isinstance(action, ExecutionAction):
+        raise TypeError("Execution action serialization requires ExecutionAction")
+    try:
+        return json.dumps(
+            action.to_dict(),
+            ensure_ascii=False,
+            allow_nan=False,
+            sort_keys=True,
+            separators=(",", ":"),
+        )
+    except (TypeError, ValueError) as error:
+        raise ValueError("ExecutionAction payload must be JSON-compatible") from error
+
+
+def _action_from_json(encoded):
+    try:
+        data = json.loads(encoded)
+    except (TypeError, json.JSONDecodeError) as error:
+        raise ValueError("Persisted ExecutionAction payload is invalid JSON") from error
+    required = {
+        "id",
+        "operation_id",
+        "persistent_task_id",
+        "goal_id",
+        "candidate_id",
+        "tool",
+        "tool_version",
+        "arguments",
+        "created_at",
+    }
+    if not isinstance(data, dict) or set(data) != required:
+        raise ValueError("Persisted ExecutionAction payload has invalid fields")
+    return ExecutionAction(
+        public_id=data["id"],
+        operation_id=data["operation_id"],
+        persistent_task_id=data["persistent_task_id"],
+        goal_id=data["goal_id"],
+        candidate_id=data["candidate_id"],
+        tool=data["tool"],
+        tool_version=data["tool_version"],
+        arguments=data["arguments"],
+        created_at=data["created_at"],
+    )
 
 
 def operation_kind(action):
@@ -115,7 +170,14 @@ def action_request_hash(action):
 
 
 class ExecutionStore:
-    """Persistent operation identity without AgentRun/AgentStep semantics."""
+    """Persistent operation identity and validated Action payload.
+
+    Schema v2 adds ``execution_actions`` so a process restart can reconstruct the
+    exact system-validated ExecutionAction instead of depending on an in-memory
+    Python object. Legacy v1 operations remain readable as operation metadata, but
+    ``load_action`` fails explicitly because their validated payload was never
+    persisted.
+    """
 
     def __init__(self, database_file):
         self.database_file = Path(database_file)
@@ -125,6 +187,7 @@ class ExecutionStore:
     def _connect(self):
         connection = sqlite3.connect(self.database_file)
         connection.row_factory = sqlite3.Row
+        connection.execute("PRAGMA foreign_keys = ON")
         return connection
 
     @contextmanager
@@ -151,6 +214,14 @@ class ExecutionStore:
                 if row is None:
                     connection.execute(
                         "INSERT INTO schema_meta(key, value) VALUES('schema_version', ?)",
+                        (str(SCHEMA_VERSION),),
+                    )
+                elif row["value"] == "1":
+                    # v1 already has execution_operations. SCHEMA_SQL above creates
+                    # execution_actions; historical rows cannot be backfilled because
+                    # v1 deliberately did not retain the validated action arguments.
+                    connection.execute(
+                        "UPDATE schema_meta SET value = ? WHERE key = 'schema_version'",
                         (str(SCHEMA_VERSION),),
                     )
                 elif row["value"] != str(SCHEMA_VERSION):
@@ -224,6 +295,13 @@ class ExecutionStore:
                     """,
                     record,
                 )
+                connection.execute(
+                    """
+                    INSERT INTO execution_actions(operation_id, action_id, action_json)
+                    VALUES (?, ?, ?)
+                    """,
+                    (action.operation_id, action.public_id, _action_json(action)),
+                )
         except sqlite3.IntegrityError as error:
             raise ValueError(
                 f"Cannot create ExecutionOperation {action.operation_id}: {error}"
@@ -238,6 +316,52 @@ class ExecutionStore:
                 (public_id,),
             ).fetchone()
         return self._row(row)
+
+    def load_action(self, operation_id):
+        """Reconstruct the exact validated ExecutionAction for one operation."""
+
+        operation_id = _require_text(operation_id, "Execution operation public_id")
+        with closing(self._connect()) as connection:
+            row = connection.execute(
+                """
+                SELECT o.*, a.action_json
+                FROM execution_operations AS o
+                LEFT JOIN execution_actions AS a
+                  ON a.operation_id = o.public_id
+                WHERE o.public_id = ?
+                """,
+                (operation_id,),
+            ).fetchone()
+        if row is None:
+            raise ValueError(f"Unknown ExecutionOperation: {operation_id}")
+        if row["action_json"] is None:
+            raise ValueError(
+                "ExecutionOperation has no persisted validated ExecutionAction payload; "
+                "legacy schema-v1 operations require external recovery policy"
+            )
+
+        action = _action_from_json(row["action_json"])
+        expected = {
+            "operation_id": row["public_id"],
+            "public_id": row["action_id"],
+            "persistent_task_id": row["task_id"],
+            "goal_id": row["goal_id"],
+            "candidate_id": row["candidate_id"],
+        }
+        for field, value in expected.items():
+            if getattr(action, field) != value:
+                raise ValueError(
+                    f"Persisted ExecutionAction {field} does not match ExecutionOperation"
+                )
+        if operation_kind(action) != row["operation_kind"]:
+            raise ValueError(
+                "Persisted ExecutionAction operation kind does not match ExecutionOperation"
+            )
+        if action_request_hash(action) != row["request_hash"]:
+            raise ValueError(
+                "Persisted ExecutionAction request hash does not match ExecutionOperation"
+            )
+        return action
 
     def transition_operation(self, public_id, to_status, *, reason, timestamp=None):
         public_id = _require_text(public_id, "Execution operation public_id")
