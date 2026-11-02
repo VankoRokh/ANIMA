@@ -8,9 +8,9 @@ Roadmap описывает цель, границы и проверяемый р
 эксперименты — в [Research](Research.md).
 
 <!-- AUTO:roadmap:START -->
-**Текущая работа:** Stage 5 завершён. Перед началом реализации Stage 6 будущая дорожная карта пересмотрена: Stage 6 — Cognitive Integration Core; Stage 7 — Semantic Lifecycle & Refinement; Stage 8 — Virtual ANIMA; Stage 9 — Raspberry Pi Validation; Stage 10 — Perception & Interaction; Stage 11 — Physical Expansion. Stage 6 остаётся Planned и ещё не начат. Research tracks и mini experiments ведутся параллельно и не считаются принятой архитектурой без отдельного решения.
+**Текущая работа:** Stage 6 Cognitive Integration Core завершён и подтверждён TV-0051. Для Stage 7 принят pre-training semantic boundary v0: immutable qualified/time-scoped Claim, отдельные Evidence/Source/Producer/provenance, typed Value v0, explicit temporal semantics, независимые CONTENT/REVISION results и read-only classify_relation/0.1 с deterministic-first processing. Stage 7 implementation остаётся Planned; DP-08, DP-09, полная dependency policy DP-10 и production integration DP-11 открыты. До model training обязательны conformance corpus и измерение реального model residual; LoRA/SFT не начаты.
 
-**Фокус:** 6 — Cognitive Integration Core (Planned).
+**Фокус:** 7 — Semantic Lifecycle & Refinement (Planned).
 
 | Этап | Проверяемый результат | Статус | Зависимости |
 |---|---|---|---|
@@ -22,7 +22,7 @@ Roadmap описывает цель, границы и проверяемый р
 | [3 — Sleep](#stage-3) | Консолидация прерывается и возобновляется без потери источников | Complete | [2](#stage-2) |
 | [4 — Agent / LLM Planner Experiment](#stage-4) | Проверен recoverable action loop, но роль LLM Planner признана архитектурным отклонением; результаты 4.0–4.12 сохранены | Stopped | [3](#stage-3) |
 | [5 — FAST Cognition & Memory Integration](#stage-5) | FAST использует ограниченный контекст Cognitive Memory и участвует в текстовом цикле без владения памятью или системным состоянием | Complete | [1](#stage-1), [D1](#d1) |
-| [6 — Cognitive Integration Core](#stage-6) | FAST, DEEP, routing, Tasks, Goals, Internal State, Sleep и проверяемый исполнительный слой участвуют в одном наблюдаемом когнитивном цикле без передачи LLM системного ownership | Planned | [5](#stage-5), [2](#stage-2), [3](#stage-3) |
+| [6 — Cognitive Integration Core](#stage-6) | FAST, DEEP, routing, Tasks, Goals, Internal State, Sleep и проверяемый исполнительный слой участвуют в одном наблюдаемом когнитивном цикле без передачи LLM системного ownership | Complete | [5](#stage-5), [2](#stage-2), [3](#stage-3) |
 | [7 — Semantic Lifecycle & Refinement](#stage-7) | Semantic write/update/revision/consolidation работают с provenance и authority rules; bootstrap knowledge проходит через тот же проверяемый lifecycle | Planned | [6](#stage-6), [1](#stage-1), [3](#stage-3) |
 | [8 — Virtual ANIMA](#stage-8) | ANIMA непрерывно действует в наблюдаемой 2D-среде с synthetic history, live events, ручными и автоматизированными сценариями | Planned | [7](#stage-7) |
 | [9 — Raspberry Pi Validation](#stage-9) | Один и тот же workload воспроизводимо сравнивается на PC и Raspberry Pi 5; Pico используется только там, где полезен realtime/telemetry контур; сняты performance и endurance показатели | Planned | [8](#stage-8) |
@@ -64,8 +64,7 @@ bounded context, recovery и performance baseline.
 ## Stage 3
 
 **Sleep — Complete.** Persistent bounded orchestration, checkpoint/resume,
-derived results и provenance подтверждены. Когнитивная интеграция Sleep возвращается
-только после доказанного FAST-контура. Доказательства:
+derived results и provenance подтверждены. Доказательства:
 [TV-0018 — TV-0030](../TESTING/Results/README.md).
 
 ## Stage 4
@@ -73,8 +72,8 @@ derived results и provenance подтверждены. Когнитивная �
 **Agent / LLM Planner Experiment — Stopped after 4.12.** Эксперимент доказал
 полезные свойства Executor/Tool/Observation/Verification/recovery, но показал, что
 LLM Planner как владелец proposal generation противоречит архитектуре ANIMA.
-Результаты 4.0–4.12 сохранены; полезный исполнительный код может быть возвращён
-позже без возврата Planner ownership.
+Результаты 4.0–4.12 сохранены; полезный исполнительный код возвращён позднее под
+system ownership без возврата Planner ownership.
 
 Доказательства: [TV-0031 — TV-0042](../TESTING/Results/README.md).
 Решения: [ADR-008](../DECISIONS/README.md#adr-008),
@@ -110,78 +109,90 @@ write/update/revision и temporal lifecycle — **не считаются вып
 
 ## Stage 6
 
-**Cognitive Integration Core — Planned.** Утверждённый рабочий контракт и декомпозиция
-этапа зафиксированы в [Stage 6 Cognitive Integration Core](Stage_6_Cognitive_Integration_Core.md).
+**Cognitive Integration Core — Complete.** Утверждённый target/decomposition сохранён в
+[Stage 6 Cognitive Integration Core](Stage_6_Cognitive_Integration_Core.md), а
+реализованная архитектура — в
+[Architecture: Stage 6 Cognitive Integration Core](../ARCHITECTURE/Stage_6_Cognitive_Integration_Core.md).
 
-### Главный вопрос
+Stage 6 объединил под system ownership:
 
-Могут ли уже доказанные подсистемы ANIMA участвовать в одном когнитивном цикле,
-оставаясь независимыми владельцами своих данных и не превращая LLM в системный
-оркестратор?
+- persistent Tasks и Goal linkage;
+- CognitiveCoordinator и явный FAST/DEEP routing;
+- первый DEEP backend/role без отдельной личности или authority;
+- Internal State и Choice как причинные факторы, а не владельцы решения;
+- bounded Executor/Observation/independent Verification;
+- Sleep в общем Task lifecycle;
+- recovery и UnifiedTrace;
+- разделение Action → Receipt → Observation → Verification → Goal progress.
 
-### Планируемый scope
+Модель остаётся proposal-only: routing, persistence, execution, verification и системные переходы принадлежат ANIMA. Stage 6 не доказал преимущество DEEP по качеству во всех задачах и не превратил `request_more_context` или adaptive routing в обязательную production policy — эти вопросы остаются research.
 
-- FAST как оперативный cognitive consumer;
-- первый DEEP backend/role;
-- явный FAST ↔ DEEP routing;
-- persistent Tasks;
-- Goals и Internal State как причинно наблюдаемые факторы;
-- возвращение Sleep в общий cognitive lifecycle;
-- полезные Executor/Verification элементы Stage 4 под system ownership;
-- единый trace для route, context, decision proposal, validation и result;
-- restart/recovery интегрированного cognitive loop.
-
-В Stage 6 **не требуется** semantic write/revision, виртуальный мир, perception,
-распределённое железо или обучение весов.
-
-### Кандидаты на mini experiments
-
-- `request_more_context`: FAST просит систему расширить bounded context, но не
-  получает прямой доступ к Memory;
-- FAST/DEEP routing по сложности/неопределённости/бюджету;
-- synchronous против bounded asynchronous DEEP request;
-- измерение реального влияния Internal State на Choice без скрытого LLM ownership;
-- восстановление незавершённого cognitive turn после restart.
-
-**Definition of Done (предварительная).** Один canonical scenario проходит через
-несколько системных подсистем, его решения и переходы причинно прослеживаются,
-restart не разрушает ownership/continuity, а замена FAST/DEEP backend не требует
-переноса Identity или Memory.
+Доказательства: [TV-0044 — TV-0051](../TESTING/Results/README.md), итоговая приёмка — [TV-0051](../TESTING/Results/TV-0051.md).
 
 ## Stage 7
 
-**Semantic Lifecycle & Refinement — Planned.**
+**Semantic Lifecycle & Refinement — Planned. Semantic boundary v0 accepted; production implementation not started.**
 
-### Главный вопрос
+Канонический pre-training/read-only контракт:
+[Stage 7 Semantic Boundary v0](Stage_7_Semantic_Boundary_v0.md).
+Причина решения: [ADR-010](../DECISIONS/ADR-010_Stage_7_Semantic_Boundary.md).
+Conformance-план: [Stage 7 Semantic Conformance v0](../TESTING/Stage7_Conformance_v0.md).
 
-Может ли ANIMA не только читать прошлый опыт, но и безопасно формировать,
-уточнять и переосмысливать semantic records без потери истории и provenance?
+### Принятый первый slice
 
-### Планируемый scope
+Перед production write lifecycle вводится ограниченный read-only/shadow semantic interface:
 
-- cognition → semantic proposal, но не прямой DB write;
-- system-owned validation и persistence;
-- write/update/revision/contradiction lifecycle;
-- temporal validity и сохранение старых версий/источников;
-- Knowledge authority rules;
-- Sleep + DEEP consolidation как derived result;
-- измеренное улучшение retrieval/Entity/Relation только при доказанной необходимости;
-- controlled retention/decay только после появления метрик пользы и вреда.
+- immutable qualified/time-scoped Claim;
+- Evidence identity отдельно от Claim equality;
+- Source отдельно от Producer;
+- typed Value v0 + registry-owned predicate/cardinality/qualifiers;
+- `observed_at`, `asserted_at`, `received_at`, `created_at` и world-valid scope не смешиваются;
+- `Unknown != Unbounded`;
+- CONTENT и REVISION — независимые facet results;
+- `SUPPORT`, `CONTRADICTION`, `COMPATIBLE_DISTINCT`, `TEMPORAL_SUCCESSION`, `CORRECTION`, insufficiency/not-comparable/unsupported;
+- `classify_relation/0.1` сравнивает ровно два supplied Claims и bounded Evidence;
+- deterministic-decidable cases не должны вызывать LLM;
+- conformance corpus и измерение реального semantic residual предшествуют LoRA/SFT.
+
+### Открытые решения
+
+До write-through lifecycle остаются открыты:
+
+- DP-08 — authority/lifecycle actions/correction rights;
+- DP-09 — public Knowledge read semantics и mapping на текущие statuses;
+- DP-10b — полная re-evaluation policy для derived descendants;
+- DP-11 — production integration с Stage 6 routing/validators.
+
+Stage 7 не считается начатым только из-за принятия semantic boundary. Первый implementation slice должен быть отдельным read-only/shadow capability после фиксации conformance fixtures.
+
+### Design history и scoped concepts
+
+Ранние design baselines сохранены для контекста; при конфликте с accepted boundary текущий slice следует `Stage_7_Semantic_Boundary_v0.md`:
+
+- [SemanticCandidate v0](Semantic_Candidate_v0.md);
+- [Knowledge Lifecycle v0](Knowledge_Lifecycle_v0.md);
+- [Semantic Temporal Conflict v0](Semantic_Temporal_Conflict_v0.md);
+- [Semantic Verification v0](Semantic_Verification_v0.md);
+- [Bootstrap Knowledge v0](Bootstrap_Knowledge_v0.md).
+
+Отдельные будущие concepts не входят автоматически в текущий Stage 7 slice:
+
+- [Dynamic Task Arbitration](Dynamic_Task_Arbitration_Concept.md);
+- [Emergency Response Mode](Emergency_Response_Mode_Concept.md).
 
 ### Bootstrap Knowledge
 
 Финальная часть Stage 7 может загрузить первый небольшой набор настоящих
 фундаментальных знаний ANIMA: собственная архитектура и ограничения, базовые
-понятия мира и системные определения. Эти записи должны быть явно помечены как
-bootstrap knowledge и проходить тот же provenance/lifecycle, что остальные данные.
-
-Bootstrap knowledge не является искусственной биографией. Synthetic memories
-предназначены для Stage 8 test instances.
+понятия мира и системные определения. Bootstrap остаётся versioned curated source,
+проходит общий provenance/lifecycle и не является искусственной биографией.
+Synthetic memories предназначены для Stage 8 test instances.
 
 **Definition of Done (предварительная).** Новая, уточняющая и противоречащая
 информация проходит system-owned semantic lifecycle; история не переписывается
 молча, provenance сохраняется, а bootstrap dataset не требует особых обходных
-правил памяти.
+правил памяти. До этого read-only interface и conformance являются подготовительным
+slice, а не доказательством полного Stage 7.
 
 ## Stage 8
 
