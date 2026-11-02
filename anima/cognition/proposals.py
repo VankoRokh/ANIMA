@@ -1,8 +1,8 @@
 """Typed Stage 6 cognitive request/proposal boundary.
 
 FAST/DEEP may produce proposals, but proposals do not mutate persistent state.
-Only RESPOND is enabled in the Stage 6.2 baseline; other kinds are represented so
-later stages can add explicit validators without silently changing the contract.
+Only RESPOND is enabled for model-backed cognition; action choice is a separate
+system-owned Stage 6.3 path and must never pass through this dispatcher.
 """
 
 from collections.abc import Mapping
@@ -68,8 +68,8 @@ class ProposalValidation:
 class ProposalValidator:
     """System-owned authority gate for model proposals.
 
-    Stage 6.2 enables only RESPOND. Action/Task/context proposals remain visible
-    contract vocabulary but cannot pass this validator yet.
+    Stage 6 currently enables only RESPOND. Action/Task/context proposals remain
+    visible contract vocabulary but cannot pass this validator yet.
     """
 
     def validate(self, proposal):
@@ -156,10 +156,11 @@ class CognitiveDispatchTurn:
 
 
 class CognitiveDispatcher:
-    """Call only the system-selected role and validate its proposal.
+    """Call only the system-selected model role and validate its proposal.
 
-    The dispatcher owns no persistent state and performs no side effects. A
-    BLOCKED route returns without calling either backend.
+    The dispatcher owns no persistent state and performs no side effects. BLOCKED
+    returns without a model call; CHOICE is rejected because it belongs to the
+    system-owned ActionChoiceCoordinator rather than FAST/DEEP.
     """
 
     def __init__(
@@ -200,6 +201,15 @@ class CognitiveDispatcher:
                 proposal=None,
                 validation=validation,
                 backend_called=False,
+            )
+
+        if decision.destination == CognitiveDestination.CHOICE:
+            self._trace(
+                "cognitive_dispatch: system_choice_boundary "
+                f"task={persistent_task_id} canonical={task.task_id}"
+            )
+            raise ValueError(
+                "System CHOICE route must use ActionChoiceCoordinator, not model dispatcher"
             )
 
         role = decision.role
