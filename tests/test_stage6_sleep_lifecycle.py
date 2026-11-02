@@ -245,7 +245,7 @@ def test_task_can_wake_then_reenter_same_checkpointed_sleep_job(tmp_path):
     )
     assert completed.status == "completed"
     assert completed.resumed_from_sequence == 1
-    assert completed.final_result["output"] == {"values": ["alpha", "beta"]}
+    assert completed.final_result.output == {"values": ["alpha", "beta"]}
 
     final_wake = env["coordinator"].wake(env["task"].public_id)
     assert final_wake.link.status == "closed"
@@ -328,7 +328,7 @@ def test_checkpointed_sleep_link_recovers_after_process_restart(tmp_path):
     )
     assert completed.status == "completed"
     assert completed.resumed_from_sequence == 1
-    assert completed.final_result["output"] == {"values": ["alpha", "beta"]}
+    assert completed.final_result.output == {"values": ["alpha", "beta"]}
 
     resumed = restarted["coordinator"].wake(env["task"].public_id)
     assert resumed.link.status == "closed"
