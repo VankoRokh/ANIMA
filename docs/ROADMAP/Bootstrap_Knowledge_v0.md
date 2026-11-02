@@ -1,172 +1,107 @@
-# Bootstrap Knowledge v0
+# Bootstrap Knowledge v0 — scoped concept
 
-Status: **pre-Stage 7 design baseline; not yet a production contract**.
+Status: **concept retained; semantic terminology aligned with [Stage 7 Semantic Boundary v0](Stage_7_Semantic_Boundary_v0.md). Full write lifecycle remains open.**
 
 ## Core principle
 
-Bootstrap Knowledge is the curated starting knowledge given to ANIMA before it accumulates enough real experience of its own. It must enter through the same semantic lifecycle as later knowledge instead of bypassing validation and persistence rules.
+Bootstrap Knowledge is curated starting evidence for ANIMA, not a privileged database backdoor and not sacred truth.
 
-Canonical flow:
+A bootstrap item must have an explicit, versioned curated Source/provenance record. There is no provenance-free exception.
 
-```text
-bootstrap/system-curated source
-        ↓
-SemanticCandidate
-        ↓
-SemanticLifecycleEngine
-        ↓
-SemanticDecision
-        ↓
-Knowledge + provenance/history
-```
+Future write-through ingestion must pass through the same system-owned semantic validation/lifecycle as later evidence once DP-08/09/10b/11 are accepted.
 
-Bootstrap input is therefore a special source class, not a privileged database backdoor.
+## Source and authority
 
-## Authority
+A bootstrap source may be intentionally trusted by system policy, but that authority is assigned by the system, not by model output or by a special `KNOWN` token.
 
-Bootstrap Knowledge may begin with strong source authority because it is explicitly curated by the developer/system setup, but it is not immutable or infallible.
+Bootstrap source identity should reference a versioned curated artifact/revision so replay and later correction remain auditable.
 
-It may later be:
+Bootstrap evidence may later be:
 
-- supported by new evidence;
-- superseded by temporal change;
-- corrected when the original curated fact was wrong;
-- challenged by conflicting strong evidence;
-- retained historically when no longer current.
+- independently supported;
+- contradicted by new evidence;
+- subject to a source-declared correction;
+- related to later temporal succession;
+- revised/rejected according to future system-owned lifecycle rules.
 
-The original bootstrap source must remain traceable in provenance.
+The exact action/status mapping is still open DP-08/09 and must not be invented in this document.
 
-## Knowledge vs system policy
+## Knowledge vs policy
 
-A strict distinction is required:
+The distinction remains strict:
 
-- **Knowledge** = information ANIMA may know, reason about, retrieve and revise;
-- **System policy** = rules ANIMA must obey and that do not become ordinary semantic claims.
+- **Knowledge** — information ANIMA may retrieve, reason about and later revise;
+- **System policy** — enforced rules/permissions that cognition cannot reinterpret away as ordinary facts.
 
 Examples suitable for Knowledge:
 
 ```text
 physical hardware can overheat
 measurements may be wrong
-objects may change state over time
+objects may have time-dependent state
 ANIMA is an artificial software system
 FAST and DEEP are cognitive roles in ANIMA
 ```
 
-Examples that belong to system policy instead:
+Examples that remain policy/code:
 
 ```text
-HYPOTHESIS must not be silently promoted to confirmed Knowledge
-FAST/DEEP may not directly mutate persistent Knowledge
-safety policy overrides optional interest-driven work
+models may not directly mutate durable Knowledge
+Hypothesis is not silently promoted to factual Knowledge
+safety/execution authority belongs to system-owned policy
 ```
-
-A policy must not be implemented merely as a retrievable fact that cognition can reinterpret away.
 
 ## Suggested bootstrap groups
 
-### 1. Self/system knowledge
+### Self/system knowledge
 
-Basic facts about ANIMA and its architecture that are useful to cognition, while implementation-enforced boundaries remain policy/code.
+Useful facts about ANIMA and its architecture, while enforcement remains code/policy.
 
-Examples:
+### Basic world knowledge
 
-```text
-ANIMA is this system
-FAST is a cognitive role
-DEEP is a cognitive role
-Memory persists independently of LLM model replacement
-```
+Small stable facts useful for retrieval/semantic tests. The goal is not to preload an encyclopedia.
 
-### 2. Basic world knowledge
+### Test-oriented semantic facts
 
-Small, stable, useful facts sufficient to exercise semantic reasoning and retrieval. The goal is not to preload a miniature encyclopedia.
+Curated items specifically chosen to exercise support, contradiction, temporal succession, source-declared correction, provenance and retrieval behavior.
 
-Examples:
+These are test/curated facts, not fabricated production autobiography.
 
-```text
-physical objects may change state
-temperature is time-dependent
-hardware can fail
-files can be modified
-measurements can contain error
-```
+## Scale
 
-### 3. Test-oriented semantic facts
-
-Curated facts chosen specifically to exercise lifecycle behavior: entities, relations, temporal changes, corrections, contradictions and support.
-
-These remain real bootstrap inputs for the test instance but must not be fabricated autobiographical events of production ANIMA.
-
-## Loading strategy
-
-Bootstrap scale should grow incrementally instead of loading an arbitrary large set immediately.
-
-Suggested progression:
+Grow incrementally rather than loading an arbitrary large set:
 
 ```text
-~10 items
+~10
 → ~30
 → ~100
 → ~200
 ```
 
-At each scale measure at least:
+At each scale measure processing cost, replay/dedup, provenance, retrieval quality/latency, Context size and model behavior.
 
-- candidate processing cost;
-- duplicate/support behavior;
-- Entity resolution;
-- provenance preservation;
-- retrieval quality and latency;
-- Context Builder size/selection;
-- effects on FAST/DEEP behavior;
-- restart/replay idempotency;
-- conflict/temporal lifecycle behavior.
+The final number is not a target by itself.
 
-The final number is not a target by itself. Scale is increased only while the added corpus provides useful coverage.
+## Relationship to Stage 7 conformance
 
-## Relationship to testing
+Bootstrap data can later contribute controlled semantic scenarios, but the first pre-training corpus must remain independently reviewed and split by semantic root situations.
 
-Bootstrap Knowledge should double as a controlled Stage 7 corpus.
-
-Examples:
-
-```text
-bootstrap: device_X.capacity = 512 GB
-later correction candidate: device_X.capacity = 1 TB
-```
-
-```text
-bootstrap: bar.closing_time = 23:00
-later temporal update: bar.closing_time = 00:00 from T2
-```
-
-```text
-bootstrap: relation A connected_to B
-later independent evidence supports the same relation
-```
-
-This lets Stage 7 validate the full path from ingestion through retrieval rather than testing persistence in isolation.
+Do not train on a corpus merely because it exists in bootstrap storage.
 
 ## Synthetic memories boundary
 
-Fake autobiographical memories must not be placed into production bootstrap Knowledge.
+Fake autobiographical memories do not belong in production bootstrap Knowledge.
 
-Synthetic history belongs only to explicitly marked test/virtual instances and must remain distinguishable from real ANIMA history.
+Synthetic history is reserved for explicit test/virtual instances and must remain distinguishable from real ANIMA history/provenance.
 
-## Validation requirements
+## Current implementation boundary
 
-Before production lock, verify that bootstrap data:
+The accepted Stage 7 slice is still read-only/shadow. This document does not authorize direct bootstrap writes into a new semantic lifecycle implementation.
 
-1. enters through the normal SemanticCandidate/SemanticDecision path;
-2. retains explicit `bootstrap/system-curated` provenance;
-3. can be supported, corrected, challenged and superseded normally;
-4. survives restart/replay without duplicate semantic effects;
-5. is retrieved according to current/historical/contested/corrected status;
-6. does not bypass system policy or create a second source of truth;
-7. scales from small to larger corpora with measured latency/resource impact;
-8. remains separate from synthetic autobiographical test history.
+Canonical references:
 
-## Design rule
+- [Stage 7 Semantic Boundary v0](Stage_7_Semantic_Boundary_v0.md);
+- [ADR-010](../DECISIONS/ADR-010_Stage_7_Semantic_Boundary.md);
+- [Stage 7 Semantic Conformance v0](../TESTING/Stage7_Conformance_v0.md).
 
-> Bootstrap Knowledge is trusted starting evidence, not sacred truth. It must use the same semantic lifecycle as later knowledge, while system policy remains outside ordinary Knowledge and is enforced by system-owned code/rules.
+The original detailed bootstrap proposal remains available in Git history.
