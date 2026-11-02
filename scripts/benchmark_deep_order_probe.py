@@ -11,6 +11,7 @@ from datetime import datetime, timezone
 import json
 from pathlib import Path
 import sys
+from uuid import uuid4
 
 ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
@@ -45,9 +46,9 @@ def ordered_request(case, role, candidates):
     payload["candidates"] = list(candidates)
     payload["audit_version"] = PROBE_VERSION
     return RoutedCognitiveRequest(
-        persistent_task_id=f"task_order_{case.case_id}_{role.value}",
-        canonical_task_id=f"ct_order_{case.case_id}_{role.value}",
-        source_id=f"src_order_{case.case_id}_{role.value}",
+        persistent_task_id=f"task_{uuid4()}",
+        canonical_task_id=f"ct_{uuid4()}",
+        source_id=f"src_{uuid4()}",
         role=role,
         view=CognitiveView(role.value, payload),
     )
