@@ -195,7 +195,7 @@ def test_task_sleep_link_store_persists_association_and_phase(tmp_path):
     )
 
     reopened = TaskSleepLinkStore(tmp_path / "task_sleep.db")
-    restored = reopened.get_active_for_task(env["task"].public_id)
+    restored = reopened.get_open_for_task(env["task"].public_id)
 
     assert reopened.schema_version() == 1
     assert restored.public_id == link.public_id
@@ -204,39 +204,66 @@ def test_task_sleep_link_store_persists_association_and_phase(tmp_path):
     assert restored.status == "sleeping"
 
 
-def test_active_task_checkpoint_wake_resume(tmp_path):
+def test_task_can_wake_then_reenter_same_checkpointed_sleep_job(tmp_path):
     env = _environment(tmp_path)
-    turn = env["coordinator"].request_sleep(
+    entered = env["coordinator"].request_sleep(
         env["task"].public_id,
         env["job"]["id"],
     )
 
-    assert turn.task_status == "interrupted"
-    assert turn.goal_status == "active"
-    assert turn.sleep_job_status == "running"
-    assert turn.anima_status == "sleeping"
-    assert turn.link.status == "sleeping"
+    assert entered.task_status == "interrupted"
+    assert entered.goal_status == "active"
+    assert entered.sleep_job_status == "running"
+    assert entered.anima_status == "sleeping"
+    assert entered.link.status == "sleeping"
 
-    outcome = env["anima"].runtime.process_sleep_work(
+    first = env["anima"].runtime.process_sleep_work(
         env["item"].public_id,
         ["alpha", "beta"],
         max_new_chunks=1,
     )
-    assert outcome.status == "checkpointed"
-    assert env["sleep_store"].get_job(env["job"]["id"])["status"] == "checkpointed"
-    assert env["tasks"].get_task(env["task"].public_id).status == "interrupted"
+    assert first.status == "checkpointed"
 
-    resumed = env["coordinator"].wake(env["task"].public_id)
+    first_wake = env["coordinator"].wake(env["task"].public_id)
+    assert first_wake.link.status == "awake"
+    assert first_wake.task_status == "active"
+    assert first_wake.sleep_job_status == "interrupted"
+    assert first_wake.anima_status == "awake"
 
-    assert resumed.link.status == "resumed"
-    assert resumed.task_status == "active"
-    assert resumed.goal_status == "active"
-    assert resumed.sleep_job_status == "interrupted"
-    assert resumed.anima_status == "awake"
+    second_sleep = env["coordinator"].request_sleep(
+        env["task"].public_id,
+        env["job"]["id"],
+    )
+    assert second_sleep.link.public_id == first_wake.link.public_id
+    assert second_sleep.link.status == "sleeping"
+    assert second_sleep.sleep_job_status == "running"
+
+    completed = env["anima"].runtime.process_sleep_work(
+        env["item"].public_id,
+        ["alpha", "beta"],
+        max_new_chunks=None,
+    )
+    assert completed.status == "completed"
+    assert completed.resumed_from_sequence == 1
+    assert completed.final_result["output"] == {"values": ["alpha", "beta"]}
+
+    final_wake = env["coordinator"].wake(env["task"].public_id)
+    assert final_wake.link.status == "closed"
+    assert final_wake.task_status == "active"
+    assert final_wake.sleep_job_status == "completed"
+    assert final_wake.anima_status == "awake"
+    assert env["links"].get_open_for_task(env["task"].public_id) is None
     assert [
         transition["to_status"]
         for transition in env["tasks"].list_transitions(env["task"].public_id)
-    ] == ["queued", "active", "interrupted", "active"]
+    ] == [
+        "queued",
+        "active",
+        "interrupted",
+        "active",
+        "interrupted",
+        "active",
+    ]
 
 
 def test_sleep_is_blocked_at_unresolved_execution_boundary(tmp_path):
@@ -264,7 +291,7 @@ def test_sleep_is_blocked_at_unresolved_execution_boundary(tmp_path):
 
     assert env["tasks"].get_task(env["task"].public_id).status == "active"
     assert env["sleep_store"].get_job(env["job"]["id"])["status"] == "queued"
-    assert env["links"].get_active_for_task(env["task"].public_id) is None
+    assert env["links"].get_open_for_task(env["task"].public_id) is None
 
 
 def test_checkpointed_sleep_link_recovers_after_process_restart(tmp_path):
@@ -289,7 +316,7 @@ def test_checkpointed_sleep_link_recovers_after_process_restart(tmp_path):
     recovery = restarted["coordinator"].recover()
 
     assert recovery["restored"] == 1
-    link = restarted["links"].get_active_for_task(env["task"].public_id)
+    link = restarted["links"].get_open_for_task(env["task"].public_id)
     assert link.status == "sleeping"
     assert restarted["tasks"].get_task(env["task"].public_id).status == "interrupted"
     assert restarted["anima"].state.get()["status"] == "sleeping"
@@ -304,7 +331,7 @@ def test_checkpointed_sleep_link_recovers_after_process_restart(tmp_path):
     assert completed.final_result["output"] == {"values": ["alpha", "beta"]}
 
     resumed = restarted["coordinator"].wake(env["task"].public_id)
-    assert resumed.link.status == "resumed"
+    assert resumed.link.status == "closed"
     assert resumed.task_status == "active"
     assert resumed.sleep_job_status == "completed"
     assert resumed.anima_status == "awake"
@@ -340,7 +367,8 @@ def test_committed_keyed_side_effect_is_not_repeated_across_sleep_wake(tmp_path)
         env["task"].public_id,
         env["job"]["id"],
     )
-    env["coordinator"].wake(env["task"].public_id)
+    awake = env["coordinator"].wake(env["task"].public_id)
+    assert awake.link.status == "awake"
 
     target = sandbox / "result.txt"
     target.write_text("external-change", encoding="utf-8")
