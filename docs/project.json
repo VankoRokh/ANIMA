@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "current_stage": "7",
-  "focus": "Stage 6 Cognitive Integration Core завершён и подтверждён TV-0051: persistent Tasks/Goals, deterministic resolution, system-owned FAST/DEEP/CHOICE routing, bounded Internal State, Sleep lifecycle, validated execution, independent verification, controlled restart recovery и unified trace работают в одном проверяемом контуре без LLM ownership. Stage 7 Semantic Lifecycle & Refinement остаётся Planned; до начала реализации проводится отдельное обсуждение нововведений, целей и границ Stage 7.",
+  "focus": "Stage 6 Cognitive Integration Core завершён и подтверждён TV-0051. Stage 7 Semantic Lifecycle & Refinement остаётся Planned. В pre-Stage 7 архитектурном обсуждении зафиксирован versioned design baseline SemanticCandidate v0: единое immutable ядро semantic claim + provenance/producer/timestamps, восемь candidate kinds, optional context/evidence и system-owned SemanticProcessingProfile для bounded cheap/review/deep paths. Контракт не считается production-proven: перед lock обязательны corpus validation, restart/replay, explainable semantic trace, latency/throughput и DEEP-escalation measurements; допускаются явные ревизии v0.1/v0.2/v1. Следующие открытые вопросы: authority, SemanticDecision/lifecycle transitions, temporal/conflict semantics, persistence/history integration, selection gate и отдельный разбор роли DEEP.",
   "stages": [
     {"id": "D0", "title": "Documentation", "status": "Complete", "depends_on": [], "outcome": "Контекст и процедуры работы восстанавливаются из репозитория"},
     {"id": "0", "title": "Foundation", "status": "Complete", "depends_on": ["D0"], "outcome": "Перенос сохраняет идентичность, историю и возможность продолжения"},
