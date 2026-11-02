@@ -254,7 +254,7 @@ def test_task_can_wake_then_reenter_same_checkpointed_sleep_job(tmp_path):
     assert final_wake.anima_status == "awake"
     assert env["links"].get_open_for_task(env["task"].public_id) is None
     assert [
-        transition["to_status"]
+        transition.to_status
         for transition in env["tasks"].list_transitions(env["task"].public_id)
     ] == [
         "queued",
