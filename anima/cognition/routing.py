@@ -1,9 +1,9 @@
 """System-owned FAST/DEEP/action-choice routing for Stage 6.
 
 The baseline is deliberately conservative. The router decides before any model
-call and never asks a model to classify its own difficulty. Stage 6.3 opens only
-the verified system Choice path for action candidates; unresolved action safety
-or policy questions remain blocked from both models and ChoiceEngine.
+call and never asks a model to classify its own difficulty. Stage 6.3 introduces
+system Choice behind an explicit capability flag so the proven 6.2 baseline stays
+closed by default until the new path passes acceptance.
 """
 
 from dataclasses import dataclass
@@ -59,10 +59,13 @@ class CognitiveRouteDecision:
 class CognitiveRouter:
     """Pure, bounded Stage 6 routing policy with optional diagnostic trace."""
 
-    def __init__(self, *, trace=None):
+    def __init__(self, *, trace=None, enable_action_choice=False):
         if trace is not None and not isinstance(trace, DiagnosticTrace):
             raise TypeError("CognitiveRouter trace must be a DiagnosticTrace or null")
+        if type(enable_action_choice) is not bool:
+            raise ValueError("enable_action_choice must be boolean")
         self.trace = trace
+        self.enable_action_choice = enable_action_choice
 
     def route(self, task, resolution):
         if not isinstance(task, CanonicalTask):
@@ -73,19 +76,23 @@ class CognitiveRouter:
             raise ValueError("CognitiveRouter requires COGNITIVE_REQUIRED")
 
         if task.operation == "CHOOSE_ACTION":
-            # Stage 6.3 permits ChoiceEngine only after the resolver has fully
-            # checked hard constraints and found multiple admissible candidates
-            # with no formal policy. Unsupported/malformed/conflicting authority
-            # is not something Internal State may override.
-            if resolution.reason == "multiple_actions_without_policy":
-                decision = CognitiveRouteDecision(
-                    CognitiveDestination.CHOICE,
-                    "system_action_choice",
-                )
-            else:
+            # ChoiceEngine is permitted only after hard constraints are fully
+            # checked and the resolver has a verified multi-candidate set with
+            # no formal policy. Even that path is capability-gated in 6.3.
+            if resolution.reason != "multiple_actions_without_policy":
                 decision = CognitiveRouteDecision(
                     CognitiveDestination.BLOCKED,
                     "action_choice_requires_verified_candidate_set",
+                )
+            elif not self.enable_action_choice:
+                decision = CognitiveRouteDecision(
+                    CognitiveDestination.BLOCKED,
+                    "action_choice_reserved_for_stage_6_3",
+                )
+            else:
+                decision = CognitiveRouteDecision(
+                    CognitiveDestination.CHOICE,
+                    "system_action_choice",
                 )
         elif task.output_contract == "candidate":
             # Candidate-shaped non-action cognition remains disabled until a
