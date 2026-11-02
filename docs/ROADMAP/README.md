@@ -110,7 +110,8 @@ write/update/revision и temporal lifecycle — **не считаются вып
 
 ## Stage 6
 
-**Cognitive Integration Core — Planned.**
+**Cognitive Integration Core — Planned.** Утверждённый рабочий контракт и декомпозиция
+этапа зафиксированы в [Stage 6 Cognitive Integration Core](Stage_6_Cognitive_Integration_Core.md).
 
 ### Главный вопрос
 
