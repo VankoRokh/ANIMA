@@ -28,8 +28,9 @@ D0 на Python 3.12.14 зафиксировал 48 страниц, 282 ссыл�
 
 У смешанных страниц (Memory/Core/Interfaces/System Architecture) подтверждённое
 поведение находится в Architecture, а будущие части — в
-[Research](../ROADMAP/Research.md). Старые номера CORE/MEM/COG/SLP/IF/HW сохранены
-там, где помогают соотнести идеи; статусы карточек больше не дублируются.
+[Research](../ROADMAP/Research.md). Карта сохраняет старые имена путей только для
+исторической навигации: ссылка ведёт к нынешнему месту **смысла**, а не обязательно
+к Stage с тем же номером. Статусы старых карточек отдельно не дублируются.
 
 | Прежний путь | Новое место |
 |---|---|
@@ -64,9 +65,9 @@ D0 на Python 3.12.14 зафиксировал 48 страниц, 282 ссыл�
 | `docs/06_ROADMAP/Stage_2_Internal_State.md` | [Каноническое место](../ROADMAP/README.md#stage-2) |
 | `docs/06_ROADMAP/Stage_3_Sleep.md` | [Каноническое место](../ROADMAP/README.md#stage-3) |
 | `docs/06_ROADMAP/Stage_4_Agent.md` | [Каноническое место](../ROADMAP/README.md#stage-4) |
-| `docs/06_ROADMAP/Stage_5_Virtual_ANIMA.md` | [Каноническое место](../ROADMAP/README.md#stage-5) |
-| `docs/06_ROADMAP/Stage_6_Cyberdeck.md` | [Каноническое место](../ROADMAP/README.md#stage-6) |
-| `docs/06_ROADMAP/Stage_7_Embodiment.md` | [Каноническое место](../ROADMAP/README.md#stage-7) |
+| `docs/06_ROADMAP/Stage_5_Virtual_ANIMA.md` | [Virtual ANIMA](../ROADMAP/README.md#stage-8) |
+| `docs/06_ROADMAP/Stage_6_Cyberdeck.md` | [Hardware / переносимость](../ROADMAP/Research.md#research-track-hardware-и-переносимость) |
+| `docs/06_ROADMAP/Stage_7_Embodiment.md` | [Physical Expansion](../ROADMAP/README.md#stage-11) |
 | `docs/06_ROADMAP/Stage_D0_Documentation.md` | [Каноническое место](../ROADMAP/README.md#d0) |
 | `docs/06_ROADMAP/Stage_D1_Runtime_Observability.md` | [Каноническое место](../ROADMAP/README.md#d1) |
 | `docs/07_EXPERIMENTS/README.md` | [Каноническое место](../ROADMAP/Research.md#mini-experiments) |
