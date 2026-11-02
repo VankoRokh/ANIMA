@@ -3,7 +3,7 @@ from uuid import uuid4
 import pytest
 
 from anima.cognition.deep_llm import DeepLLMBackend
-from anima.cognition.fast_llm import FastLLMCallResult
+from anima.cognition.llm_transport import LLMCallResult
 from anima.cognition.proposals import CognitiveDispatcher, CognitiveProposal
 from anima.cognition.routing import CognitiveDestination, CognitiveRole, CognitiveRouter
 from anima.ir import CanonicalTask, Evidence
@@ -19,7 +19,7 @@ class StubTransport:
 
     def complete(self, *, system_prompt, user_prompt, timeout_seconds):
         self.calls.append((system_prompt, user_prompt, timeout_seconds))
-        return FastLLMCallResult(
+        return LLMCallResult(
             provider="stub",
             model=self.model,
             text=self.text,
