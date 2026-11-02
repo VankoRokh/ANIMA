@@ -229,11 +229,17 @@ def main(argv=None):
                     )
                     arms.append(arm)
                     summary = arm["summary"]
+                    mean = summary["mean_latency_ms"]
+                    mean_text = (
+                        f"{mean:.1f} ms"
+                        if isinstance(mean, (int, float))
+                        else "n/a"
+                    )
                     print(
                         f"  {summary['passes']}/{summary['total']} PASS; "
                         f"abstention {summary['abstention_passes']}/"
                         f"{summary['abstention_total']}; "
-                        f"mean {summary['mean_latency_ms']:.1f} ms",
+                        f"mean {mean_text}; errors {summary['errors']}",
                         flush=True,
                     )
         except Exception as error:
@@ -267,7 +273,8 @@ def main(argv=None):
     print(f"Evidence: {output}", flush=True)
     if setup_errors:
         print(json.dumps(setup_errors, ensure_ascii=False, indent=2), file=sys.stderr)
-    return int(bool(setup_errors))
+    runtime_errors = any(arm["summary"]["errors"] for arm in arms)
+    return int(bool(setup_errors) or runtime_errors)
 
 
 if __name__ == "__main__":
