@@ -2,11 +2,10 @@
 """Analyze an existing DEEP baseline evidence.json without rerunning models.
 
 The benchmark's strict PASS requires an exact allowed label. This analyzer adds a
-second deterministic metric: semantic label correctness. If a response contains
-exactly one allowed label token anywhere in the text, that label is counted as the
-model's semantic classification even when surrounding explanation violates the
-exact-output contract. Multiple different labels remain ambiguous and receive no
-semantic credit.
+second deterministic metric: semantic label correctness. For a non-exact response,
+the model's classification is the first emitted token when that token is one of the
+allowed labels. Surrounding explanation still fails the exact-output/format metric.
+This avoids treating label words mentioned later in an explanation as extra votes.
 """
 
 import argparse
@@ -22,20 +21,18 @@ ALLOWED_LABELS = (
     "CONTRADICTION",
     "UNRESOLVED",
 )
-_LABEL_RE = re.compile(
-    r"(?<![A-Z0-9_])(" + "|".join(map(re.escape, ALLOWED_LABELS)) + r")(?![A-Z0-9_])",
+_LEADING_LABEL_RE = re.compile(
+    r"^\s*(" + "|".join(map(re.escape, ALLOWED_LABELS)) + r")(?![A-Z0-9_])",
     re.IGNORECASE,
 )
 
 
 def extract_semantic_label(response):
-    """Return one unique allowed label mentioned in text, otherwise None."""
+    """Return an allowed label only when it is the model's leading classification."""
     if not isinstance(response, str) or not response.strip():
         return None
-    labels = {match.upper() for match in _LABEL_RE.findall(response)}
-    if len(labels) != 1:
-        return None
-    return next(iter(labels))
+    match = _LEADING_LABEL_RE.match(response)
+    return match.group(1).upper() if match else None
 
 
 def analyze_case(case):
