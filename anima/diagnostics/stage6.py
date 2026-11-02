@@ -153,7 +153,7 @@ class Stage6TraceRecorder:
                 {
                     "candidate_id": record["candidate_id"],
                     "base_score": record["base_score"],
-                    "score": record.get("score"),
+                    "final_score": record.get("final_score"),
                     "modifiers": [dict(modifier) for modifier in record.get("modifiers", ())],
                 }
             )
