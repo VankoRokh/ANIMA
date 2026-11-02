@@ -87,6 +87,7 @@ def _environment(tmp_path):
     )
     coordinator = ExecutionCoordinator(
         task_store=tasks,
+        goal_store=runtime.goals,
         execution_store=execution_store,
         registry=registry,
         executor=executor,
@@ -133,6 +134,25 @@ def _apply(env, turn, result, observation):
         result=result,
         observations=(observation,),
     )
+
+
+def _successful_verified_turn(env):
+    turn = env["coordinator"].prepare_and_execute(
+        env["choice"],
+        env["specs"],
+        created_at=_now(),
+    )
+    observation = FileObserver(env["sandbox"]).observe(
+        turn.action,
+        turn.receipt,
+        path="result.txt",
+    )
+    result = DeterministicGoalVerifier().verify(
+        env["verification"],
+        action=turn.action,
+        observations=(observation,),
+    )
+    return turn, observation, result
 
 
 def test_execution_uses_task_goal_operation_not_agent_run_or_step(tmp_path):
@@ -210,21 +230,7 @@ def test_environment_change_after_success_causes_verification_failure(tmp_path):
 
 def test_independent_observation_can_confirm_goal_success(tmp_path):
     env = _environment(tmp_path)
-    turn = env["coordinator"].prepare_and_execute(
-        env["choice"],
-        env["specs"],
-        created_at=_now(),
-    )
-    observation = FileObserver(env["sandbox"]).observe(
-        turn.action,
-        turn.receipt,
-        path="result.txt",
-    )
-    result = DeterministicGoalVerifier().verify(
-        env["verification"],
-        action=turn.action,
-        observations=(observation,),
-    )
+    turn, observation, result = _successful_verified_turn(env)
 
     assert result.outcome == "success"
     assert result.criterion_satisfied is True
@@ -234,6 +240,26 @@ def test_independent_observation_can_confirm_goal_success(tmp_path):
     assert env["runtime"].goals.get_goal(env["goal"]["id"])["status"] == "completed"
     # Verification owns Goal success; execution itself still does not mutate Task.
     assert env["tasks"].get_task(env["task"].public_id).status == "active"
+
+
+def test_verification_bridge_rejects_mismatched_spec_before_goal_mutation(tmp_path):
+    env = _environment(tmp_path)
+    turn, observation, result = _successful_verified_turn(env)
+    other_spec = VerificationSpec.create(
+        goal_id=env["goal"]["id"],
+        criterion_kind=FILE_CONTENT_EQUALS,
+        parameters={"path": "result.txt", "expected": "42"},
+    )
+
+    with pytest.raises(ValueError, match="does not belong to VerificationSpec"):
+        GoalVerificationBridge(env["runtime"]).apply(
+            spec=other_spec,
+            action=turn.action,
+            result=result,
+            observations=(observation,),
+        )
+
+    assert env["runtime"].goals.get_goal(env["goal"]["id"])["status"] == "active"
 
 
 def test_keyed_success_replay_does_not_repeat_write_side_effect(tmp_path):
@@ -324,6 +350,27 @@ def test_stale_task_is_rechecked_before_side_effect(tmp_path):
     )
 
     with pytest.raises(ValueError, match="side-effect boundary"):
+        env["coordinator"].execute(action)
+
+    assert not (env["sandbox"] / "result.txt").exists()
+    assert env["execution_store"].get_operation(action.operation_id)["status"] == "prepared"
+
+
+def test_stale_goal_is_rechecked_before_side_effect(tmp_path):
+    env = _environment(tmp_path)
+    action = env["coordinator"].prepare(
+        env["choice"],
+        env["specs"],
+        created_at=_now(),
+    )
+    env["runtime"].goals.transition_goal(
+        env["goal"]["id"],
+        to_status="blocked",
+        reason="simulated blocker before execution",
+        timestamp=_now(),
+    )
+
+    with pytest.raises(ValueError, match="active Goal at side-effect boundary"):
         env["coordinator"].execute(action)
 
     assert not (env["sandbox"] / "result.txt").exists()
