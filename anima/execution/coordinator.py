@@ -106,6 +106,15 @@ class ExecutionCoordinator:
     def execute(self, action):
         if not isinstance(action, ExecutionAction):
             raise TypeError("ExecutionCoordinator.execute requires ExecutionAction")
+        persistent = self.task_store.get_task(action.persistent_task_id)
+        if persistent is None:
+            raise ValueError(f"Unknown Task: {action.persistent_task_id}")
+        if persistent.status != "active":
+            raise ValueError(
+                f"Execution requires active Task at side-effect boundary, got {persistent.status!r}"
+            )
+        if persistent.goal_id != action.goal_id:
+            raise ValueError("ExecutionAction no longer matches Task Goal")
         receipt = self.executor.execute(action)
         self._trace(
             "execution: receipt "
