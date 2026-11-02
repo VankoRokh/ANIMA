@@ -53,9 +53,9 @@ D0 на Python 3.12.14 зафиксировал 48 страниц, 282 ссыл�
 | `docs/03_SOFTWARE/Event_Pipeline.md` | [Каноническое место](../ARCHITECTURE/README.md) |
 | `docs/03_SOFTWARE/Repository_Audit.md` | [Каноническое место](README.md#исходный-аудит) |
 | `docs/03_SOFTWARE/Software_Architecture.md` | [Каноническое место](../ARCHITECTURE/README.md) |
-| `docs/04_HARDWARE/Hardware_Architecture.md` | [Каноническое место](../ROADMAP/Research.md#аппаратные-направления) |
+| `docs/04_HARDWARE/Hardware_Architecture.md` | [Каноническое место](../ROADMAP/Research.md#research-track-hardware-и-переносимость) |
 | `docs/05_PROTOCOLS/Events.md` | [Каноническое место](../ARCHITECTURE/README.md#каталог-и-контракты-данных) |
-| `docs/05_PROTOCOLS/Module_Contracts.md` | [Каноническое место](../ROADMAP/Research.md#контракты-независимых-узлов) |
+| `docs/05_PROTOCOLS/Module_Contracts.md` | [Каноническое место](../ROADMAP/Research.md#интерфейсы-и-действия) |
 | `docs/06_ROADMAP/Backlog.md` | [Каноническое место](../ROADMAP/Research.md) |
 | `docs/06_ROADMAP/Current_Stage.md` | [Каноническое место](../ROADMAP/README.md) |
 | `docs/06_ROADMAP/Roadmap.md` | [Каноническое место](../ROADMAP/README.md) |
