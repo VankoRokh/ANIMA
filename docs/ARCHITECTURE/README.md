@@ -58,25 +58,23 @@ Confirmed boundaries:
 - Stage 4 Planner/AgentRun remains historical/experimental substrate, not the current top-level cognitive owner;
 - semantic write/update/revision is not yet implemented by Stage 6.
 
-## Confirmed component map
+## Компоненты и подтверждение
 
-| Area | Current responsibility | Main implementation / evidence |
-|---|---|---|
-| Identity / lifecycle | persistent instance identity and runtime state | `anima/core/identity.py`, `anima/core/state.py` |
-| Events | typed Events, FIFO bus and append-only raw log | `anima/core/event_bus.py`, `anima/memory/event_log.py` |
-| Cognitive Memory | Event → Memory → Knowledge, entities/relations/provenance | `anima/memory/*` |
-| Retrieval / Context | bounded read path for FAST/DEEP | `anima/memory/retrieval.py`, `context_builder.py` |
-| Canonical IR / resolver | deterministic task/evidence resolution before model calls | `anima/ir.py`, `anima/resolution/*` |
-| FAST cognition | replaceable bounded primary cognitive backend | `anima/cognition/fast_llm.py`, pipeline/contracts |
-| DEEP cognition | replaceable expensive backend for explicitly routed cases | `anima/cognition/deep_llm.py`, Stage 6 router |
-| Internal State | bounded fatigue/uncertainty/frustration/satisfaction transitions | `anima/internal_state/*` |
-| Goals / Choice | persistent goals and system-owned candidate selection | `anima/internal_state/goals.py`, `choice_engine.py` |
-| Tasks | persistent work units distinct from Goals/CanonicalTask | Stage 6 Task store/contracts |
-| Execution | validated side effects and operation ledger | Stage 6 execution layer / `execution.db` |
-| Observation / Verification | independent result checking after execution | Stage 6 verification contracts |
-| Sleep | persistent bounded orchestration, checkpoint/recovery | `anima/sleep/*`, `sleep.db` |
-| Unified trace | causal observability across Stage 6 lifecycle | `trace.db`, Stage 6 trace contracts |
-| Recovery | subsystem recovery plus Stage 6 coordination | Stage 6 recovery coordinator |
+| Компонент | Ответственность | Код | Проверка |
+|---|---|---|---|
+| Runtime | system-owned assembly/session runtime | [runtime.py](../../anima/runtime.py) | [test_runtime.py](../../tests/test_runtime.py) |
+| Identity / state / events | persistent identity, lifecycle state, raw event flow | [state.py](../../anima/core/state.py) | [test_state.py](../../tests/test_state.py) |
+| Cognitive Memory | Event → Memory → Knowledge and evidence/provenance storage | [knowledge.py](../../anima/memory/knowledge.py) | [test_knowledge.py](../../tests/test_knowledge.py) |
+| Retrieval / Context | bounded memory read and context projection | [retrieval.py](../../anima/memory/retrieval.py) | [test_retrieval.py](../../tests/test_retrieval.py) |
+| Canonical IR / resolver | deterministic resolution before model cognition | [ir.py](../../anima/ir.py) | [test_resolution.py](../../tests/test_resolution.py) |
+| Cognitive routing / coordination | system FAST/DEEP/CHOICE routing and coordination | [routing.py](../../anima/cognition/routing.py) | [test_cognitive_routing.py](../../tests/test_cognitive_routing.py) |
+| FAST cognition | bounded replaceable primary cognitive backend | [fast_llm.py](../../anima/cognition/fast_llm.py) | [test_fast_llm_backend.py](../../tests/test_fast_llm_backend.py) |
+| DEEP cognition | explicitly routed expensive cognitive backend | [deep_llm.py](../../anima/cognition/deep_llm.py) | [test_deep_dispatch_integration.py](../../tests/test_deep_dispatch_integration.py) |
+| Internal State / Choice | bounded state influence and system candidate selection | [choice_engine.py](../../anima/internal_state/choice_engine.py) | [test_choice_engine.py](../../tests/test_choice_engine.py) |
+| Persistent Tasks | persistent work units distinct from Goal/CanonicalTask | [store.py](../../anima/tasks/store.py) | [test_task_store.py](../../tests/test_task_store.py) |
+| Execution / Verification | validated side effects, receipts, observations and independent verification | [coordinator.py](../../anima/execution/coordinator.py) | [test_stage6_execution_verification.py](../../tests/test_stage6_execution_verification.py) |
+| Sleep lifecycle | persistent bounded Sleep orchestration integrated with Tasks | [task_lifecycle.py](../../anima/sleep/task_lifecycle.py) | [test_stage6_sleep_lifecycle.py](../../tests/test_stage6_sleep_lifecycle.py) |
+| UnifiedTrace / recovery | persistent causal trace and restart reconciliation | [unified_trace.py](../../anima/diagnostics/unified_trace.py) | [test_stage6_unified_trace_recovery.py](../../tests/test_stage6_unified_trace_recovery.py) |
 
 Representative validation history is indexed in [Testing Results](../TESTING/Results/README.md). Stage 6 final acceptance: [TV-0051](../TESTING/Results/TV-0051.md).
 
