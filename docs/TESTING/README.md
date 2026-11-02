@@ -133,7 +133,7 @@ Synthetic SQLite seed нужен только для воспроизводим�
 До реализации этапа задаются Goal, Observable result, условия старта, Required
 work, Test scenarios, Regression scope, Acceptance criteria и Evidence.
 Критерии конкретных этапов — в [Roadmap](../ROADMAP/README.md), эксперименты —
-в [Research](../ROADMAP/Research.md#exp-001). Список функций не заменяет проверяемый
+в [Research](../ROADMAP/Research.md#mini-experiments). Список функций не заменяет проверяемый
 результат. Если свойство нельзя наблюдать, сначала создаётся наблюдаемость.
 
 ## Показательные отчёты
