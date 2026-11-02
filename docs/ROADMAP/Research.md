@@ -350,3 +350,65 @@ cognition после deterministic resolution. Их нельзя напряму�
 Независимый backup реального экземпляра, лицензия проекта и права на модели требуют
 отдельного решения. Открытая публикация кода не заменяет лицензию. Полноценный сайт
 документации оправдан только если Markdown-навигация станет реальным bottleneck.
+
+## Совместимость старых ссылок
+
+Ниже сохранены только якоря прежней структуры Research. Они не являются вторым
+источником содержания; актуальные формулировки находятся в Research Tracks и
+Mini Experiments выше.
+
+### Память и данные
+
+См. [Research Track: Memory и данные](#research-track-memory-и-данные).
+
+### Отложенные механизмы памяти Stage 1
+
+См. [Research Track: Memory и данные](#research-track-memory-и-данные).
+
+### Fast и Deep
+
+См. [Research Track: FAST / DEEP / Context](#research-track-fast--deep--context).
+
+### Внутренние оценки и цели
+
+См. [Research Track: Internal State, Goals и autonomy](#research-track-internal-state-goals-и-autonomy).
+
+### Отложенные механизмы Internal State
+
+См. [Research Track: Internal State, Goals и autonomy](#research-track-internal-state-goals-и-autonomy).
+
+### Когнитивный сон
+
+См. [Research Track: Sleep и consolidation](#research-track-sleep-и-consolidation).
+
+### Отложенные cognitive механизмы Sleep
+
+См. [Research Track: Sleep и consolidation](#research-track-sleep-и-consolidation).
+
+### Контракты независимых узлов
+
+См. [Интерфейсы и действия](#интерфейсы-и-действия).
+
+### Аппаратные направления
+
+См. [Research Track: Hardware и переносимость](#research-track-hardware-и-переносимость).
+
+### Stage 4.12: small-model Planner baseline
+
+См. [Исторический Stage 4 small-model finding](#исторический-stage-4-small-model-finding).
+
+### EXP-001
+
+См. [Mini Experiments](#mini-experiments).
+
+### EXP-002
+
+См. [Mini Experiments](#mini-experiments).
+
+### EXP-003
+
+См. [Mini Experiments](#mini-experiments).
+
+### Отложенные задачи
+
+См. [Отложенные проектные задачи](#отложенные-проектные-задачи).
