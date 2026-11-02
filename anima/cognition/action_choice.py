@@ -1,13 +1,13 @@
 """System-owned Stage 6.3 bridge from resolved action candidates to ChoiceEngine.
 
 This module does not create candidates and does not ask FAST/DEEP to choose an
-action.  It accepts already-formed system Candidate objects, verifies that their
+action. It accepts already-formed system Candidate objects, verifies that their
 IDs exactly match the resolver's admissible set, then delegates bounded scoring
 to the proven Stage 2 ChoiceEngine.
 """
 
-from dataclasses import dataclass
 from collections.abc import Mapping
+from dataclasses import dataclass
 
 from anima.diagnostics.trace import DiagnosticTrace
 from anima.internal_state.choice_engine import Candidate, ChoiceEngine
@@ -111,6 +111,8 @@ class ActionChoiceCoordinator:
             raise TypeError("Action choice requires system Candidate objects")
 
         candidate_ids = [item.candidate_id for item in candidates]
+        if not all(isinstance(item, str) and item.strip() for item in candidate_ids):
+            raise ValueError("Action choice Candidate IDs must be non-empty strings")
         if len(candidate_ids) != len(set(candidate_ids)):
             raise ValueError("Action choice Candidate IDs must be unique")
         if set(candidate_ids) != set(resolution.remaining):
