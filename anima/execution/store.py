@@ -8,7 +8,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from anima.agent.tools import ToolRegistry
-from .contracts import ExecutionAction, thaw
+from .contracts import ExecutionAction, VerificationSpec, thaw
 
 
 SCHEMA_VERSION = 2
@@ -72,6 +72,15 @@ CREATE TABLE IF NOT EXISTS execution_actions (
         REFERENCES execution_operations(public_id)
         ON DELETE CASCADE
 );
+
+CREATE TABLE IF NOT EXISTS execution_verification_specs (
+    operation_id TEXT PRIMARY KEY,
+    verification_spec_id TEXT NOT NULL UNIQUE,
+    spec_json TEXT NOT NULL,
+    FOREIGN KEY (operation_id)
+        REFERENCES execution_operations(public_id)
+        ON DELETE CASCADE
+);
 """
 
 
@@ -96,19 +105,23 @@ def _validate_timestamp(value, label):
     return value
 
 
-def _action_json(action):
-    if not isinstance(action, ExecutionAction):
-        raise TypeError("Execution action serialization requires ExecutionAction")
+def _json_dumps(value, label):
     try:
         return json.dumps(
-            action.to_dict(),
+            value,
             ensure_ascii=False,
             allow_nan=False,
             sort_keys=True,
             separators=(",", ":"),
         )
     except (TypeError, ValueError) as error:
-        raise ValueError("ExecutionAction payload must be JSON-compatible") from error
+        raise ValueError(f"{label} must be JSON-compatible") from error
+
+
+def _action_json(action):
+    if not isinstance(action, ExecutionAction):
+        raise TypeError("Execution action serialization requires ExecutionAction")
+    return _json_dumps(action.to_dict(), "ExecutionAction payload")
 
 
 def _action_from_json(encoded):
@@ -142,6 +155,36 @@ def _action_from_json(encoded):
     )
 
 
+def _verification_spec_json(spec):
+    if not isinstance(spec, VerificationSpec):
+        raise TypeError("Verification spec serialization requires VerificationSpec")
+    return _json_dumps(
+        {
+            "id": spec.public_id,
+            "goal_id": spec.goal_id,
+            "criterion_kind": spec.criterion_kind,
+            "parameters": thaw(spec.parameters),
+        },
+        "VerificationSpec payload",
+    )
+
+
+def _verification_spec_from_json(encoded):
+    try:
+        data = json.loads(encoded)
+    except (TypeError, json.JSONDecodeError) as error:
+        raise ValueError("Persisted VerificationSpec payload is invalid JSON") from error
+    required = {"id", "goal_id", "criterion_kind", "parameters"}
+    if not isinstance(data, dict) or set(data) != required:
+        raise ValueError("Persisted VerificationSpec payload has invalid fields")
+    return VerificationSpec(
+        public_id=data["id"],
+        goal_id=data["goal_id"],
+        criterion_kind=data["criterion_kind"],
+        parameters=data["parameters"],
+    )
+
+
 def operation_kind(action):
     if not isinstance(action, ExecutionAction):
         raise TypeError("operation_kind requires ExecutionAction")
@@ -170,13 +213,12 @@ def action_request_hash(action):
 
 
 class ExecutionStore:
-    """Persistent operation identity and validated Action payload.
+    """Persistent operation identity and validated execution intent.
 
-    Schema v2 adds ``execution_actions`` so a process restart can reconstruct the
-    exact system-validated ExecutionAction instead of depending on an in-memory
-    Python object. Legacy v1 operations remain readable as operation metadata, but
-    ``load_action`` fails explicitly because their validated payload was never
-    persisted.
+    Schema v2 adds exact validated ``ExecutionAction`` and ``VerificationSpec``
+    payloads so restart recovery does not depend on pre-crash Python objects.
+    Legacy v1 operations remain readable as operation metadata, but missing v2
+    payloads fail explicitly instead of being guessed or silently reconstructed.
     """
 
     def __init__(self, database_file):
@@ -218,8 +260,8 @@ class ExecutionStore:
                     )
                 elif row["value"] == "1":
                     # v1 already has execution_operations. SCHEMA_SQL above creates
-                    # execution_actions; historical rows cannot be backfilled because
-                    # v1 deliberately did not retain the validated action arguments.
+                    # the v2 intent tables. Historical rows cannot be backfilled
+                    # because v1 deliberately did not retain exact validated payloads.
                     connection.execute(
                         "UPDATE schema_meta SET value = ? WHERE key = 'schema_version'",
                         (str(SCHEMA_VERSION),),
@@ -362,6 +404,89 @@ class ExecutionStore:
                 "Persisted ExecutionAction request hash does not match ExecutionOperation"
             )
         return action
+
+    def save_verification_spec(self, action, spec):
+        """Persist one typed verification contract for the validated Action."""
+
+        if not isinstance(action, ExecutionAction):
+            raise TypeError("save_verification_spec requires ExecutionAction")
+        if not isinstance(spec, VerificationSpec):
+            raise TypeError("save_verification_spec requires VerificationSpec")
+        operation = self.get_operation(action.operation_id)
+        if operation is None:
+            raise ValueError(f"Unknown ExecutionOperation: {action.operation_id}")
+        # Reuse the full persisted-action integrity check before binding verification.
+        persisted_action = self.load_action(action.operation_id)
+        if persisted_action != action:
+            raise ValueError("VerificationSpec Action does not match persisted ExecutionAction")
+        if spec.goal_id != action.goal_id:
+            raise ValueError("VerificationSpec Goal does not match ExecutionAction Goal")
+
+        encoded = _verification_spec_json(spec)
+        try:
+            with self.transaction() as connection:
+                existing = connection.execute(
+                    """
+                    SELECT verification_spec_id, spec_json
+                    FROM execution_verification_specs
+                    WHERE operation_id = ?
+                    """,
+                    (action.operation_id,),
+                ).fetchone()
+                if existing is not None:
+                    if (
+                        existing["verification_spec_id"] == spec.public_id
+                        and existing["spec_json"] == encoded
+                    ):
+                        return spec
+                    raise ValueError(
+                        "ExecutionOperation already has a different VerificationSpec"
+                    )
+                connection.execute(
+                    """
+                    INSERT INTO execution_verification_specs(
+                        operation_id, verification_spec_id, spec_json
+                    ) VALUES (?, ?, ?)
+                    """,
+                    (action.operation_id, spec.public_id, encoded),
+                )
+        except sqlite3.IntegrityError as error:
+            raise ValueError(
+                f"Cannot bind VerificationSpec to {action.operation_id}: {error}"
+            ) from error
+        return spec
+
+    def load_verification_spec(self, operation_id):
+        """Reconstruct the exact VerificationSpec bound before restart."""
+
+        operation_id = _require_text(operation_id, "Execution operation public_id")
+        operation = self.get_operation(operation_id)
+        if operation is None:
+            raise ValueError(f"Unknown ExecutionOperation: {operation_id}")
+        with closing(self._connect()) as connection:
+            row = connection.execute(
+                """
+                SELECT verification_spec_id, spec_json
+                FROM execution_verification_specs
+                WHERE operation_id = ?
+                """,
+                (operation_id,),
+            ).fetchone()
+        if row is None:
+            raise ValueError(
+                "ExecutionOperation has no persisted VerificationSpec; "
+                "recovery must not invent a verification contract"
+            )
+        spec = _verification_spec_from_json(row["spec_json"])
+        if spec.public_id != row["verification_spec_id"]:
+            raise ValueError(
+                "Persisted VerificationSpec ID does not match execution binding"
+            )
+        if spec.goal_id != operation["goal_id"]:
+            raise ValueError(
+                "Persisted VerificationSpec Goal does not match ExecutionOperation"
+            )
+        return spec
 
     def transition_operation(self, public_id, to_status, *, reason, timestamp=None):
         public_id = _require_text(public_id, "Execution operation public_id")
