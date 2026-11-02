@@ -1,9 +1,12 @@
-"""Dependency-light model-view contract shared by projection and FAST adapters."""
+"""Dependency-light cognitive view contracts shared by projection and backends."""
 
 from collections.abc import Mapping
 from dataclasses import dataclass
 
 from anima.ir import freeze, plain
+
+
+COGNITIVE_CONSUMERS = {"FAST", "DEEP"}
 
 
 @dataclass(frozen=True)
@@ -12,8 +15,10 @@ class CognitiveView:
     data: Mapping
 
     def __post_init__(self):
-        if self.consumer != "FAST":
-            raise ValueError("Stage 5 supports only the FAST consumer")
+        if self.consumer not in COGNITIVE_CONSUMERS:
+            raise ValueError(
+                "Cognitive view consumer must be FAST or DEEP"
+            )
         if not isinstance(self.data, Mapping):
             raise ValueError("Cognitive view data must be a mapping")
         object.__setattr__(self, "data", freeze(self.data))
