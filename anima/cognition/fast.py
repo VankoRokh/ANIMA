@@ -56,6 +56,8 @@ class ProjectedFastRequest:
             raise ValueError("Projected FAST request requires input_source_id")
         if not isinstance(self.cognitive_view, CognitiveView):
             raise TypeError("Projected FAST request requires CognitiveView")
+        if self.cognitive_view.consumer != "FAST":
+            raise ValueError("Projected FAST request requires a FAST cognitive view")
         if self.input_event_id is None:
             if self.input_text is not None or self.context_bundle is not None:
                 raise ValueError("Structured FAST request carries projection without text context")
