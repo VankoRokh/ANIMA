@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "current_stage": "6",
-  "focus": "Stage 6 в работе. Slice 6.0 Persistent Task Foundation подтверждён TV-0044; 6.1–6.2b Coordinator, system-owned FAST/DEEP routing, сменяемый DEEP backend и общий LLM transport подтверждены TV-0045; 6.3 Goals + Internal State + Choice подтверждён TV-0046; 6.4 Execution + Independent Verification подтверждён TV-0047; 6.5 Sleep Lifecycle Integration подтверждён TV-0048; 6.6 Recovery + Unified Trace подтверждён TV-0049; 6.7 Mini Experiments подтверждён TV-0050 без изменения production policy. Текущая работа — 6.8 final Stage 6 end-to-end acceptance с controlled restart, persistent validated execution intent, independent verification, Sleep resume и полным regression gate.",
+  "current_stage": "7",
+  "focus": "Stage 6 Cognitive Integration Core завершён и подтверждён TV-0051: persistent Tasks/Goals, deterministic resolution, system-owned FAST/DEEP/CHOICE routing, bounded Internal State, Sleep lifecycle, validated execution, independent verification, controlled restart recovery и unified trace работают в одном проверяемом контуре без LLM ownership. Stage 7 Semantic Lifecycle & Refinement остаётся Planned; до начала реализации проводится отдельное обсуждение нововведений, целей и границ Stage 7.",
   "stages": [
     {"id": "D0", "title": "Documentation", "status": "Complete", "depends_on": [], "outcome": "Контекст и процедуры работы восстанавливаются из репозитория"},
     {"id": "0", "title": "Foundation", "status": "Complete", "depends_on": ["D0"], "outcome": "Перенос сохраняет идентичность, историю и возможность продолжения"},
@@ -11,7 +11,7 @@
     {"id": "3", "title": "Sleep", "status": "Complete", "depends_on": ["2"], "outcome": "Консолидация прерывается и возобновляется без потери источников"},
     {"id": "4", "title": "Agent / LLM Planner Experiment", "status": "Stopped", "depends_on": ["3"], "outcome": "Проверен recoverable action loop, но роль LLM Planner признана архитектурным отклонением; результаты 4.0–4.12 сохранены"},
     {"id": "5", "title": "FAST Cognition & Memory Integration", "status": "Complete", "depends_on": ["1", "D1"], "outcome": "FAST использует ограниченный контекст Cognitive Memory и участвует в текстовом цикле без владения памятью или системным состоянием"},
-    {"id": "6", "title": "Cognitive Integration Core", "status": "InProgress", "depends_on": ["5", "2", "3"], "outcome": "FAST, DEEP, routing, Tasks, Goals, Internal State, Sleep и проверяемый исполнительный слой участвуют в одном наблюдаемом когнитивном цикле без передачи LLM системного ownership"},
+    {"id": "6", "title": "Cognitive Integration Core", "status": "Complete", "depends_on": ["5", "2", "3"], "outcome": "FAST, DEEP, routing, Tasks, Goals, Internal State, Sleep и проверяемый исполнительный слой участвуют в одном наблюдаемом когнитивном цикле без передачи LLM системного ownership"},
     {"id": "7", "title": "Semantic Lifecycle & Refinement", "status": "Planned", "depends_on": ["6", "1", "3"], "outcome": "Semantic write/update/revision/consolidation работают с provenance и authority rules; bootstrap knowledge проходит через тот же проверяемый lifecycle"},
     {"id": "8", "title": "Virtual ANIMA", "status": "Planned", "depends_on": ["7"], "outcome": "ANIMA непрерывно действует в наблюдаемой 2D-среде с synthetic history, live events, ручными и автоматизированными сценариями"},
     {"id": "9", "title": "Raspberry Pi Validation", "status": "Planned", "depends_on": ["8"], "outcome": "Один и тот же workload воспроизводимо сравнивается на PC и Raspberry Pi 5; Pico используется только там, где полезен realtime/telemetry контур; сняты performance и endurance показатели"},
