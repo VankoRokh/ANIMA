@@ -4,13 +4,15 @@ from scripts.analyze_deep_baseline import (
 )
 
 
-def test_extract_semantic_label_accepts_one_label_inside_explanation():
-    assert extract_semantic_label("The case is UNRESOLVED because evidence conflicts.") == "UNRESOLVED"
-    assert extract_semantic_label("result: temporal_change") == "TEMPORAL_CHANGE"
+def test_extract_semantic_label_accepts_leading_label_with_explanation():
+    assert extract_semantic_label("UNRESOLVED because evidence conflicts.") == "UNRESOLVED"
+    assert extract_semantic_label("temporal_change — states do not overlap") == "TEMPORAL_CHANGE"
 
 
-def test_extract_semantic_label_rejects_multiple_distinct_labels():
+def test_extract_semantic_label_does_not_treat_later_label_words_as_classification():
+    assert extract_semantic_label("The case is UNRESOLVED because evidence conflicts.") is None
     assert extract_semantic_label("Could be SUPPORT or CONTRADICTION.") is None
+    assert extract_semantic_label("UNRESOLVED, not CONTRADICTION.") == "UNRESOLVED"
 
 
 def test_analyzer_separates_semantic_correctness_from_exact_contract():
