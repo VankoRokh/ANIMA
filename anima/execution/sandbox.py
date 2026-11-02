@@ -5,7 +5,11 @@ import time
 from datetime import datetime, timezone
 from pathlib import Path
 
-from anima.agent.executor import SandboxHandler, build_sandbox_handlers
+from anima.agent.executor import (
+    SandboxHandler,
+    SandboxToolError,
+    build_sandbox_handlers,
+)
 from anima.agent.tools import ToolOutputError, ToolRegistry
 from .contracts import ExecutionAction, ExecutionReceipt, thaw
 from .store import ExecutionStore, action_request_hash, operation_kind
@@ -298,11 +302,16 @@ class SandboxExecutor:
                     raise UncertainOperationError(
                         "keyed uncertain operation has no reconciler"
                     )
-                outcome, output = handler.reconcile(
-                    str(self.root),
-                    thaw(action.arguments),
-                    action.operation_id,
-                )
+                try:
+                    outcome, output = handler.reconcile(
+                        str(self.root),
+                        thaw(action.arguments),
+                        action.operation_id,
+                    )
+                except SandboxToolError as error:
+                    raise UncertainOperationError(
+                        f"cannot reconcile operation: {error.code}: {error.message}"
+                    ) from error
                 if outcome == "succeeded":
                     descriptor.validate_output(output)
                     self.store.transition_operation(
