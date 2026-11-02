@@ -190,7 +190,7 @@ Confirmed properties:
 
 Generative dreaming, unrestricted reflection and FAST weight adaptation during Sleep are not implemented guarantees.
 
-## Data directory contracts
+## Каталог и контракты данных
 
 Default data location is `<project>/data`; `ANIMA_DATA_DIR` may select another location.
 
