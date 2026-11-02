@@ -50,6 +50,7 @@ def test_default_corpus_is_balanced_and_ground_truthed():
     assert len(corpus) == 30
     assert len({case.case_id for case in corpus}) == 30
     assert {case.expected for case in corpus} <= set(ALLOWED_LABELS)
+    assert len({case.input_text for case in corpus}) == 1
     assert sum(case.difficulty == AuditDifficulty.SIMPLE for case in corpus) == 10
     assert sum(case.difficulty == AuditDifficulty.INTERMEDIATE for case in corpus) == 10
     assert sum(case.difficulty == AuditDifficulty.HARD for case in corpus) == 10
