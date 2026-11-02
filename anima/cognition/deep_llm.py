@@ -1,15 +1,15 @@
 """Replaceable local LLM adapter for the Stage 6 DEEP role.
 
-DEEP is a cognitive backend selected by the system router.  The backend receives
+DEEP is a cognitive backend selected by the system router. The backend receives
 only a bounded RoutedCognitiveRequest and returns a CognitiveProposal; it owns no
-persistent ANIMA state.  SmolLM3-3B is the first experimental profile, not part
+persistent ANIMA state. SmolLM3-3B is the first experimental profile, not part
 of the DEEP contract and can be replaced without changing routing/proposals.
 """
 
 from dataclasses import dataclass
 import json
 
-from .fast_llm import FastLLMCallResult, FastTextTransport, LlamaCppFastTransport
+from .llm_transport import LLMCallResult, LlamaCppTransport, TextTransport
 from .proposals import CognitiveProposal, RoutedCognitiveRequest
 from .routing import CognitiveRole
 
@@ -96,10 +96,10 @@ def render_deep_prompts(request):
 
 
 class DeepLLMBackend:
-    """Adapt a text-generation transport to the Stage 6 CognitiveBackend contract."""
+    """Adapt a provider-neutral text transport to the Stage 6 DEEP contract."""
 
     def __init__(self, transport, *, timeout_seconds=DEEP_DEFAULT_TIMEOUT_SECONDS):
-        if not isinstance(transport, FastTextTransport):
+        if not isinstance(transport, TextTransport):
             raise TypeError("DEEP LLM transport must implement the text transport contract")
         if (
             not isinstance(timeout_seconds, (int, float))
@@ -124,7 +124,7 @@ class DeepLLMBackend:
             user_prompt=user_prompt,
             timeout_seconds=self.timeout_seconds,
         )
-        if not isinstance(call, FastLLMCallResult):
+        if not isinstance(call, LLMCallResult):
             raise TypeError("DEEP text transport must return the shared LLM call result")
         proposal = CognitiveProposal.respond(call.text)
         self.call_history.append(call)
@@ -141,7 +141,7 @@ def build_llama_cpp_deep_backend(
     """Build a DEEP backend from a replaceable llama.cpp generation profile."""
     if not isinstance(profile, DeepLLMProfile):
         raise TypeError("DEEP profile must be DeepLLMProfile")
-    transport = LlamaCppFastTransport(
+    transport = LlamaCppTransport(
         base_url=base_url,
         model=profile.model,
         thinking=profile.thinking,
