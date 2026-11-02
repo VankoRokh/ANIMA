@@ -108,6 +108,32 @@ def _latest(observations):
     )
 
 
+def _validate_trace(*, spec, action, result, observations):
+    if not isinstance(spec, VerificationSpec):
+        raise TypeError("verification trace requires VerificationSpec")
+    if not isinstance(action, ExecutionAction):
+        raise TypeError("verification trace requires ExecutionAction")
+    if not isinstance(result, VerificationResult):
+        raise TypeError("verification trace requires VerificationResult")
+    observations = tuple(observations)
+    if any(not isinstance(item, Observation) for item in observations):
+        raise TypeError("verification trace observations must contain Observation values")
+    if spec.public_id != result.verification_spec_id:
+        raise ValueError("VerificationResult does not belong to VerificationSpec")
+    if spec.goal_id != action.goal_id or result.goal_id != action.goal_id:
+        raise ValueError("Verification trace Goal mismatch")
+    if result.candidate_id != action.candidate_id:
+        raise ValueError("VerificationResult candidate does not match ExecutionAction")
+    if any(item.action_id != action.public_id for item in observations):
+        raise ValueError("Observation evidence does not belong to ExecutionAction")
+    if tuple(item.public_id for item in observations) != result.observation_ids:
+        raise ValueError("VerificationResult observation IDs do not match evidence")
+    result_time = datetime.fromisoformat(result.timestamp)
+    if any(datetime.fromisoformat(item.observed_at) > result_time for item in observations):
+        raise ValueError("VerificationResult cannot precede Observation evidence")
+    return observations
+
+
 class DeterministicGoalVerifier:
     """Verify a bounded criterion only from supplied Observation evidence."""
 
@@ -188,16 +214,20 @@ class VerificationApplication:
 
 
 class GoalVerificationBridge:
-    """Apply trusted VerificationResult through the existing Stage 2 Goal boundary."""
+    """Apply a coherent verified trace through the existing Stage 2 Goal boundary."""
 
     def __init__(self, runtime):
         if not isinstance(runtime, InternalStateRuntime):
             raise TypeError("GoalVerificationBridge runtime must be InternalStateRuntime")
         self.runtime = runtime
 
-    def apply(self, result):
-        if not isinstance(result, VerificationResult):
-            raise TypeError("GoalVerificationBridge requires VerificationResult")
+    def apply(self, *, spec, action, result, observations):
+        observations = _validate_trace(
+            spec=spec,
+            action=action,
+            result=result,
+            observations=observations,
+        )
         goal = self.runtime.goals.get_goal(result.goal_id)
         if goal is None:
             raise ValueError(f"Unknown Goal: {result.goal_id}")
