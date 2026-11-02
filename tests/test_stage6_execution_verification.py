@@ -187,7 +187,7 @@ def test_environment_change_after_success_causes_verification_failure(tmp_path):
     )
     result = DeterministicGoalVerifier().verify(
         env["verification"],
-        candidate_id=turn.action.candidate_id,
+        action=turn.action,
         observations=(observation,),
     )
 
@@ -213,7 +213,7 @@ def test_independent_observation_can_confirm_goal_success(tmp_path):
     )
     result = DeterministicGoalVerifier().verify(
         env["verification"],
-        candidate_id=turn.action.candidate_id,
+        action=turn.action,
         observations=(observation,),
     )
 
@@ -298,6 +298,27 @@ def test_operation_binding_rejects_same_id_with_different_action_intent(tmp_path
     assert action_request_hash(tampered) != action_request_hash(action)
     with pytest.raises(ExecutionRejectedError, match="does not match"):
         env["executor"].execute(tampered)
+
+
+def test_stale_task_is_rechecked_before_side_effect(tmp_path):
+    env = _environment(tmp_path)
+    action = env["coordinator"].prepare(
+        env["choice"],
+        env["specs"],
+        created_at=_now(),
+    )
+    env["tasks"].transition_task(
+        env["task"].public_id,
+        "interrupted",
+        reason="simulated interruption before execution",
+        timestamp=_now(),
+    )
+
+    with pytest.raises(ValueError, match="side-effect boundary"):
+        env["coordinator"].execute(action)
+
+    assert not (env["sandbox"] / "result.txt").exists()
+    assert env["execution_store"].get_operation(action.operation_id)["status"] == "prepared"
 
 
 def test_execution_store_reopens_with_operation_state(tmp_path):
