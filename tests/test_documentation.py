@@ -127,6 +127,20 @@ def test_bad_local_links_fail(repo, target, message):
         check_documentation(repo)
 
 
+def test_multiple_bad_local_links_are_reported_together(repo):
+    research = repo / "docs/ROADMAP/Research.md"
+    research.write_text(
+        research.read_text()
+        + "\n[Нет файла](missing-one.md)\n"
+        + "[Вне репозитория](../../../../outside.md)\n"
+    )
+    with pytest.raises(RuntimeError) as captured:
+        check_documentation(repo)
+    message = str(captured.value)
+    assert "Broken link" in message
+    assert "Link leaves repository" in message
+
+
 def test_unreachable_page_fails(repo):
     (repo / "docs/lost.md").write_text("# Потерянная страница\n")
     with pytest.raises(RuntimeError, match="Unreachable documentation"):
