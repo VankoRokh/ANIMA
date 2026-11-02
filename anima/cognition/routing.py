@@ -1,8 +1,9 @@
-"""System-owned FAST/DEEP routing for Stage 6.
+"""System-owned FAST/DEEP/action-choice routing for Stage 6.
 
 The baseline is deliberately conservative. The router decides before any model
-call and never asks a model to classify its own difficulty. Action-choice
-cognition remains blocked until Stage 6.3 adds Goal/Internal State/Choice.
+call and never asks a model to classify its own difficulty. Stage 6.3 opens only
+the verified system Choice path for action candidates; unresolved action safety
+or policy questions remain blocked from both models and ChoiceEngine.
 """
 
 from dataclasses import dataclass
@@ -13,7 +14,7 @@ from anima.ir import CanonicalTask
 from anima.resolution import ResolutionResult, ResolutionRoute
 
 
-ROUTING_POLICY_VERSION = "stage6-baseline-v1"
+ROUTING_POLICY_VERSION = "stage6-baseline-v2"
 
 
 class CognitiveRole(str, Enum):
@@ -24,6 +25,7 @@ class CognitiveRole(str, Enum):
 class CognitiveDestination(str, Enum):
     FAST = "FAST"
     DEEP = "DEEP"
+    CHOICE = "CHOICE"
     BLOCKED = "BLOCKED"
 
 
@@ -70,13 +72,27 @@ class CognitiveRouter:
         if resolution.route != ResolutionRoute.COGNITIVE_REQUIRED:
             raise ValueError("CognitiveRouter requires COGNITIVE_REQUIRED")
 
-        # Action choice is intentionally unavailable to FAST/DEEP in 6.2. The
-        # system will reopen this path only after Goal + State + Choice exist in
-        # the integrated loop (Stage 6.3).
-        if task.operation == "CHOOSE_ACTION" or task.output_contract == "candidate":
+        if task.operation == "CHOOSE_ACTION":
+            # Stage 6.3 permits ChoiceEngine only after the resolver has fully
+            # checked hard constraints and found multiple admissible candidates
+            # with no formal policy. Unsupported/malformed/conflicting authority
+            # is not something Internal State may override.
+            if resolution.reason == "multiple_actions_without_policy":
+                decision = CognitiveRouteDecision(
+                    CognitiveDestination.CHOICE,
+                    "system_action_choice",
+                )
+            else:
+                decision = CognitiveRouteDecision(
+                    CognitiveDestination.BLOCKED,
+                    "action_choice_requires_verified_candidate_set",
+                )
+        elif task.output_contract == "candidate":
+            # Candidate-shaped non-action cognition remains disabled until a
+            # dedicated validator gives it system semantics.
             decision = CognitiveRouteDecision(
                 CognitiveDestination.BLOCKED,
-                "action_choice_reserved_for_stage_6_3",
+                "candidate_output_not_enabled",
             )
         # Conflict resolution is the only baseline reason to pay the DEEP cost.
         # This is based on system-owned IR/resolution, never model self-report.
