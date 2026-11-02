@@ -111,9 +111,13 @@ def _latest(observations):
 class DeterministicGoalVerifier:
     """Verify a bounded criterion only from supplied Observation evidence."""
 
-    def verify(self, spec, *, candidate_id, observations, timestamp=None):
+    def verify(self, spec, *, action, observations, timestamp=None):
         if not isinstance(spec, VerificationSpec):
             raise TypeError("DeterministicGoalVerifier requires VerificationSpec")
+        if not isinstance(action, ExecutionAction):
+            raise TypeError("DeterministicGoalVerifier requires ExecutionAction")
+        if action.goal_id != spec.goal_id:
+            raise ValueError("VerificationSpec Goal does not match ExecutionAction")
         if spec.criterion_kind != FILE_CONTENT_EQUALS:
             raise ValueError(
                 f"Unsupported deterministic criterion: {spec.criterion_kind!r}"
@@ -132,6 +136,8 @@ class DeterministicGoalVerifier:
         observations = tuple(observations)
         if any(not isinstance(item, Observation) for item in observations):
             raise TypeError("observations must contain Observation values")
+        if any(item.action_id != action.public_id for item in observations):
+            raise ValueError("Observation evidence does not belong to ExecutionAction")
         relevant = [
             item for item in observations
             if thaw(item.data).get("path") == path
@@ -164,7 +170,7 @@ class DeterministicGoalVerifier:
                 raise ValueError("VerificationResult cannot precede Observation evidence")
         return VerificationResult.create(
             spec=spec,
-            candidate_id=candidate_id,
+            candidate_id=action.candidate_id,
             observations=observations,
             outcome=outcome,
             criterion_satisfied=satisfied,
