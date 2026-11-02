@@ -75,22 +75,40 @@ def check_documentation(root=ROOT):
     anchors = {p: heading_anchors(t) for p, t in visible.items()}
     edges = {p: set() for p in pages}
     links = 0
+    link_errors = []
     for page, content in visible.items():
-        require(not re.search(r"\[\[[^\]\n]+\]\]", content), f"Use portable links: {page}")
+        relative_page = page.relative_to(root)
+        if re.search(r"\[\[[^\]\n]+\]\]", content):
+            link_errors.append(f"Use portable links: {relative_page}")
         for target in LINK.findall(content):
             url = urlsplit(target)
             if url.scheme or url.netloc:
                 continue
-            require(not url.path.startswith("/"), f"Use relative link: {page}: {target}")
+            links += 1
+            if url.path.startswith("/"):
+                link_errors.append(f"Use relative link: {relative_page}: {target}")
+                continue
             destination = (page.parent / unquote(url.path)).resolve() if url.path else page
-            require(destination.is_relative_to(root), f"Link leaves repository: {target}")
-            require(destination.exists(), f"Broken link: {page.relative_to(root)} -> {target}")
+            if not destination.is_relative_to(root):
+                link_errors.append(f"Link leaves repository: {relative_page} -> {target}")
+                continue
+            if not destination.exists():
+                link_errors.append(f"Broken link: {relative_page} -> {target}")
+                continue
             if url.fragment:
-                require(destination in anchors, f"Anchor target is not Markdown: {target}")
-                require(unquote(url.fragment).lower() in anchors[destination], f"Missing anchor: {page.relative_to(root)} -> {target}")
+                if destination not in anchors:
+                    link_errors.append(f"Anchor target is not Markdown: {relative_page} -> {target}")
+                    continue
+                fragment = unquote(url.fragment).lower()
+                if fragment not in anchors[destination]:
+                    link_errors.append(f"Missing anchor: {relative_page} -> {target}")
+                    continue
             if destination in edges:
                 edges[page].add(destination)
-            links += 1
+    if link_errors:
+        raise RuntimeError(
+            "Documentation link errors:\n- " + "\n- ".join(link_errors)
+        )
     start = root / "docs/README.md"
     require(start in visible, "Missing docs/README.md")
     visited, pending = set(), [start]
