@@ -1,6 +1,6 @@
 # Cognitive Resolution Integration Specification
 
-> **Утверждённый контракт Stage 5.** Реализованные детали и остающиеся closure checks отделены от требований ниже. Динамический статус/focus хранится только в [project.json](../project.json); документ не объявляет Stage завершённым.
+> **Утверждённый и завершённый контракт Stage 5.** Реализованные детали и acceptance evidence отделены от требований ниже. Динамический статус/focus хранится только в [project.json](../project.json); этот документ сохраняет принятый scope и критерии закрытого Stage 5.
 >
 > Основание: экспериментальная серия Structured Request / Semantic Memory / Adaptive IR / Deterministic Resolution (Tests H–M1) на ветке `work/context-grounding-v0`.
 
@@ -11,7 +11,7 @@ interpretation-to-write и revision/contradiction. Одобренный посл
 сначала стабилизировать Canonical IR, exact deterministic resolution, epistemic
 handling, projected cognition, legacy/projected ACI и audit этой границы.
 Это изменение плана сохраняет исходный intent как
-[отложенную работу](README.md#отложенный-исходный-scope-stage-5); semantic persistence,
+[отложенную работу](README.md#stage-7); semantic persistence,
 write/update/revision и temporal fact lifecycle не являются closure gate Stage 5.
 Не требуется Runtime/CLI, Agent/Planner или executor integration.
 
@@ -516,7 +516,7 @@ Do not mark the integration complete merely because unit tests for the new modul
 
 ## 13. Deferred follow-up
 
-After this integration is stable, revisit separately:
+После закрытия Stage 5 отложенные задачи распределены между последующими этапами Roadmap. Актуальный порядок определяется [Stage 6](README.md#stage-6) и [Stage 7](README.md#stage-7); список ниже сохраняет происхождение follow-up из Stage 5:
 
 1. Semantic Memory read/write schema and update lifecycle;
 2. temporal/confidence conflict resolution policies;
@@ -526,4 +526,4 @@ After this integration is stable, revisit separately:
 6. response rendering versus internal action/result representation;
 7. cross-model benchmark using the same fixed model-facing task contract.
 
-The next architectural phase begins only after the current read/resolution/cognition path is stable in production code.
+Stage 6 забирает cognitive integration/routing/system-loop задачи, а Stage 7 — semantic write/update/revision и temporal lifecycle. Канонический порядок дальнейшей работы хранится в [Roadmap](README.md).
