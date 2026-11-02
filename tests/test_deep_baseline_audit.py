@@ -90,7 +90,8 @@ def test_invalid_free_text_does_not_receive_subjective_partial_credit():
 
     assert result.correct is False
     assert result.format_valid is False
-    assert result.normalized_response == "I THINK THE FIRST SOURCE WINS."
+    # normalize_response intentionally strips trivial terminal punctuation.
+    assert result.normalized_response == "I THINK THE FIRST SOURCE WINS"
 
 
 def test_normalization_allows_only_trivial_terminal_punctuation():
