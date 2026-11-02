@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "current_stage": "6",
-  "focus": "Stage 6 начат. Slice 6.0 Persistent Task Foundation подтверждён TV-0044: system-owned Task имеет отдельный tasks.db, lifecycle, transition history и restart persistence без Planner или LLM ownership. Текущая работа — 6.1 Cognitive Coordinator: минимальная системная связка Task, CanonicalTask, deterministic resolution и observable trace без DEEP, semantic writes и нового AgentLoop.",
+  "focus": "Stage 6 в работе. Slice 6.0 Persistent Task Foundation подтверждён TV-0044; 6.1–6.2b Coordinator, system-owned FAST/DEEP routing, сменяемый DEEP backend и общий LLM transport подтверждены TV-0045. Текущая работа — 6.3 Goals + Internal State + Choice: capability-gated системный выбор только среди уже проверенных resolver action candidates без передачи FAST/DEEP права выбирать действие.",
   "stages": [
     {"id": "D0", "title": "Documentation", "status": "Complete", "depends_on": [], "outcome": "Контекст и процедуры работы восстанавливаются из репозитория"},
     {"id": "0", "title": "Foundation", "status": "Complete", "depends_on": ["D0"], "outcome": "Перенос сохраняет идентичность, историю и возможность продолжения"},
