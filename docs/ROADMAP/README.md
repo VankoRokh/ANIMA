@@ -20,14 +20,14 @@ Roadmap описывает цель, границы и проверяемый р
 | [1 — Cognitive Memory](#stage-1) | Релевантный опыт извлекается с происхождением и ограниченным контекстом | Complete | [0](#stage-0), [D1](#d1) |
 | [2 — Internal State](#stage-2) | Влияние внутреннего состояния на выбор причинно прослеживается | Complete | [1](#stage-1) |
 | [3 — Sleep](#stage-3) | Консолидация прерывается и возобновляется без потери источников | Complete | [2](#stage-2) |
-| [4 — Agent / LLM Planner Experiment](#stage-4) | Проверен recoverable action loop, но роль LLM Planner признана архитектурным отклонением | Stopped | [3](#stage-3) |
-| [5 — FAST Cognition & Memory Integration](#stage-5) | FAST использует bounded Memory context и projected cognition без системного ownership | Complete | [1](#stage-1), [D1](#d1) |
-| [6 — Cognitive Integration Core](#stage-6) | FAST, DEEP, routing, Tasks, Goals, State, Sleep и execution работают в одном наблюдаемом цикле | Planned | [5](#stage-5), [2](#stage-2), [3](#stage-3) |
-| [7 — Semantic Lifecycle & Refinement](#stage-7) | Semantic write/update/revision/consolidation работают с provenance; bootstrap knowledge проходит тот же lifecycle | Planned | [6](#stage-6), [1](#stage-1), [3](#stage-3) |
-| [8 — Virtual ANIMA](#stage-8) | Непрерывная ANIMA действует в 2D-среде с synthetic history и воспроизводимыми сценариями | Planned | [7](#stage-7) |
-| [9 — Raspberry Pi Validation](#stage-9) | Один workload сравнивается на PC и Pi 5; сняты performance/endurance показатели | Planned | [8](#stage-8) |
-| [10 — Perception & Interaction](#stage-10) | Camera/audio sources превращаются в Events через стабильные interfaces | Planned | [9](#stage-9) |
-| [11 — Physical Expansion](#stage-11) | Специализированная периферия подключается по измеренным требованиям без потери Identity/Memory | Planned | [10](#stage-10) |
+| [4 — Agent / LLM Planner Experiment](#stage-4) | Проверен recoverable action loop, но роль LLM Planner признана архитектурным отклонением; результаты 4.0–4.12 сохранены | Stopped | [3](#stage-3) |
+| [5 — FAST Cognition & Memory Integration](#stage-5) | FAST использует ограниченный контекст Cognitive Memory и участвует в текстовом цикле без владения памятью или системным состоянием | Complete | [1](#stage-1), [D1](#d1) |
+| [6 — Cognitive Integration Core](#stage-6) | FAST, DEEP, routing, Tasks, Goals, Internal State, Sleep и проверяемый исполнительный слой участвуют в одном наблюдаемом когнитивном цикле без передачи LLM системного ownership | Planned | [5](#stage-5), [2](#stage-2), [3](#stage-3) |
+| [7 — Semantic Lifecycle & Refinement](#stage-7) | Semantic write/update/revision/consolidation работают с provenance и authority rules; bootstrap knowledge проходит через тот же проверяемый lifecycle | Planned | [6](#stage-6), [1](#stage-1), [3](#stage-3) |
+| [8 — Virtual ANIMA](#stage-8) | ANIMA непрерывно действует в наблюдаемой 2D-среде с synthetic history, live events, ручными и автоматизированными сценариями | Planned | [7](#stage-7) |
+| [9 — Raspberry Pi Validation](#stage-9) | Один и тот же workload воспроизводимо сравнивается на PC и Raspberry Pi 5; Pico используется только там, где полезен realtime/telemetry контур; сняты performance и endurance показатели | Planned | [8](#stage-8) |
+| [10 — Perception & Interaction](#stage-10) | Камера, микрофон и аудиовывод подключаются через стабильные source/output interfaces и преобразуются в наблюдаемые Events без захламления Memory сырыми потоками | Planned | [9](#stage-9) |
+| [11 — Physical Expansion](#stage-11) | После измеренных требований подключается специализированная физическая периферия и исследуется первое устойчивое физическое воплощение без потери Identity/Memory | Planned | [10](#stage-10) |
 <!-- AUTO:roadmap:END -->
 
 ## D0
