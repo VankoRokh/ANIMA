@@ -23,12 +23,12 @@ Harness создаёт данные в tmp_path; subprocess-тесты явно 
 
 Обычный pytest suite проверяет deterministic contracts и fake-LLM сценарии; real-model experiments в него не входят. Они запускаются opt-in через [LLM experiment runner](../../scripts/run_llm_planner_experiment.py) и требуют явно доступных локальных backend и model. Наличие модели или работающего сервера не предполагается; обычные проверки не запускают inference и не загружают модели.
 
-Для сравнения лёгких локальных моделей с tool/function calling используется отдельный [ANIMA Tool Model Benchmark v1](Tool_Model_Benchmark.md): фиксированные 10 рабочих сценариев, одинаковые временные Memory/Internal State fixtures, раздельные quality-метрики и измерения latency/ресурсов. Real-model прогоны benchmark остаются opt-in и не входят в regression pytest suite. Сравнительные прогоны выполняются по зафиксированному [runtime-профилю ANIMA FAST CPU v1](Tool_Model_Runtime_Profile.md), чтобы параметры `llama-server` не менялись между кандидатами. Representative результаты серии сводятся в [таблицу сравнения tool-моделей](Tool_Model_Comparison.md).
+Исторический [ANIMA Tool Model Benchmark v1](Tool_Model_Benchmark.md) сохраняет сравнение лёгких моделей на tool/function-calling bridge: фиксированные 10 сценариев, одинаковые временные Memory/Internal State fixtures, раздельные quality-метрики и измерения latency/ресурсов. Этот benchmark относится к исследовательскому pull/tool path и **не является текущим каноническим FAST contract**. Real-model прогоны benchmark остаются opt-in и не входят в regression pytest suite. Сравнительные прогоны выполнялись по зафиксированному [runtime-профилю ANIMA FAST CPU v1](Tool_Model_Runtime_Profile.md), чтобы параметры `llama-server` не менялись между кандидатами. Representative результаты серии сохранены в [таблице сравнения tool-моделей](Tool_Model_Comparison.md).
 
 Representative saved evidence оформляется отдельным TV report с implementation snapshot, условиями, canonical scenario, измеренными результатами и границами доказанного. Пример — [TV-0042](Results/TV-0042.md): integration Passed отделён от model reliability. Временные captures не заменяют сохраняемый проектный отчёт; каждый диагностический запуск копировать не требуется.
 
-Для текущего Stage 5 pipeline доступен отдельный [Benchmark v2](Stage5_Benchmark_v2.md):
-восемь bounded scenarios на том же inventory моделей; Benchmark v1 сохраняется отдельно.
+Для production pipeline, закрытого в Stage 5, доступен отдельный [Benchmark v2](Stage5_Benchmark_v2.md):
+восемь bounded scenarios на том же inventory моделей; Benchmark v1 сохраняется отдельно как исторический эксперимент другого интерфейса.
 Завершённый one-pass прогон документирован там только как preliminary / exploratory
 evidence архитектурной границы, не как официальный рейтинг, reliability estimate
 или решение о preferred FAST backend. До выбора модели нужны repeated runs с
@@ -75,7 +75,7 @@ request и присутствие marker в raw model response и итогово
 вместо task content не проходят. Запрос и fixture сохраняются без изменений.
 `output_contract="text"` не гарантирует byte-exact форматирование unrestricted
 text output. Такая гарантия потребовала бы будущего явного output contract или
-constrained decoding и находится вне текущего Stage 5 scope. Candidate-mode
+constrained decoding и находится вне Stage 5 scope. Candidate-mode
 validation остаётся точной: `CONTINUE.` не равен допустимому ID `CONTINUE`.
 
 Evidence содержит model hash/server identity, параметры, projected view, role и
@@ -84,8 +84,8 @@ failure classification. Backend attempt, generation POST `/completion` и succes
 backend completion — разные счётчики; `/apply-template` не считается generation.
 В исправном live smoke три real generations; controlled failure даёт 1 backend
 attempt / 0 generations / 0 completions. Любой failed case сохраняется и возвращает
-nonzero exit status. Smoke сам по себе не меняет stage status и не заменяет final
-acceptance report.
+nonzero exit status. Smoke сам по себе не определяет stage status; закрытие Stage 5
+подтверждено отдельным acceptance report [TV-0043](Results/TV-0043.md).
 
 ## Наблюдать процесс
 
