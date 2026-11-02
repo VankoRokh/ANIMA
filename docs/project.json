@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "current_stage": "6",
-  "focus": "Stage 6 в работе. Slice 6.0 Persistent Task Foundation подтверждён TV-0044; 6.1–6.2b Coordinator, system-owned FAST/DEEP routing, сменяемый DEEP backend и общий LLM transport подтверждены TV-0045; 6.3 Goals + Internal State + Choice подтверждён TV-0046. Текущая работа — 6.4 Execution + Independent Verification: нейтральный Task/Goal-owned action/operation boundary, bounded sandbox execution и независимая проверка наблюдаемого результата без возврата Planner/AgentRun ownership.",
+  "focus": "Stage 6 в работе. Slice 6.0 Persistent Task Foundation подтверждён TV-0044; 6.1–6.2b Coordinator, system-owned FAST/DEEP routing, сменяемый DEEP backend и общий LLM transport подтверждены TV-0045; 6.3 Goals + Internal State + Choice подтверждён TV-0046; 6.4 Execution + Independent Verification подтверждён TV-0047. Текущая работа — 6.5 Sleep Lifecycle Integration: persistent связь Task ↔ SleepJob, безопасное interruption/resume и bounded Sleep без повторения committed side effect.",
   "stages": [
     {"id": "D0", "title": "Documentation", "status": "Complete", "depends_on": [], "outcome": "Контекст и процедуры работы восстанавливаются из репозитория"},
     {"id": "0", "title": "Foundation", "status": "Complete", "depends_on": ["D0"], "outcome": "Перенос сохраняет идентичность, историю и возможность продолжения"},
