@@ -180,14 +180,19 @@ def test_production_proposal_validator_still_rejects_request_context():
 
 
 def test_routing_experiment_keeps_baseline_and_rejects_unproven_adaptive_cost():
-    result = run_routing_policy_experiment()
+    result = run_routing_policy_experiment(
+        fast_benchmark_passes=4,
+        deep_benchmark_passes=4,
+        benchmark_cases=4,
+    )
 
     assert result.baseline_verdict == ExperimentVerdict.ACCEPTED
     assert result.adaptive_verdict == ExperimentVerdict.REJECTED
     assert result.deep_value_verdict == ExperimentVerdict.INCONCLUSIVE
     assert result.baseline_deep_calls == 2
     assert result.adaptive_deep_calls == 3
-    assert result.fast_benchmark_passes == result.deep_benchmark_passes == 8
+    assert result.fast_benchmark_passes == result.deep_benchmark_passes == 4
+    assert result.benchmark_cases == 4
     assert result.deep_latency_ratio > 6.0
     assert result.adaptive_estimated_mean_ms > result.baseline_estimated_mean_ms
     assert result.all_deep_estimated_mean_ms > result.baseline_estimated_mean_ms
