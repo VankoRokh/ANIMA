@@ -156,17 +156,16 @@ threshold equality, missing + unsupported requirements, omitted/empty candidates
 uniform output validation, sufficient projection и explicit backend capability.
 Production tests используют fake backends/transports; real Qwen validation не входит
 в unit CI. Read-stack reconstruction и backend replacement проверяются с неизменными
-Memory/Identity и сохранённым provenance. Текущий статус/focus Stage 5 определяется
-только [project.json](../project.json). Реальный projected smoke прошёл все семь
-cases; evidence, параметры и ограничения зафиксированы в
-[TV-0043](../TESTING/Results/TV-0043.md). Free-text `output_contract="text"`
-проверяет semantic delivery task content, а не byte-exact форматирование:
-`COBALT47.` допустим. Candidate-mode требует точного разрешённого ID;
-`CONTINUE.` отклоняется. Byte-exact гарантия unrestricted text потребовала бы
-будущего explicit output contract или constrained decoding, вне текущего scope.
-Проверки завершены; переход статуса Stage 5 остаётся отдельным решением.
-Не добавлены semantic persistence/write, DEEP, policy precedence, широкий language
-frontend, Agent/Planner, execution, Sleep или Internal State decision integration.
+Memory/Identity и сохранённым provenance. Stage-level status хранится только в
+[project.json](../project.json). Stage 5 закрыт после representative acceptance
+[TV-0043](../TESTING/Results/TV-0043.md); real projected smoke прошёл все семь cases.
+Free-text `output_contract="text"` проверяет semantic delivery task content, а не
+byte-exact форматирование: `COBALT47.` допустим. Candidate-mode требует точного
+разрешённого ID; `CONTINUE.` отклоняется. Byte-exact гарантия unrestricted text
+потребовала бы будущего explicit output contract или constrained decoding, вне
+закрытого Stage 5 scope. Не добавлены semantic persistence/write, DEEP, policy
+precedence, широкий language frontend, Agent/Planner, execution, Sleep или Internal
+State decision integration.
 
 ## Agent и Planner boundary
 
