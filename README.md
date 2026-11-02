@@ -10,17 +10,18 @@ ANIMA — исследовательский проект модульного �
 
 Главный вопрос: можно ли развивать память, cognition и действия агента, сохраняя
 проверяемую непрерывность данных при замене моделей и оборудования?
-Ближайший стенд — обычный ноутбук/VM; переносимый cyberdeck и физическое тело
-следуют за измеренными программными результатами.
+Ближайшие этапы остаются программными: сначала единый когнитивный контур, semantic
+lifecycle и виртуальная среда; физическое воплощение следует только после измеренных
+требований и переносимости workload.
 
 ## Состояние
 
 <!-- AUTO:summary:START -->
 Версия прототипа: **00.1-alpha** (из кода).
 
-Текущий фокус: **6 — Cognitive Integration** (Planned).
+Текущий фокус: **6 — Cognitive Integration Core** (Planned).
 
-Stage 5 завершён: принят scope canonical IR → deterministic resolution → projected cognition → FAST integration; representative acceptance evidence — TV-0043, real-model projected smoke прошёл все семь acceptance cases. Unrestricted text output остаётся semantic, не byte-exact. Stage 6 запланирован, работа не начата. Semantic persistence/write lifecycle, DEEP, Agent/Planner, execution, Sleep, Internal State integration, broader parsing/data acquisition/rendering остаются будущей работой.
+Stage 5 завершён. Перед началом реализации Stage 6 будущая дорожная карта пересмотрена: Stage 6 — Cognitive Integration Core; Stage 7 — Semantic Lifecycle & Refinement; Stage 8 — Virtual ANIMA; Stage 9 — Raspberry Pi Validation; Stage 10 — Perception & Interaction; Stage 11 — Physical Expansion. Stage 6 остаётся Planned и ещё не начат. Research tracks и mini experiments ведутся параллельно и не считаются принятой архитектурой без отдельного решения.
 
 [Этапы и критерии](docs/ROADMAP/README.md).
 <!-- AUTO:summary:END -->
@@ -40,6 +41,8 @@ Stage 5 завершён: принят scope canonical IR → deterministic reso
 - FAST предназначен для оперативного reasoning с компактным контекстом; DEEP — для
   более дорогого анализа. Они используют общую память и историю ANIMA, а не являются
   отдельными личностями.
+- Hardware и физическая форма выбираются по измеренному workload; корпус не является
+  отдельной смысловой целью проекта.
 - Код и воспроизводимые результаты предназначены для открытого развития;
   лицензию проекта и права на будущие модели ещё нужно определить.
 
