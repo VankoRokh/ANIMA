@@ -1,32 +1,12 @@
-# Knowledge Lifecycle v0
+# Knowledge Lifecycle v0 — historical compatibility note
 
-Status: **pre-Stage 7 design baseline; not yet a production contract**.
+Status: **not a current accepted lifecycle state machine.** Current semantic boundary: [Stage 7 Semantic Boundary v0](Stage_7_Semantic_Boundary_v0.md).
 
-This document fixes the agreed baseline for how semantic decisions affect durable Knowledge and how retrieval must interpret that state afterward.
+The original document proposed how semantic outcomes might affect durable Knowledge and retrieval. Its core principle remains valid:
 
-## Core principle
+> write/update semantics and read/retrieval semantics must agree; history and provenance must remain auditable.
 
-Semantic lifecycle does not end at persistence.
-
-```text
-SemanticCandidate
-      ↓
-SemanticDecision
-      ↓
-Knowledge + history + provenance
-      ↓
-Retrieval
-      ↓
-Context
-      ↓
-FAST / DEEP
-```
-
-Stage 7 is only correct if the read path respects the semantic state produced by the write/update path.
-
-## Baseline outcomes
-
-A new candidate interacting with existing Knowledge may produce one of:
+However, owner review on 2026-11-03 explicitly separated evidence relation, evidence sufficiency, Knowledge state and lifecycle decision. The original list:
 
 ```text
 CREATE
@@ -38,178 +18,85 @@ UNRESOLVED
 REJECT
 ```
 
-No additional lifecycle states are required for v0 unless implementation tests demonstrate a real gap.
+must **not** be treated as one production enum.
 
-## CREATE
+## Accepted separation
 
-Use when the candidate is accepted as a genuinely new durable fact and no existing Knowledge item represents the same claim.
+### Relation / evidence assessment
 
-```text
-new candidate
-→ accepted
-→ new current Knowledge
-```
-
-All provenance must be retained.
-
-## SUPPORT
-
-Use when new evidence supports an already existing claim.
+The current read-only relation profile can describe:
 
 ```text
-existing Knowledge
-+ new supporting evidence
-→ same Knowledge item with richer provenance/support history
+SUPPORT
+CONTRADICTION
+COMPATIBLE_DISTINCT
+TEMPORAL_SUCCESSION
+CORRECTION declaration
+INSUFFICIENT
+NOT_COMPARABLE
+UNSUPPORTED
 ```
 
-Do not create duplicate Knowledge rows for semantically identical support unless a future storage design proves that necessary.
+These results do not mutate Knowledge.
 
-## TEMPORAL_CHANGE
+### Knowledge state
 
-Use when both old and new values are valid, but at different times.
-
-Example:
+Public read semantics and their exact mapping to the existing implementation statuses:
 
 ```text
-old: bar.closing_time = 23:00
-new: bar.closing_time = 00:00
+provisional
+confirmed
+challenged
+superseded
+rejected
 ```
 
-Result:
+remain **open DP-09**. Documentation must not invent a second production state machine by renaming these statuses to `current/historical/corrected/contested` without an explicit mapping.
+
+### Lifecycle action
+
+The exact accepted system-owned action vocabulary, source authority policy and correction rights remain **open DP-08**.
+
+The design proposal discussed actions such as:
 
 ```text
-old Knowledge
-  status: historical
-  valid_until: change boundary
-
-new Knowledge
-  status: current
-  valid_from: change boundary
+CREATE
+ATTACH_SUPPORT
+OPEN_CHALLENGE
+APPLY_REVISION
+DEFER
+REJECT
+NO_OP
 ```
 
-The old claim is not marked wrong. It remains available for historical queries.
+but these are not accepted production API until DP-08 is reviewed.
 
-## CORRECTION
+### Dependency re-evaluation
 
-Use when prior Knowledge is determined to have been wrong for the period it claimed to describe.
+Evidence identity/replay semantics are accepted under DP-10a, but full descendant re-evaluation after a premise correction remains **open DP-10b**.
 
-Example:
+## Read-path requirements retained
 
-```text
-old: ssd.capacity = 512 GB
-new verified correction: ssd.capacity = 1 TB
-```
+Regardless of the eventual storage mapping, Stage 7 must preserve these requirements:
 
-Result:
+- corrected/historical evidence must not silently reappear as an unconditional current fact;
+- contested/disputed information must remain distinguishable from accepted information;
+- temporal applicability must be respected for the query scope;
+- source/provenance history must survive revision;
+- weak new evidence must not overwrite stronger accepted state merely because it is newer or model-produced;
+- restart/replay must preserve the same semantic effects;
+- Context Builder must not erase semantic status when projecting information to FAST/DEEP.
 
-```text
-old Knowledge
-  status: corrected / invalidated
-  retained in history
+## Current implementation boundary
 
-new Knowledge
-  status: current
-```
+The first Stage 7 interface slice is read-only/shadow. `classify_relation/0.1` may classify supplied Claims/Evidence but cannot CREATE, challenge, revise, supersede or reject durable Knowledge.
 
-The original evidence/Event is immutable and must not be deleted or rewritten.
+Write-through lifecycle integration requires later acceptance of DP-08, DP-09, DP-10b and DP-11.
 
-## CONTRADICTION
+Canonical references:
 
-Use when sufficiently strong evidence supports incompatible claims about the same entity/property over the same relevant period.
+- [Stage 7 Semantic Boundary v0](Stage_7_Semantic_Boundary_v0.md);
+- [ADR-010](../DECISIONS/ADR-010_Stage_7_Semantic_Boundary.md);
+- [Stage 7 Semantic Conformance v0](../TESTING/Stage7_Conformance_v0.md).
 
-Example:
-
-```text
-sensor A: door = open
-sensor B: door = closed
-```
-
-Result:
-
-```text
-claim A: contested
-claim B: contested
-current truth: unresolved
-```
-
-The system must not silently pick one claim for normal retrieval.
-
-A contradiction may trigger the Semantic Verification flow according to importance, urgency, cost of delay/error, verifiability and verification cost.
-
-## UNRESOLVED
-
-Use when the system cannot yet classify the new information as support, temporal change, correction or true contradiction.
-
-Typical causes:
-
-- ambiguous entity identity;
-- weak or stale source;
-- unclear temporal scope;
-- incomplete evidence;
-- uncertain interpretation.
-
-Baseline behavior:
-
-```text
-existing stable Knowledge usually remains the best available representation
-new candidate remains pending/unresolved
-```
-
-A weak ambiguous candidate must not automatically destabilize otherwise strong Knowledge.
-
-The system may choose VERIFY NOW, VERIFY LATER, KEEP AMBIGUOUS, or CONSERVATIVE ACTION + VERIFY depending on risk and relevance.
-
-## REJECT
-
-Use when the candidate fails structural, provenance, authority or semantic validation strongly enough that it should not affect current Knowledge.
-
-The rejected candidate and reason may remain observable in trace/history according to retention policy, but it must not be presented as current Knowledge.
-
-## Retrieval rules
-
-### Current queries
-
-Prefer Knowledge that is current, valid for the requested time and not corrected/invalidated.
-
-### Historical queries
-
-May retrieve historical and corrected claims when the query explicitly asks about prior state/history. Their status and provenance must remain visible.
-
-### Contested Knowledge
-
-Retrieval must expose the conflict rather than selecting one candidate arbitrarily.
-
-Example projection:
-
-```text
-door state: unresolved
-- open supported by sensor A
-- closed supported by sensor B
-```
-
-### Corrected Knowledge
-
-Corrected/invalidated claims must not be injected into ordinary FAST/DEEP context as if they were current facts.
-
-### Unresolved candidates
-
-Unresolved candidate evidence may be exposed only when relevant to the query/verification case and must remain clearly marked as unresolved.
-
-## Read-path acceptance requirement
-
-A correct persistence layer with an incorrect retrieval layer is a Stage 7 failure.
-
-Mandatory acceptance tests must verify that:
-
-1. current retrieval prefers current valid Knowledge;
-2. temporal history remains accessible for historical queries;
-3. corrected Knowledge does not reappear as a current fact;
-4. contradictions return competing claims and unresolved state;
-5. weak unresolved candidates do not automatically replace strong current Knowledge;
-6. supporting evidence enriches provenance without duplicating semantic facts unnecessarily;
-7. restart/replay preserves the same lifecycle states and retrieval behavior;
-8. Context Builder preserves semantic status when passing Knowledge to FAST/DEEP.
-
-## Design rule
-
-> Knowledge lifecycle is complete only when both persistence and retrieval preserve the meaning of semantic state. History must remain auditable, while current cognition must not revive corrected, contested or unresolved claims as ordinary facts.
+The original detailed lifecycle proposal remains available in Git history.
