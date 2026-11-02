@@ -1,620 +1,244 @@
 # Реализованная архитектура
 
-Здесь описан только работающий и подтверждённый локальный Python-контур.
-Будущие механизмы находятся в [Roadmap](../ROADMAP/README.md) и
-[Research](../ROADMAP/Research.md). Принятый ADR или наличие таблицы в схеме сами
-по себе не считаются реализацией.
+Этот раздел описывает **подтверждённый работающий код**, а не будущие design proposals.
+Динамический stage/status хранится в [project.json](../project.json). Будущие механизмы находятся в [Roadmap](../ROADMAP/README.md) и [Research](../ROADMAP/Research.md).
 
-## Компоненты и подтверждение
+Stage 6 завершён и является текущей реализованной cognitive integration boundary. Его подробный исторический снимок:
+[Stage 6 — Cognitive Integration Core](Stage_6_Cognitive_Integration_Core.md).
 
-| Компонент | Код и граница ответственности | Проверки |
+Принятый Stage 7 semantic boundary пока **не реализован**; он документирован в
+[Stage 7 Semantic Boundary v0](../ROADMAP/Stage_7_Semantic_Boundary_v0.md).
+
+## Текущий system-owned контур
+
+```text
+raw input / Event / source data
+          ↓
+      Runtime / stores
+          ↓
+      persistent Task
+          ↓
+      CanonicalTask
+          ↓
+ deterministic resolution
+   ├─ deterministic result
+   ├─ insufficient data
+   └─ cognitive remainder
+             ↓
+        system Router
+        ├─ FAST
+        ├─ DEEP
+        └─ CHOICE
+             ↓
+     validated proposal
+             ↓
+ Internal State + ChoiceEngine
+             ↓
+  validated ExecutionAction
+             ↓
+          Executor
+             ↓
+Receipt → Observation → Verification
+             ↓
+   Goal progress / Task state
+```
+
+Sleep, recovery and UnifiedTrace participate in the same lifecycle.
+
+## Ownership rules
+
+Confirmed boundaries:
+
+- Identity/state/events/memory/tasks/goals/sleep/execution remain system-owned;
+- FAST and DEEP are replaceable cognitive backends, not personalities or authorities;
+- routing is system-owned and occurs before model invocation;
+- model output is proposal-only and cannot directly mutate Memory/Knowledge/Task/Goal/Internal State/Sleep/execution stores;
+- Internal State modifies Choice through bounded rules and does not create candidates/goals;
+- execution success receipt is not Goal success; independent Observation/Verification is required;
+- Stage 4 Planner/AgentRun remains historical/experimental substrate, not the current top-level cognitive owner;
+- semantic write/update/revision is not yet implemented by Stage 6.
+
+## Confirmed component map
+
+| Area | Current responsibility | Main implementation / evidence |
 |---|---|---|
-| Сборка и путь данных | [main](../../main.py) собирает зависимости; [paths](../../anima/config/paths.py) выбирает каталог данных | [cwd/внешний каталог](../../tests/test_data_directory.py), [CLI/headless](../../tests/test_d1_validation.py) |
-| Runtime | [Runtime](../../anima/runtime.py): wake/user_input/sleep, Event processing и snapshot | [lifecycle](../../tests/test_runtime.py), [end-to-end](../../tests/test_d1_validation.py) |
-| CLI и headless | [CLI](../../anima/interfaces/cli.py) владеет терминальным вводом; [ScenarioRunner](../../anima/scenario.py) выполняет сценарии без input() | [CLI session](../../tests/test_cli_session.py), [scenario](../../tests/test_scenario.py) |
-| Идентичность и состояние | [Identity](../../anima/core/identity.py) хранит постоянный UUID4; [AnimaState](../../anima/core/state.py) сохраняет lifecycle/state | [state](../../tests/test_state.py), [recovery](../../tests/test_recovery.py) |
-| Events | [Event/EventBus](../../anima/core/event_bus.py): `ev_` UUIDv4, hierarchical type, timestamp/source/session/references и FIFO | [Event Foundation](../../tests/test_events.py) |
-| Raw Event Log | [EventLog](../../anima/memory/event_log.py): append-only JSONL, validation и duplicate-ID detection | [порядок/повреждения/reopen](../../tests/test_events.py), [restore](../../tests/test_recovery.py) |
-| SQLite Memory Store | [MemoryStore](../../anima/memory/memory_store.py): schema v1, transactions, Memory CRUD/source links, indexes и FTS5 | [store/FTS/FK/rollback](../../tests/test_memory.py) |
-| Memory read-view | [EpisodicMemory](../../anima/memory/episodic.py): `load/count/last` поверх того же MemoryStore | [reader view](../../tests/test_memory.py), [recovery](../../tests/test_recovery.py) |
-| Entities / Relations | [LinkStore](../../anima/memory/link_store.py): Entity aliases, универсальные Relations и low-level Knowledge anchors | [relations/entity resolution](../../tests/test_provenance.py) |
-| Provenance | [ProvenanceResolver](../../anima/memory/provenance.py): Memory/Relation/Knowledge/Entity → source Memory → raw Event | [provenance](../../tests/test_provenance.py) |
-| Memory Processor | [MemoryProcessor](../../anima/memory/processor.py): Selection, bounded candidates, explainable Association и create/update/create_related | [association corpus](../../tests/test_memory_processor.py) |
-| Event Processing / Recovery | [EventProcessingCoordinator](../../anima/memory/event_processing.py): persistent ledger, atomic Event effects, replay/retry/recovery и raw Event identity check | [event processing](../../tests/test_event_processing.py), [backup/restart](../../tests/test_recovery.py) |
-| Memory Composer | [RuleBasedComposer](../../anima/memory/composer.py): deterministic bounded `content`, deduplication и conservative revision | [composer](../../tests/test_memory_composer.py), [revision](../../tests/test_memory_composer_revision.py) |
-| Memory Lifecycle / History | [MemoryLifecycle](../../anima/memory/lifecycle.py): OPEN→CLOSED, Merge→MERGED и compact history | [lifecycle/merge/provenance](../../tests/test_memory_lifecycle.py) |
-| Knowledge Layer | [KnowledgeLayer](../../anima/memory/knowledge.py): CLOSED evidence, provisional/confirmed/challenged/superseded/rejected lifecycle и history | [knowledge lifecycle](../../tests/test_knowledge.py), [evidence/state machine](../../tests/test_knowledge_evidence.py) |
-| Retrieval | [RetrievalEngine](../../anima/memory/retrieval.py): exact ID, structured filters, Entity anchors, FTS5, 1-hop Relations и explainable ranking | [retrieval corpus](../../tests/test_retrieval.py) |
-| Context Builder | [ContextBuilder](../../anima/memory/context_builder.py): FAST/DEEP read policies, exact/Knowledge/Memory priority, provenance Events и strict item/character budget | [context corpus](../../tests/test_context_builder.py) |
-| Canonical IR / Resolution | [ANIMA IR](../../anima/ir.py), [resolver](../../anima/resolution/resolver.py) и [ACTION_PRIORITY](../../anima/resolution/policy.py): typed task/evidence, строгие правила, constraints перед policies; без LLM и persistence | [production boundary corpus](../../tests/test_resolution.py) |
-| Cognitive Projection / Stage 5 Routing | [projection](../../anima/cognition/projection.py) выбирает unresolved view; [pipeline](../../anima/cognition/pipeline.py) вызывает заменяемый FAST только для `COGNITIVE_REQUIRED` | [projection/frontend](../../tests/test_cognitive_projection.py), [pipeline/ownership](../../tests/test_cognitive_pipeline.py), [FAST ACI](../../tests/test_fast_cognition.py) |
-| Internal State Store / History | [InternalStateStore](../../anima/internal_state/store.py): `internal_state.db`, current values, causal transitions, Goals и source-operation ledger | [storage](../../tests/test_internal_state_storage.py), [history](../../tests/test_state_history.py) |
-| State Variables / Transitions | [TransitionEngine](../../anima/internal_state/transition_engine.py) применяет bounded event/result rules к fatigue/uncertainty/frustration/satisfaction | [variables](../../tests/test_state_variables.py), [transition engine](../../tests/test_transition_engine.py) |
-| Goals / Progress / Arbitration | [GoalStore](../../anima/internal_state/goals.py) хранит lifecycle; progress и arbitration отделяют verified result от порядка активных Goals | [goal model](../../tests/test_goal_model.py), [progress/arbitration](../../tests/test_goal_progress_arbitration.py) |
-| Time Dynamics | [TimeDynamics](../../anima/internal_state/time_dynamics.py): lazy injected-time growth/recovery/decay без фонового tick | [time dynamics](../../tests/test_time_dynamics.py) |
-| Choice Engine | [ChoiceEngine](../../anima/internal_state/choice_engine.py): read-only Candidate evaluation с bounded state modifiers и score trace | [choice](../../tests/test_choice_engine.py), [performance](../../tests/test_decision_performance.py) |
-| Expression Adapter | [ExpressionAdapter](../../anima/internal_state/expression_adapter.py): read-only state → normalized ExpressionProfile | [expression](../../tests/test_expression_adapter.py) |
-| Stage 2 Runtime / Recovery | [InternalStateRuntime](../../anima/internal_state/runtime_integration.py) собирает Goals/State/Choice/Expression; recovery journal завершает pending source operations | [runtime integration](../../tests/test_runtime_internal_state_integration.py), [recovery](../../tests/test_internal_state_recovery.py), [stage validation](../../tests/test_stage2_validation.py) |
-| Sleep Contracts / Selection / Store | [Sleep contracts](../../anima/sleep/contracts.py) задают `SourceRef`/`WorkItem`; [SleepSelector](../../anima/sleep/selection.py) строит deterministic bounded очередь; [SleepStore](../../anima/sleep/store.py) хранит jobs, transitions, work items и checkpoints в `sleep.db` | [contracts](../../tests/test_sleep_contracts.py), [selection](../../tests/test_sleep_selection.py), [storage](../../tests/test_sleep_storage.py) |
-| Sleep Execution / Recovery | [SleepChunkExecutor](../../anima/sleep/execution.py) обрабатывает работу по chunks и checkpoint boundaries; [SleepRecoveryCoordinator](../../anima/sleep/recovery.py) восстанавливает stale/pending состояние без повторного committed effect | [checkpoint/resume](../../tests/test_sleep_checkpoint_resume.py), [recovery](../../tests/test_sleep_recovery.py), [large data](../../tests/test_sleep_large_data.py) |
-| Sleep Derived / Runtime / Observability | [DerivedResultRepository](../../anima/sleep/derived.py) сохраняет `authority=derived` и provenance; [SleepRuntimeIntegration](../../anima/sleep/runtime_integration.py) даёт stepped processing и safe wake; [SleepObservability](../../anima/sleep/observability.py) контролирует budget/metrics/stop reason | [derived](../../tests/test_sleep_derived_results.py), [runtime integration](../../tests/test_sleep_runtime_integration.py), [observability](../../tests/test_sleep_observability.py), [stage validation](../../tests/test_sleep_stage_validation.py) |
-| Наблюдаемость | [DiagnosticTrace](../../anima/diagnostics/trace.py) и [DiagnosticMetrics](../../anima/diagnostics/metrics.py) | [trace](../../tests/test_trace.py), [metrics](../../tests/test_metrics.py) |
-| Изоляция тестов | [AnimaTestHarness](../../tests/harness.py) собирает Runtime во временном каталоге | [CLI/headless](../../tests/test_d1_validation.py) |
+| Identity / lifecycle | persistent instance identity and runtime state | `anima/core/identity.py`, `anima/core/state.py` |
+| Events | typed Events, FIFO bus and append-only raw log | `anima/core/event_bus.py`, `anima/memory/event_log.py` |
+| Cognitive Memory | Event → Memory → Knowledge, entities/relations/provenance | `anima/memory/*` |
+| Retrieval / Context | bounded read path for FAST/DEEP | `anima/memory/retrieval.py`, `context_builder.py` |
+| Canonical IR / resolver | deterministic task/evidence resolution before model calls | `anima/ir.py`, `anima/resolution/*` |
+| FAST cognition | replaceable bounded primary cognitive backend | `anima/cognition/fast_llm.py`, pipeline/contracts |
+| DEEP cognition | replaceable expensive backend for explicitly routed cases | `anima/cognition/deep_llm.py`, Stage 6 router |
+| Internal State | bounded fatigue/uncertainty/frustration/satisfaction transitions | `anima/internal_state/*` |
+| Goals / Choice | persistent goals and system-owned candidate selection | `anima/internal_state/goals.py`, `choice_engine.py` |
+| Tasks | persistent work units distinct from Goals/CanonicalTask | Stage 6 Task store/contracts |
+| Execution | validated side effects and operation ledger | Stage 6 execution layer / `execution.db` |
+| Observation / Verification | independent result checking after execution | Stage 6 verification contracts |
+| Sleep | persistent bounded orchestration, checkpoint/recovery | `anima/sleep/*`, `sleep.db` |
+| Unified trace | causal observability across Stage 6 lifecycle | `trace.db`, Stage 6 trace contracts |
+| Recovery | subsystem recovery plus Stage 6 coordination | Stage 6 recovery coordinator |
 
-Показательные результаты Stage 1–2: [TV-0004](../TESTING/Results/TV-0004.md),
-[TV-0005](../TESTING/Results/TV-0005.md),
-[TV-0006](../TESTING/Results/TV-0006.md),
-[TV-0007](../TESTING/Results/TV-0007.md),
-[TV-0008](../TESTING/Results/TV-0008.md),
-[TV-0009](../TESTING/Results/TV-0009.md),
-[TV-0010](../TESTING/Results/TV-0010.md),
-[TV-0011](../TESTING/Results/TV-0011.md),
-[TV-0012](../TESTING/Results/TV-0012.md),
-[TV-0013](../TESTING/Results/TV-0013.md),
-[TV-0014](../TESTING/Results/TV-0014.md),
-[TV-0015](../TESTING/Results/TV-0015.md),
-[TV-0016](../TESTING/Results/TV-0016.md),
-[TV-0017](../TESTING/Results/TV-0017.md).
+Representative validation history is indexed in [Testing Results](../TESTING/Results/README.md). Stage 6 final acceptance: [TV-0051](../TESTING/Results/TV-0051.md).
 
-Показательные результаты Stage 3: промежуточные отчёты [TV-0018 — TV-0029](../TESTING/Results/README.md) и финальная end-to-end validation [TV-0030](../TESTING/Results/TV-0030.md).
+## Cognitive Memory boundary
 
-## Stage 3: persistent bounded Sleep
-
-Stage 3 реализует Sleep как отдельный persistent orchestration-контур, а не как
-«третью модель» или скрытый LLM loop. Его задача — выбрать ограниченный объём уже
-существующего опыта, обработать его заменяемым processor, сохранить checkpoints и
-производный результат так, чтобы работу можно было безопасно остановить, пережить
-restart и продолжить без потери provenance или повторения committed effect.
-
-Канонический путь:
+Persistent memory keeps three distinct levels:
 
 ```text
-Event / CLOSED Memory / CONFIRMED Knowledge / Asset
-                    ↓
-               SourceRef
-                    ↓
-       deterministic bounded selection
-                    ↓
-                 WorkItem
-                    ↓
-          chunk processor/executor
-             ↓              ↓
-        checkpoint      final result
-             ↓              ↓
-           resume      DerivedResult
-                           ↓
-                 provenance to source
+Event → Memory → Knowledge
 ```
 
-`SourceRef` поддерживает `event`, `memory`, `knowledge` и `asset`. Sleep хранит ссылку
-на источник и проверяет его существование через `SourceRegistry`, но не копирует
-исходный payload в `sleep.db`. Базовый `work_kind` — `CONSOLIDATE`; WorkItem также
-фиксирует processor/version, priority, cost hint, attempts и checkpoint reference.
+- Event preserves raw occurrence/history;
+- Memory is compact episodic/semantic experience;
+- Knowledge has its own lifecycle and evidence links;
+- Entity and Relation provide stable semantic links;
+- provenance remains traceable toward source Events.
 
-`SleepSelector` получает metadata candidates и жёсткий `SelectionBudget` по числу
-элементов и cost units. Выбор deterministic: учитываются eligibility, terminal state,
-priority и cost; повторный selection переиспользует совместимый существующий WorkItem,
-а конфликт metadata отклоняется вместо тихого перепланирования.
+Current storage uses SQLite/FTS baseline rather than embeddings/vector/graph DB by default.
 
-`SleepStore` использует отдельный SQLite `sleep.db` (schema version 3). В нём
-persisted:
-
-- `sleep_jobs` и их transitions;
-- `work_items`;
-- `work_item_checkpoints`;
-- derived-result tables и transformation history.
-
-SleepJob имеет состояния `queued`, `running`, `checkpointed`, `interrupted`,
-`completed`, `failed`. WorkItem дополнительно поддерживает `skipped`. Переходы
-валидируются явно; restart не должен превращать stale `running` в новый независимый
-logical effect.
-
-`SleepRuntimeIntegration` намеренно работает пошагово. `process_work()` обрабатывает
-ограниченное число новых chunks (по умолчанию один) и возвращает управление Runtime
-на безопасной checkpoint boundary. Resource budget может остановить работу в
-`checkpointed`; `prepare_wake()` переводит активную работу в persistent
-`interrupted`, а recovery после restart нормализует pending/running work и jobs.
-Фоновый mutable worker для baseline Stage 3 не требуется.
-
-Завершённая обработка создаёт `DerivedResult` с `authority="derived"`, processor и
-version, transformation history, output reference и source provenance. Сам факт
-Sleep-обработки не повышает authority исходного утверждения и не переписывает
-Event/Memory/Knowledge. Один WorkItem имеет не более одного final derived result;
-replay завершённой работы не создаёт второй logical effect.
-
-Финальная [TV-0030](../TESTING/Results/TV-0030.md) проверила единый контур на реальных
-Event/Memory/Knowledge источниках: bounded selection, interruption, reopen
-`sleep.db`, resume со следующего незавершённого chunk, эквивалентность допустимого
-результата uninterrupted и resumed runs, provenance и отсутствие скрытой мутации
-источников. Тот же checkpoint contract проверен на synthetic Asset логического
-размера 10 GiB без помещения полного payload в `sleep.db`. Performance/resource
-baseline Stage 3 сохранён отдельно в TV-0029.
-
-Граница Stage 3 принципиальна: **реализован orchestration/consolidation substrate**, но
-не доказаны свободный reasoning, reflection, simulation, generative dreaming или
-качество LLM/media processors. Возвращение Sleep в общий когнитивный цикл относится
-к Stage 6, а более глубокая semantic consolidation через DEEP — к Stage 7. Эти
-будущие механизмы должны использовать существующие persistent/recovery contracts, а
-не заменять их новой LLM-owned системой.
-
-## Stage 5: deterministic resolution и cognitive routing
-
-Реализован минимальный production slice по
-[спецификации интеграции](../ROADMAP/Cognitive_Resolution_Integration_Spec.md) и
-[Issue #3](https://github.com/VankoRokh/ANIMA/issues/3), с уточнёнными границами:
-Canonical IR принадлежит `anima/ir.py`; structured task не требует text retrieval;
-отсутствие допустимого действия при полных данных — deterministic outcome.
-
-`CognitivePipeline` предоставляет два отдельных входа:
-
-- `process_event(event)` принимает `conversation.user`, сохраняет исходный текст,
-  распознаёт только целое ограниченное арифметическое выражение и один раз вызывает
-  существующий `ContextBuilder.build(text, consumer="FAST")`.
-- `process_task(canonical_task)` сразу вызывает resolution: ContextBuilder, FTS,
-  искусственный текст и Event ID не требуются.
-
-Canonical task/evidence и projected view имеют immutable nested snapshots.
-Структурированные facts передаются явно в памяти процесса. Извлечённые Memory и
-Knowledge statements остаются текстовыми evidence с исходными record IDs для
-provenance; они не становятся subject/predicate facts через FTS score или parsing.
-FAST budget `6 items / 1200 content chars`, selection stats и отсутствие raw Events
-сохраняются. Budget ContextBuilder не является лимитом всего сериализованного prompt.
-
-Resolver поддерживает exact structured lookup, scalar arithmetic/comparison,
-formal power compatibility и три явных action constraint rules:
-`PRESERVE_ACTIVE_TASK`, `CHARGER_AVAILABLE`, `BATTERY_ABOVE_THRESHOLD`.
-Состояние для них поступает в task, без обращения к Internal State. Action
-constraints/policies допустимы только для `CHOOSE_ACTION`; неизвестное правило
-не даёт разрешения выбрать действие. Missing operands не заменяются defaults.
-Decimal literals хранятся как `Decimal`, арифметика и сравнения выполняются через
-exact rational values без зависимости от ambient Decimal precision. Finite float
-inputs интерпретируются по их shortest decimal representation; ранее потерянные
-вызывающим кодом цифры восстановить нельзя. Non-terminating decimal division
-покидает deterministic path без произвольного округления. В model-facing JSON
-точные Decimal передаются строками, без потери цифр.
-
-`candidates=None` означает неизвестный/непереданный universe, а `candidates=()` —
-известный пустой. Missing candidate universe даёт `INSUFFICIENT_DATA`. Resolver
-сначала собирает все известные missing requirements, даже при unsupported rules
-или malformed policies. После проверки constraints различаются hard-rejected,
-verified remaining и unverified candidates; неизвестное правило не делает
-кандидата admissible и не стирает уже доказанный rejection.
-
-Три route имеют отдельные значения:
-
-- `DETERMINISTIC_RESULT`: typed value либо `NO_ADMISSIBLE_ACTION` с
-  `reason="no_admissible_action"`, `value=None`; ноль backend calls.
-- `INSUFFICIENT_DATA`: genuinely missing requirements/evidence, optional next-source
-  hint; ноль backend calls. Это отсутствие в supplied context, а не утверждение об
-  отсутствии факта во всей Memory. Data acquisition остаётся внешней ответственностью.
-- `COGNITIVE_REQUIRED`: Stage 5 router выбирает FAST; projector выбирает relevant
-  view без вычисления решения. Supported request с допустимым output вызывает
-  backend ровно один раз. Если constrained cognitive request не содержит ни одного
-  verified admissible candidate, возвращается observable `no_admissible_candidates`
-  без backend call; это не выдаётся за доказанный `NO_ADMISSIBLE_ACTION`.
-
-Task-local `FormalPolicy` поддерживает только machine-readable `ACTION_PRIORITY`:
-unique policy ID, ordered unique action IDs, полное покрытие surviving candidates.
-Hard constraints применяются первыми. Несколько policies дают deterministic winner
-только при согласии; malformed/incomplete policies, duplicate IDs и конфликт winners
-сохраняют cognitive route. Ноль/один survivor уже разрешены hard constraints и не
-требуют policy authority. Natural-language preference не становится Formal Policy.
-
-Существующий `FastBackend.complete(FastRequest) -> FastResult` сохранён вместе с
-non-null text/context/Event contract. Projected requests используют отдельные
-`ProjectedFastRequest` и capability
-`ProjectedFastBackend.complete_projected(request) -> FastResult`; pipeline требует
-эту capability при создании и не передаёт nullable request legacy backend.
-`FastLLMBackend` явно поддерживает оба интерфейса. `CognitiveView` находится в
-[dependency-light contracts](../../anima/cognition/contracts.py), без импорта projector
-из FAST ACI. Для structured projection Event/text/context не требуются; для Event
-path исходный bounded bundle остаётся в projected request для audit.
-FAST renderer использует только projected view без повторного добавления bundle.
-Projector сохраняет unresolved raw input наряду с goal/preference и не отбрасывает
-relevant textual evidence из-за наличия resolved subject/predicate.
-Legacy `FastCognition` и legacy prompt rendering сохраняются как compatibility path;
-новая интеграционная точка — явно создаваемый `CognitivePipeline`, не Runtime wiring.
-
-`CognitiveTurn` содержит IR, typed resolution, rejected/remaining candidates,
-policy evaluations/IDs, projected view, FAST request/result, model-call count и final
-result. Optional `DiagnosticTrace` отражает boundary, view и result. Allowed-output validation применяется к final result всех routes с value, включая
-exact deterministic fact. Ответ вне allowed candidates отклоняется с
-`invalid_output_candidate`, без выбора замены и retry; исходный resolution value
-сохраняется для audit. Typed `NO_ADMISSIBLE_ACTION` запрещает nonempty remaining
-или unverified candidates.
-`CognitivePipeline.backend_audits` хранит immutable snapshots projected attempts,
-включая вызовы, завершившиеся exception: task/source identity, `backend_attempts`,
-`backend_completions`, `terminal_failure`, bounded `failure_classification`.
-Запись attempt появляется до backend invocation; completion фиксируется отдельно
-после получения valid FastResult. При exception terminal failure записывается до
-повторного выбрасывания того же исключения, без retry/fallback. Classification:
-`TRANSPORT`, `MODEL_OUTPUT`, `INVALID_BACKEND_RESULT`, `BACKEND`; error payload в audit
-не копируется. Успешный `CognitiveTurn` ссылается на audit; zero-call turn имеет нули.
-`FastLLMBackend.call_history` содержит metadata только успешных completions и не
-используется как attempted-call counter. Проверки:
-[terminal audit](../../tests/test_projected_backend_audit.py).
-
-Acceptance counterexamples покрыты
-[focused regressions](../../tests/test_stage5_acceptance.py): exact decimals,
-threshold equality, missing + unsupported requirements, omitted/empty candidates,
-uniform output validation, sufficient projection и explicit backend capability.
-Production tests используют fake backends/transports; real Qwen validation не входит
-в unit CI. Read-stack reconstruction и backend replacement проверяются с неизменными
-Memory/Identity и сохранённым provenance. Stage-level status хранится только в
-[project.json](../project.json). Stage 5 закрыт после representative acceptance
-[TV-0043](../TESTING/Results/TV-0043.md); real projected smoke прошёл все семь cases.
-Free-text `output_contract="text"` проверяет semantic delivery task content, а не
-byte-exact форматирование: `COBALT47.` допустим. Candidate-mode требует точного
-разрешённого ID; `CONTINUE.` отклоняется. Byte-exact гарантия unrestricted text
-потребовала бы будущего explicit output contract или constrained decoding, вне
-закрытого Stage 5 scope. Не добавлены semantic persistence/write, DEEP, policy
-precedence, широкий language frontend, Agent/Planner, execution, Sleep или Internal
-State decision integration.
-
-## Agent и Planner boundary
-
-[PlannerAdapter](../../anima/agent/planner.py) допускает deterministic и real-LLM реализации; [LLM Planner](../../anima/agent/llm_planner.py) и [small-model profile](../../anima/agent/small_llm.py) возвращают только proposals. Choice остаётся authoritative при выборе Candidate; [Executor](../../anima/agent/_executor_impl.py) и ToolDescriptor отвечают за проверку input и sandbox execution. [Verifier](../../anima/agent/verification.py) независимо определяет Goal completion: успешный write receipt не заменяет matching independent readback. Контур и его границы проверяются [AgentLoop tests](../../tests/test_agent_loop.py) и [LLM Planner tests](../../tests/test_agent_llm_planner.py).
-
-[llama.cpp transport](../../anima/agent/llama_cpp_transport.py) использует отдельную non-mutating generation-schema projection: только известный несовместимый path pattern `^[^/].*$` исключается из grammar input. Authoritative ToolDescriptor, sandbox validation и model-visible path guidance сохраняются; остальные constraints остаются в generation schema. Status-discriminated small-model schema связывает status с cardinality proposals, а Python PlannerDecision независимо проверяет результат. См. [schema tests](../../tests/test_llama_cpp_dynamic_schema.py).
-
-Deterministic file-content verifier v2 трактует unavailable target readback как recoverable failure, а не доказательство Goal BLOCKED. Bridge, Goal lifecycle и остановка по настоящему trusted blocker сохраняют свои правила. Persisted v1 verification artifacts не переписываются и при replay не переинтерпретируются; v2 не принимает v1 spec для новой проверки. См. [verification](../../tests/test_agent_verification.py), [recovery](../../tests/test_agent_recovery.py) и интеграционное подтверждение [TV-0042](../TESTING/Results/TV-0042.md).
-
-## Рабочий путь записи
-
-Runtime создаёт Event и сначала пишет его в append-only `events.jsonl`.
-`EventProcessingCoordinator` требует точного присутствия этой raw-записи, затем в
-одной SQLite-транзакции переводит ledger в `processing`, вызывает
-`MemoryProcessor` и фиксирует Memory/Relations вместе с final status `done` или
-`skipped`. После commit Runtime согласует `state.json.events_processed` с числом
-final ledger records.
-
-```mermaid
-flowchart TD
-    Q["EventBus.next_event"] --> L["EventLog.write"]
-    L --> E["EventProcessingCoordinator"]
-    E --> P["MemoryProcessor"]
-    P --> S{"Selection"}
-    S -->|skip| F["ledger = skipped"]
-    S -->|process| A["bounded Association"]
-    A -->|HIGH| U["UPDATE OPEN Memory"]
-    A -->|MEDIUM| C["CREATE + related_to"]
-    A -->|LOW| N["CREATE"]
-    U --> X["RuleBasedComposer"]
-    C --> X
-    N --> X
-    X --> DB["Memory/Relations + ledger = done"]
-    F --> K["SQLite commit"]
-    DB --> K
-    K --> R["reconcile state counter + trace"]
-```
-
-JSONL Event и SQLite Memory сознательно не объединены одной общей транзакцией.
-Разрыв закрывается recovery protocol: raw Event без ledger может быть принят или
-повторён по определённым правилам, а SQLite effects и processing-status одного
-Event являются атомарными между собой.
-
-## Event Foundation
-
-Event имеет обязательные поля `id`, `type`, `timestamp`, `source`, `session_id`,
-`payload`, `references`. Public ID — `ev_` + UUIDv4; timestamp — ISO 8601 со
-смещением. Тип — hierarchical lowercase name (`system.wake`,
-`conversation.user`, `observation.visual`).
-
-EventLog при reopen валидирует существующий журнал и восстанавливает ID set.
-Malformed JSON, invalid Event и duplicate Event ID дают определённую ошибку.
-
-## SQLite Memory Store
-
-`memory.db` использует schema version 1 и `PRAGMA foreign_keys = ON`.
-SQLite-транзакция делает commit только при полном успехе операции; исключение
-вызывает rollback.
-
-Основные таблицы:
-
-- `memories`, `memory_sources`;
-- `knowledge`;
-- `entities`, `entity_aliases`;
-- `relations`;
-- `history`;
-- `event_processing`;
-- FTS5: `memory_fts`, `knowledge_fts`.
-
-`knowledge_sources`, `memory_entities`, `knowledge_entities` остаются ранним
-каркасом schema v1; канонические семантические связи уже хранятся в универсальной
-`relations`. Их удаление/миграция не требуется до доказанной необходимости schema v2.
-
-### Memory contract
-
-Memory использует внутренний integer key и внешний `mem_<UUIDv4>`.
-Поля: `type`, `domain`, `status`, `content`, `importance`, `created_at`,
-`updated_at`, `closed_at`, `merged_into`.
-
-Допустимые статусы: `open`, `closed`, `merged`. Runtime/Processor создаёт
-`episodic/user/open`, importance=1. `memory_sources` связывает Memory с raw Event ID.
-
-FTS5 индексирует `Memory.content`; triggers синхронизируют индекс при
-insert/update/delete. Это baseline поиска, а не доказательство производительности.
-
-## Entities, Relations и provenance
-
-Entity — устойчивый якорь с canonical name, aliases и status. Resolution идёт
-консервативно: exact canonical → exact alias → normalized match. Неоднозначность
-не приводит к автоматическому merge.
-
-Semantic links хранятся в одной `relations`:
-
-- `about`;
-- `related_to`, `continues`, `derived_from`;
-- `supports`, `contradicts`, `investigates`;
-- `supersedes`.
-
-Каждая Relation обязана иметь `source_memory_id`, поэтому семантическая связь не
-возникает без прослеживаемого Memory evidence. `ProvenanceResolver` проверяет
-существование фактических source Events в `events.jsonl`, а не только наличие ID
-в SQLite.
-
-Подтверждённые цепочки включают:
+Existing Knowledge implementation statuses remain:
 
 ```text
-Memory → Event
-Knowledge → supporting/contradicting Memory → Event
-Relation → source Memory → Event
-Entity → about Memory → Event
+provisional
+confirmed
+challenged
+superseded
+rejected
 ```
 
-## Memory Processor
+Stage 7 documentation must not invent a second production status vocabulary without an explicit accepted mapping (open DP-09).
 
-Selection Stage 1.4 обрабатывает непустой `conversation.user`; lifecycle Events и
-пустой ввод пропускаются. Association не сравнивает Event со всей памятью:
-берётся bounded набор OPEN episodic/user Memories и FTS candidates.
+## Stage 5 deterministic/cognitive boundary
 
-Explainable score использует domain/type, session, lexical overlap, Entity overlap
-и близость времени. Сильное совпадение обновляет OPEN Memory; среднее создаёт
-новую + `related_to`; слабое создаёт независимую Memory. Большой временной разрыв
-блокирует UPDATE. Trace сохраняет action, score и reasons.
-
-CLOSED/MERGED записи не используются как UPDATE candidates.
-
-## Event Processing и Recovery
-
-`EventProcessingCoordinator` использует ключ `(event_id, processor,
-processor_version)` и статусы `pending/processing/done/failed/skipped`. Final
-`done/skipped` Event при replay не запускает Memory effects повторно.
-
-Перед processing проверяется, что Event уже присутствует в `events.jsonl` и его
-полная raw-запись совпадает с переданным объектом. Ledger transition,
-Memory create/update, `memory_sources`, Entity links и `related_to` одного Event
-выполняются в одной SQLite-транзакции. Ошибка до commit откатывает эффекты, после
-чего отдельная запись `failed` сохраняет attempts и last_error для retry.
-
-При restart coordinator:
-
-- принимает legacy raw Event как `done`, если его effect уже виден в
-  `memory_sources`;
-- принимает невыбранный lifecycle/empty Event как `skipped`;
-- делает содержательный raw Event без effect `pending` и повторяет его;
-- повторяет stale `processing/failed`;
-- выдаёт ошибку, если ledger ссылается на отсутствующий raw Event.
-
-Runtime после recovery восстанавливает `events_processed` по числу final ledger
-records, поэтому crash после SQLite commit, но до записи `state.json`, не приводит
-к повторному Memory effect.
-
-## RuleBasedComposer
-
-Composer отделён от Association: Processor решает **куда** писать, Composer —
-**что** сохранять в `Memory.content`.
-
-Baseline Composer:
-
-- нормализует whitespace;
-- удаляет точные повторы;
-- имеет явный `max_chars` budget;
-- при переполнении приоритизирует решения, результаты, изменения, ограничения,
-  причины и открытые вопросы;
-- может заменить короткий факт более полной формулировкой;
-- допускает явную replacement-формулировку (`instead/вместо/replaced/заменили`).
-
-Это deterministic baseline, а не полноценное семантическое суммаризирование.
-Small/Deep Composer остаётся отложенным сравнительным механизмом.
-
-## Memory Lifecycle и History
-
-`MemoryLifecycle` реализует только явные операции:
-
-- `OPEN → CLOSED`;
-- `OPEN/CLOSED source → MERGED`, если target остаётся OPEN.
-
-Merge требует одинаковые type/domain, запрещает self-merge и timestamp раньше
-последнего изменения. Source не удаляется: он сохраняет свой `content`, собственные
-source Event links, `status=merged` и `merged_into=<target>`.
-
-Target получает недостающие source Event links и активные `about` Entity anchors.
-Обе стороны Merge и close фиксируются в `history`; операция выполняется одной
-SQLite-транзакцией. SPLIT намеренно не входит в Stage 1 baseline.
-
-## Knowledge Layer
-
-`KnowledgeLayer` не вызывается автоматически из Memory Processor: существование
-Memory само по себе не делает утверждение знанием. Новый candidate создаётся только
-из CLOSED source Memory и получает `supports` Relation с provenance.
-
-Подтверждённый lifecycle:
+Stage 5 established that formal/easy cases remain outside the LLM:
 
 ```text
-provisional → confirmed → challenged → confirmed
-                                  ├→ superseded
-                                  └→ rejected
+CanonicalTask
+     ↓
+resolver
+ ├─ deterministic result
+ ├─ insufficient data
+ └─ cognitive remainder → projection → FAST
 ```
 
-Investigation хранится отдельной Relation и не меняет статус Knowledge. Challenge
-требует CLOSED contradicting Memory; reconfirm после challenge требует нового
-supporting evidence. Одна и та же Memory не может одновременно поддерживать и
-противоречить одному Knowledge.
+Exact arithmetic uses exact rational/Decimal semantics. Missing data is distinguished from infeasible/no admissible action. Model output is validated against allowed outputs and does not own persistence.
 
-Supersession не переписывает старое утверждение: создаётся новая confirmed
-Knowledge, старая становится `superseded`, а между ними создаётся Relation
-`supersedes`. `superseded` и `rejected` являются терминальными состояниями для
-новых investigation branches. Переходы и существенные evidence changes пишутся в
-`history`; provenance продолжает проходить до raw Events.
+Representative acceptance: [TV-0043](../TESTING/Results/TV-0043.md).
 
-## Retrieval
+## Stage 6 Cognitive Integration Core
 
-`RetrievalEngine` является read-only слоем поверх MemoryStore/LinkStore. Он
-объединяет дешёвые и объяснимые сигналы в фиксированном baseline:
+Stage 6 added the integrated system substrate:
 
-1. exact `mem_` / `kn_` ID;
-2. structured filters по domain/type/status;
-3. Entity ID/alias через `about`;
-4. FTS5 по `Memory.content` и `Knowledge.statement`;
-5. максимум один hop по Relations;
-6. deterministic ranking и `top_k`.
+- persistent Tasks and Task↔Goal linkage;
+- `CognitiveCoordinator` and system `CognitiveRouter`;
+- explicit FAST/DEEP/CHOICE routes;
+- common `CognitiveProposal` validation boundary;
+- Internal State and Choice integration;
+- validated `ExecutionAction` plus persisted `VerificationSpec`;
+- independent Observation/Verification;
+- Sleep integration with Task lifecycle;
+- restart/recovery across execution uncertainty;
+- persistent UnifiedTrace.
 
-Каждый результат содержит `kind`, `id`, `score`, `reasons`, `record`. Exact ID
-имеет наибольший вес; current Knowledge status и Memory importance дают только
-ограниченные bonuses. `importance` не заменяет relevance.
+The canonical detailed document is [Stage 6 — Cognitive Integration Core](Stage_6_Cognitive_Integration_Core.md).
 
-Обычный current-search по умолчанию исключает `merged` Memories и
-`superseded/rejected` Knowledge. История не удаляется: terminal records доступны
-через exact ID или явный status filter. Deep traversal, embeddings, semantic/LLM
-rerank и query expansion в этот baseline не входят.
+### FAST/DEEP status
 
-## Context Builder
+FAST/DEEP are roles, not fixed models. Current experimental defaults may change without changing the architecture.
 
-`ContextBuilder` является read-only слоем поверх Retrieval/Provenance и формирует
-структурированный `ContextBundle`: query, consumer, budget, `knowledge[]`,
-`memories[]`, `events[]`, `truncated` и selection statistics.
+Stage 6 experiments showed:
 
-FAST использует узкую выборку без raw Events; DEEP разрешает один relation hop и
-добавляет deduplicated provenance Events. Exact-ID result имеет первый приоритет,
-после него обычная выборка предпочитает Knowledge перед Memories, а Events идут
-последними. Каждый объект сохраняет score/selection reason.
+- conservative routing mechanism works;
+- `request_more_context` mechanism was accepted experimentally, but real quality benefit remains inconclusive;
+- naive uncertainty-only DEEP escalation was rejected as more expensive without proven gain;
+- bounded Internal State influence on Choice is demonstrable.
 
-`max_items` и `max_chars` являются жёсткими budget: запись, которая не помещается
-целиком, не обрезается, а пропускается с `truncated=true`. Token-aware budgets и
-model-specific policies отложены до появления конкретного model consumer.
+Therefore DEEP is not documented as universally superior reasoning. Its current value must continue to be measured per task.
 
-## Internal State, Goals и Choice
+## Execution semantics
 
-Stage 2 добавляет отдельный регулирующий контур в `internal_state.db`. Он не заменяет
-lifecycle `state.json` и не смешивается с `memory.db`. Основные данные: `state_values`,
-`state_transitions`, `goals`, `goal_transitions` и `source_operations` для replay-safe
-мутаций.
-
-Четыре baseline state — `fatigue`, `uncertainty`, `frustration`, `satisfaction` —
-ограничены диапазоном `0.0..1.0`. Любое содержательное изменение проходит через
-причинный transition `before + delta → after` с source/rule/reason и optional
-Goal/Candidate context. Arbitrary public setter отсутствует.
-
-Goal имеет lifecycle `active/blocked/completed/cancelled`. Progress и success
-принимаются только через явный `GoalObservation`; success требует проверенного
-результата и выполненного criterion. Arbitration выбирает только среди active Goals
-по внешнему priority и не разрешает Internal State менять authority цели.
-
-Choice получает уже существующий active Goal и список Candidates:
+The execution boundary separates intent, side effect, observation and verified outcome:
 
 ```text
-Goal + Candidates
-       ↓
-base score
-       +
-bounded Internal State modifiers
-       ↓
-ranked Choice + score trace
+ExecutionAction
+      ↓
+Executor
+      ↓
+ExecutionReceipt
+      ↓
+independent Observation
+      ↓
+VerificationResult
+      ↓
+Goal progress
 ```
 
-`fatigue` штрафует effort, `uncertainty` повышает information gain и штрафует
-irreversible risk, `frustration` штрафует repeated failure и поддерживает alternative,
-`satisfaction` даёт меньший бонус verified continuation. Choice read-only и не создаёт
-Goal/Candidate.
+A successful tool/OS receipt does not by itself complete a Goal.
 
-Time dynamics вычисляется лениво по injected elapsed time. Fatigue растёт по awake
-period и workload, recovery снижает fatigue; frustration возвращается к baseline,
-satisfaction decay к baseline, uncertainty не меняется только из-за времени. Это
-исключает зависимость результата от частоты фонового tick.
+`execution.db` persists exact validated action intent and verification specification needed for restart/reconciliation. `executing → uncertain` after restart remains conservative until reconciliation/observation establishes the result.
 
-Expression Adapter является односторонним read-only отображением state в
-`energy/caution/tension/positive_affect`; скрытого feedback `Expression → State` нет.
-Raw Event не получает автоматической эмоциональной интерпретации: Runtime принимает
-явные `StateSignal`/`GoalObservation`, чтобы семантическая причина оставалась видимой.
+## Sleep boundary
 
-Persistent `source_operations` journal делает state signals, goal observations и
-source-backed Goal creation идемпотентными. После crash Runtime достраивает pending
-операцию, не начисляя уже существующий `source_id + rule_id` effect повторно.
+Sleep is a software orchestration mode, not a third cognitive model.
 
-## Stage 1 validation и performance baseline
+Confirmed properties:
 
-Финальный Stage 1 corpus содержит 37 raw Events в 11 сессиях и проходит через
-restart/replay, Memory/Relations, CLOSED evidence, Knowledge supersession,
-Retrieval, FAST/DEEP Context и provenance до исходных Events. Результат подтверждён
-[TV-0014](../TESTING/Results/TV-0014.md).
+- persistent jobs/work items/checkpoints;
+- bounded chunk processing;
+- safe wake/interruption;
+- restart recovery;
+- derived results preserve provenance and do not inherit source authority automatically;
+- Task↔Goal↔Sleep linkage participates in Stage 6 lifecycle.
 
-Performance baseline [TV-0015](../TESTING/Results/TV-0015.md) измеряет 1k/10k/100k
-синтетических записей без заданного SLA. На 100k Event append остаётся около
-15.5k/s, Memory CRUD/lookup и 1-hop — около 1 ms, FTS — около 10 ms p95,
-Retrieval — около 119 ms p95, FAST Context — около 118 ms p95. Полный data-каталог
-занимает около 152 MB, peak RSS процесса достиг 265 MB.
+Generative dreaming, unrestricted reflection and FAST weight adaptation during Sleep are not implemented guarantees.
 
-Измерены два существенных bottleneck: production EventProcessing batch падает до
-0.41 events/s на 100k, а DEEP Context достигает около 23.4 s p95. Текущий
-coordinator для каждого Event линейно перечитывает raw Event log при identity
-check; provenance при каждом выбранном объекте заново строит полный Event index.
-Baseline сохранён до оптимизации, чтобы последующие изменения сравнивались с
-фактическими исходными числами.
+## Data directory contracts
 
-## Stage 2 validation и performance baseline
+Default data location is `<project>/data`; `ANIMA_DATA_DIR` may select another location.
 
-Stage 2 завершён на snapshot `36c8d65`: 13 canonical validation tests прошли вместе
-с полным regression suite `306 passed`; результат зафиксирован в
-[TV-0017](../TESTING/Results/TV-0017.md). Проверка связывает Goals, четыре state,
-Choice, time, Expression, ScenarioRunner и restart/replay через существующие Runtime
-границы.
-
-Decision baseline [TV-0016](../TESTING/Results/TV-0016.md) показывает для 100
-Candidates p95 0.0211 ms на base ranking, 0.0993 ms на state modifiers и 2.0092 ms
-на production Choice с полным trace/history. Python allocation peak полного режима
-составил 273.101 KiB. Process peak RSS сохраняется только как high-water mark worker
-и не трактуется как per-choice allocation.
-
-## Каталог и контракты данных
-
-По умолчанию данные находятся в `<project>/data`; `ANIMA_DATA_DIR` задаёт другой
-каталог.
-
-| Файл | Контракт |
+| File | Purpose |
 |---|---|
-| `identity.json` | schema_version, постоянный instance_id, created_at |
-| `state.json` | lifecycle/status/session/timestamps/events_processed |
+| `identity.json` | persistent instance identity |
+| `state.json` | lifecycle/session/event counter state |
 | `events.jsonl` | append-only raw Events |
-| `memory.db` | SQLite Cognitive Memory storage |
-| `internal_state.db` | SQLite Internal State, Goals, causal history и source recovery ledger |
-| `sleep.db` | SQLite Sleep jobs/transitions, WorkItems, checkpoints, resource/observability state и derived results с provenance |
+| `memory.db` | Cognitive Memory / Knowledge / Entities / Relations / provenance |
+| `internal_state.db` | Internal State, Goals, causal transitions and source recovery ledger |
+| `sleep.db` | Sleep jobs/work/checkpoints/derived results |
+| `tasks.db` | persistent Stage 6 Tasks |
+| `execution.db` | execution operation ledger, validated action and verification spec |
+| `trace.db` | persistent UnifiedTrace |
 
-Backup/restore копирует весь data-каталог. После восстановления продолжаются
-identity, session/event history, Cognitive Memory, Internal State/Goal history и
-незавершённые Sleep jobs/checkpoints; завершённые derived results сохраняют provenance.
-Старый `memories.jsonl` больше не является рабочим форматом и не мигрируется.
+Backup/restore must preserve the entire instance data directory. Code clone alone is not instance continuation.
 
-## Подтверждённые ограничения
+## Current limitations
 
-- EventBus FIFO остаётся RAM-only; persistent queue/ack отсутствуют.
-- JSONL append и SQLite commit не образуют одну физическую транзакцию; recovery
-  protocol закрывает этот разрыв на уровне обработки, но не делает файлы атомарными.
-- Автоматические правила закрытия/merge Memory ещё не реализованы; lifecycle
-  вызывается явно.
-- Автоматическое создание/принятие Knowledge моделью не реализовано; lifecycle
-  вызывается явно на подтверждённом evidence.
-- EventProcessing raw identity check и DEEP provenance используют повторные полные
-  сканирования `events.jsonl`; на 100k это даёт 0.41 batch events/s и около 23.4 s
-  p95 DEEP Context. Оптимизация отложена после фиксации baseline.
-- Произвольные Raw Events не преобразуются автоматически в StateSignal/GoalObservation;
-  Agent использует явный trusted verification consumer для Goal progress.
-- Internal State не создаёт Goals/Candidates самостоятельно. Agent адаптирует Planner
-  proposals в Candidates; self-generated goals и общая authority policy не реализованы.
-- ExpressionProfile пока не привязан к конкретному text/voice/UI renderer, а fatigue
-  не использует реальные CPU/GPU/power signals.
-- Stage 3 Sleep реализует deterministic bounded orchestration/consolidation с
-  checkpoint/recovery, но не свободный reasoning/reflection/dreaming. Когнитивное
-  использование Sleep с FAST/DEEP относится к Stage 6/7.
-- Deep/LLM Composer, embeddings, vector/graph DB и distributed memory не реализованы.
-  Persistent bounded Sleep consolidation подтверждена [Stage 3 validation](../TESTING/Results/TV-0030.md).
+Confirmed current limitations include:
+
+- EventBus FIFO remains RAM-only; persistence is in the raw Event log/recovery path rather than a persistent broker queue;
+- JSONL and SQLite commits are not one physical transaction; recovery/idempotency close the gap at logical-operation level;
+- Memory automatic close/merge policy remains limited and explicit;
+- semantic write/update/revision lifecycle from the accepted Stage 7 boundary is **not implemented**;
+- Stage 7 `Claim`/`Evidence`/typed relation contract is documentation-only until a later implementation slice;
+- existing Knowledge status/read semantics have not yet been remapped to Stage 7 public semantic read states (DP-09 open);
+- full Evidence dependency descendant re-evaluation remains open DP-10b;
+- production Stage 6 dispatcher does not yet expose `classify_relation/0.1` (DP-11 open);
+- DEEP quality advantage is not generally proven; model selection remains empirical;
+- `request_more_context` quality benefit remains inconclusive and production-disabled;
+- embeddings/vector/graph DB/distributed memory are not part of the confirmed baseline;
+- self-generated Goals and broad autonomy authority are not confirmed;
+- generative dreaming and model weight training are not part of the confirmed runtime;
+- Virtual ANIMA, perception and hardware-specific routing remain future stages.
+
+## Stage 7 boundary
+
+Accepted documentation only:
+
+- [Stage 7 Semantic Boundary v0](../ROADMAP/Stage_7_Semantic_Boundary_v0.md);
+- [ADR-010](../DECISIONS/ADR-010_Stage_7_Semantic_Boundary.md);
+- [Stage 7 Semantic Conformance v0](../TESTING/Stage7_Conformance_v0.md).
+
+The first authorized implementation direction is read-only/shadow semantic evaluation with deterministic-first processing. Production Knowledge writes require separate acceptance of DP-08/09/10b/11.
+
+## Documentation note
+
+Earlier detailed architecture text remains available through Git history. This README intentionally acts as the current architecture index and confirmed-boundary summary so completed Stage 6 behavior is not described as future work.
