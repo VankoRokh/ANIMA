@@ -35,10 +35,13 @@
 | Choice Engine | [ChoiceEngine](../../anima/internal_state/choice_engine.py): read-only Candidate evaluation с bounded state modifiers и score trace | [choice](../../tests/test_choice_engine.py), [performance](../../tests/test_decision_performance.py) |
 | Expression Adapter | [ExpressionAdapter](../../anima/internal_state/expression_adapter.py): read-only state → normalized ExpressionProfile | [expression](../../tests/test_expression_adapter.py) |
 | Stage 2 Runtime / Recovery | [InternalStateRuntime](../../anima/internal_state/runtime_integration.py) собирает Goals/State/Choice/Expression; recovery journal завершает pending source operations | [runtime integration](../../tests/test_runtime_internal_state_integration.py), [recovery](../../tests/test_internal_state_recovery.py), [stage validation](../../tests/test_stage2_validation.py) |
+| Sleep Contracts / Selection / Store | [Sleep contracts](../../anima/sleep/contracts.py) задают `SourceRef`/`WorkItem`; [SleepSelector](../../anima/sleep/selection.py) строит deterministic bounded очередь; [SleepStore](../../anima/sleep/store.py) хранит jobs, transitions, work items и checkpoints в `sleep.db` | [contracts](../../tests/test_sleep_contracts.py), [selection](../../tests/test_sleep_selection.py), [storage](../../tests/test_sleep_storage.py) |
+| Sleep Execution / Recovery | [SleepChunkExecutor](../../anima/sleep/execution.py) обрабатывает работу по chunks и checkpoint boundaries; [SleepRecoveryCoordinator](../../anima/sleep/recovery.py) восстанавливает stale/pending состояние без повторного committed effect | [checkpoint/resume](../../tests/test_sleep_checkpoint_resume.py), [recovery](../../tests/test_sleep_recovery.py), [large data](../../tests/test_sleep_large_data.py) |
+| Sleep Derived / Runtime / Observability | [DerivedResultRepository](../../anima/sleep/derived.py) сохраняет `authority=derived` и provenance; [SleepRuntimeIntegration](../../anima/sleep/runtime_integration.py) даёт stepped processing и safe wake; [SleepObservability](../../anima/sleep/observability.py) контролирует budget/metrics/stop reason | [derived](../../tests/test_sleep_derived_results.py), [runtime integration](../../tests/test_sleep_runtime_integration.py), [observability](../../tests/test_sleep_observability.py), [stage validation](../../tests/test_sleep_stage_validation.py) |
 | Наблюдаемость | [DiagnosticTrace](../../anima/diagnostics/trace.py) и [DiagnosticMetrics](../../anima/diagnostics/metrics.py) | [trace](../../tests/test_trace.py), [metrics](../../tests/test_metrics.py) |
 | Изоляция тестов | [AnimaTestHarness](../../tests/harness.py) собирает Runtime во временном каталоге | [CLI/headless](../../tests/test_d1_validation.py) |
 
-Показательные результаты: [TV-0004](../TESTING/Results/TV-0004.md),
+Показательные результаты Stage 1–2: [TV-0004](../TESTING/Results/TV-0004.md),
 [TV-0005](../TESTING/Results/TV-0005.md),
 [TV-0006](../TESTING/Results/TV-0006.md),
 [TV-0007](../TESTING/Results/TV-0007.md),
@@ -52,6 +55,87 @@
 [TV-0015](../TESTING/Results/TV-0015.md),
 [TV-0016](../TESTING/Results/TV-0016.md),
 [TV-0017](../TESTING/Results/TV-0017.md).
+
+Показательные результаты Stage 3: промежуточные отчёты [TV-0018 — TV-0029](../TESTING/Results/README.md) и финальная end-to-end validation [TV-0030](../TESTING/Results/TV-0030.md).
+
+## Stage 3: persistent bounded Sleep
+
+Stage 3 реализует Sleep как отдельный persistent orchestration-контур, а не как
+«третью модель» или скрытый LLM loop. Его задача — выбрать ограниченный объём уже
+существующего опыта, обработать его заменяемым processor, сохранить checkpoints и
+производный результат так, чтобы работу можно было безопасно остановить, пережить
+restart и продолжить без потери provenance или повторения committed effect.
+
+Канонический путь:
+
+```text
+Event / CLOSED Memory / CONFIRMED Knowledge / Asset
+                    ↓
+               SourceRef
+                    ↓
+       deterministic bounded selection
+                    ↓
+                 WorkItem
+                    ↓
+          chunk processor/executor
+             ↓              ↓
+        checkpoint      final result
+             ↓              ↓
+           resume      DerivedResult
+                           ↓
+                 provenance to source
+```
+
+`SourceRef` поддерживает `event`, `memory`, `knowledge` и `asset`. Sleep хранит ссылку
+на источник и проверяет его существование через `SourceRegistry`, но не копирует
+исходный payload в `sleep.db`. Базовый `work_kind` — `CONSOLIDATE`; WorkItem также
+фиксирует processor/version, priority, cost hint, attempts и checkpoint reference.
+
+`SleepSelector` получает metadata candidates и жёсткий `SelectionBudget` по числу
+элементов и cost units. Выбор deterministic: учитываются eligibility, terminal state,
+priority и cost; повторный selection переиспользует совместимый существующий WorkItem,
+а конфликт metadata отклоняется вместо тихого перепланирования.
+
+`SleepStore` использует отдельный SQLite `sleep.db` (schema version 3). В нём
+persisted:
+
+- `sleep_jobs` и их transitions;
+- `work_items`;
+- `work_item_checkpoints`;
+- derived-result tables и transformation history.
+
+SleepJob имеет состояния `queued`, `running`, `checkpointed`, `interrupted`,
+`completed`, `failed`. WorkItem дополнительно поддерживает `skipped`. Переходы
+валидируются явно; restart не должен превращать stale `running` в новый независимый
+logical effect.
+
+`SleepRuntimeIntegration` намеренно работает пошагово. `process_work()` обрабатывает
+ограниченное число новых chunks (по умолчанию один) и возвращает управление Runtime
+на безопасной checkpoint boundary. Resource budget может остановить работу в
+`checkpointed`; `prepare_wake()` переводит активную работу в persistent
+`interrupted`, а recovery после restart нормализует pending/running work и jobs.
+Фоновый mutable worker для baseline Stage 3 не требуется.
+
+Завершённая обработка создаёт `DerivedResult` с `authority="derived"`, processor и
+version, transformation history, output reference и source provenance. Сам факт
+Sleep-обработки не повышает authority исходного утверждения и не переписывает
+Event/Memory/Knowledge. Один WorkItem имеет не более одного final derived result;
+replay завершённой работы не создаёт второй logical effect.
+
+Финальная [TV-0030](../TESTING/Results/TV-0030.md) проверила единый контур на реальных
+Event/Memory/Knowledge источниках: bounded selection, interruption, reopen
+`sleep.db`, resume со следующего незавершённого chunk, эквивалентность допустимого
+результата uninterrupted и resumed runs, provenance и отсутствие скрытой мутации
+источников. Тот же checkpoint contract проверен на synthetic Asset логического
+размера 10 GiB без помещения полного payload в `sleep.db`. Performance/resource
+baseline Stage 3 сохранён отдельно в TV-0029.
+
+Граница Stage 3 принципиальна: **реализован orchestration/consolidation substrate**, но
+не доказаны свободный reasoning, reflection, simulation, generative dreaming или
+качество LLM/media processors. Возвращение Sleep в общий когнитивный цикл относится
+к Stage 6, а более глубокая semantic consolidation через DEEP — к Stage 7. Эти
+будущие механизмы должны использовать существующие persistent/recovery contracts, а
+не заменять их новой LLM-owned системой.
 
 ## Stage 5: deterministic resolution и cognitive routing
 
@@ -504,9 +588,11 @@ Candidates p95 0.0211 ms на base ranking, 0.0993 ms на state modifiers и 2.
 | `events.jsonl` | append-only raw Events |
 | `memory.db` | SQLite Cognitive Memory storage |
 | `internal_state.db` | SQLite Internal State, Goals, causal history и source recovery ledger |
+| `sleep.db` | SQLite Sleep jobs/transitions, WorkItems, checkpoints, resource/observability state и derived results с provenance |
 
 Backup/restore копирует весь data-каталог. После восстановления продолжаются
-identity, session/event history, Cognitive Memory и Internal State/Goal history.
+identity, session/event history, Cognitive Memory, Internal State/Goal history и
+незавершённые Sleep jobs/checkpoints; завершённые derived results сохраняют provenance.
 Старый `memories.jsonl` больше не является рабочим форматом и не мигрируется.
 
 ## Подтверждённые ограничения
@@ -527,5 +613,8 @@ identity, session/event history, Cognitive Memory и Internal State/Goal history
   proposals в Candidates; self-generated goals и общая authority policy не реализованы.
 - ExpressionProfile пока не привязан к конкретному text/voice/UI renderer, а fatigue
   не использует реальные CPU/GPU/power signals.
+- Stage 3 Sleep реализует deterministic bounded orchestration/consolidation с
+  checkpoint/recovery, но не свободный reasoning/reflection/dreaming. Когнитивное
+  использование Sleep с FAST/DEEP относится к Stage 6/7.
 - Deep/LLM Composer, embeddings, vector/graph DB и distributed memory не реализованы.
   Persistent bounded Sleep consolidation подтверждена [Stage 3 validation](../TESTING/Results/TV-0030.md).
