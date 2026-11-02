@@ -1,191 +1,137 @@
-# Semantic Verification v0
+# Semantic Verification v0 — scoped concept
 
-Status: **pre-Stage 7 design baseline; not yet a production contract**.
-
-This document fixes the agreed principle for handling important semantic uncertainty. It complements `SemanticCandidate v0` and does not start Stage 7 implementation.
+Status: **concept retained; terminology aligned with [Stage 7 Semantic Boundary v0](Stage_7_Semantic_Boundary_v0.md). Production lifecycle integration remains open.**
 
 ## Core principle
 
-When ANIMA receives conflicting, uncertain or weakly supported semantic candidates, especially where the possible consequence is important, the system should not resolve the situation by simple source ranking or model voting.
+Important semantic uncertainty should not be resolved by source-count voting, model-role preference or model confidence alone.
 
-Instead, sufficiently important uncertainty should be able to create a **persistent verification task** whose purpose is to obtain stronger evidence and resolve the uncertainty.
+When the cost of being wrong justifies it, ANIMA may create or schedule a persistent verification task that seeks stronger evidence through the existing Stage 6 Task/Goal/Choice/Executor/Observation/Verification substrate.
 
-Canonical flow:
+This is a system-owned decision. A FAST/DEEP output may suggest uncertainty or an interpretation, but does not assign final verification priority or mutate Knowledge.
 
-```text
-conflicting / uncertain candidates
-              ↓
-     system significance check
-              ↓
-   verification needed?
-      ├─ no  → normal semantic decision / defer
-      └─ yes
-              ↓
-      persistent verification Task
-              ↓
-      gather stronger evidence
-              ↓
-      one logical verification case
-              ↓
-      bounded FAST / DEEP interpretation if needed
-              ↓
-      system semantic decision
-              ↓
-      optional validated response/action
-```
+## Evidence roles
 
-## Why this exists
+The accepted Stage 7 boundary distinguishes evidence form and provenance explicitly:
 
-Authority rules are useful, but source ranking alone is insufficient when:
+- **Observation** — registered measurement/observation from a source adapter;
+- **Report** — a source states a proposition; the report act is evidence that the statement occurred, not proof of its content;
+- **Hypothesis** — explicitly speculative interpretation;
+- **Derived claim** — conclusion produced from recorded premises/method.
 
-- available sources disagree materially;
-- the consequence of being wrong is significant;
-- the evidence is stale, indirect or incomplete;
-- several plausible interpretations remain;
-- a stronger direct measurement is available.
-
-The preferred response is therefore often **active investigation**, not guessing which candidate is correct.
+Model estimates are therefore **derived/hypothetical interpretations unless backed by registered observations**. They must not be presented beside hardware measurements as if all were equivalent observations.
 
 ## Example: thermal conflict
 
-Initial candidates may disagree:
+Possible initial evidence:
 
 ```text
-user estimate:       temperature ≈ 40 C
-DEEP interpretation: temperature ≈ 60 C, normal
-FAST interpretation: temperature ≈ 70 C, near critical
-internal alarm:      temperature critical
+user report: estimated temperature around 40 C
+FAST derived hypothesis: likely near 70 C
+DEEP derived hypothesis: likely around 60 C
+registered internal alarm observation: thermal condition critical
 ```
 
-Because the subject is safety/reliability relevant and the disagreement is large, ANIMA should create a high-priority verification task instead of selecting a winner.
+These are not four equal measurements.
 
-Possible investigation:
+If the situation is important, the system can create a verification task such as:
 
 ```text
-1. read current hardware temperature sensor
-2. read throttle / thermal status
-3. inspect recent temperature history
-4. inspect current CPU load
-5. inspect cooling/fan state if available
-6. inspect the internal condition that raised the alarm
+1. obtain registered hardware temperature observation
+2. obtain throttle/thermal status observation
+3. inspect recent temperature observations
+4. inspect CPU load observation
+5. inspect fan/cooling observation if available
 ```
 
-The resulting evidence may be:
+A resulting evidence slice might contain independently identifiable observations:
 
 ```text
-sensor temperature: 83.4 C
-thermal throttling: true
-CPU load: 92%
-fan RPM: 0
+temperature sensor = 83.4 C
+thermal throttling = true
+CPU load = 92%
+fan RPM = 0
 ```
 
-FAST/DEEP may then interpret the *combined verified evidence* and propose a conclusion/response strategy, for example:
+FAST/DEEP may then interpret that bounded evidence and propose a conclusion/response. Normal system validation, Choice, safety policy and Executor boundaries remain authoritative.
 
-```text
-conclusion: active overheating
-likely cause: cooling failure
-proposed response: reduce load and inspect cooling
-```
+## One logical case, multiple Evidence identities
 
-The model does not directly execute the response. Normal system validation, Choice, safety policy and Executor boundaries still apply.
-
-## One logical case, many evidence records
-
-The verification should be represented as one logical case/task, but evidence must remain individually identifiable.
+A verification case can group many records without flattening them into one opaque event:
 
 ```text
 Verification Case
-├── original conflicting candidates
-├── evidence item A
-├── evidence item B
-├── evidence item C
-├── interpretation/proposal
-└── final system decision
+├── original claims/evidence
+├── Evidence A
+├── Evidence B
+├── Evidence C
+├── derived interpretation/proposal
+└── eventual system decision
 ```
 
-Do not flatten all evidence into one opaque Event. Provenance must preserve who/what produced each observation, when it was produced, and how it affected the final decision.
+Evidence identity/dependence follows accepted DP-10a:
+
+- replay of one occurrence is not new independent support;
+- different EvidenceRefs can share one provenance root;
+- independent measurements remain distinct even when their semantic Claim is equal.
+
+## Time and provenance
+
+Verification records must preserve the relevant distinction between:
+
+```text
+observed_at
+asserted_at
+received_at
+created_at
+Claim validity
+```
+
+A later receipt does not make evidence a later world state. Unknown time is not silently replaced with `now`.
+
+## Relationship to `classify_relation/0.1`
+
+Relation assessment and verification are separate contracts.
+
+For example:
+
+```text
+CONTENT = CONTRADICTION
+```
+
+can be known while the system still has insufficient authority/evidence to choose a truth winner. A later lifecycle policy may decide whether that contradiction warrants immediate verification, deferred verification or no new task.
+
+`classify_relation/0.1` itself does not create verification Tasks.
 
 ## Priority
 
-Verification priority is system-owned. A producer may suggest urgency, but may not assign final priority to itself.
+Future verification priority should remain system-owned and may consider:
 
-Priority should consider at least:
+- consequence of error;
+- Goal relevance;
+- evidence disagreement;
+- freshness and provenance;
+- availability/cost of stronger evidence;
+- execution/physical safety.
 
-- possible consequence of being wrong;
-- importance of the affected subject/Goal;
-- disagreement between evidence;
-- uncertainty;
-- freshness of evidence;
-- availability/cost of stronger verification;
-- physical or execution safety implications.
-
-A low-impact preference conflict may be deferred. A possible thermal, power or safety conflict may become an urgent task.
-
-## Relationship to Stage 6
-
-This mechanism should reuse the Stage 6 system substrate rather than create a second investigation agent:
-
-```text
-Persistent Task
-Goal / purpose
-Choice
-Executor
-Observation
-Verification
-Unified Trace
-Recovery
-```
-
-The semantic layer decides that verification is necessary; Stage 6 mechanisms provide the persistent, restart-safe process for carrying it out.
-
-## Learning from resolved cases
-
-The completed verification case is itself valuable experience.
-
-A single case may update the factual result, but should not automatically rewrite a global procedure.
-
-Preferred longer path:
-
-```text
-resolved case
-   ↓
-history / episodic evidence
-   ↓
-repeated cases or Sleep analysis
-   ↓
-procedural-rule candidate
-   ↓
-validation
-   ↓
-possible durable procedure
-```
-
-Example future procedural candidate:
-
-```text
-When thermal-model estimates conflict with an internal thermal alarm,
-read hardware temperature + throttle status before escalating model reasoning.
-```
-
-This keeps strategy refinement evidence-backed rather than letting one unusual incident become a permanent reflex.
+Exact arbitration remains outside the first read-only Stage 7 slice.
 
 ## Validation requirements
 
-Before production lock, this mechanism should be tested on at least:
+Future lifecycle integration should test at least:
 
-1. low-importance conflicts that should not create urgent work;
-2. high-importance conflicts that should create verification tasks;
-3. stronger direct evidence that resolves weaker derived claims;
-4. verification that remains inconclusive and must `DEFER` rather than guess;
+1. low-impact conflicts that do not create urgent work;
+2. high-impact conflicts that do;
+3. stronger registered observations against weaker derived hypotheses;
+4. inconclusive verification that defers rather than guesses;
 5. restart during evidence collection;
-6. duplicate/replay without duplicate side effects;
-7. multiple independent evidence items kept under one logical case;
-8. bounded FAST/DEEP use after evidence collection;
-9. response proposals that still require normal system validation;
-10. measurable investigation latency/cost and priority behavior.
+6. replay without duplicate side effects;
+7. multiple evidence identities under one case;
+8. bounded FAST/DEEP interpretation after evidence collection;
+9. response proposals still requiring normal validation;
+10. measurable investigation cost and latency.
 
-## Design rule
+Canonical semantics and open integration boundaries:
 
-> High-significance uncertainty may become an active verification task. ANIMA should prefer obtaining stronger evidence over voting between conflicting candidates when the cost of being wrong justifies investigation.
-
-This is the accepted pre-Stage 7 baseline and may be revised after implementation experiments.
+- [Stage 7 Semantic Boundary v0](Stage_7_Semantic_Boundary_v0.md);
+- [ADR-010](../DECISIONS/ADR-010_Stage_7_Semantic_Boundary.md).
