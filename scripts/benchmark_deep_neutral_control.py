@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
-"""Neutral model-only control for the FAST/DEEP baseline audit.
+"""Neutral model-only control for the cognitive baseline audit.
 
-This experiment removes FAST/DEEP role identity and the ordered candidate list.
-Both models receive the same evidence and neutral semantic-classification prompt.
-Taxonomy definition order is counterbalanced across cases so a fixed first-label
-preference cannot dominate the entire corpus. Production routing is unchanged.
+Both models receive the same evidence and the same role-neutral semantic
+classification prompt. No ordered candidate list is supplied. Taxonomy definition
+order is counterbalanced across cases so a fixed first-label preference cannot
+dominate the corpus. Production routing is unchanged.
 """
 
 import argparse
@@ -47,10 +47,10 @@ _RESOLUTION_DEFINITIONS = {
 }
 
 _NEUTRAL_SYSTEM = (
-    "You are a bounded semantic evidence classifier. You are not FAST or DEEP and "
-    "you have no authority over ANIMA state. Use only the supplied evidence. Do not "
-    "invent facts and do not decide by source name, confidence, recency, or source "
-    "count alone. Return only the requested final classification, without explanation."
+    "You are a bounded semantic evidence classifier with no authority over persistent "
+    "system state. Use only the supplied evidence. Do not invent facts and do not "
+    "decide by source name, confidence, recency, or source count alone. Return only "
+    "the requested final classification, without explanation."
 )
 
 _OUTPUT_RE = re.compile(
@@ -102,21 +102,30 @@ def render_prompts(case, case_index, *, reversed_order=False):
     )
 
 
+def _first_label(text, labels):
+    if not isinstance(text, str):
+        return None
+    upper = text.upper()
+    for label in labels:
+        if re.search(
+            rf"(?<![A-Z0-9_]){re.escape(label)}(?![A-Z0-9_])",
+            upper,
+        ):
+            return label
+    return None
+
+
 def parse_output(text):
     if not isinstance(text, str):
         return None, None, False
     match = _OUTPUT_RE.match(text)
     if match:
         return match.group(1).upper(), match.group(2).upper(), True
-
-    upper = text.upper()
-    relation = next((label for label in RELATION_LABELS if re.search(
-        rf"(?<![A-Z0-9_]){re.escape(label)}(?![A-Z0-9_])", upper
-    )), None)
-    resolution = next((label for label in RESOLUTION_LABELS if re.search(
-        rf"(?<![A-Z0-9_]){re.escape(label)}(?![A-Z0-9_])", upper
-    )), None)
-    return relation, resolution, False
+    return (
+        _first_label(text, RELATION_LABELS),
+        _first_label(text, RESOLUTION_LABELS),
+        False,
+    )
 
 
 def selected_cases(difficulty):
@@ -160,6 +169,7 @@ def run_case(case, case_index, *, transport, timeout, reversed_order=False):
     latency_ms = (time.perf_counter() - started) * 1000.0
     if call is not None and isinstance(call.latency_ms, (int, float)):
         latency_ms = float(call.latency_ms)
+
     relation, resolution, exact = parse_output(response)
     return {
         "case_id": case.case_id,
@@ -230,6 +240,7 @@ def main(argv=None):
         ),
     )
     args = parser.parse_args(argv)
+
     if not math.isfinite(args.timeout) or args.timeout <= 0:
         parser.error("timeout must be positive and finite")
     if not 1 <= args.port <= 65535:
@@ -305,7 +316,7 @@ def main(argv=None):
         "arms": arms,
         "setup_errors": setup_errors,
         "notes": [
-            "No FAST/DEEP role identity is present in the system prompt.",
+            "No cognitive role identity is present in the system prompt.",
             "No ordered candidate list is present in TASK_VIEW.",
             "Taxonomy definition order is counterbalanced across cases.",
         ],
