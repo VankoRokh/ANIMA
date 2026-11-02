@@ -39,7 +39,7 @@ Fast обслуживает оперативную реакцию, Deep — тщ
 Цена: offline journal, синхронизация, совместимость данных/моделей и питание.
 Разные названия не дают обучения, точности или непрерывности. Модели, latency/RAM,
 транспорт, конфликты, резерв и распределение нагрузки требуют проектирования.
-Контуры и проверки — [в планах](../ROADMAP/Research.md#fast-и-deep).
+Контуры и проверки — [в планах](../ROADMAP/Research.md#research-track-fast--deep--context).
 
 ## ADR-003
 
@@ -51,7 +51,7 @@ Fast обслуживает оперативную реакцию, Deep — тщ
 
 Это не отказ от метрик и не доказательство превосходства эмоций над RL.
 Сначала задача, baseline простого управления, метрика, бюджет и сравнение
-[EXP-003](../ROADMAP/Research.md#exp-003). RL необязателен.
+[EXP-003](../ROADMAP/Research.md#exp-003--peripheral-local-reinforcement). RL необязателен.
 
 ## ADR-004
 
@@ -114,7 +114,7 @@ status transitions и необходимость контрольного corpus
 памяти от моделей, объяснимый retrieval, сохранение истории противоречий и путь к
 будущим Sleep/Fast/Deep без переписывания основы. Реализация и приёмка идут по
 [Stage 1](../ROADMAP/README.md#stage-1); сознательно отложенные механизмы — в
-[Research](../ROADMAP/Research.md#отложенные-механизмы-памяти-stage-1).
+[Research](../ROADMAP/Research.md#research-track-memory-и-данные).
 
 ## ADR-006
 
@@ -228,7 +228,7 @@ recovery protocol и дополнительные тесты large-data readines
 расширять новыми data types и cognitive processors без замены scheduler/lifecycle;
 длинная работа становится прерываемой, а история преобразований остаётся проверяемой.
 Порядок реализации, проверки и Definition of Done — [Stage 3](../ROADMAP/README.md#stage-3);
-отложенные cognitive механизмы — [Research](../ROADMAP/Research.md#когнитивный-сон).
+отложенные cognitive механизмы — [Research](../ROADMAP/Research.md#research-track-sleep-и-consolidation).
 
 ## ADR-008
 
