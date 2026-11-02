@@ -20,6 +20,17 @@ from ._executor_impl import (
 )
 
 
+def build_sandbox_handlers():
+    """Return fresh trusted sandbox handlers without exposing Agent lifecycle state.
+
+    Stage 6 reuses the already-tested filesystem sandbox implementation, but owns
+    its own Action/Operation lifecycle. Returning a fresh mapping preserves the
+    Stage 4 handler boundary without requiring AgentStore/AgentRun/AgentStep.
+    """
+
+    return _impl._standard_handlers()
+
+
 class SandboxExecutor(_impl.SandboxExecutor):
     """Public sandbox Executor with bounded worker IPC and recovery semantics."""
 
@@ -202,6 +213,7 @@ __all__ = [
     "SandboxToolError",
     "UncertainOperationError",
     "action_request_hash",
+    "build_sandbox_handlers",
     "build_sandbox_registry",
     "operation_kind",
     "sandbox_tool_descriptors",
