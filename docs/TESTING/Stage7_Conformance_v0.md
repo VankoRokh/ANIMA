@@ -4,12 +4,31 @@ Status: **Accepted test plan for the pre-training read-only Stage 7 interface sl
 
 Canonical semantics: [Stage 7 Semantic Boundary v0](../ROADMAP/Stage_7_Semantic_Boundary_v0.md).
 Decision: [ADR-010](../DECISIONS/ADR-010_Stage_7_Semantic_Boundary.md).
+Accepted JSON renderer shape: [classify_relation_0_1.schema.json](../SCHEMAS/classify_relation_0_1.schema.json).
 
 ## Purpose
 
 Validate the semantic contract independently of any specific FAST/DEEP model, prompt, storage schema or renderer before model training.
 
 The test plan must reveal how much of `classify_relation/0.1` is solved by deterministic preprocessing and how much meaningful semantic residual remains for an LLM.
+
+## Renderer conformance
+
+The accepted JSON Schema is a **wire-shape validator**, not the whole semantic validator.
+
+Required renderer behavior:
+
+- parse with duplicate-key rejection before schema validation;
+- validate against JSON Schema draft 2020-12 with `date-time` format checking enabled or equivalent explicit RFC3339 validation;
+- reject unknown semantic properties in frozen closed records;
+- reject the old top-level `UnsupportedRequest` shape;
+- represent `EntityRef`/`PredicateRef` as explicit `resolved | unresolved` tagged records rather than `string | null`;
+- expose Evidence occurrence/version identity and provenance roots independently from local aliases;
+- keep `observed_at`, `asserted_at`, `received_at` and `created_at` separate and explicitly `known | unknown`;
+- keep `source_ref` separate from `producer_ref`;
+- use `TEMPORAL_SUCCESSION`, never the legacy Stage 7 model-facing label `TEMPORAL_CHANGE`.
+
+Schema success alone does **not** prove reference integrity, entity/predicate binding, clock comparability, interval ordering, unit normalization, evidence entailment/dependence, capability semantics or authority/lifecycle permission. Those remain separate semantic checks.
 
 ## Corpus shape
 
@@ -121,7 +140,9 @@ Tests must prove:
 - same Claim from two independent observations remains two Evidence occurrences;
 - different EvidenceRefs with one shared root remain dependent for support accounting;
 - content hash equality alone does not merge independent measurements;
-- replay identity survives restart/re-evaluation.
+- replay identity survives restart/re-evaluation;
+- local EvidenceRef alias changes do not change occurrence/version identity;
+- derived evidence preserves premise refs, method identity and shared roots.
 
 ## Time tests
 
@@ -139,7 +160,9 @@ Required traps:
 - same printed timestamp from unmapped clocks does not prove simultaneity;
 - missing bound is `Unknown`, never `Unbounded`;
 - two point observations do not imply a continuous interval or exact transition boundary;
-- equal interval bounds are invalid; point state uses `Instant`.
+- equal interval bounds are invalid; point state uses `Instant`;
+- `unknown` time marker is not replaced with `now`;
+- model projection may omit irrelevant receipt/record clocks, but the typed operation envelope must not collapse their meanings.
 
 ## Protocol and security tests
 
@@ -152,7 +175,8 @@ Keep process/protocol failures distinct from semantic uncertainty:
 - bad or cross-request ref;
 - unsupported profile/version;
 - backend timeout/cancel;
-- truncated model output.
+- truncated model output;
+- old top-level `kind="unsupported"` result rejected as a valid Assessment.
 
 Source content such as:
 
@@ -189,6 +213,7 @@ The current FAST/DEEP audit cases are contaminated by taxonomy/protocol iteratio
 
 ```text
 semantic boundary accepted
+→ accepted renderer schema
 → owner-reviewed conformance roots
 → deterministic evaluator
 → constrained renderer / grammar
