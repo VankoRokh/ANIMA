@@ -1,0 +1,1 @@
+{"profile":"classify_relation/0.1","kind":"assessment","content":{"kind":"insufficient","missing":["cardinality"],"considered_evidence_refs":["e1","e2"]},"revision":{"kind":"not_requested"}}
