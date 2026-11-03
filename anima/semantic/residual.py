@@ -13,7 +13,7 @@ from dataclasses import dataclass
 import json
 from typing import Any, Mapping, Protocol, runtime_checkable
 
-from .evaluator import EvaluationPlan
+from .evaluator import EvaluationPlan, fingerprint_request
 from .validation import (
     ProcessFailure,
     SUPPORTED_PROFILE,
@@ -87,7 +87,8 @@ Choose exactly one decision from the language in the supplied evidence:
 2) ambiguous_correction
    Use when the evidence suggests a possible correction but the correction intent, attribution, target, or decisive evidence fragment is not explicit enough.
    Hedged or tentative correction language is ambiguous, not no_declaration.
-   Output: {\"decision\":\"ambiguous_correction\",\"missing\":\"correction_intent|source_attribution|correction_target|evidence_fragment\",\"evidence_ref\":\"<evidence>\"}
+   missing must be exactly one of: correction_intent, source_attribution, correction_target, evidence_fragment.
+   Output example: {\"decision\":\"ambiguous_correction\",\"missing\":\"correction_intent\",\"evidence_ref\":\"<evidence>\"}
 
 3) no_declaration
    Use only when the supplied evidence language contains no correction/retraction/replacement declaration or suggestion. Do not use this for tentative or ambiguous correction language.
@@ -130,6 +131,8 @@ def build_revision_residual_view(
         raise ValueError("Residual adapter requires classify_relation/0.1")
     if plan.profile != SUPPORTED_PROFILE:
         raise ValueError("Residual plan profile does not match request profile")
+    if plan.request_fingerprint != fingerprint_request(request):
+        raise ValueError("Residual plan/request fingerprint mismatch")
     if tuple(plan.residual_facets) != ("revision",):
         raise ValueError("Residual adapter currently supports only one REVISION facet")
     if "revision" not in request["aspects"]:
@@ -252,6 +255,8 @@ def validate_revision_proposal(
         refs = _refs(proposal["evidence_refs"], field="evidence_refs", allowed=evidence_refs)
         if request["coverage"]["completeness"] != "complete_for_declared_scope":
             raise ResidualModelError("No-declaration requires complete declared-scope coverage")
+        if set(refs) != evidence_refs:
+            raise ResidualModelError("No-declaration must cover the full supplied evidence slice")
         return {"kind": "no_declaration_in_scope", "evidence_refs": list(refs)}
 
     raise ResidualModelError("Unsupported REVISION residual decision")
@@ -291,12 +296,11 @@ class RevisionResidualBackend:
             user_prompt=user_prompt,
             timeout_seconds=self.timeout_seconds,
         )
+        self.call_history.append(call)
         text = getattr(call, "text", None)
         if not isinstance(text, str):
             raise ResidualModelError("Residual transport returned no text completion")
-        proposal = parse_revision_proposal(text, request)
-        self.call_history.append(call)
-        return proposal
+        return parse_revision_proposal(text, request)
 
 
 def complete_with_residual(
@@ -309,6 +313,8 @@ def complete_with_residual(
     validate_request(request)
     if plan.profile != request["profile"]:
         raise ValueError("Residual plan/request profile mismatch")
+    if plan.request_fingerprint != fingerprint_request(request):
+        raise ValueError("Residual plan/request fingerprint mismatch")
 
     if plan.complete:
         assessment = plan.assessment()
