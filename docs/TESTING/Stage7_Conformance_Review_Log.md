@@ -4,6 +4,8 @@ Status: **Active review log.** This file records owner decisions for the draft r
 
 Corpus: [Stage7_Conformance_Corpus_v0_Draft.md](Stage7_Conformance_Corpus_v0_Draft.md)
 
+Until gold-freeze, this review log is **normative over conflicting wording in the draft rows**. The final accepted corpus will fold all accepted clarifications back into one clean specification.
+
 ## Review status
 
 | Block | Cases | Status | Decision date |
@@ -11,11 +13,11 @@ Corpus: [Stage7_Conformance_Corpus_v0_Draft.md](Stage7_Conformance_Corpus_v0_Dra
 | A — Atomic CONTENT relations | CR-001…CR-016 | **Accepted** | 2026-11-03 |
 | B — Temporal CONTENT relations | CR-017…CR-026 | **Accepted with clarifications** | 2026-11-03 |
 | C — REVISION / correction | CR-027…CR-034 | **Accepted with clarifications** | 2026-11-03 |
-| D — Evidence identity / replay / dependence | CR-035…CR-040 | Pending review | — |
+| D — Evidence identity / replay / dependence | CR-035…CR-040 | **Accepted with clarification** | 2026-11-03 |
 | E — Comparability / sufficiency / capability | CR-041…CR-045 | Pending review | — |
 | F — Protocol / boundary / security | CR-046…CR-050 | Pending review | — |
 
-Current progress: **34 / 50 root cases accepted.**
+Current progress: **40 / 50 root cases accepted.**
 
 ## Accepted Block A invariants
 
@@ -68,3 +70,20 @@ Additional accepted revision invariants:
 - `CORRECTION` never itself selects truth, grants source authority or performs Knowledge supersession.
 
 No accepted Block C case authorizes lifecycle mutation from the relation assessment alone.
+
+## Accepted Block D invariants
+
+The owner accepted CR-035…CR-040 with one clarification that is normative for fixture expansion:
+
+- **CR-039:** the primary root is made exact. A derived Claim with explicit premise EvidenceRefs and derivation method is compared with an equivalent supplied/direct Claim whose subject, predicate, typed value, polarity, qualifiers and temporal scope are semantically equal. Expected result is `CONTENT=SUPPORT`. Provenance/dependency remains independent of that content relation: if the derivation depends on the compared Evidence root, the grounds are dependent; independent premises remain separately traceable. `form=derivation` alone never makes evidence stronger or weaker.
+
+Additional accepted evidence invariants:
+
+- replay/redelivery of one immutable occurrence can have multiple local aliases but contributes only one independent provenance root;
+- distinct EvidenceRefs produced by summary/extraction from one source root remain dependent;
+- distinct independent sensor occurrences remain distinguishable even when they support the same Claim;
+- byte/content/hash equality never defines Evidence identity by itself;
+- CONTENT classification follows proposition semantics and scope, while evidence independence follows provenance;
+- direct observation and derived evidence can contradict in content without either winning merely because of evidence form.
+
+No accepted Block D case converts record count, alias count, content hash or `DIRECT/DERIVED` labels into truth authority.
