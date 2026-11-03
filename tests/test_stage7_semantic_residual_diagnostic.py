@@ -130,3 +130,22 @@ def test_diagnostic_signal_none_still_requires_system_owned_complete_coverage():
         parse_diagnostic_proposal(
             '{"signal":"none","evidence_refs":["e1"]}', request
         )
+
+
+def test_rejected_diagnostic_output_keeps_transport_call_for_observability():
+    request, plan, _ = _case("CR-032")
+    transport = FakeTransport(
+        {
+            "signal": "present",
+            "intent": "ambiguous",
+            "missing": "not_an_allowed_reason",
+            "evidence_ref": "e1",
+        }
+    )
+    backend = DiagnosticBackend(transport)
+
+    with pytest.raises(ResidualModelError, match="invalid missing reason"):
+        complete_with_diagnostic(request, plan, backend)
+
+    assert len(backend.call_history) == 1
+    assert backend.call_history[0].text == transport.text
