@@ -27,6 +27,13 @@ CASE_PATHS = {
 CASES = tuple(CASE_PATHS)
 
 
+def _call_details(backend):
+    call = backend.call_history[-1] if backend.call_history else None
+    metadata = call.to_dict() if call is not None and hasattr(call, "to_dict") else None
+    model_output = getattr(call, "text", None) if call is not None else None
+    return model_output, metadata
+
+
 def run_case(case_id, transport, *, timeout_seconds):
     case_dir = CASE_PATHS[case_id]
     raw = (case_dir / "request.json").read_text(encoding="utf-8")
@@ -42,24 +49,28 @@ def run_case(case_id, transport, *, timeout_seconds):
     try:
         completed = complete_with_diagnostic(request, plan, backend)
     except ResidualModelError as error:
+        model_output, metadata = _call_details(backend)
         return {
             "case": case_id,
             "status": "invalid_model_output",
             "error": str(error),
             "deterministic_facets": plan.determined_facets(),
+            "model_output": model_output,
+            "model_call": metadata,
         }, False
     except Exception as error:
+        model_output, metadata = _call_details(backend)
         return {
             "case": case_id,
             "status": "backend_failure",
             "error": f"{type(error).__name__}: {error}",
             "deterministic_facets": plan.determined_facets(),
+            "model_output": model_output,
+            "model_call": metadata,
         }, False
 
     exact = completed.assessment == expected
-    call = backend.call_history[-1] if backend.call_history else None
-    metadata = call.to_dict() if call is not None and hasattr(call, "to_dict") else None
-    model_output = getattr(call, "text", None) if call is not None else None
+    model_output, metadata = _call_details(backend)
     return {
         "case": case_id,
         "status": "pass" if exact else "semantic_mismatch",
