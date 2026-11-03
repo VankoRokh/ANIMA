@@ -138,7 +138,24 @@ class DeterministicRelationEvaluator:
         )
 
     def _evidence_refs(self, request: Mapping[str, Any]) -> list[str]:
-        return [item["ref"] for item in request["evidence"]]
+        """Return terminal facet grounds, not transitive derivation premises.
+
+        Premise Evidence remains addressable through ``premise_evidence_refs`` and
+        provenance. Repeating it in a facet result would flatten the dependency
+        graph and make one lineage look like multiple independent grounds.
+        """
+
+        premise_refs = {
+            premise_ref
+            for item in request["evidence"]
+            for premise_ref in item.get("premise_evidence_refs", ())
+        }
+        terminal_refs = [
+            item["ref"]
+            for item in request["evidence"]
+            if item["ref"] not in premise_refs
+        ]
+        return terminal_refs or [item["ref"] for item in request["evidence"]]
 
     def _content_relation(self, relation: str, request: Mapping[str, Any]) -> dict[str, Any]:
         return {
