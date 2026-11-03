@@ -90,12 +90,11 @@ class DiagnosticBackend:
             user_prompt=user_prompt,
             timeout_seconds=self.timeout_seconds,
         )
+        self.call_history.append(call)
         text = getattr(call, "text", None)
         if not isinstance(text, str):
             raise ResidualModelError("Diagnostic transport returned no text completion")
-        revision = parse_diagnostic_proposal(text, request)
-        self.call_history.append(call)
-        return revision
+        return parse_diagnostic_proposal(text, request)
 
 
 def _ref(value: Any, *, allowed: set[str], field: str) -> str:
