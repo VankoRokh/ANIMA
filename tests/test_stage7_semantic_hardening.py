@@ -1,15 +1,34 @@
 import json
 from pathlib import Path
+from types import SimpleNamespace
+
+import pytest
 
 from anima.semantic import (
+    REVISION_SYSTEM_PROMPT,
     DeterministicRelationEvaluator,
     EvaluationPlan,
     ExactUnitRegistry,
+    ResidualModelError,
+    RevisionResidualBackend,
+    complete_with_residual,
     evaluate_document,
+    parse_and_validate_request,
+    parse_revision_proposal,
 )
 
 
 FIXTURE_ROOT = Path(__file__).parent / "fixtures" / "stage7" / "classify_relation_0_1"
+
+
+def _residual_case(case_id="CR-028"):
+    case_dir = FIXTURE_ROOT / "block_c" / case_id
+    raw = (case_dir / "request.json").read_text(encoding="utf-8")
+    request = parse_and_validate_request(raw)
+    plan = evaluate_document(raw)
+    assert isinstance(plan, EvaluationPlan)
+    assert plan.residual_facets == ("revision",)
+    return raw, request, plan
 
 
 def test_exact_unit_conversion_does_not_round_large_decimal_values():
@@ -63,3 +82,46 @@ def test_exact_time_comparison_normalizes_rfc3339_offsets_without_losing_fractio
     }
 
     assert evaluator._timepoint_cmp(left, right) == 0
+
+
+def test_residual_plan_is_bound_to_the_exact_request_that_created_it():
+    raw, _, plan = _residual_case()
+    changed_request = json.loads(raw)
+    changed_request["claims"][0]["value"]["value"] = "513"
+
+    with pytest.raises(ValueError, match="fingerprint mismatch"):
+        complete_with_residual(changed_request, plan)
+
+
+def test_no_declaration_must_cover_the_full_supplied_evidence_slice():
+    _, request, _ = _residual_case()
+    raw_proposal = '{"decision":"no_declaration","evidence_refs":["e1"]}'
+
+    with pytest.raises(ResidualModelError, match="full supplied evidence slice"):
+        parse_revision_proposal(raw_proposal, request)
+
+
+def test_rejected_residual_output_remains_observable_in_call_history():
+    _, request, plan = _residual_case()
+    raw_output = (
+        '{"decision":"ambiguous_correction",'
+        '"missing":"not_a_valid_gap","evidence_ref":"e1"}'
+    )
+
+    class FakeTransport:
+        def complete(self, **kwargs):
+            return SimpleNamespace(text=raw_output, model="fake")
+
+    backend = RevisionResidualBackend(FakeTransport())
+    with pytest.raises(ResidualModelError, match="invalid missing reason"):
+        complete_with_residual(request, plan, backend)
+
+    assert len(backend.call_history) == 1
+    assert backend.call_history[0].text == raw_output
+
+
+def test_residual_prompt_does_not_present_enum_alternatives_as_one_literal_value():
+    assert "correction_intent|source_attribution|correction_target|evidence_fragment" not in (
+        REVISION_SYSTEM_PROMPT
+    )
+    assert "missing must be exactly one of" in REVISION_SYSTEM_PROMPT
