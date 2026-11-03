@@ -11,6 +11,8 @@ from dataclasses import dataclass, field
 from datetime import date
 from decimal import Decimal
 from fractions import Fraction
+import hashlib
+import json
 import re
 from typing import Any, Mapping
 
@@ -24,6 +26,19 @@ _RFC3339_RE = re.compile(
     r"(?:\.(?P<fraction>\d+))?"
     r"(?P<zone>Z|[+-]\d{2}:\d{2})$"
 )
+
+
+def fingerprint_request(request: Mapping[str, Any]) -> str:
+    """Return a stable system-owned digest for one exact validated request."""
+
+    payload = json.dumps(
+        request,
+        ensure_ascii=False,
+        allow_nan=False,
+        sort_keys=True,
+        separators=(",", ":"),
+    ).encode("utf-8")
+    return hashlib.sha256(payload).hexdigest()
 
 
 @dataclass(frozen=True)
@@ -63,6 +78,7 @@ class EvaluationPlan:
     content: Mapping[str, Any] | None
     revision: Mapping[str, Any] | None
     residual_facets: tuple[str, ...] = ()
+    request_fingerprint: str | None = None
 
     @property
     def backend_calls_required(self) -> int:
@@ -145,6 +161,7 @@ class DeterministicRelationEvaluator:
             content=content,
             revision=revision,
             residual_facets=tuple(residual),
+            request_fingerprint=fingerprint_request(request),
         )
 
     def _evidence_refs(self, request: Mapping[str, Any]) -> list[str]:
