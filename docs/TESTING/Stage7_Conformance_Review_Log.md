@@ -14,10 +14,10 @@ Until gold-freeze, this review log is **normative over conflicting wording in th
 | B — Temporal CONTENT relations | CR-017…CR-026 | **Accepted with clarifications** | 2026-11-03 |
 | C — REVISION / correction | CR-027…CR-034 | **Accepted with clarifications** | 2026-11-03 |
 | D — Evidence identity / replay / dependence | CR-035…CR-040 | **Accepted with clarification** | 2026-11-03 |
-| E — Comparability / sufficiency / capability | CR-041…CR-045 | Pending review | — |
+| E — Comparability / sufficiency / capability | CR-041…CR-045 | **Accepted with clarification** | 2026-11-03 |
 | F — Protocol / boundary / security | CR-046…CR-050 | Pending review | — |
 
-Current progress: **40 / 50 root cases accepted.**
+Current progress: **45 / 50 root cases accepted.**
 
 ## Accepted Block A invariants
 
@@ -87,3 +87,19 @@ Additional accepted evidence invariants:
 - direct observation and derived evidence can contradict in content without either winning merely because of evidence form.
 
 No accepted Block D case converts record count, alias count, content hash or `DIRECT/DERIVED` labels into truth authority.
+
+## Accepted Block E invariants
+
+The owner accepted CR-041…CR-045 with one clarification normative for fixture expansion:
+
+- **CR-045:** the unsupported capability for known partial context overlap is explicitly named `content.partial_context_overlap/1`. The input contains enough information to know that the contexts partially overlap; the profile simply does not promise this reasoning capability in `0.1`, so the result is `CONTENT=UNSUPPORTED(required feature)` rather than generic insufficiency.
+
+Additional accepted comparability/sufficiency invariants:
+
+- proven different semantic predicates yield `NOT_COMPARABLE(DIFFERENT_PREDICATE)` even when Value text happens to match;
+- proven disjoint registered contexts yield `NOT_COMPARABLE(DISJOINT_CONTEXT)` rather than a contradiction across incompatible scopes;
+- unresolved entity identity is `INSUFFICIENT(entity_binding)`, never automatically `same` or `different` from mention text;
+- different positive values with `cardinality=unknown` yield `INSUFFICIENT(cardinality)` because the system cannot decide between contradiction and compatible multiplicity;
+- `INSUFFICIENT` means required information/precondition is missing, while `UNSUPPORTED` means the relevant semantics are known but profile capability is absent.
+
+No accepted Block E case silently treats unresolved identity, unknown cardinality or unsupported overlap reasoning as a truth decision.
