@@ -22,12 +22,18 @@ from anima.semantic import (
 )
 
 
-FIXTURE_ROOT = ROOT / "tests/fixtures/stage7/classify_relation_0_1/block_c"
-CASES = ("CR-028", "CR-032")
+FIXTURE_ROOT = ROOT / "tests/fixtures/stage7/classify_relation_0_1"
+CASE_PATHS = {
+    "CR-028": FIXTURE_ROOT / "block_c" / "CR-028",
+    "CR-032": FIXTURE_ROOT / "block_c" / "CR-032",
+    "CR-030-M": FIXTURE_ROOT / "model_residual" / "CR-030-M",
+    "CR-050-M": FIXTURE_ROOT / "model_residual" / "CR-050-M",
+}
+CASES = tuple(CASE_PATHS)
 
 
 def run_case(case_id, transport, *, timeout_seconds):
-    case_dir = FIXTURE_ROOT / case_id
+    case_dir = CASE_PATHS[case_id]
     raw = (case_dir / "request.json").read_text(encoding="utf-8")
     expected = json.loads((case_dir / "expected.json").read_text(encoding="utf-8"))
     request = parse_and_validate_request(raw)
@@ -58,12 +64,14 @@ def run_case(case_id, transport, *, timeout_seconds):
     exact = completed.assessment == expected
     call = backend.call_history[-1] if backend.call_history else None
     metadata = call.to_dict() if call is not None and hasattr(call, "to_dict") else None
+    model_output = getattr(call, "text", None) if call is not None else None
     return {
         "case": case_id,
         "status": "pass" if exact else "semantic_mismatch",
         "assessment": completed.assessment,
         "expected": expected,
         "backend_calls": completed.backend_calls,
+        "model_output": model_output,
         "model_call": metadata,
     }, exact
 
@@ -89,14 +97,23 @@ def main():
     )
     selected = CASES if args.case == "all" else (args.case,)
     results = []
-    passed = True
+    passed = 0
     for case_id in selected:
         result, exact = run_case(case_id, transport, timeout_seconds=args.timeout)
         results.append(result)
-        passed = passed and exact
+        passed += int(exact)
 
-    print(json.dumps({"results": results}, ensure_ascii=False, indent=2, allow_nan=False))
-    return 0 if passed else 1
+    payload = {
+        "summary": {
+            "model": args.model,
+            "passed": passed,
+            "total": len(selected),
+            "exact_rate": passed / len(selected),
+        },
+        "results": results,
+    }
+    print(json.dumps(payload, ensure_ascii=False, indent=2, allow_nan=False))
+    return 0 if passed == len(selected) else 1
 
 
 if __name__ == "__main__":
