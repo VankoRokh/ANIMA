@@ -1,0 +1,1 @@
+{"kind":"process_error","stage":"schema_validation","code":"unknown_semantic_field","backend_calls_expected":0,"field":"claims[0].trust_me"}
