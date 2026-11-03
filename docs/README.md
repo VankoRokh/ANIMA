@@ -9,6 +9,7 @@
 | Текущая работа и статусы этапов? | [project.json](project.json); представление в [Roadmap](ROADMAP/README.md) |
 | Какой semantic boundary принят для текущего Stage 7 interface slice? | [Stage 7 Semantic Boundary v0](ROADMAP/Stage_7_Semantic_Boundary_v0.md); решение [ADR-010](DECISIONS/ADR-010_Stage_7_Semantic_Boundary.md) |
 | Как выглядит первый принятый JSON renderer `classify_relation/0.1`? | [classify_relation_0_1.schema.json](SCHEMAS/classify_relation_0_1.schema.json) |
+| Какие root cases приняты как Stage 7 conformance gold? | [Stage 7 Conformance Corpus v0](TESTING/Stage7_Conformance_Corpus_v0.md); история review — [Owner Review Log](TESTING/Stage7_Conformance_Review_Log.md) |
 | Как проверять Stage 7 semantic contract до обучения? | [Stage 7 Semantic Conformance v0](TESTING/Stage7_Conformance_v0.md) |
 | Что и как проверять дальше? | [Roadmap](ROADMAP/README.md); [идеи и эксперименты](ROADMAP/Research.md) |
 | Как работает подтверждённый код? | [Architecture](ARCHITECTURE/README.md) |
