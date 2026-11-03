@@ -5,6 +5,7 @@ Status: **Accepted test plan for the pre-training read-only Stage 7 interface sl
 Canonical semantics: [Stage 7 Semantic Boundary v0](../ROADMAP/Stage_7_Semantic_Boundary_v0.md).
 Decision: [ADR-010](../DECISIONS/ADR-010_Stage_7_Semantic_Boundary.md).
 Accepted JSON renderer shape: [classify_relation_0_1.schema.json](../SCHEMAS/classify_relation_0_1.schema.json).
+Owner-review draft roots: [Stage 7 Conformance Corpus v0 — Draft](Stage7_Conformance_Corpus_v0_Draft.md).
 
 ## Purpose
 
