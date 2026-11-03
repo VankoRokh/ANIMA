@@ -9,12 +9,14 @@ from anima.semantic import (
     DeterministicRelationEvaluator,
     EvaluationPlan,
     ExactUnitRegistry,
+    ProcessFailure,
     ResidualModelError,
     RevisionResidualBackend,
     complete_with_residual,
     evaluate_document,
     parse_and_validate_request,
     parse_revision_proposal,
+    validate_assessment,
 )
 
 
@@ -99,6 +101,51 @@ def test_no_declaration_must_cover_the_full_supplied_evidence_slice():
 
     with pytest.raises(ResidualModelError, match="full supplied evidence slice"):
         parse_revision_proposal(raw_proposal, request)
+
+
+def test_standalone_validator_rejects_no_declaration_with_partial_evidence_slice():
+    _, request, plan = _residual_case()
+    assessment = {
+        "profile": request["profile"],
+        "kind": "assessment",
+        "content": dict(plan.content),
+        "revision": {
+            "kind": "no_declaration_in_scope",
+            "evidence_refs": ["e1"],
+        },
+    }
+
+    with pytest.raises(ProcessFailure) as exc_info:
+        validate_assessment(assessment, request)
+
+    assert exc_info.value.stage == "semantic_validation"
+    assert exc_info.value.code == "invalid_no_declaration_scope"
+    assert exc_info.value.details == {"field": "revision.evidence_refs"}
+
+
+def test_standalone_validator_rejects_no_declaration_without_complete_coverage():
+    _, request, plan = _residual_case()
+    request = json.loads(json.dumps(request))
+    request["coverage"] = {
+        "completeness": "partial",
+        "limitations": ["other_selection_limit"],
+    }
+    assessment = {
+        "profile": request["profile"],
+        "kind": "assessment",
+        "content": dict(plan.content),
+        "revision": {
+            "kind": "no_declaration_in_scope",
+            "evidence_refs": [item["ref"] for item in request["evidence"]],
+        },
+    }
+
+    with pytest.raises(ProcessFailure) as exc_info:
+        validate_assessment(assessment, request)
+
+    assert exc_info.value.stage == "semantic_validation"
+    assert exc_info.value.code == "invalid_no_declaration_scope"
+    assert exc_info.value.details == {"field": "coverage.completeness"}
 
 
 def test_rejected_residual_output_remains_observable_in_call_history():
