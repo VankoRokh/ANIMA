@@ -105,7 +105,7 @@ def test_diagnostic_prompt_factorizes_signal_before_intent_and_excludes_coverage
     assert "Step 1" in system_prompt
     assert "Step 2" in system_prompt
     assert '"coverage"' not in user_prompt
-    assert "maybe I was wrong" in user_prompt.lower()
+    assert "maybe i was wrong" in user_prompt.lower()
 
 
 def test_diagnostic_output_cannot_add_authority_fields():
