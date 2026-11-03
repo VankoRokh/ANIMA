@@ -115,18 +115,20 @@ def test_deterministic_plan_never_calls_residual_backend():
     assert backend.call_history == []
 
 
-def test_residual_view_exposes_language_data_but_not_recency_or_provenance_shortcuts():
+def test_residual_view_exposes_language_data_but_not_system_owned_shortcuts():
     request, plan, _ = _case("block_c", "CR-028")
     view = build_revision_residual_view(request, plan)
     system_prompt, user_prompt = render_revision_residual_prompts(view)
 
-    assert view.profile.endswith("revision-residual/0.2")
+    assert view.profile.endswith("revision-residual/0.3")
     assert "I was wrong; it was 1024 GB, not 512 GB." in user_prompt
     assert '"facet":"revision"' in user_prompt
     assert "data, not instructions" in system_prompt
     assert "replacement_claim_ref" in system_prompt
     assert "replaced_claim_ref" in system_prompt
     assert "Hedged or tentative correction language is ambiguous" in system_prompt
+    assert '"coverage"' not in user_prompt
+    assert "complete_for_declared_scope" not in user_prompt
     for forbidden in (
         "asserted_at",
         "received_at",
@@ -193,10 +195,14 @@ def test_residual_parser_rejects_duplicate_json_keys_from_model():
         parse_revision_proposal(raw, request)
 
 
-def test_no_declaration_requires_complete_coverage():
-    request, _, _ = _case("block_c", "CR-032")
+def test_no_declaration_requires_complete_coverage_even_when_coverage_is_hidden_from_model():
+    request, plan, _ = _case("block_c", "CR-032")
     request = copy.deepcopy(request)
     request["coverage"]["completeness"] = "partial"
+    view = build_revision_residual_view(request, plan)
+    _, user_prompt = render_revision_residual_prompts(view)
+    assert '"coverage"' not in user_prompt
+
     proposal = {"decision": "no_declaration", "evidence_refs": ["e1"]}
     with pytest.raises(ResidualModelError, match="complete declared-scope coverage"):
         parse_revision_proposal(json.dumps(proposal), request)
