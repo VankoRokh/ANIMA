@@ -802,6 +802,19 @@ def _validate_revision_result(value: Any, request: Mapping[str, Any], path: str)
         _closed(obj, {"kind", "evidence_refs"}, path)
         _required(obj, {"kind", "evidence_refs"}, path)
         _validate_evidence_refs(obj["evidence_refs"], request, f"{path}.evidence_refs")
+        if request["coverage"]["completeness"] != "complete_for_declared_scope":
+            raise ProcessFailure(
+                "semantic_validation",
+                "invalid_no_declaration_scope",
+                {"field": "coverage.completeness"},
+            )
+        request_evidence_refs = {item["ref"] for item in request["evidence"]}
+        if set(obj["evidence_refs"]) != request_evidence_refs:
+            raise ProcessFailure(
+                "semantic_validation",
+                "invalid_no_declaration_scope",
+                {"field": f"{path}.evidence_refs"},
+            )
         return
     if kind == "insufficient":
         _closed(obj, {"kind", "missing", "considered_evidence_refs"}, path)
