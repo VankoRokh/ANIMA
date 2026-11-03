@@ -30,6 +30,20 @@ Accepted owner decisions:
 
 The first operation profile is `classify_relation/0.1`, which compares exactly two supplied Claims and bounded Evidence without selecting truth, mutating Knowledge or choosing lifecycle actions.
 
+## Accepted JSON renderer decisions
+
+The first accepted experimental JSON renderer is [classify_relation_0_1.schema.json](../SCHEMAS/classify_relation_0_1.schema.json). The schema is a wire-shape contract, not the semantic source of truth and not a persistence schema.
+
+Accepted wire decisions:
+
+- **WR-01:** the top-level renderer accepts only `Request | Assessment`. Unsupported profile/version, malformed input, transport/backend failure and global capability mismatch remain process/preflight outcomes outside semantic Assessment. A valid requested facet may still return its own `unsupported` result.
+- **WR-02:** `EntityRef` and `PredicateRef` are tagged `resolved | unresolved` records rather than `string | null`. Unresolved identity is represented explicitly and never collapsed into absence or inequality.
+- **WR-03:** each `EvidenceView` exposes stable occurrence/version identity plus provenance roots. Replay and dependency can therefore be evaluated independently of local `EvidenceRef` aliases. Derivations may additionally carry premise refs and method identity.
+- **WR-04:** `observed_at`, `asserted_at`, `received_at` and `created_at` are separate typed markers. Each is explicitly `known | unknown`; none substitutes for Claim world-validity. A later model projection may omit unnecessary fields by whitelist without deleting them from the typed operation envelope.
+- **WR-05:** `source_ref` and `producer_ref` remain separate. Producer identity never grants source authority. Derivations may have no direct source but must preserve producer/method/premise provenance under semantic validation.
+
+The schema deliberately cannot prove cross-reference integrity, clock comparability, interval validity, unit normalization, evidence entailment, provenance independence, source authority or lifecycle permissions. Those checks remain system-owned semantic validation.
+
 ## Open decisions
 
 This ADR does **not** accept:
@@ -52,14 +66,15 @@ The first implementation must therefore remain read-only/shadow unless a later A
 - temporal uncertainty cannot silently become infinite validity or receipt-order truth;
 - deterministic cases can bypass LLM inference entirely;
 - future training targets can be generated from a stable semantic profile rather than temporary prompt/service fields;
-- legacy audits remain reproducible because their old labels are not rewritten retroactively.
+- legacy audits remain reproducible because their old labels are not rewritten retroactively;
+- the first renderer now represents unresolved references, evidence occurrence identity and the four accepted time axes without granting model authority.
 
 ### Cost
 
-- earlier provisional Stage 7 documents require explicit compatibility notes or updates;
-- the Work-proposed JSON schema must be regenerated/reviewed against the accepted naming/time decisions before it becomes an implementation contract;
 - lifecycle/write integration remains deliberately incomplete until DP-08/09/10b/11 are reviewed;
-- a new independent conformance corpus is required before LoRA/SFT.
+- JSON Schema validation is insufficient by itself; semantic/reference/provenance validators are mandatory in implementation;
+- a new independent conformance corpus is required before LoRA/SFT;
+- the renderer adds explicit structure that costs more bytes/tokens than the earlier loose JSON draft, so later model projection must stay bounded and task-specific.
 
 ## Rejected shortcuts
 
@@ -69,6 +84,8 @@ The first implementation must therefore remain read-only/shadow unless a later A
 - interpreting missing temporal bounds as unbounded;
 - using `NOT_COMPARABLE` for comparable multi-valued claims;
 - keeping `TEMPORAL_CHANGE` in the new model-facing profile despite its stronger world-change implication;
+- using `null` as a generic unresolved Entity/Predicate state;
+- counting redelivery or shared-root derived Evidence as independent support;
 - training on the current audit corpus before the contract and independent splits are stable.
 
 ## Validation gate
@@ -79,7 +96,8 @@ Before the first model-facing implementation is considered stable:
 2. require 100% conformance on deterministic-decidable reviewed fixtures;
 3. verify deterministic cases invoke no model backend;
 4. test replay/dependent evidence, unknown/unbounded time, partial coverage, adversarial source text and metamorphic permutations;
-5. measure the remaining semantic model residual;
-6. compare constrained vanilla inference before deciding on LoRA/SFT.
+5. validate JSON shape with the accepted renderer schema and semantic invariants with independent code;
+6. measure the remaining semantic model residual;
+7. compare constrained vanilla inference before deciding on LoRA/SFT.
 
-Stage 7 remains `Planned`; this ADR accepts a semantic boundary, not completed implementation.
+Stage 7 remains `Planned`; this ADR accepts a semantic boundary and experimental renderer contract, not completed implementation.
