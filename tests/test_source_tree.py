@@ -23,6 +23,7 @@ def test_source_only_tree_excludes_local_artifacts_and_keeps_pending_source(tmp_
     write(root, "tests/test_pending.py", "# legitimate pending test\n")
     write(root, "docs/ROADMAP/pending.md", "# pending docs\n")
     write(root, "docs/project.json", "{}")
+    write(root, "docs/SCHEMAS/example.schema.json", "{}")
     write(root, "config/pending.json", "{}")
     write(root, ".vscode/settings.json", "{}")
     artifacts = [
@@ -31,6 +32,7 @@ def test_source_only_tree_excludes_local_artifacts_and_keeps_pending_source(tmp_
         "models/model.gguf", "build/generated.py", "dist/generated.py", "htmlcov/index.html",
         ".coverage", ".env", ".env.production", "qwen_tool_trace.log", "random.py",
         "docs/.obsidian/settings.json", "docs/.trash/private.md", "docs/private/notes.md",
+        "docs/private/config.json", "docs/secret.json", "docs/auth.json",
         "config/credentials.json", "config/settings.local.json", "config/api_key.json", "anima/secrets.py",
         "anima/__pycache__/cache.py", "anima/build/generated.py", "tests/.cache/cache.py",
     ]
@@ -43,6 +45,7 @@ def test_source_only_tree_excludes_local_artifacts_and_keeps_pending_source(tmp_
     assert (destination / "anima/new_production_module.py").read_text() == "VALUE = 42\n"
     assert (destination / "anima/benchmarks/gateway.py").exists()
     assert (destination / "docs/project.json").exists()
+    assert (destination / "docs/SCHEMAS/example.schema.json").exists()
     assert (destination / ".vscode/settings.json").exists()
     assert (destination / "config/pending.json").exists()
     assert (destination / "tests/test_pending.py").exists()
