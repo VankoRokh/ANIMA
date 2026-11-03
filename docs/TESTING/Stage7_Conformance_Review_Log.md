@@ -10,12 +10,12 @@ Corpus: [Stage7_Conformance_Corpus_v0_Draft.md](Stage7_Conformance_Corpus_v0_Dra
 |---|---:|---|---|
 | A — Atomic CONTENT relations | CR-001…CR-016 | **Accepted** | 2026-11-03 |
 | B — Temporal CONTENT relations | CR-017…CR-026 | **Accepted with clarifications** | 2026-11-03 |
-| C — REVISION / correction | CR-027…CR-034 | Pending review | — |
+| C — REVISION / correction | CR-027…CR-034 | **Accepted with clarifications** | 2026-11-03 |
 | D — Evidence identity / replay / dependence | CR-035…CR-040 | Pending review | — |
 | E — Comparability / sufficiency / capability | CR-041…CR-045 | Pending review | — |
 | F — Protocol / boundary / security | CR-046…CR-050 | Pending review | — |
 
-Current progress: **26 / 50 root cases accepted.**
+Current progress: **34 / 50 root cases accepted.**
 
 ## Accepted Block A invariants
 
@@ -49,3 +49,22 @@ Additional accepted temporal invariants:
 - richer cross-time inference for registry-declared invariant predicates remains `UNSUPPORTED` in profile `0.1` until a dedicated capability is accepted.
 
 No accepted Block B case infers truth, lifecycle revision or source authority from temporal ordering alone.
+
+## Accepted Block C invariants
+
+The owner accepted CR-027…CR-034 with the following clarifications, normative for fixture expansion:
+
+- **CR-030:** the primary root is deterministic. All relevant supplied structured evidence records explicitly carry `declaration_status=absent`, coverage is `complete_for_declared_scope`, and the result is `REVISION=no_declaration_in_scope` with backend calls = 0. A separate mandatory natural-language variant (`CR-030-M`) may exercise model residual on a complete text fragment that contains no correction declaration.
+- **CR-032:** the primary root isolates **correction intent** ambiguity while source attribution is known, so the exact expected result is `REVISION=INSUFFICIENT(correction_intent)`. A separate variant isolates ambiguous source attribution and expects `INSUFFICIENT(source_attribution)`.
+- **CR-033:** `UNSUPPORTED` applies specifically when the requested revision question requires interpreting a **reported third-party correction act** (for example Alice reports that Bob corrected A to B). Such evidence must not be reclassified as Alice's own direct `CORRECTION`. This does not mean the report is unsupported for every other possible operation/profile.
+
+Additional accepted revision invariants:
+
+- structured correction declaration and content contradiction may coexist as independent facet results;
+- explicit correction can remain known when CONTENT is insufficient, demonstrating that facets do not share one universal resolved/unresolved state;
+- truncated evidence cannot justify `no_declaration_in_scope`;
+- correction-like language with unresolved intent/attribution must abstain with the precise gap rather than manufacture a declaration;
+- retraction without replacement is outside correction v0 and requires an explicit future capability rather than an invented replacement Claim;
+- `CORRECTION` never itself selects truth, grants source authority or performs Knowledge supersession.
+
+No accepted Block C case authorizes lifecycle mutation from the relation assessment alone.
