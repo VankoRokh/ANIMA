@@ -8,14 +8,22 @@ still require language semantics. It never writes Knowledge or invokes a model.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import date
 from decimal import Decimal
+from fractions import Fraction
+import re
 from typing import Any, Mapping
 
 from .validation import SUPPORTED_PROFILE, ProcessFailure, parse_and_validate_request
 
 
 NOT_REQUESTED = {"kind": "not_requested"}
+_RFC3339_RE = re.compile(
+    r"^(?P<date>\d{4}-\d{2}-\d{2})T"
+    r"(?P<hour>\d{2}):(?P<minute>\d{2}):(?P<second>\d{2})"
+    r"(?:\.(?P<fraction>\d+))?"
+    r"(?P<zone>Z|[+-]\d{2}:\d{2})$"
+)
 
 
 @dataclass(frozen=True)
@@ -44,7 +52,9 @@ class ExactUnitRegistry:
         right_def = self.units.get(right_unit)
         if not left_def or not right_def or left_def[0] != right_def[0]:
             return None
-        return left_value * left_def[1] == right_value * right_def[1]
+        left_exact = Fraction(left_value) * Fraction(left_def[1])
+        right_exact = Fraction(right_value) * Fraction(right_def[1])
+        return left_exact == right_exact
 
 
 @dataclass(frozen=True)
@@ -373,13 +383,42 @@ class DeterministicRelationEvaluator:
             )
         return left["value"] == right["value"]
 
+    @staticmethod
+    def _rfc3339_value(text: str) -> Fraction:
+        match = _RFC3339_RE.fullmatch(text)
+        if match is None:
+            raise ValueError(f"Unsupported RFC3339 timestamp: {text!r}")
+
+        day = date.fromisoformat(match.group("date"))
+        hour = int(match.group("hour"))
+        minute = int(match.group("minute"))
+        second = int(match.group("second"))
+        whole_seconds = ((day.toordinal() * 24 + hour) * 60 + minute) * 60 + second
+
+        fraction_text = match.group("fraction") or ""
+        fraction = (
+            Fraction(int(fraction_text), 10 ** len(fraction_text))
+            if fraction_text
+            else Fraction(0, 1)
+        )
+
+        zone = match.group("zone")
+        offset_seconds = 0
+        if zone != "Z":
+            sign = 1 if zone[0] == "+" else -1
+            offset_hours = int(zone[1:3])
+            offset_minutes = int(zone[4:6])
+            offset_seconds = sign * (offset_hours * 3600 + offset_minutes * 60)
+
+        return Fraction(whole_seconds - offset_seconds, 1) + fraction
+
     def _timepoint_cmp(
         self, left: Mapping[str, Any], right: Mapping[str, Any]
     ) -> int | None:
         if left["clock"] != right["clock"]:
             return None
-        left_time = datetime.fromisoformat(left["value"].replace("Z", "+00:00"))
-        right_time = datetime.fromisoformat(right["value"].replace("Z", "+00:00"))
+        left_time = self._rfc3339_value(left["value"])
+        right_time = self._rfc3339_value(right["value"])
         return (left_time > right_time) - (left_time < right_time)
 
     def _start_boundary(self, scope: Mapping[str, Any]) -> _Boundary:
