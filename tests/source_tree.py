@@ -14,7 +14,7 @@ import subprocess
 _ROOT_FILES = {"README.md", "main.py", ".gitignore"}
 _ROOT_SUFFIXES = {
     "anima": {".py"}, "tests": {".py"}, "scripts": {".py", ".sh"},
-    "config": {".json"}, ".vscode": {".json"}, "docs": {".md"},
+    "config": {".json"}, ".vscode": {".json"}, "docs": {".md", ".json"},
 }
 # These are never source subdirectories, even when a filename looks like source.
 _ARTIFACT_DIRS = {"__pycache__", "node_modules", "__pypackages__", "venv", "env",
@@ -42,8 +42,6 @@ def _allowed(path):
         return False
     if len(parts) == 1:
         return path.name in _ROOT_FILES or (path.name.startswith("requirements") and path.suffix == ".txt")
-    if path == Path("docs/project.json"):
-        return True
     return (not path.name.startswith(".") and parts[0] in _ROOT_SUFFIXES
             and path.suffix in _ROOT_SUFFIXES[parts[0]])
 
