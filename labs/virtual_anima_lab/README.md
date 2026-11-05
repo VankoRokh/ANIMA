@@ -1,4 +1,4 @@
-# Virtual ANIMA Lab — P5-A standalone feasibility
+# Virtual ANIMA Lab — isolated P5-A and P5-B feasibility
 
 **Status:** Godot real headless smoke **owner-reported PASS** (9/9 checks, 22 commands, seed 7) and **GUI dual-actor controls owner-reported PASS**. Exact tested Git SHA and independent unit/full regression output are not yet supplied; no ANIMA Core integration.  
 **Branch:** `work/val-p5a-godot-feasibility`.  
@@ -163,6 +163,52 @@ unobserved door states. No in-process Core source registry receives these yet.
   after a crash. These belong to later P5/P6 work.
 - Python client tests can pass with no Godot installed; P5-A only passes when
   the **real headless smoke** and a **visual keyboard check** have both passed.
+
+## P5-B experimental typed world contract
+
+**Status:** implemented, **Godot execution unverified**. P5-A `val.bridge/0.1`
+remains supported for the original controllers and smoke tests. The *new*
+`val.bridge/0.2` must be selected explicitly through
+`LabClient(protocol="val.bridge/0.2")`.
+
+P5-B adds an **epoch** (changes on world reset), conditional **revision**,
+monotonic process-local **event IDs**, a paged operator journal, an observation
+record with source/producer/observer identity and spatial readings, and
+`act` with a bound `operation_id`. Duplicate admitted actions replay the
+original receipt without moving the agent again. A stale world precondition
+fails closed; an operation ID with different content is rejected.
+
+`val.receipt/0.1` is **not independent verification of any ANIMA Goal**.
+The keyed ledger lives in Godot RAM only: do not infer crash-safe exactly-once
+or actual caller authentication from these tests.
+
+The Godot window now displays a **developer-only diagnostics panel**:
+world truth, last agent observation metadata and recent event IDs. That
+panel must not be treated as information available to ANIMA.
+
+See the full [P5-B contract specification](../../docs/ROADMAP/Virtual_ANIMA_Lab_P5B_World_Contracts_Draft.md).
+
+### P5-B verification
+
+From the new P5-B branch:
+
+```bash
+bash scripts/check.sh
+.venv/bin/python -m pytest -q tests/test_val_p5a_client.py tests/test_val_p5b_contracts.py
+
+GODOT_BIN="$HOME/.local/opt/godot/Godot_v4.7.2-stable_linux.x86_64"
+"$GODOT_BIN" --headless --path labs/virtual_anima_lab/godot \
+  --script res://BridgeV2ContractTest.gd
+
+report_dir="$(mktemp -d)"
+.venv/bin/python labs/virtual_anima_lab/python/p5b_smoke.py \
+  --godot "$GODOT_BIN" --seed 7 --report-dir "$report_dir"
+cat "$report_dir/summary.md"
+```
+
+**No Core integration.** Run the original P5-A smoke and live GUI after the
+new v0.2 tests, so a new protocol cannot silently break our established
+visual/world fixtures.
 
 ## Tests and next gate
 
