@@ -1,6 +1,6 @@
 # Virtual ANIMA Lab — P5-B Versioned World Contracts
 
-**Status:** **P5-B typed Python controller live bridge PASS (owner-reported: 24/24 admitted moves); negative contract/headless gates V2–V8 PENDING**. The P5-B branch is not yet accepted or independently verified.  
+**Status:** **P5-B real Godot↔Python headless integration PASS (owner-reported: 10/10 checks, 29 requests)** and typed GUI controller 24/24 moves PASS. Remaining evidence gates: native Godot V2, standalone Python V3, P5-A regression V1 and full-suite V8; exact tested SHA not provided. The branch is not yet formally accepted or independently audited.  
 **Date:** 2026-11-05.  
 **Branch:** `work/val-p5b-world-contracts` (based on last owner-observed P5-A doc commit `788a04c3d93f59e05068474572044f577f9cfcb8`).  
 **Scope:** isolated P5 Lab only. **No import of `anima` and no changes to Core, Stage6 execution, Goals, Belief, Memory, or `docs/project.json`.**  
@@ -158,10 +158,7 @@ The same operator fixture controls (`human_move`, `set_door`, `pause`,
 | V7 | Reset, epoch and truncated event sequence | No old-epoch action accepted, IDs not reused, bounded diagnostics |
 | V8 | `scripts/check.sh` and full Python regression | Existing Core unaffected; clean checked SHA provided |
 
-**Status of V1:** prior P5-A functional feasibility PASS owner-reported,
-re-run regression on this change pending. **V2–V8: not yet executed** in the
-authoring environment. No number of passing tests or closed-stage claim is
-invented.
+**Owner-reported on the P5-B working tree:** V4 PASS (10/10 check groups, 29 requests); smoke directly exercises V5 and V6 and the reset/epoch and paged-event portions of V7. Earlier P5-A GUI success and P5-B 24/24 typed controller moves were also reported. **Still not supported by provided output:** V1 P5-A headless rerun on this branch; V2 native Godot-only contract test; V3 Python unit contracts; V7 truncation/expired cursor stress specifically; V8 full regression; exact tested SHA/clean checkout. This is not independent verification and does not imply P6 readiness.
 
 ## 4.1 First owner-side v0.2 controller result (2026-11-05)
 
@@ -180,6 +177,32 @@ failure, reset/epoch behavior, event paging, operator interventions during the
 v0.2 run, GUI diagnostic display, standalone native Godot contract test,
 full `p5b_smoke.py` run, complete `pytest` regression, or exact tested SHA.
 Those gates remain open. No Core integration was present.
+
+## 4.2 Owner-local real headless acceptance (2026-11-05)
+
+The owner supplied the exact terminal summary and Markdown result of
+`python/p5b_smoke.py` against the real `val.bridge/0.2`:
+
+- **PASS**, 10/10 check groups, **29 requests**;
+- `versioned_observation_provenance`;
+- `operator_debug_separation`;
+- `keyed_replay_without_duplicate_effect`;
+- `collision_and_stale_preconditions`;
+- `blocked_action_receipt_not_success`;
+- `external_intervention_invalidates_revision`;
+- `readback_is_not_execution_receipt`;
+- `monotonic_paginated_event_log`;
+- `epoch_prevents_old_world_actions`;
+- `p5a_compatibility_profile_retained`.
+
+These observed assertions support the **in-process** contract and successful
+legacy protocol handshake within the new test. They do **not** prove
+durability over Godot process termination, authentication of self-declared
+roles, provenance authority within Core, independent goal verification,
+bounded-log expiration, or the full set of separately defined V1/V2/V3/V8
+gates. The owner has not supplied the run's `git rev-parse HEAD`,
+`git status --short`, complete `trace.jsonl`/`godot.log` or native
+Godot test output. Do not misstate this as a final release gate.
 
 ## 5. Local verification (from repo root)
 
