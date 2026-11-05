@@ -280,7 +280,7 @@ def test_p2b_upgrades_p2a_schema_without_losing_prior_events(tmp_path):
     with sqlite3.connect(db) as connection:
         assert connection.execute(
             "SELECT value FROM schema_meta WHERE key='schema_version'"
-        ).fetchone()[0] == "2"
+        ).fetchone()[0] == "3"
 
 
 def test_p2b_projection_is_opt_in_and_does_not_touch_legacy_store(tmp_path):
