@@ -418,3 +418,39 @@ def test_p4b_multi_episode_cold_restart_and_noise_stay_bounded(
     assert all(a["outcome"] == "VERIFIED_SUCCESS" for a in attempts)
     assert len(core.core_decision.tasks.list_tasks()) == 12
     assert core.runtime.run_core_autonomous().turns == ()
+
+
+
+def test_p4b_operator_completed_goal_does_not_invent_core_evidence(tmp_path):
+    core = _core(tmp_path)
+    goal = core.internal_state.goals.create_goal(
+        source="test.operator", priority=5, description="operator resolved",
+        success_criterion="closed", reason="P4-B external resolution",
+    )
+    def stop(_goal_id):
+        raise RuntimeError("P4-B crash before decision")
+
+    core.core_autonomy.executor.run = stop
+    with pytest.raises(RuntimeError, match="P4-B crash before decision"):
+        core.runtime.bind_core_goal(GoalCriterion(
+            goal_id=goal["id"], subject_ref=DOOR_SUBJECT,
+            predicate_ref=DOOR_PREDICATE, expected=dict(EXPECTED),
+        ))
+    assert core.core_autonomy.attempts()[0]["status"] == "started"
+    assert _effects(core) == 0
+    core.internal_state.goals.transition_goal(
+        goal["id"], to_status="completed",
+        reason="explicit operator success; no Core sensor proof",
+    )
+
+    restarted = _core(tmp_path)
+    restarted.runtime.wake()
+    attempt = restarted.core_autonomy.attempts()[0]
+    assert attempt["status"] == "finished"
+    assert attempt["outcome"] == "DEFERRED"
+    assert attempt["reason_code"] == "COMPLETED_WITHOUT_CORE_PROOF"
+    assert attempt["operation_id"] is None
+    assert attempt["evidence_event_id"] is None
+    assert restarted.core_execution._proof(goal["id"]) is None
+    assert _effects(restarted) == 0
+    assert restarted.core_autonomy.pending_count() == 0
