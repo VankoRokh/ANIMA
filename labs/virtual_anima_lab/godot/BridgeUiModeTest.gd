@@ -74,14 +74,14 @@ func _initialize() -> void:
 	):
 		_fail(lab, "presentation toggle changed world state")
 		return
-	var denied := lab._request(JSON.stringify({
+	var denied: Dictionary = lab._request(JSON.stringify({
 		"protocol": "val.bridge/0.2", "id": 11,
 		"role": "agent", "op": "inspect",
 	}))
 	if denied["ok"] or denied["error"] != "FORBIDDEN":
 		_fail(lab, "normal view weakened agent source boundary")
 		return
-	var permitted := lab._request(JSON.stringify({
+	var permitted: Dictionary = lab._request(JSON.stringify({
 		"protocol": "val.bridge/0.2", "id": 12,
 		"role": "operator", "op": "inspect",
 	}))
