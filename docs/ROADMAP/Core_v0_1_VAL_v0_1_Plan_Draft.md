@@ -6,6 +6,8 @@
 **Назначение:** закрепить последовательность работ до начала изменений production-кода.  
 **Источник статусов Stage:** [project.json](../project.json); данный документ **не** меняет статусы или зависимости текущего Roadmap.
 
+**P0 code-reading audit / proposed Core boundary:** [Core v0.1 — P0 Boundary & Reuse Audit](Core_v0_1_P0_Boundary_Draft.md). Это рабочая спецификация границ и рисков; P0 gate остаётся открытым до её принятия и baseline проверки.
+
 Связанные материалы: [Roadmap](README.md), [реализованная архитектура](../ARCHITECTURE/README.md), [Stage 6](Stage_6_Cognitive_Integration_Core.md), [Stage 7 Semantic Boundary](Stage_7_Semantic_Boundary_v0.md), [ADR-010](../DECISIONS/ADR-010_Stage_7_Semantic_Boundary.md), [тестирование](../TESTING/README.md).
 
 ## 1. Цель и критерий первой работоспособной версии
