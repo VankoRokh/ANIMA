@@ -1,6 +1,5 @@
 """P2-C end-to-end: opt-in Core ingress through Runtime and safe legacy replay."""
 
-import json
 import sqlite3
 
 import pytest
@@ -135,12 +134,6 @@ def test_p2c_crash_between_legacy_steps_recovers_without_duplicate(tmp_path, sta
 
 def test_p2c_crash_before_legacy_append_keeps_pending_and_resumes(tmp_path):
     first = _core(tmp_path)
-    def fail(at, event_id):
-        if at == "after_legacy_append":
-            # Simulate I/O crash before any log bytes persist by stopping
-            # before the dispatcher explicitly writes: use EventLog.write fault.
-            pass
-
     original_write = first.event_log.write
 
     def fail_write(event):
@@ -275,3 +268,26 @@ def test_p2c_raw_invalid_source_stays_out_of_legacy_memory(tmp_path):
     assert core.core_events.ingress.pending_event_ids() == ()
     assert core.event_log.load_events() == []
     assert core.memory.count() == 0
+
+
+def test_p2c_crash_after_durable_ack_recovers_runtime_counter(tmp_path):
+    first = _core(tmp_path)
+
+    def fail(at, event_id):
+        if at == "after_core_ack":
+            raise RuntimeError("controlled crash after core ack")
+
+    first.core_events.fault_hook = fail
+    with pytest.raises(RuntimeError, match="controlled crash after core ack"):
+        first.runtime.ingest_core_event(_event(), source_ref=SOURCE)
+    assert first.core_events.ingress.pending_event_ids() == ()
+    assert first.runtime.snapshot()["state"]["events_processed"] == 0
+    assert len(first.event_log.load_events()) == 1
+
+    second = _core(tmp_path)
+    second.runtime.wake()
+    assert second.runtime.snapshot()["state"]["events_processed"] == 2
+    assert second.core_events.ingress.pending_event_ids() == ()
+    assert len([r for r in second.event_log.load_events()
+                if r["type"] == "world.observation"]) == 1
+    assert second.runtime.read_core_belief(SUBJECT, PREDICATE)["revision"] == 1
