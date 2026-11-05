@@ -21,6 +21,7 @@ P4_MODULES = (
     "tests/test_core_p4_acceptance.py",
     "tests/test_core_p4c_release.py",
     "tests/test_core_p4_report.py",
+    "tests/test_core_audit_blockers.py",
 )
 CORE_MODULES = P4_MODULES + (
     "tests/test_core_p3c_autonomy.py",
@@ -54,6 +55,14 @@ P4_REQUIRED = (
     "test_p4c_bounded_no_work_idle_does_not_mutate_world",
     "test_p4c_readonly_belief_unknown_without_event_and_no_goal",
     "test_p4c_registered_untrusted_source_cannot_forge_door_completion",
+    "test_core_audit_b1_atomic_prepare_failure_rolls_back_all_rows",
+    "test_core_audit_b1_os_exit_inside_atomic_prepare_recovers",
+    "test_core_audit_b1_legacy_missing_spec_is_local_and_next_goal_progresses",
+    "test_core_audit_b2_cancel_after_proof_does_not_poison_other_goals[goal]",
+    "test_core_audit_b2_cancel_after_proof_does_not_poison_other_goals[task]",
+    "test_core_audit_b3_same_runtime_retry_uses_identical_stage2_request",
+    "test_core_audit_b4_blocked_to_active_resumes_parked_goal",
+    "test_core_audit_t1_mandatory_test_identity_includes_module",
 )
 
 
