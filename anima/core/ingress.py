@@ -20,7 +20,7 @@ from anima.core.belief import BeliefProjection, PropertyRule
 
 
 CONTRACT = "core.event/0.1"
-SCHEMA_VERSION = 2
+SCHEMA_VERSION = 3
 MAX_PAYLOAD_BYTES = 16_384
 _REF = re.compile(r"[a-zA-Z][a-zA-Z0-9._/@-]{0,127}\Z")
 _SCHEMA = """
@@ -50,6 +50,13 @@ CREATE TABLE IF NOT EXISTS ingress_rejections (
     received_at TEXT NOT NULL,
     source_ref TEXT,
     reason_code TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS core_dispatch_receipts (
+    event_id TEXT PRIMARY KEY REFERENCES core_events(event_id),
+    disposition TEXT NOT NULL CHECK (
+        disposition IN ('forwarded', 'filtered')
+    ),
+    acknowledged_at TEXT NOT NULL
 );
 """
 
@@ -158,8 +165,8 @@ class CoreIngress:
                 row = connection.execute(
                     "SELECT value FROM schema_meta WHERE key = 'schema_version'"
                 ).fetchone()
-                if row["value"] == "1":
-                    # P2-A -> P2-B: additive, idempotent schema upgrade.
+                if row["value"] in {"1", "2"}:
+                    # Additive migrations v1/v2 -> v3; preserve the event journal.
                     connection.execute(
                         "UPDATE schema_meta SET value=? WHERE key='schema_version'",
                         (str(SCHEMA_VERSION),),
@@ -304,13 +311,70 @@ class CoreIngress:
             "content_sha256": row["content_sha256"],
         }
 
-    def pending_event_ids(self):
-        """Read-only; P2-C will define dispatch acknowledgements/reconciliation."""
+    def pending_event_ids(self, *, limit=None):
+        """Unacknowledged outbox records in append order, optionally bounded."""
+        if limit is not None and (type(limit) is not int or limit < 1):
+            raise ValueError("pending_event_ids limit must be a positive integer")
+        query = (
+            "SELECT o.event_id FROM core_outbox AS o"
+            " LEFT JOIN core_dispatch_receipts AS r ON o.event_id = r.event_id"
+            " WHERE o.status='pending' AND r.event_id IS NULL"
+            " ORDER BY o.rowid"
+        )
+        parameters = ()
+        if limit is not None:
+            query += " LIMIT ?"
+            parameters = (limit,)
         with closing(self._connect()) as connection:
-            rows = connection.execute(
-                "SELECT event_id FROM core_outbox WHERE status='pending' ORDER BY rowid"
-            ).fetchall()
+            rows = connection.execute(query, parameters).fetchall()
         return tuple(row["event_id"] for row in rows)
+
+    def acknowledge_dispatch(self, event_id, *, disposition):
+        """Only trusted bridge calls this after legacy projection is durable.
+
+        A receipt is the authoritative completion marker; the original outbox
+        request remains immutable. Missing/mismatched acknowledgements fail.
+        """
+        if disposition not in {"forwarded", "filtered"}:
+            raise ValueError("Invalid Core dispatch disposition")
+        with closing(self._connect()) as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            try:
+                row = connection.execute(
+                    "SELECT disposition FROM core_dispatch_receipts WHERE event_id=?",
+                    (event_id,),
+                ).fetchone()
+                if row is not None:
+                    if row["disposition"] != disposition:
+                        raise ValueError("Core dispatch acknowledgment conflict")
+                    changed = False
+                else:
+                    pending = connection.execute(
+                        "SELECT 1 FROM core_outbox WHERE event_id=? AND status='pending'",
+                        (event_id,),
+                    ).fetchone()
+                    if pending is None:
+                        raise ValueError("Unknown Core outbox event")
+                    connection.execute(
+                        "INSERT INTO core_dispatch_receipts("
+                        "event_id, disposition, acknowledged_at) VALUES (?, ?, ?)",
+                        (event_id, disposition, self._now()),
+                    )
+                    changed = True
+                connection.commit()
+            except BaseException:
+                connection.rollback()
+                raise
+        return changed
+
+    def dispatch_receipt(self, event_id):
+        with closing(self._connect()) as connection:
+            row = connection.execute(
+                "SELECT disposition, acknowledged_at FROM core_dispatch_receipts"
+                " WHERE event_id=?",
+                (event_id,),
+            ).fetchone()
+        return None if row is None else dict(row)
 
     def read_belief(self, subject_ref, predicate_ref, *, as_of_tick=None):
         if self.beliefs is None:
