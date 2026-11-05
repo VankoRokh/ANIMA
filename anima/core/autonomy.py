@@ -5,7 +5,6 @@ Stage6 execution ledger, independent observation and verifier. There is no
 background thread, LLM-generated Goal or unrestricted environment access.
 """
 
-import sqlite3
 from contextlib import closing
 from dataclasses import dataclass
 from datetime import datetime, timezone
