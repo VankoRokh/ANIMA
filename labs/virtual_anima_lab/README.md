@@ -226,7 +226,7 @@ visual/world fixtures.
 
 ## P5-C scenario profiles and deterministic script replay
 
-**Status: work branch only; real-Godot and full regression tests pending.**
+**Status: owner-reported REAL-GODOT REPLAY PASS (4/4 scenarios × 2 identical runs) and FULL PYTEST PASS (1450/1450, 0 failed) on clean code SHA `e995169e61385a3e1c2e44a60b27e6bf501211e2`. Native Godot-only contract test, legacy P5-A/P5-B reruns on P5-C and new GUI variants remain pending.**
 
 The default world remains `base` and retains P5-A/P5-B behavior. To inspect
 two additional fixed spatial variants, launch Godot with
