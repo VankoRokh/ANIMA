@@ -113,7 +113,7 @@ demo_closed="$(mktemp -d)"
 .venv/bin/python -m anima.core.demo_p3c --data-dir "$demo_closed" --initial-state closed
 ```
 
-The structured output contains `stage=bootstrap`, `goal_registered`, `decision`, `scheduler_attempt`, optional `execution_ledger`, and `result`. `operator_ground_truth` is explicitly **privileged test operator context**, not input to the Core decision system.
+**В P4-A формат демонстрации изменён:** по умолчанию выводится читаемый терминальный отчёт с проверками PASS/FAIL. Для прежнего машинного JSONL использовать `--format json`. Для сохранения Markdown — `--report-md <file>` (без перезаписи существующего файла), для привязки к commit — `--snapshot "$(git rev-parse HEAD)"`. Детали и тесты находятся в [P4-A reporting](Core_v0_1_P4_Integrated_Acceptance_Draft.md). В JSONL по-прежнему есть `stage=bootstrap`, `goal_registered`, `decision`, `scheduler_attempt`, optional `execution_ledger`, `result`. `operator_ground_truth` — привилегированный контекст испытателя, не вход в Core.
 
 **P3-C owner-local acceptance (2026-11-05):** владелец подтвердил успешное выполнение всех предложенных проверок и прислал два самостоятельных демонстрационных JSONL-прогона. Формальные итоги targeted/full `pytest`, `scripts/check.sh` и точный локальный SHA не предоставлены; не выдавать эти числа за известные или за CI.
 
