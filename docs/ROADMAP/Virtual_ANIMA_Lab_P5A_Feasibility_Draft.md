@@ -1,6 +1,6 @@
 # Virtual ANIMA Lab — P5-A Independent Godot Feasibility
 
-**Status:** **IMPLEMENTED IN WORK BRANCH / UNVERIFIED IN GODOT**. This is NOT P5 Complete, NOT P6, and does not change the accepted Core v0.1 release status.  
+**Status:** **P5-A real-Godot headless smoke PASS (owner-reported); GUI keyboard/Human + live Python ANIMA interaction PENDING**. This is NOT P5 Complete, NOT P6, and does not change the Core v0.1 independent-audit gate.  
 **Date:** 2026-11-05.  
 **Branch:** `work/val-p5a-godot-feasibility`, branched from the exact Core audit-fixes owner-tested snapshot `b639a52281eeaece1b5b00d8223d8f31bd492ca1`. Production `anima/`, Core stores, `docs/project.json` and official Stage statuses remain untouched.  
 **Plan:** [Core v0.1 / VAL v0.1](Core_v0_1_VAL_v0_1_Plan_Draft.md) §4 P5/P6; independent prototype: [`labs/virtual_anima_lab/README.md`](../../labs/virtual_anima_lab/README.md).
@@ -15,7 +15,7 @@ Why test it first:
 - Standard Linux binary supports interactive and headless operation.
 - MIT license; no Godot engine internals or custom renderer are maintained by ANIMA.
 
-**Not yet established by testing:** correct Godot runtime import/parser, local Linux visual behavior, headless bridge interoperability or deterministic replay; those are the P5-A owner-run gates below. Alternative MultiGrid remains fallback if Godot fails required P5 acceptance, not an implementation target now.
+**Owner-run evidence now supplied:** Godot 4.7.2 native protocol regression PASS, followed by actual Godot↔Python headless smoke PASS with seed 7 and 22 protocol commands. A real GUI Human keyboard + simultaneous Python-controlled ANIMA test remains **PENDING**; headless smoke is not a substitute for it. Exact Git commit for the smoke run was not provided, so the successful run is not yet SHA-pinned. Alternative MultiGrid remains fallback if Godot fails required P5 acceptance, not an implementation target now.
 
 ## 2. Isolated implementation
 
@@ -57,6 +57,35 @@ Pause blocks Human and ANIMA movement; explicit `step` increments logical time; 
 | F10 | Python framing unit tests and existing regression | No imported Core coupling; no unexpected Core tests regressed |
 
 **P5-A acceptance is blocked until F1–F10 pass on a real local Godot binary.** Passing `pytest` alone is insufficient.
+
+## 4.1 Owner-local runtime results (2026-11-05)
+
+Reported **after** the numeric JSON identifier correction:
+
+- Real Godot version `4.7.2.stable.official.ed1daf0bf`: `BridgeProtocolTest.gd` reported `VAL_BRIDGE_ID_CONTRACT_PASS`. Its first invocation emitted off-tree resource leak warnings; a cleanup change was subsequently committed but a separate post-cleanup Godot test was not provided.
+- Real `smoke.py` headless integration: `Result: PASS`, protocol `val.p5a.acceptance/0.1`, world `p5a-grid/0.1`, seed `7`, **22 commands**.
+- Its reported Markdown summary lists **9/9 checks PASS**: independent actor positions, restricted observable state, protocol role guard, pause/step, walls/door collision, operator door intervention, follow-up observation, seeded reset, Human/ANIMA event trace.
+- Evidence provided in chat is the terminal summary and `summary.md` excerpt. **Exact tested Git SHA, full `trace.jsonl`, `summary.json`, `godot.log` and interactive GUI keyboard run were not provided.** Do not claim these were independently inspected.
+- This result closes the **headless Godot feasibility subgate only**. The real GUI/keyboard independence F1–F2 and any unreported full-regression F10 remain pending. `F3` protocol version negative check is not separately demonstrated by this smoke.
+
+### Next owner-side gate — two independent live actors
+
+Start the real Godot GUI and verify visually that a blue Human moves with WASD/arrows, a green ANIMA moves **only** from separate Python controller, Human can still move while the controller runs, the two actors do not overlap walls or occupy one cell, and Human E toggles the door when adjacent. If two input routes work but use the same player state, this gate must fail.
+
+```bash
+GODOT_BIN="$HOME/.local/opt/godot/Godot_v4.7.2-stable_linux.x86_64"
+"$GODOT_BIN" --path labs/virtual_anima_lab/godot -- \
+  --lab-port 46019 --lab-seed 7
+```
+
+Second terminal:
+
+```bash
+.venv/bin/python labs/virtual_anima_lab/python/controller.py \
+  --port 46019 --auto --steps 24 --interval 0.65
+```
+
+Also record `git rev-parse HEAD`, `git status --short`, visual outcome and any Godot parser/runtime warnings. Only after GUI and outstanding F-gates pass may P5-A be marked accepted.
 
 ## 5. Run locally
 
@@ -107,10 +136,7 @@ A follow-up branch commit now:
 - adds a **real Godot parser** regression in
   `godot/BridgeProtocolTest.gd` and Python mock-transport checks.
 
-**Not yet claimed as fixed in execution:** restart the Godot process after
-updating source, run the Godot script regression + pytest + headless smoke
-before setting any F-gate to PASS. The problem is unrelated to Intel/NVIDIA
-rendering.
+**Owner-side confirmation:** real Godot parser regression and headless smoke have since reported PASS. The tested snapshot was not explicitly pinned by SHA in the report; GUI acceptance is separate. The problem is unrelated to Intel/NVIDIA rendering.
 
 ## 6. Known gates before P6
 
