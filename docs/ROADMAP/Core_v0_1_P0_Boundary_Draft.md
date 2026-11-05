@@ -1,6 +1,6 @@
 # ANIMA Core v0.1 — P0 Boundary & Reuse Audit
 
-**Статус:** P0 architecture direction approved by owner; P1–P4-B checked through documented gates, P4-B exact-SHA owner-local 1373/1373 PASS; P4-C release-candidate gate still pending. No Core v0.1 Complete claim.  
+**Статус:** P0 direction approved; P4-C stock acceptance 1380/1380 on exact SHA, but independent Work audit confirmed B1–B4 and set release gate to BLOCKED. Audit fixes in `work/core-v0-1-audit-fixes` are UNVERIFIED; Core v0.1 is not Complete.  
 **Дата:** 2026-11-05.  
 **Исходный code snapshot:** `e2a1e6bfdb6126b82ac36873dce92e7c6876aa4b` на `work/stage7-semantic-boundary-v0`.  
 **Исходная ветка планирования:** `work/core-v0-1-planning` (только документация). Дальнейшие реализации — отдельные work branches.  
@@ -16,7 +16,8 @@
 **P3-C owner-reported PASS (two demo traces, pytest counts/SHA not supplied):** [Bounded Autonomous Event Loop](Core_v0_1_P3C_Autonomous_Loop_Draft.md).
 **P4-A owner-reported PASS (exact SHA and test counts not supplied):** [Integrated Acceptance and Readable Diagnostics](Core_v0_1_P4_Integrated_Acceptance_Draft.md).
 **P4-B owner-local PASS (exact tested commit `f6536f3`, 1373/1373 tests, mandatory 12/12):** [Repeated Restarts / Scheduler Recovery](Core_v0_1_P4B_Endurance_Recovery_Draft.md).
-**P4-C implementation / tests pending:** [Seeded Release Candidate Acceptance](Core_v0_1_P4C_Release_Gate_Draft.md).  
+**P4-C owner-local 1380/1380 PASS but release BLOCKED by independent audit:** [Seeded Release Candidate Acceptance](Core_v0_1_P4C_Release_Gate_Draft.md).
+**B1–B4 fixes / tests pending:** [Independent Work Audit Remediation](Core_v0_1_Independent_Audit_Remediation_Draft.md).  
 **Референс реализованной архитектуры:** [Architecture](../ARCHITECTURE/README.md).  
 **Актуальные статусы:** [project.json](../project.json); никакой Stage не объявляется закрытым этим документом.
 
