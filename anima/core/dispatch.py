@@ -124,6 +124,7 @@ class CoreEventDispatcher:
             self._fault("after_legacy_projection", event_id)
 
             self.ingress.acknowledge_dispatch(event_id, disposition="forwarded")
+            self._fault("after_core_ack", event_id)
             turns.append(CoreDispatchTurn(event_id, "forwarded"))
 
         return tuple(turns)
