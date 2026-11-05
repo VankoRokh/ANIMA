@@ -260,6 +260,13 @@ class CoreAutonomy:
                 if row is None or row["status"] == "started":
                     outstanding.append((rank, goal_id))
             if not outstanding:
+                # A blocked Goal is temporarily unavailable, not terminal.
+                # Parking its original trigger preserves wake/rebind/restart
+                # recovery without inventing another Goal or Task identity.
+                if trigger["kind"] == "goal":
+                    target = self.decisions.goals.get_goal(trigger["reference_id"])
+                    if target is not None and target["status"] == "blocked":
+                        continue
                 connection.execute(
                     "UPDATE core_auto_triggers SET status='done'"
                     " WHERE trigger_key=?",
