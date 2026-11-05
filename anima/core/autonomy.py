@@ -41,6 +41,11 @@ CREATE TABLE IF NOT EXISTS core_auto_attempts (
     updated_at TEXT NOT NULL,
     PRIMARY KEY(trigger_key, goal_id)
 );
+CREATE TABLE IF NOT EXISTS core_parked_goal_triggers (
+    goal_id TEXT PRIMARY KEY,
+    trigger_key TEXT NOT NULL UNIQUE REFERENCES core_auto_triggers(trigger_key),
+    parked_at TEXT NOT NULL
+);
 """
 
 
@@ -104,6 +109,37 @@ class CoreAutonomy:
             (_now(),),
         )
 
+    def _restore_parked_goals(self, connection):
+        """Rearm original Goal trigger only after explicit Stage2 reactivation.
+
+        Parked rows are out of the runnable queue: a large collection of
+        blocked Goals cannot permanently hide unrelated pending work.
+        """
+        parked = connection.execute(
+            "SELECT goal_id, trigger_key FROM core_parked_goal_triggers"
+            " ORDER BY rowid"
+        ).fetchall()
+        for row in parked:
+            goal = self.decisions.goals.get_goal(row["goal_id"])
+            if goal is None:
+                raise ValueError("Parked Core Goal is missing from Stage2")
+            if goal["status"] == "active":
+                connection.execute(
+                    "UPDATE core_auto_triggers SET status='pending'"
+                    " WHERE trigger_key=?",
+                    (row["trigger_key"],),
+                )
+                connection.execute(
+                    "DELETE FROM core_parked_goal_triggers WHERE goal_id=?",
+                    (row["goal_id"],),
+                )
+            elif goal["status"] in {"completed", "cancelled"}:
+                # The original trigger stays done. Never resurrect terminal work.
+                connection.execute(
+                    "DELETE FROM core_parked_goal_triggers WHERE goal_id=?",
+                    (row["goal_id"],),
+                )
+
     def sync(self, *, max_new_events=64):
         """Find committed Core input without assuming a transient RAM message."""
         if type(max_new_events) is not int or not 1 <= max_new_events <= 256:
@@ -127,6 +163,7 @@ class CoreAutonomy:
                 if current != cursor:
                     raise RuntimeError("Core autonomous event cursor changed concurrently")
                 self._enqueue_bound_goals(connection)
+                self._restore_parked_goals(connection)
                 for row in observations:
                     if (
                         row["rowid"] <= cursor
@@ -273,13 +310,16 @@ class CoreAutonomy:
                 if row is None or row["status"] == "started":
                     outstanding.append((rank, goal_id))
             if not outstanding:
-                # A blocked Goal is temporarily unavailable, not terminal.
-                # Parking its original trigger preserves wake/rebind/restart
-                # recovery without inventing another Goal or Task identity.
                 if trigger["kind"] == "goal":
                     target = self.decisions.goals.get_goal(trigger["reference_id"])
                     if target is not None and target["status"] == "blocked":
-                        continue
+                        # Move it OUT of the first-64 pending scan, while
+                        # preserving its identity for a future activation.
+                        connection.execute(
+                            "INSERT OR IGNORE INTO core_parked_goal_triggers("
+                            "goal_id, trigger_key, parked_at) VALUES (?, ?, ?)",
+                            (target["id"], trigger["trigger_key"], _now()),
+                        )
                 connection.execute(
                     "UPDATE core_auto_triggers SET status='done'"
                     " WHERE trigger_key=?",
