@@ -130,7 +130,7 @@ def render_markdown(record):
         "",
         "| Status | Test | Seconds |",
         "|---|---|---:|",
-    ]
+    ])
     for case in record["cases"]:
         label = (case["classname"] + "::" + case["name"]).replace("|", "\\|")
         lines.append(
