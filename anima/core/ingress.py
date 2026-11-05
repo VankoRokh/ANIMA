@@ -1,7 +1,7 @@
-"""P2-A durable ingress for trusted, registered Core event adapters.
+"""P2-A/P2-B durable ingress for trusted, registered Core event adapters.
 
-This is a narrow event receipt boundary, NOT an Observation validator, Belief
-writer, or replacement for the legacy EventLog / MemoryProcessor.
+Validated observation/belief projection is optional and shares the SQLite
+transaction. This is not a replacement for legacy EventLog / MemoryProcessor.
 """
 
 import hashlib
@@ -16,9 +16,11 @@ from types import MappingProxyType
 from typing import Callable, Mapping
 from uuid import uuid4
 
+from anima.core.belief import BeliefProjection, PropertyRule
+
 
 CONTRACT = "core.event/0.1"
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
 MAX_PAYLOAD_BYTES = 16_384
 _REF = re.compile(r"[a-zA-Z][a-zA-Z0-9._/@-]{0,127}\Z")
 _SCHEMA = """
@@ -120,6 +122,7 @@ class CoreIngress:
         *,
         sources: Mapping[str, SourceRegistration],
         fault_hook: Callable[[str], None] | None = None,
+        properties: Mapping[tuple[str, str], PropertyRule] | None = None,
     ):
         if not isinstance(sources, Mapping):
             raise TypeError("sources must be a trusted registration mapping")
@@ -132,6 +135,7 @@ class CoreIngress:
         if fault_hook is not None and not callable(fault_hook):
             raise TypeError("fault_hook must be callable")
         self.fault_hook = fault_hook
+        self.beliefs = BeliefProjection(properties) if properties is not None else None
         self.database_file = Path(database_file)
         self.database_file.parent.mkdir(parents=True, exist_ok=True)
         self._initialize()
@@ -145,6 +149,7 @@ class CoreIngress:
     def _initialize(self):
         with closing(self._connect()) as connection:
             connection.executescript(_SCHEMA)
+            BeliefProjection.initialize(connection)
             with connection:
                 connection.execute(
                     "INSERT OR IGNORE INTO schema_meta(key, value) VALUES('schema_version', ?)",
@@ -153,7 +158,13 @@ class CoreIngress:
                 row = connection.execute(
                     "SELECT value FROM schema_meta WHERE key = 'schema_version'"
                 ).fetchone()
-                if row["value"] != str(SCHEMA_VERSION):
+                if row["value"] == "1":
+                    # P2-A -> P2-B: additive, idempotent schema upgrade.
+                    connection.execute(
+                        "UPDATE schema_meta SET value=? WHERE key='schema_version'",
+                        (str(SCHEMA_VERSION),),
+                    )
+                elif row["value"] != str(SCHEMA_VERSION):
                     raise ValueError("Unsupported Core ingress schema version")
 
     @staticmethod
@@ -263,6 +274,8 @@ class CoreIngress:
                         "VALUES (?, 'core.dispatch', 'pending')",
                         (event_id,),
                     )
+                    if self.beliefs is not None:
+                        self.beliefs.project(connection, record, event_id)
                     if self.fault_hook is not None:
                         self.fault_hook(event_id)
                     result = AdmissionResult("ACCEPTED", event_id)
@@ -298,6 +311,26 @@ class CoreIngress:
                 "SELECT event_id FROM core_outbox WHERE status='pending' ORDER BY rowid"
             ).fetchall()
         return tuple(row["event_id"] for row in rows)
+
+    def read_belief(self, subject_ref, predicate_ref, *, as_of_tick=None):
+        if self.beliefs is None:
+            raise RuntimeError("Belief projection is not enabled")
+        with closing(self._connect()) as connection:
+            return self.beliefs.read(
+                connection, subject_ref, predicate_ref, as_of_tick=as_of_tick
+            )
+
+    def belief_history(self, subject_ref, predicate_ref):
+        if self.beliefs is None:
+            raise RuntimeError("Belief projection is not enabled")
+        with closing(self._connect()) as connection:
+            return self.beliefs.history(connection, subject_ref, predicate_ref)
+
+    def observation_outcome(self, event_id):
+        if self.beliefs is None:
+            raise RuntimeError("Belief projection is not enabled")
+        with closing(self._connect()) as connection:
+            return self.beliefs.observation_outcome(connection, event_id)
 
     def rejection_count(self):
         with closing(self._connect()) as connection:
