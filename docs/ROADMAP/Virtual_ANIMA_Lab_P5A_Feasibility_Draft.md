@@ -3,7 +3,7 @@
 **Status:** **P5-A functional feasibility PASS (owner-reported): headless 9/9 and GUI dual-actor controls successful**. Formal evidence gate remains PARTIAL: exact tested SHA, Python protocol regression / full-repository check output, and separately checked negative-version handshake were not supplied. This is NOT P5 Complete, NOT P6, and does not change the Core v0.1 independent-audit gate.  
 **Date:** 2026-11-05.  
 **Branch:** `work/val-p5a-godot-feasibility`, branched from the exact Core audit-fixes owner-tested snapshot `b639a52281eeaece1b5b00d8223d8f31bd492ca1`. Production `anima/`, Core stores, `docs/project.json` and official Stage statuses remain untouched.  
-**Plan:** [Core v0.1 / VAL v0.1](Core_v0_1_VAL_v0_1_Plan_Draft.md) §4 P5/P6; independent prototype: [`labs/virtual_anima_lab/README.md`](../../labs/virtual_anima_lab/README.md).
+**Plan:** [Core v0.1 / VAL v0.1](Core_v0_1_VAL_v0_1_Plan_Draft.md) §4 P5/P6; independent prototype instructions: `labs/virtual_anima_lab/README.md` (source-tree path; intentionally not a Markdown hyperlink because documentation-only test snapshots exclude `labs/`).
 
 ## 1. Engine choice
 
