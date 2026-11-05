@@ -1,6 +1,6 @@
 # ANIMA Core v0.1 — P3-B Door Execution / Independent Verification
 
-**Status:** implementation in isolated branch; **UNVERIFIED — needs owner-local pytest + checks**.  
+**Status:** **P3-B PASS по сообщению владельца** (2026-11-05): предложенные проверки прошли успешно. Точное число тестов и SHA локального прогона не приложены; это не CI и не запуск ассистента. P3-C и автономный Core пока не подтверждены.  
 **Date:** 2026-11-05.  
 **Branch:** `work/core-v0-1-p3b-execution` (based on owner-reported P3-A PASS).  
 **Upstream:** [P3-A Typed Goal/Task/Decision](Core_v0_1_P3A_Goal_Decision_Draft.md), [P2-C Runtime/Dispatch](Core_v0_1_P2C_Runtime_Integration_Draft.md), [P0 Execution Contracts](Core_v0_1_Goal_Decision_Execution_Contract_Draft.md).
@@ -100,7 +100,7 @@ Acceptance cases:
 - default `build_core()` remains without world adapter;
 - old Stage6/P2/P3-A regression tests remain passing.
 
-**Gate:** no P3-B PASS until owner-provided targeted/full regression plus `scripts/check.sh` on exact local commit. Code writing through GitHub connector is not execution evidence.
+**P3-B acceptance evidence:** пользователь сообщил «Все проверки прошли успешно» после выполнения предложенных `scripts/check.sh`, прицельного и полного pytest; числовой вывод и `git rev-parse HEAD` в сообщении отсутствуют. Это owner-reported PASS, не независимая проверка exact snapshot. Перед финальным release gate рекомендуется повторный тест с сохранением точного SHA. Реализация P3-C получает отдельный gate и не наследует PASS автоматически.
 
 ## 6. Next: P3-C
 
