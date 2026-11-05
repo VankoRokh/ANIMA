@@ -53,6 +53,7 @@ P4_REQUIRED = (
     "test_p4c_seed_plan_replays_same_workload_independent_of_uuid",
     "test_p4c_bounded_no_work_idle_does_not_mutate_world",
     "test_p4c_readonly_belief_unknown_without_event_and_no_goal",
+    "test_p4c_registered_untrusted_source_cannot_forge_door_completion",
 )
 
 
