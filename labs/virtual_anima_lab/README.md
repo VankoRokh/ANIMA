@@ -206,6 +206,20 @@ report_dir="$(mktemp -d)"
 cat "$report_dir/summary.md"
 ```
 
+### P5-B visual inspection
+
+Launch the same Godot GUI as P5-A and, in a second terminal:
+
+```bash
+.venv/bin/python labs/virtual_anima_lab/python/controller.py \
+  --port 46019 --typed --auto --steps 24 --interval 0.65
+```
+
+The right-hand debug panel shows **World truth** independently from the
+last `val.observation/0.1` sample and recent event sequence. Human still
+moves on the keyboard. Without `--typed`, the controller uses the original
+`val.bridge/0.1` protocol.
+
 **No Core integration.** Run the original P5-A smoke and live GUI after the
 new v0.2 tests, so a new protocol cannot silently break our established
 visual/world fixtures.
