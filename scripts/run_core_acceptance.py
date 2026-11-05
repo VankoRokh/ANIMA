@@ -62,6 +62,7 @@ P4_REQUIRED = (
     "test_core_audit_b2_cancel_after_proof_does_not_poison_other_goals[task]",
     "test_core_audit_b3_same_runtime_retry_uses_identical_stage2_request",
     "test_core_audit_b4_blocked_to_active_resumes_parked_goal",
+    "test_core_audit_b4_many_blocked_goals_do_not_hide_new_work",
     "test_core_audit_t1_mandatory_test_identity_includes_module",
 )
 
