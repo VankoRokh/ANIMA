@@ -1,7 +1,7 @@
 """Single composition root for the existing ANIMA runtime.
 
-Incremental Core v0.1 composition: P1 runtime, P2 observations and optional
-P3-A Goal→Task→Decision. Action execution and verification are not wired.
+Incremental Core composition: P1 runtime, P2 observations, P3-A decisions,
+and optional P3-B sandbox-local door action with independent readback.
 """
 
 from dataclasses import dataclass
@@ -14,9 +14,13 @@ from anima.core.dispatch import CoreEventDispatcher
 from anima.core.event_bus import EventBus
 from anima.core.ingress import CoreIngress, SourceRegistration
 from anima.core.goal_decision import CoreGoalDecision
+from anima.core.door_execution import CoreDoorExecution
+from anima.core.door_world import VirtualDoorWorld, door_tool_registry, door_handlers
 from anima.core.identity import Identity
 from anima.core.state import AnimaState
 from anima.execution.contracts import ActionSpec
+from anima.execution.store import ExecutionStore
+from anima.execution.sandbox import SandboxExecutor
 from anima.tasks.store import TaskStore
 from anima.diagnostics.metrics import DiagnosticMetrics
 from anima.diagnostics.trace import DiagnosticTrace
@@ -54,6 +58,7 @@ class CoreAssembly:
     runtime: Runtime
     core_events: CoreEventDispatcher | None
     core_decision: CoreGoalDecision | None
+    core_execution: CoreDoorExecution | None
 
 
 def build_core(
@@ -62,18 +67,21 @@ def build_core(
     sources: Mapping[str, SourceRegistration] | None = None,
     properties: Mapping[tuple[str, str], PropertyRule] | None = None,
     goal_actions: Mapping[tuple[str, str, str], ActionSpec] | None = None,
+    virtual_door_root: str | Path | None = None,
 ) -> CoreAssembly:
     """Build the current, proven runtime stack once for CLI and headless use.
 
     No wakeup is implicit. Caller owns lifecycle. Registered Core inputs and
-    a bounded decision driver may be opted in; this does NOT execute actions
-    or complete Goals.
+    a bounded decision driver and explicit virtual-world adapter can be opted
+    in. No background autonomy or model-generated action is configured.
     """
 
     if (sources is None) != (properties is None):
         raise ValueError("Core inputs require both source and property registries")
     if goal_actions is not None and sources is None:
         raise ValueError("Core goal decisions require registered Core input and Belief")
+    if virtual_door_root is not None and goal_actions is None:
+        raise ValueError("Core world execution requires typed Goal decision configuration")
     root = (get_data_dir() if data_dir is None else Path(data_dir)).expanduser().resolve()
     state = AnimaState(root / "state.json")
     identity = Identity(root / "identity.json")
@@ -122,6 +130,25 @@ def build_core(
             ingress=core_events.ingress,
             actions=goal_actions,
         )
+    core_execution = None
+    if virtual_door_root is not None:
+        world = VirtualDoorWorld(virtual_door_root)
+        registry = door_tool_registry()
+        execution_store = ExecutionStore(root / "execution.db")
+        executor = SandboxExecutor(
+            root=world.root,
+            registry=registry,
+            store=execution_store,
+            handlers=door_handlers(),
+        )
+        core_execution = CoreDoorExecution(
+            decisions=core_decision,
+            internal_state=internal_state,
+            world=world,
+            execution_store=execution_store,
+            registry=registry,
+            executor=executor,
+        )
     runtime = Runtime(
         anima=state,
         identity=identity,
@@ -135,6 +162,7 @@ def build_core(
         internal_state=internal_state,
         core_events=core_events,
         core_decision=core_decision,
+        core_execution=core_execution,
     )
     return CoreAssembly(
         data_dir=root,
@@ -155,6 +183,7 @@ def build_core(
         runtime=runtime,
         core_events=core_events,
         core_decision=core_decision,
+        core_execution=core_execution,
     )
 
 
