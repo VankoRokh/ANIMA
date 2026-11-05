@@ -175,6 +175,39 @@ Goal/Task transitions + causal trace + next event
 
 Численные метрики (`latency`, `queue depth`, `actions per goal`, `recovery delay`) снимаются на baseline. Перечень exact fixtures, поддерживаемый clock model и ограничения тестового адаптера фиксируются до acceptance run. `P4 passed` нельзя объявлять, опираясь только на тесты Stage 6.
 
+### 7.1. Owner-approved validation strategy (2026-11-05)
+
+**Решение:** owner одобрил проверку **всех функций, включённых в Core v0.1**, на трёх уровнях. Решение относится к тестовому подходу, **не** означает утверждения спорных P0 contracts и не делает P0/P1 Complete.
+
+1. **Unit:** инварианты отдельных модулей (Event, Belief, Task, Goal, Policy, Action, Verifier, Recovery) на точных тестовых входах.
+2. **Integration:** проверка причинных стыков (Event→Belief→Task; Decision→Policy→Execution→Verification; persistence→restart→reconciliation). Нельзя доказывать систему только моками, всегда успешно отвечающими друг другу.
+3. **System / end-to-end:** настоящий собранный headless Core, несколько последовательных, не всегда связанных событий, собственные цели и state transition; никакого внешнего сценарного вызова «заверши цель» вместо автономного loop. Фиксировать условия/версии/детерминизм.
+
+Сценарные требования, согласованные owner (соответствия уже существующим блокирующим C0–C8; названия S01–S10 — человекочитаемая группировка, **не** ещё один конкурирующий набор fixtures):
+
+| Семейство | Scenario | Блокирующее свойство |
+|---|---|---|
+| S01 | открытая дверь → закрыть → независимое наблюдение | C1, C5 |
+| S02 | уже закрытая дверь → действие не требуется | C1 |
+| S03 | contradictory / stale observations | C2, C3 |
+| S04 | выбор из нескольких разрешённых действий | C8, Choice contracts; только если действительно есть несколько валидных кандидатов |
+| S05 | исполнение не удалось / receipt не равен goal success | C5 |
+| S06 | остановка на нескольких стадиях и restart | C0, C6 |
+| S07 | несколько заданных целей/задач; ограниченный арбитраж | C7, Goal/Task contracts |
+| S08 | отвлекающие события при сохранении важных | C7 |
+| S09 | запрещённая операция / forged proposal | C8 |
+| S10 | отсутствующие сведения / недоступный сенсор | C3 |
+
+**Вариативность:** минимум положительный, отрицательный и крайний/переставленный вариант, где применимо; отдельные прогоны с повторными, запоздалыми и противоречивыми событиями; доказательная матрица отображает coverage по **всем включённым механизмам**, а не номинальную численность тестов.
+
+**Live observability также одобрена.** Предусмотреть необязательный терминальный dev monitor без GUI и без прав записи в Core: `mode/goal/task, last event, currently accepted belief + evidence reference/freshness, decision + reason, policy verdict, action/receipt, independent verification, diagnostics`. Любое поле ground truth принадлежит только test operator и явно помечается как external privileged context; в Core оно не передаётся. `confidence` не выводить как калиброванное число без модели и проверки калибровки.
+
+**Run logs:** отдельный machine-readable trace с causal IDs/версией/seed/clock и автоматически сформированный human-readable Markdown report. Монитор показывает поток событий, но не заменяет persistent logs и acceptance assertions.
+
+**Gate P4:** (a) все обязательные unit/integration/system suites PASS на известном snapshot; (b) минимум один длительный многошаговый headless-прогон, не один hardcoded door demo; (c) ноль unauthorized side effects, ноль false-positive goal verification в предусмотренной модели отказов; (d) есть протокол restart/fault injection; (e) regression suite existing modules не ломается. Не объявлять 100% надёжность за пределами испытанных условий.
+
+**Остаётся открыть до P1:** выбрать точные границы persistence/replay, Belief authority, typed criterion, action adapter/observer и независимого Sleep recovery; снять baseline запуск `scripts/check.sh` и `pytest`. Одобрение тестового плана не подменяет эти решения.
+
 ## 8. Порядок на следующую сессию разработки
 
 1. Принять/исправить P0 boundary и выбрать один minimal `CoreAssembly` path (не через новый Stage 4 planner).
