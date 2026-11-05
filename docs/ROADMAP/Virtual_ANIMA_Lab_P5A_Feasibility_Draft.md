@@ -90,6 +90,28 @@ cat "$report_dir/summary.md"
 
 Use explicit `--godot /path/to/binary` when the binary is named differently or is an AppImage. No external networking or npm/pip requirements.
 
+## 5.1 First observed bridge incompatibility (corrected, pending local confirmation)
+
+The owner successfully launched Godot 4, but the Python controller's first
+`ping` failed with `LabProtocolError: bridge response contract/id mismatch`.
+Code review identified the immediate cause: Godot `JSON.parse_string`
+represents JSON integer identifiers as floating-point values (`1.0`),
+while `Main.gd` originally required `TYPE_INT`. The early rejection sent a
+numeric ID incompatible with the strict Python response check.
+
+A follow-up branch commit now:
+- accepts `TYPE_FLOAT` only when finite, integral, nonnegative and within
+  the bounded protocol ID range, then normalizes it to `int`;
+- normalizes valid Python-side numeric `id` and `tick` while rejecting
+  fractional/bool/non-finite values;
+- adds a **real Godot parser** regression in
+  `godot/BridgeProtocolTest.gd` and Python mock-transport checks.
+
+**Not yet claimed as fixed in execution:** restart the Godot process after
+updating source, run the Godot script regression + pytest + headless smoke
+before setting any F-gate to PASS. The problem is unrelated to Intel/NVIDIA
+rendering.
+
 ## 6. Known gates before P6
 
 The P5 JSON bridge **does not authenticate** `role`: any local client can claim `operator`. This is acceptable **only** as a same-machine throwaway feasibility test and would be a serious authority flaw if reused as a production ANIMA bridge.
