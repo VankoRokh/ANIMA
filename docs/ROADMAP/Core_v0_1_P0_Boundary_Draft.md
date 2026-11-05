@@ -1,6 +1,6 @@
 # ANIMA Core v0.1 — P0 Boundary & Reuse Audit
 
-**Статус:** P0 architecture direction reviewed/approved by owner; P1 and P2-A/P2-B verified, P2-C owner-reported PASS, P3-A pending tests. Open implementation/recovery gates remain; no blanket P0 Complete claim.  
+**Статус:** P0 architecture direction approved by owner; P1, P2-A/B verified; P2-C and P3-A/B/C owner-reported PASS with stated evidence limits. P4 integrated acceptance in progress, no Core v0.1 Complete claim.  
 **Дата:** 2026-11-05.  
 **Исходный code snapshot:** `e2a1e6bfdb6126b82ac36873dce92e7c6876aa4b` на `work/stage7-semantic-boundary-v0`.  
 **Исходная ветка планирования:** `work/core-v0-1-planning` (только документация). Дальнейшие реализации — отдельные work branches.  
@@ -13,7 +13,8 @@
 **P2-C owner-reported PASS (SHA/pytest counts not supplied):** [Runtime / Durable Dispatch Integration](Core_v0_1_P2C_Runtime_Integration_Draft.md).
 **P3-A owner-reported PASS (SHA/pytest counts not supplied):** [Typed Goal → Task → Decision](Core_v0_1_P3A_Goal_Decision_Draft.md).
 **P3-B owner-reported PASS (SHA/pytest counts not supplied):** [Door Execution / Independent Verification](Core_v0_1_P3B_Door_Execution_Draft.md).
-**P3-C implementation (tests pending):** [Bounded Autonomous Event Loop](Core_v0_1_P3C_Autonomous_Loop_Draft.md).  
+**P3-C owner-reported PASS (two demo traces, pytest counts/SHA not supplied):** [Bounded Autonomous Event Loop](Core_v0_1_P3C_Autonomous_Loop_Draft.md).
+**P4-A implementation (tests pending):** [Integrated Acceptance and Readable Diagnostics](Core_v0_1_P4_Integrated_Acceptance_Draft.md).  
 **Референс реализованной архитектуры:** [Architecture](../ARCHITECTURE/README.md).  
 **Актуальные статусы:** [project.json](../project.json); никакой Stage не объявляется закрытым этим документом.
 
