@@ -9,7 +9,7 @@ Roadmap описывает цель, границы и проверяемый р
 
 **Рабочий проектный план (не утверждён как новый Stage):** [Core v0.1 и Virtual ANIMA Lab v0.1](Core_v0_1_VAL_v0_1_Plan_Draft.md). Он описывает порядок подготовки standalone Core, его проверок и последующего подключения к виртуальной среде; статусы `project.json` не меняет.
 
-**Текущий рабочий интеграционный gate (P4-A, ещё не принят):** [Core v0.1 — системные проверки и читаемые отчёты](Core_v0_1_P4_Integrated_Acceptance_Draft.md). Исходные статусы Stage остаются в `project.json`; подтверждение P3-C owner-reported и не означает закрытия P4.
+**Интеграционный P4-A (PASS по сообщению владельца):** [системные проверки и читаемые отчёты](Core_v0_1_P4_Integrated_Acceptance_Draft.md). **Текущая работа P4-B (тесты ещё не выполнены):** [восстановление попыток, повторные рестарты и количественная матрица](Core_v0_1_P4B_Endurance_Recovery_Draft.md). Исходные статусы Stage остаются в `project.json`; P4 и Core v0.1 не объявлены Complete.
 
 <!-- AUTO:roadmap:START -->
 **Текущая работа:** Stage 6 Cognitive Integration Core завершён и подтверждён TV-0051. Для Stage 7 принят pre-training semantic boundary v0: immutable qualified/time-scoped Claim, отдельные Evidence/Source/Producer/provenance, typed Value v0, explicit temporal semantics, независимые CONTENT/REVISION results и read-only classify_relation/0.1 с deterministic-first processing. Stage 7 implementation остаётся Planned; DP-08, DP-09, полная dependency policy DP-10 и production integration DP-11 открыты. До model training обязательны conformance corpus и измерение реального model residual; LoRA/SFT не начаты.
