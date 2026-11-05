@@ -13,8 +13,11 @@ from anima.core.belief import PropertyRule
 from anima.core.dispatch import CoreEventDispatcher
 from anima.core.event_bus import EventBus
 from anima.core.ingress import CoreIngress, SourceRegistration
+from anima.core.goal_decision import CoreGoalDecision
 from anima.core.identity import Identity
 from anima.core.state import AnimaState
+from anima.execution.contracts import ActionSpec
+from anima.tasks.store import TaskStore
 from anima.diagnostics.metrics import DiagnosticMetrics
 from anima.diagnostics.trace import DiagnosticTrace
 from anima.internal_state.runtime_integration import InternalStateRuntime
@@ -50,6 +53,7 @@ class CoreAssembly:
     internal_state: InternalStateRuntime
     runtime: Runtime
     core_events: CoreEventDispatcher | None
+    core_decision: CoreGoalDecision | None
 
 
 def build_core(
@@ -57,6 +61,7 @@ def build_core(
     *,
     sources: Mapping[str, SourceRegistration] | None = None,
     properties: Mapping[tuple[str, str], PropertyRule] | None = None,
+    goal_actions: Mapping[tuple[str, str, str], ActionSpec] | None = None,
 ) -> CoreAssembly:
     """Build the current, proven runtime stack once for CLI and headless use.
 
@@ -67,6 +72,8 @@ def build_core(
 
     if (sources is None) != (properties is None):
         raise ValueError("Core inputs require both source and property registries")
+    if goal_actions is not None and sources is None:
+        raise ValueError("Core goal decisions require registered Core input and Belief")
     root = (get_data_dir() if data_dir is None else Path(data_dir)).expanduser().resolve()
     state = AnimaState(root / "state.json")
     identity = Identity(root / "identity.json")
@@ -105,6 +112,16 @@ def build_core(
     metrics = DiagnosticMetrics()
     internal_state_store = InternalStateStore(root / "internal_state.db")
     internal_state = InternalStateRuntime(internal_state_store, trace=trace)
+    core_decision = None
+    if goal_actions is not None:
+        task_store = TaskStore(root / "tasks.db")
+        core_decision = CoreGoalDecision(
+            database_file=root / "core_work.db",
+            goals=internal_state.goals,
+            tasks=task_store,
+            ingress=core_events.ingress,
+            actions=goal_actions,
+        )
     runtime = Runtime(
         anima=state,
         identity=identity,
@@ -117,6 +134,7 @@ def build_core(
         metrics=metrics,
         internal_state=internal_state,
         core_events=core_events,
+        core_decision=core_decision,
     )
     return CoreAssembly(
         data_dir=root,
@@ -136,6 +154,7 @@ def build_core(
         internal_state=internal_state,
         runtime=runtime,
         core_events=core_events,
+        core_decision=core_decision,
     )
 
 
