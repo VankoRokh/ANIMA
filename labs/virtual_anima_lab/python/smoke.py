@@ -171,6 +171,19 @@ def _run(client: LabClient, seed: int) -> tuple[list[dict], dict]:
     return records, result
 
 
+_LABELS = {
+    "two_actors_independent": "Human и ANIMA перемещаются независимо",
+    "hidden_human_ground_truth": "Скрытое состояние мира не передаётся агенту",
+    "agent_restricted_operations": "Запрет тестовых операторских команд для роли agent",
+    "pause_and_logical_step": "Пауза и пошаговое логическое время",
+    "walls_and_closed_door_collision": "Столкновения со стенами и закрытой дверью",
+    "operator_world_intervention": "Внешнее изменение двери",
+    "new_observation_after_intervention": "Новое наблюдение после вмешательства",
+    "seeded_reset": "Повторяемый сброс по seed",
+    "human_and_anima_event_log": "События обоих акторов в журнале",
+}
+
+
 def _render(result: dict) -> str:
     lines = [
         "Virtual ANIMA Lab / P5-A / Godot feasibility",
@@ -184,7 +197,7 @@ def _render(result: dict) -> str:
         "ПРОВЕРКИ",
     ]
     for key, value in result["checks"].items():
-        lines.append(f"  {'✓' if value else '✗'} {key}")
+        lines.append(f"  {'✓' if value else '✗'} {_LABELS.get(key, key)}")
     lines += ["", "ANIMA Core не подключён. Внешний TCP bridge не аутентифицирован."]
     return "\n".join(lines) + "\n"
 
