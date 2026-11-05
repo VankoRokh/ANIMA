@@ -30,7 +30,7 @@ CREATE TABLE IF NOT EXISTS core_auto_triggers (
     created_at TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_core_auto_pending
-    ON core_auto_triggers(status, rowid);
+    ON core_auto_triggers(status, created_at);
 CREATE TABLE IF NOT EXISTS core_auto_attempts (
     trigger_key TEXT NOT NULL REFERENCES core_auto_triggers(trigger_key),
     goal_id TEXT NOT NULL,
@@ -87,12 +87,7 @@ class CoreAutonomy:
         self.decisions = decisions
         self.executor = executor
         with closing(self.decisions._connect()) as connection:
-            # SQLite does not allow indexing the hidden rowid as an indexed
-            # column in CREATE INDEX; status index is sufficient here.
-            connection.executescript(_SCHEMA.replace(
-                "ON core_auto_triggers(status, rowid)",
-                "ON core_auto_triggers(status, created_at)",
-            ))
+            connection.executescript(_SCHEMA)
             with connection:
                 connection.execute(
                     "INSERT OR IGNORE INTO core_autonomy_meta(name,integer_value)"
