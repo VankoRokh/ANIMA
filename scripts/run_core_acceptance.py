@@ -19,6 +19,7 @@ from xml.etree import ElementTree
 ROOT = Path(__file__).resolve().parents[1]
 P4_MODULES = (
     "tests/test_core_p4_acceptance.py",
+    "tests/test_core_p4c_release.py",
     "tests/test_core_p4_report.py",
 )
 CORE_MODULES = P4_MODULES + (
@@ -46,6 +47,12 @@ P4_REQUIRED = (
     "test_p4b_operator_completed_goal_does_not_invent_core_evidence",
     "test_p4b_multi_episode_cold_restart_and_noise_stay_bounded[2]",
     "test_p4b_multi_episode_cold_restart_and_noise_stay_bounded[4]",
+    "test_p4c_seeded_24_episode_endurance_with_cold_restarts[7]",
+    "test_p4c_seeded_24_episode_endurance_with_cold_restarts[31]",
+    "test_p4c_seeded_24_episode_endurance_with_cold_restarts[73]",
+    "test_p4c_seed_plan_replays_same_workload_independent_of_uuid",
+    "test_p4c_bounded_no_work_idle_does_not_mutate_world",
+    "test_p4c_readonly_belief_unknown_without_event_and_no_goal",
 )
 
 
