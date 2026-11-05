@@ -10,7 +10,8 @@
 **P1 standalone bootstrap:** [P1 — owner-verified bootstrap PASS](Core_v0_1_P1_Bootstrap_Draft.md).
 **P2-A owner-verified PASS:** [SQLite Core Event Ingress](Core_v0_1_P2A_Ingress_Draft.md).
 **P2-B owner-verified PASS:** [Typed Observation / Belief Projection](Core_v0_1_P2B_Belief_Draft.md).
-**P2-C implementation (tests pending):** [Runtime / Durable Dispatch Integration](Core_v0_1_P2C_Runtime_Integration_Draft.md).  
+**P2-C owner-reported PASS (SHA/pytest counts not supplied):** [Runtime / Durable Dispatch Integration](Core_v0_1_P2C_Runtime_Integration_Draft.md).
+**P3-A implementation (tests pending):** [Typed Goal → Task → Decision](Core_v0_1_P3A_Goal_Decision_Draft.md).  
 **Референс реализованной архитектуры:** [Architecture](../ARCHITECTURE/README.md).  
 **Актуальные статусы:** [project.json](../project.json); никакой Stage не объявляется закрытым этим документом.
 
