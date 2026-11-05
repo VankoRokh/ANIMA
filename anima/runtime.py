@@ -1,5 +1,6 @@
 from anima.core.dispatch import CoreEventDispatcher
 from anima.core.goal_decision import CoreGoalDecision
+from anima.core.door_execution import CoreDoorExecution
 from anima.internal_state.runtime_integration import InternalStateRuntime
 from anima.sleep.runtime_integration import SleepRuntimeIntegration
 
@@ -23,6 +24,7 @@ class Runtime:
         sleep_runtime=None,
         core_events=None,
         core_decision=None,
+        core_execution=None,
     ):
         if internal_state is not None and not isinstance(
             internal_state,
@@ -47,6 +49,10 @@ class Runtime:
             core_decision, CoreGoalDecision
         ):
             raise TypeError("Runtime core_decision must be CoreGoalDecision or null")
+        if core_execution is not None and not isinstance(
+            core_execution, CoreDoorExecution
+        ):
+            raise TypeError("Runtime core_execution must be CoreDoorExecution or null")
 
         self.trace = trace
         self.metrics = metrics
@@ -61,6 +67,7 @@ class Runtime:
         self.sleep_runtime = sleep_runtime
         self.core_events = core_events
         self.core_decision = core_decision
+        self.core_execution = core_execution
         self._recovery_checked = False
 
     def _session_id(self):
@@ -133,6 +140,21 @@ class Runtime:
         planner = self._require_core_decision()
         self._ensure_recovered()
         return planner.step_next(as_of_tick=as_of_tick)
+
+    def run_core_door_goal(self, goal_id):
+        """P3-B explicitly triggered bounded action + independent readback.
+
+        This does not schedule itself or confer authority to unregistered tools.
+        """
+        if self.core_execution is None:
+            raise RuntimeError("Core door execution is not configured")
+        self._ensure_recovered()
+        try:
+            return self.core_execution.run(goal_id)
+        finally:
+            # World observations are canonical in Core DB first. Legacy outbox
+            # catch-up remains bounded and replay-safe on the next Runtime entry.
+            self._drain_core_events()
 
     def _process_events(self):
         processed = []
