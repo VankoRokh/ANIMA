@@ -197,6 +197,19 @@ class CoreAutonomy:
                     continue
                 if proof["goal_id"] != row["goal_id"]:
                     raise ValueError("Mismatched autonomous verification proof")
+                task = self.decisions.tasks.get_task(proof["task_id"])
+                if task is None:
+                    raise ValueError("Core proof references missing Task")
+                if task.status in {"cancelled", "failed"}:
+                    connection.execute(
+                        "UPDATE core_auto_attempts SET status='finished',"
+                        " outcome='DEFERRED',"
+                        " reason_code='PROOF_SUPERSEDED_BY_TERMINAL_STATE',"
+                        " operation_id=NULL, evidence_event_id=NULL, updated_at=?"
+                        " WHERE trigger_key=? AND goal_id=? AND status='started'",
+                        (_now(), row["trigger_key"], row["goal_id"]),
+                    )
+                    continue
                 connection.execute(
                     "UPDATE core_auto_attempts SET status='finished',"
                     " outcome='RECOVERED_VERIFIED_SUCCESS',"
