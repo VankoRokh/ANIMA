@@ -1,6 +1,6 @@
 # Virtual ANIMA Lab — P5-C Scenario Profiles & Replay
 
-**Status: owner-local P5-C scenario replay PASS (4/4 cases × 2 fresh Godot runs) and full project regression PASS (1450/1450) on exact code commit `e995169e61385a3e1c2e44a60b27e6bf501211e2`, clean worktree. Native Godot-only C1, legacy real-Godot reruns C5, and interactive GUI variants C6 remain pending; P5-C is not formally closed.**  
+**Status: P5-C owner-accepted / Complete for its isolated feasibility scope.** Four scripted scenarios replayed identically in two fresh Godot runs, full regression **1450/1450 PASS** on clean code commit `e995169e61385a3e1c2e44a60b27e6bf501211e2`; owner subsequently reported native Godot, P5-A/P5-B backward smoke and visual `base`/`detour`/`clutter` checks all successful. This is owner attestation, **not an independent audit**. Core/P6 remain outside scope.  
 **Date:** 2026-11-05.  
 **Branch:** `work/val-p5c-scenarios-replay`, based on P5-B `a512faceb4e2e12376424ad20662758f6fd82651`.  
 **Scope:** only standalone Godot Lab, Python test harness, tests and documentation. No `anima/` code, no external policies or Core authority; `docs/project.json` is unchanged.  
@@ -105,7 +105,7 @@ a deterministic isolated test fixture under fixed preconditions.
 | C6 | GUI base mode and optional detour/clutter modes render; Human/ANIMA remain independently controlled. |
 | C7 | `scripts/check.sh`, full `pytest -q`, clean worktree and precise tested SHA recorded. |
 
-**Owner-provided evidence:** C2 (P5-C Python unit tests as part of 1450 PASS), C3 (4/4 scenarios twice), C4 (the scripted Human/door/obstacle/noise invariants) and C7 (`scripts/check.sh`, full 1450 PASS, tested SHA and clean tree) are **PASS for the reported code snapshot**. **C1, C5 and C6 remain unreported**, and no complete `trace.jsonl` or engine logs were supplied for independent inspection. Existing P5-B native-only V2 and explicitly pinned branch-level acceptance are separate matters. Do not merge P5-C into production or mark Core/P6 complete based on these provisional Lab experiments.
+**C1–C7: owner-reported PASS.** C2–C4/C7 include concrete console summaries (4/4 × two runs, 1450 Python tests, clean SHA); C1/C5 were subsequently affirmed collectively by the owner after running the requested native Godot and P5-A/P5-B commands, but their individual console outputs were not posted. C6 (`base`, `detour`, `clutter` GUI controls and obstacles) was explicitly affirmed by the owner. The exact tested code SHA pertains to the supplied runner/regression output; later commits only update documentation. No independent audit of Godot logs or full traces was performed; full Engine/OS timing, network auth, Core verification and restart durability remain out of scope.
 
 ## 5.1 Owner-local acceptance evidence (2026-11-05)
 
@@ -131,12 +131,17 @@ CLI extraction and tracked-file hygiene PASS on Python 3.14.4.
 `.venv/bin/python -m pytest -q` reported **1450 passed in 39.29s** with
 zero failures. No new code modifications were made as part of the test.
 
-**Evidence limits:** native Godot-only `BridgeP5CScenarioTest.gd` output not
-provided; P5-A `smoke.py` and P5-B `p5b_smoke.py` were not explicitly
-rerun after P5-C changes; GUI testing of `detour` and `clutter` unreported.
-The full local `trace.jsonl`/Godot logs were not supplied. The Code SHA
-above remains the exact tested version; subsequent documentation-only
-commits do **not** change that tested source.
+**Subsequent owner confirmations:** native Godot P5-C/P5-B contract checks and P5-A/P5-B real-engine smoke reruns were collectively reported successful after execution; `base`, `detour` and `clutter` were then visually checked and reported functional. Individual native/legacy test transcripts and the full local `trace.jsonl`/Godot logs were not supplied. The exact pinned SHA above describes the submitted runner/regression evidence; later documentation-only commits do **not** modify the tested source. This is acceptance of the isolated P5-C feasibility gate, not a security or Core audit.
+
+## 5.2 Final visual acceptance (owner report, 2026-11-05)
+
+The owner opened the Lab project in Godot and verified the remaining GUI
+checks for `base`, `detour` and `clutter`, including actor controls and
+obstacle behavior, reporting: **«Проверил, всё работает.»** They also
+confirmed that all previously requested native Godot and legacy smoke checks
+passed. No video/GUI trace or full native test transcripts were supplied.
+This closes P5-C **for the agreed stand-alone Lab acceptance matrix**;
+`docs/project.json` is intentionally not changed and ANIMA Core is not connected.
 
 ## 6. Local commands
 
