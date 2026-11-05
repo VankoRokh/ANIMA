@@ -163,7 +163,7 @@ class VALDoorPort:
         seq = self._next_sample(ident, obs)
         observed = {"domain": "lab_sample", "value": seq}
         door = self._door_reading(obs)
-        kind = "state.property" if door is not None else "state.unknown"
+        kind = "state.property" if door is not None else "sensor.unavailable"
         payload = {
             "subject_ref": DOOR_SUBJECT,
             "predicate_ref": DOOR_PREDICATE,
