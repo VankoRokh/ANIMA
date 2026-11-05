@@ -1,9 +1,9 @@
 # ANIMA Core v0.1 — P0 Boundary & Reuse Audit
 
-**Статус:** P0 architecture review / proposed baseline. Требует owner acceptance перед P1.  
+**Статус:** P0 architecture direction reviewed/approved by owner; P1 and P2-A/P2-B verified, P2-C owner-reported PASS, P3-A pending tests. Open implementation/recovery gates remain; no blanket P0 Complete claim.  
 **Дата:** 2026-11-05.  
 **Исходный code snapshot:** `e2a1e6bfdb6126b82ac36873dce92e7c6876aa4b` на `work/stage7-semantic-boundary-v0`.  
-**Рабочая ветка:** `work/core-v0-1-planning` (только документация).  
+**Исходная ветка планирования:** `work/core-v0-1-planning` (только документация). Дальнейшие реализации — отдельные work branches.  
 **Общий план:** [Core v0.1 + VAL](Core_v0_1_VAL_v0_1_Plan_Draft.md).
 **Первый технический контракт (на согласование):** [Event / Observation / Belief](Core_v0_1_Event_Belief_Contract_Draft.md).
 **Второй технический контракт (на согласование):** [Belief → Goal / Task → Decision → Execution / Verification](Core_v0_1_Goal_Decision_Execution_Contract_Draft.md).
