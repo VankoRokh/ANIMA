@@ -32,6 +32,16 @@ class _Handler(socketserver.StreamRequestHandler):
             if request["op"] == "forbidden":
                 reply.pop("data")
                 reply["error"] = "FORBIDDEN"
+            if request["op"] == "float_ids":
+                # Godot JSON may serialize its parsed numeric fields as floats.
+                reply["id"] = float(reply["id"])
+                reply["tick"] = 3.0
+            elif request["op"] == "fractional_id":
+                reply["id"] = float(reply["id"]) + 0.5
+            elif request["op"] == "fractional_tick":
+                reply["tick"] = 3.5
+            elif request["op"] == "bool_id":
+                reply["id"] = True
             self.wfile.write((json.dumps(reply) + "\n").encode("utf-8"))
 
 
@@ -69,7 +79,19 @@ def test_val_p5a_client_exposes_rejections_without_spoofing_success(bridge):
         assert error.value.response["ok"] is False
 
 
-@pytest.mark.parametrize("operation", ["wrong_id", "invalid_json"])
+def test_val_p5a_client_normalizes_godot_integral_float_response(bridge):
+    with LabClient(bridge, role="agent") as client:
+        response = client.call("float_ids")
+    assert response["id"] == 1
+    assert type(response["id"]) is int
+    assert response["tick"] == 3
+    assert type(response["tick"]) is int
+
+
+@pytest.mark.parametrize(
+    "operation",
+    ["wrong_id", "invalid_json", "fractional_id", "fractional_tick", "bool_id"],
+)
 def test_val_p5a_client_rejects_invalid_transport_response(bridge, operation):
     with LabClient(bridge, role="operator") as client:
         with pytest.raises(LabProtocolError):
