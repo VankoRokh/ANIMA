@@ -125,6 +125,8 @@ def render_markdown(record):
         f"**Result:** {verdict}  ",
         f"**Suite:** `{record['suite']}`  ",
         f"**Commit:** `{record['commit']}`  ",
+        f"**Git tree:** `{record.get('tree', 'not recorded')}`  ",
+        f"**Clean/unchanged checkout:** `{record.get('checkout_unchanged', 'unknown')}`  ",
         f"**Python:** `{record['python']}`  ",
         f"**UTC timestamp:** `{record['timestamp']}`  ",
         f"**Process exit code:** `{record['exit_code']}`",
@@ -185,12 +187,27 @@ def render_markdown(record):
     return "\n".join(lines)
 
 
-def _commit():
-    completed = subprocess.run(
-        ["git", "rev-parse", "HEAD"], cwd=ROOT,
-        text=True, capture_output=True, check=False, timeout=10,
-    )
-    return completed.stdout.strip() if completed.returncode == 0 else "unknown"
+def _git_snapshot():
+    """Verified HEAD/tree/clean-worktree identity for each acceptance run."""
+    results = {}
+    for name, command in (
+        ("commit", ("git", "rev-parse", "HEAD")),
+        ("tree", ("git", "rev-parse", "HEAD^{tree}")),
+        ("porcelain", ("git", "status", "--porcelain=v1", "--untracked-files=normal")),
+    ):
+        result = subprocess.run(
+            command, cwd=ROOT, capture_output=True, text=True,
+            check=False, timeout=10,
+        )
+        if result.returncode != 0:
+            results[name] = None
+            results.setdefault("git_errors", []).append(
+                f"{name}: {result.stderr.strip() or result.returncode}"
+            )
+        else:
+            results[name] = result.stdout.strip()
+    results["clean"] = results.get("porcelain") == ""
+    return results
 
 
 def main(argv=None):
@@ -209,6 +226,7 @@ def main(argv=None):
     ):
         parser.error("output-dir must be absent or empty; refusing to overwrite")
     destination.mkdir(parents=True, exist_ok=True)
+    git_before = _git_snapshot()
     files = (
         P4_MODULES if args.suite == "p4"
         else CORE_MODULES if args.suite == "core"
@@ -226,6 +244,14 @@ def main(argv=None):
         check=False,
     )
     elapsed_wall_seconds = round(time.monotonic() - started, 6)
+    git_after = _git_snapshot()
+    checkout_unchanged = (
+        git_before["clean"] and git_after["clean"]
+        and git_before["commit"] is not None
+        and git_before["commit"] == git_after["commit"]
+        and git_before["tree"] is not None
+        and git_before["tree"] == git_after["tree"]
+    )
     (destination / "pytest.log").write_text(
         completed.stdout, encoding="utf-8"
     )
@@ -238,12 +264,17 @@ def main(argv=None):
         "PASS" if completed.returncode == 0
         and totals["total"] > 0 and totals["failed"] == 0
         and all(status == "PASS" for status in coverage.values())
+        and checkout_unchanged
         else "FAIL"
     )
     record = {
         "schema": "anima.core.acceptance-report/0.1",
         "suite": args.suite,
-        "commit": _commit(),
+        "commit": git_before["commit"] or "unknown",
+        "tree": git_before["tree"] or "unknown",
+        "git_before": git_before,
+        "git_after": git_after,
+        "checkout_unchanged": checkout_unchanged,
         "python": sys.version.split()[0],
         "timestamp": datetime.now(timezone.utc).isoformat(),
         "exit_code": completed.returncode,
