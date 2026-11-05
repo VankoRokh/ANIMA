@@ -59,6 +59,7 @@ func _parse_args() -> void:
 	if _port < 1024 or _port > 65535 or _seed < 0:
 		push_error("VAL: invalid port or seed")
 		get_tree().quit(2)
+		return
 
 
 func _reset_world() -> void:
@@ -158,7 +159,12 @@ func _request(line: String) -> Dictionary:
 		"debug_snapshot":
 			return _reply(request_id, true, _debug_snapshot())
 		"trace":
-			return _reply(request_id, true, {"events": _history.duplicate(true)})
+			# Keep one JSON response below the bounded 8192-byte frame size.
+			var start: int = maxi(0, _history.size() - 20)
+			return _reply(
+				request_id, true,
+				{"events": _history.slice(start, _history.size()).duplicate(true)},
+			)
 		"human_move":
 			if _paused:
 				return _reply(request_id, false, {}, "PAUSED")
