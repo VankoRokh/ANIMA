@@ -2,8 +2,12 @@ extends Node2D
 ## P5-A independent world. ANIMA Core is intentionally NOT imported.
 ## The loopback bridge is a feasibility protocol, not authentication.
 
-const PROTOCOL := "val.bridge/0.1"
-const WORLD_VERSION := "p5a-grid/0.1"
+const PROTOCOL := "val.bridge/0.1" # Stable P5-A compatibility profile.
+const PROTOCOL_V2 := "val.bridge/0.2" # New P5-B typed/conditional profile.
+const WORLD_VERSION := "p5a-grid/0.1" # Same geometry; protocol is independently versioned.
+const OBSERVATION_VERSION := "val.observation/0.1"
+const ACTION_VERSION := "val.action/0.1"
+const MAX_ACTION_KEYS := 1024
 const WIDTH := 12
 const HEIGHT := 8
 const CELL := 56
@@ -17,6 +21,12 @@ var _buffer := ""
 var _port := 46019
 var _seed := 7
 var _tick := 0
+var _epoch := 0
+var _revision := 0
+var _event_seq := 0
+var _sample_seq := 0
+var _last_sample: Dictionary = {}
+var _action_ledger: Dictionary = {}
 var _paused := false
 var _human := Vector2i(2, 2)
 var _anima := Vector2i(9, 5)
@@ -63,8 +73,14 @@ func _parse_args() -> void:
 
 
 func _reset_world() -> void:
+	# Each reset creates a different world incarnation. Tick and revision
+	# restart; event/sample sequence numbers NEVER go backwards in a process.
+	_epoch += 1
+	_revision = 0
 	_tick = 0
 	_paused = false
+	_last_sample.clear()
+	_action_ledger.clear()
 	_human = Vector2i(2, 2)
 	_anima = Vector2i(9, 5)
 	_door_open = false
@@ -144,6 +160,8 @@ func _request(line: String) -> Dictionary:
 	):
 		return _reply(null, false, {}, "INVALID_ID")
 	var request_id: int = int(raw_id)
+	if req.get("protocol") == PROTOCOL_V2:
+		return _request_v2(req, request_id)
 	if req.get("protocol") != PROTOCOL:
 		return _reply(request_id, false, {}, "UNSUPPORTED_PROTOCOL")
 	var role: String = str(req.get("role", ""))
@@ -191,23 +209,30 @@ func _request(line: String) -> Dictionary:
 			if not bool(desired) and (_human == _door or _anima == _door):
 				return _reply(request_id, false, {}, "DOOR_OCCUPIED")
 			_tick += 1
+			if _door_open != bool(desired):
+				_revision += 1
 			_door_open = bool(desired)
 			_record("operator", "set_door", {"open": _door_open})
 			queue_redraw()
 			_refresh_hud()
 			return _reply(request_id, true, {"open": _door_open})
 		"pause":
+			if not _paused:
+				_revision += 1
 			_paused = true
 			_record("operator", "pause", {})
 			_refresh_hud()
 			return _reply(request_id, true, {"paused": true})
 		"resume":
+			if _paused:
+				_revision += 1
 			_paused = false
 			_record("operator", "resume", {})
 			_refresh_hud()
 			return _reply(request_id, true, {"paused": false})
 		"step":
 			_tick += 1
+			_revision += 1
 			_record("operator", "step", {})
 			_refresh_hud()
 			return _reply(request_id, true, {"tick": _tick})
@@ -274,13 +299,17 @@ func _move(who: String, direction: String) -> Dictionary:
 			_anima = target
 		else:
 			_human = target
+		_revision += 1
 	_tick += 1
-	_record(who, "move", {
+	var event := _record(who, "move", {
 		"direction": direction, "moved": moved, "reason": reason,
 	})
 	queue_redraw()
 	_refresh_hud()
-	return {"moved": moved, "position": _cell(target if moved else before), "reason": reason}
+	return {
+		"moved": moved, "position": _cell(target if moved else before),
+		"reason": reason, "event_id": event["event_id"], "revision": _revision,
+	}
 
 
 func _agent_observation() -> Dictionary:
@@ -317,12 +346,18 @@ func _debug_snapshot() -> Dictionary:
 	}
 
 
-func _record(actor: String, event_type: String, details: Dictionary) -> void:
-	_history.append({
-		"tick": _tick, "actor": actor, "event": event_type, "details": details,
-	})
+func _record(actor: String, event_type: String, details: Dictionary) -> Dictionary:
+	_event_seq += 1
+	var record := {
+		"event_id": "val_evt:%d" % _event_seq,
+		"event_seq": _event_seq, "epoch": _epoch, "revision": _revision,
+		"tick": _tick, "actor": actor, "event": event_type,
+		"details": details.duplicate(true),
+	}
+	_history.append(record)
 	if _history.size() > MAX_EVENTS:
 		_history.pop_front()
+	return record
 
 
 func _refresh_hud() -> void:
@@ -352,8 +387,11 @@ func _unhandled_key_input(event: InputEvent) -> void:
 		KEY_D, KEY_RIGHT:
 			direction = "E"
 		KEY_E:
-			if _distance(_human, _door) <= 1:
+			if _distance(_human, _door) <= 1 and (
+				not _door_open or (_human != _door and _anima != _door)
+			):
 				_tick += 1
+				_revision += 1
 				_door_open = not _door_open
 				_record("human", "toggle_door", {"open": _door_open})
 				queue_redraw()
