@@ -185,7 +185,9 @@ def _exercise(client: LabClient) -> tuple[dict, list[dict]]:
             break
     else:
         raise AssertionError("event pagination loop exceeded bound")
-    _check(cursor == crossing["event_seq"] + 0 or cursor == illegal_close["event_seq"],
+    _check(illegal_close["event_seq"] == crossing["event_seq"],
+           "rejected operator door close unexpectedly produced an event")
+    _check(cursor == illegal_close["event_seq"],
            "event cursor did not reach current world event sequence")
     _check(len({event["event_id"] for event in all_events}) == len(all_events),
            "duplicate event IDs in paged history")
@@ -279,8 +281,9 @@ def _run(args) -> int:
                                 for item in trace),
                         encoding="utf-8",
                     )
-                client.role = "operator"
-                client.call("reset")
+                # Success is established by _exercise(). Process teardown
+                # is handled in finally; do not issue another world mutation
+                # after printing a PASS result.
                 return 0
             except Exception as exc:
                 print(f"Virtual ANIMA Lab P5-B: FAIL — {exc}", file=sys.stderr)
