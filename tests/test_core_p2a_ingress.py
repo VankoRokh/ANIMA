@@ -120,6 +120,7 @@ def test_p2a_versions_and_sources_are_distinct_occurrences(tmp_path):
         {**_event(), "received_at": "2020-01-01T00:00:00+00:00"},
         {**_event(), "event_id": "ev_attacker"},
         {**_event(), "occurrence_version": True},
+        {**_event(), "occurrence_version": 2**64},
         {**_event(), "kind": "unregistered.kind"},
         {**_event(), "payload": {"measurement": 0.1}},
         {**_event(), "payload": {"too_big": "x" * 17_000}},
@@ -176,3 +177,12 @@ def test_p2a_does_not_write_legacy_history_or_boot_core_runtime(tmp_path):
     assert not (tmp_path / "events.jsonl").exists()
     assert not (tmp_path / "memory.db").exists()
     assert not (tmp_path / "state.json").exists()
+
+
+def test_p2a_source_registry_is_a_frozen_copy(tmp_path):
+    registrations = _sources()
+    ingress = CoreIngress(tmp_path / "core_state.db", sources=registrations)
+    registrations.clear()
+    assert ingress.admit(_event(), source_ref=SOURCE).status == "ACCEPTED"
+    with pytest.raises(TypeError):
+        ingress.sources["sensor.forged"] = _sources()[SOURCE]
