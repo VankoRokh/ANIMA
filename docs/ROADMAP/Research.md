@@ -1,347 +1,172 @@
-# Будущие механизмы и открытые вопросы
+# Исследовательские направления
 
-Этот документ хранит **текущие** research tracks, mini experiments и отложенные механизмы. Завершённая реализация описывается в [Architecture](../ARCHITECTURE/README.md), stage/status — в [Roadmap](README.md) и [project.json](../project.json), причины принятых решений — в [ADR](../DECISIONS/README.md).
-
-Исторические формулировки и прежние experiment hypotheses сохраняются Git history и validation reports; их не следует выдавать за текущий production plan. При этом названия основных Research Tracks и Mini Experiments сохраняются как стабильные documentation anchors, чтобы старые ADR/Archive ссылки не ломались при редактуре.
+Здесь перечислены **только незавершённые вопросы**. Принятые решения находятся в [ADR](../DECISIONS/README.md), работающий код — в [архитектуре](../ARCHITECTURE/README.md), статус — в [плане](README.md). Полные ранние концепции — в [фиксированной истории Git](../ARCHIVE/Development_Snapshots.md). Технические названия разделов сохранены для устойчивости ссылок.
 
 ## Статусы
 
-- **Accepted principle** — архитектурный принцип принят, но не означает завершённую реализацию всех вариантов.
-- **Implemented baseline** — механизм существует и подтверждён текущей архитектурой.
-- **Experiment Accepted / Rejected / Inconclusive** — результат ограниченного эксперимента; не равен production capability автоматически.
-- **Planned** — направление относится к будущему Stage, но ещё не реализовано.
-- **Research / Draft** — вопрос или дизайн без обязательства реализации.
+**Принято** — принцип; **реализовано** — код с проверкой; **исследуется** — гипотеза; **отложено** — нет утверждённого срока. Успех эксперимента не равен разрешению внедрения.
 
 ## Текущее положение
 
+Системный Stage 6 подтверждён, семантический Stage 7 подготовлен, но не завершён. Core v0.1 ожидает [повторного независимого аудита](Core_v0_1_Audit_Boundaries.md). [Virtual Lab](Virtual_ANIMA_Lab_P5C_Scenario_Replay_Draft.md) проверен отдельно от Core.
+
 ### Stage 6 — завершённый baseline
 
-Реализованы и подтверждены:
-
-- persistent Tasks и связь Task ↔ Goal;
-- CognitiveCoordinator;
-- system-owned FAST/DEEP/CHOICE routing;
-- первый DEEP backend/role;
-- Internal State + Choice integration;
-- bounded ExecutionAction / Executor / independent Observation / Verification;
-- Sleep integration в общий Task lifecycle;
-- recovery и UnifiedTrace.
-
-Подробности: [Stage 6 implemented architecture](../ARCHITECTURE/Stage_6_Cognitive_Integration_Core.md), representative acceptance — [TV-0051](../TESTING/Results/TV-0051.md).
-
-Stage 6 не доказал, что DEEP всегда улучшает качество, и не сделал все routing/context research ideas production policy.
+Tasks/Goals, FAST/DEEP/CHOICE, независимая Verification, Sleep и recovery объединены под системным управлением. [TV-0051](../TESTING/Results/TV-0051.md). Универсальный выигрыш DEEP не доказан.
 
 ### Stage 7 — semantic boundary принят, implementation Planned
 
-Текущий канонический pre-training boundary: [Stage 7 Semantic Boundary v0](Stage_7_Semantic_Boundary_v0.md).
-
-Приняты semantic concepts и read-only `classify_relation/0.1`, но production write lifecycle не реализован. Открыты DP-08/09/10b/11.
-
-Перед model training обязательны:
-
-```text
-reviewed conformance corpus
-→ deterministic baseline
-→ constrained vanilla inference
-→ measure semantic residual
-→ only then LoRA/SFT decision
-```
-
-Conformance plan: [Stage 7 Semantic Conformance v0](../TESTING/Stage7_Conformance_v0.md).
+Приняты [read-only правила](Stage_7_Semantic_Boundary_v0.md); DP-08/09/10b/11 открыты. Полный жизненный цикл записи Knowledge не реализован.
 
 ## Research Track: FAST / DEEP / Context
 
-**Accepted principle:** FAST и DEEP — логические cognitive roles, не личности. Routing, Tasks, Memory, verification и execution остаются system-owned.
+FAST и DEEP — роли, а не личности. Маршрутизация, память, полномочия и итоговая проверка остаются у системы.
 
 ### Current conservative routing — Implemented baseline
 
-Stage 6 routing вызывает:
-
-- FAST для bounded unresolved reasoning baseline;
-- DEEP для explicit conflict reasoning;
-- CHOICE для system-owned selection при допустимом verified candidate set;
-- deterministic/blocked paths без model call, когда это возможно.
+Консервативный выбор FAST/DEEP/CHOICE и отказ без LLM работают в ограниченном профиле. Нельзя автоматически переносить результат на любую задачу.
 
 ### EXP-004 — request_more_context
 
-**Mechanism Accepted; model-quality effect Inconclusive.**
-
-System-mediated дополнительный retrieval может быть реализован без прямого Memory ownership модели. Controlled mechanism доказан, но достаточного real-model quality gain для production enablement не показано.
-
-Production capability остаётся disabled до отдельной необходимости/приёмки.
+Дополнительное извлечение контекста допускается через систему с бюджетом. **Качество: не доказано**.
 
 ### EXP-005 — FAST/DEEP routing baseline
 
-**Conservative routing Accepted. Naive uncertainty-only escalation Rejected. DEEP incremental quality Inconclusive.**
-
-Наблюдения Stage 6 и последующего audit:
-
-- DEEP значительно дороже FAST на текущих моделях;
-- простое правило `uncertainty high → DEEP` не оправдало дополнительную стоимость;
-- часть различий FAST/DEEP вызвана моделью и prompt/interface, а не самостоятельным доказанным классом «глубокого мышления».
-
-Открытые исследования:
-
-- task-specific routing по измеренному quality/cost;
-- same-model FAST/DEEP controls;
-- semantic residual после Stage 7 deterministic preprocessing;
-- нужен ли DEEP вообще для конкретного operation profile.
+Частичное принятие маршрутизации; часть эвристик отвергнута, общий выигрыш не доказан.
 
 ## Research Track: model-facing semantic interface
 
-**Accepted direction:** не создавать новый универсальный cognitive DSL поверх уже существующего IR.
-
-Разделять:
-
-1. semantic ontology/data model;
-2. operation-specific model-facing protocol;
-3. transport renderer/serialization;
-4. optional learned adapter.
-
-Первый baseline:
-
-```text
-accepted semantic IR
-→ typed bounded operation view
-→ JSON renderer
-→ constrained generation / validation
-→ system-owned interpretation
-```
-
-JSON является renderer, а не новой моделью мира.
+Разделять данные, профиль операции, сериализацию и адаптер модели. JSON не является новой онтологией. Сначала детерминированный ответ, затем измеренный остаток.
 
 ### Open experiment: constrained generation
 
-Для `classify_relation/0.1` сравнить минимум:
-
-- unconstrained diagnostic output;
-- constrained JSON/grammar output через существующий llama.cpp transport;
-- одинаковую semantic task при neutral prompt.
-
-Структурная валидность измеряется отдельно от semantic accuracy.
+Сравнить строгий JSON-протокол `classify_relation/0.1` с обычным выводом; запрещать недопустимые результаты при проверке.
 
 ### Open experiment: renderer comparison
 
-Только если JSON interface остаётся реальным bottleneck, сравнить одинаковую semantics через compact typed JSON, line DSL и S-expression. Отдельный DSL принимается только при измеримом преимуществе по quality/tokens/latency/debuggability без semantic regression.
+Сравнить доступные transport/rendering варианты при неизменном typed IR и одинаковом корпусе.
 
 ## Research Track: FAST adaptation / LoRA
 
-**Not started.** Qwen3-0.6B остаётся удобным первым FAST training target из-за малого размера и уже известного поведения, но обучение не является текущим следующим шагом.
-
-Допустимая будущая цель адаптера — **protocol/semantic alignment**:
-
-- понимать bounded task structure;
-- различать data и service metadata;
-- связывать supplied evidence refs;
-- сохранять uncertainty/abstention;
-- соблюдать typed proposal contract;
-- не использовать role/source/confidence/recency как скрытый authority shortcut.
-
-Не помещать в веса как замену системным хранилищам Identity/personality, autobiographical Memory, current Knowledge, Goals/Tasks, lifecycle authority и safety/execution permissions.
-
-Training gate:
-
-1. frozen semantic/profile version;
-2. independent train/dev/untouched splits;
-3. vanilla + same constrained renderer baseline;
-4. meaningful residual semantic errors after deterministic processing;
-5. explicit owner decision that LoRA/SFT is justified.
-
-Current audit cases remain regression/history и не являются untouched training benchmark.
+**Не начато.** Обучение допустимо после независимого conformance и замера residual; личность, знания и полномочия не переносятся в веса как единственное хранилище.
 
 ## Research Track: Stage 7 lifecycle and Knowledge
 
+Не изменять Knowledge напрямую по одному ярлыку `CONTRADICTION`. Нужны системные права источников, историчность и проверяемые переходы.
+
 ### Open DP-08 — authority and lifecycle actions
 
-Нужно определить source authority semantics, correction rights, accepted system-owned action vocabulary и условия, при которых contradiction/support вызывает no-op, verification, challenge или revision. Прямого `relation label → write transition` shortcut быть не должно.
+Определить права наблюдений, исправлений и допустимых переходов Knowledge. Модель не назначает полномочия источникам.
 
 ### Open DP-09 — Knowledge read semantics
 
-Нужно явное отображение между public semantic read state и существующими implementation statuses:
-
-```text
-provisional
-confirmed
-challenged
-superseded
-rejected
-```
-
-Temporal applicability, disputes/revisions и historical retrieval должны оставаться видимыми без параллельной неописанной state machine.
+Согласовать публичные состояния знания с существующими статусами хранения, временем, оспариванием и историей.
 
 ### Open DP-10b — dependency re-evaluation
 
-DP-10a уже разделяет Evidence occurrence и Claim equality и определяет replay/dependence. Открыты descendant re-evaluation, alternative grounds, stale/false/pending-review semantics и bounded traversal cost.
+Определить ограниченный пересмотр производных утверждений после изменения оснований.
 
 ### Open DP-11 — production integration
 
-Первая реализация должна оставаться read-only/shadow. Нужно определить, как typed Stage 7 results войдут в Stage 6 dispatcher/validator contracts без обхода существующих guards и без передачи model write authority.
+Согласовать Stage 7 lifecycle с Stage 6 Tasks, routing и валидаторами без второго центра управления.
 
 ## Research Track: semantic extraction
 
-После измерения deterministic residual отдельная операция может понадобиться для semantic extraction из natural-language fragments.
-
-Возможный будущий profile:
-
-```text
-extract_claim/0.x
-```
-
-Он может предлагать Claim, EntityRef binding/unresolved, predicate registry binding, polarity/qualifiers, reported/asserted time и source spans. `classify_relation/0.1` не должен превращаться в универсальный parser.
+Будущий `extract_claim/0.x` отделён от `classify_relation/0.1`; связь с сущностями и временная область не должны возникать догадкой без свидетельств.
 
 ## Research Track: Memory и данные
 
-**Implemented baseline:** Event → Memory → Knowledge; Entity/Relation/provenance; SQLite/FTS; bounded Retrieval/Context.
-
-Будущие механизмы вводятся только после измеренного ограничения baseline:
-
-- embeddings / semantic retrieval;
-- vector DB;
-- graph DB / deeper traversal;
-- LLM reranking/query expansion;
-- richer Entity resolution/NER;
-- Memory SPLIT;
-- asset/media processors;
-- distributed memory/sync.
-
-Stage 7 дополнительно требует сохранить Evidence identity/provenance и не превращать contradiction в destructive overwrite.
+Есть SQLite/FTS, Event→Memory→Knowledge и происхождение данных. Embeddings, граф, видео, мультимедиа и распределённая память — по измеренной необходимости.
 
 ## Research Track: verification and active investigation
 
-[Semantic Verification v0](Semantic_Verification_v0.md) остаётся scoped concept.
-
-High-significance semantic uncertainty может позже создавать persistent verification Task на Stage 6 substrate вместо отдельного investigator agent. Открыты risk/importance threshold, acquisition cost, task arbitration, влияние resolved verification на Knowledge по DP-08/09 и descendant reassessment по DP-10b.
-
-Models могут интерпретировать evidence; они не назначают себе sensor authority или lifecycle rights.
+Дополнительное расследование — bounded Task с отдельной ценой, источником и правилами подтверждения, а не неподконтрольный агент.
 
 ## Research Track: dynamic Task arbitration / interest
 
-[Dynamic Task Arbitration Concept](Dynamic_Task_Arbitration_Concept.md) остаётся future-scoped.
-
-Potential factors: importance, urgency, delay cost, risk, active Goals, resource budget, switch cost, bounded interest/novelty. Interest — фактор, не authority. Anti-thrashing/aging обязательны, если track станет implementation work.
+Возможны факторы срочности, риска, полезности, новизны и цены переключения. Интерес не даёт прав. Защита от starvation и thrashing обязательна.
 
 ## Research Track: emergency response
 
-[Emergency Response Mode Concept](Emergency_Response_Mode_Concept.md) остаётся вне текущего baseline.
-
-Future principle: при safety-critical uncertainty система может предпочесть conservative reversible action до perfect diagnosis, сохраняя uncertainty и verification need. Model не получает emergency authority генерацией label.
+При риске допустимо осторожное обратимое действие, но LLM не получает особого допуска; нужны правила риска, отказа и отката.
 
 ## Research Track: Internal State / Goals / autonomy
 
-**Implemented baseline:** Goals и bounded Internal State участвуют в Stage 6 Choice с causal trace.
-
-Still Research/Draft:
-
-- per-Goal/scoped state refinements;
-- interest/novelty drive;
-- новые state variables только если текущих факторов недостаточно;
-- automatic coefficient calibration;
-- self-generated Goals с явным authority/conflict policy.
-
-Self-generated Goal не должен молча переопределять внешний/user/system Goal.
+Состояние влияет на Choice; самостоятельные цели и дополнительные показатели требуют политики конфликтов с внешними Goals.
 
 ## Research Track: Sleep и consolidation
 
-**Implemented baseline:** persistent bounded Sleep orchestration с checkpoint/resume/recovery интегрирована с Stage 6 Tasks.
-
-Still Research/Draft:
-
-- multi-day reflection;
-- replay реальных Goal→Choice→result chains;
-- counterfactual simulation;
-- generative dreaming с разделением real/derived/hypothetical;
-- DEEP-assisted semantic consolidation;
-- model adaptation during Sleep как отдельный experiment.
-
-Sleep не означает training автоматически.
+Уже есть bounded checkpoint/resume. Рефлексия, контрфактические сценарии и обучение модели при сне — отдельные проверки; Sleep не равен training.
 
 ## Research Track: Bootstrap Knowledge
 
-[Bootstrap Knowledge v0](Bootstrap_Knowledge_v0.md) остаётся scoped Stage 7 concept.
-
-Accepted boundaries: versioned curated Source/provenance, отсутствие provenance-free bootstrap exception, Knowledge/policy separation, fake autobiography вне production, synthetic history только в test/virtual instances. Write-through ingestion ждёт DP-08/09/10b/11.
+Небольшая стартовая база реальных знаний проходит общий Source/provenance/lifecycle. Фальшивые воспоминания — только тестовым экземплярам.
 
 ## Research Track: Virtual ANIMA
 
-**Planned Stage 8.** Virtual environment должна быть одновременно interactive sandbox и reproducible workload.
-
-Разделяются world ground truth, synthetic test history и live events. Scenario families должны включать meaningful events, noise, repetition, stale information, contradictions, delayed consequences, causal chains, multi-hop relations, restart/recovery и fault injection. Мир не должен останавливаться из-за медленного inference.
+В Stage 8 потребуются независимая истина мира, тестовая история, живые события, шум, устаревание и fault injection. Godot Lab подготовлен без Core.
 
 ## Research Track: Hardware и переносимость
 
-**Planned Stage 9.** Reference platform остаётся PC; первый physical validation target — Raspberry Pi 5.
-
-На одинаковом workload измерять correctness, CPU/RAM/storage I/O, temperature/throttling, FAST/DEEP/retrieval latency, Active/Standby/Sleep resource profile, restart/error rate, persistent data growth и endurance/soak behavior.
-
-Pico подходит только для оправданных realtime/telemetry/watchdog/GPIO ролей. CM5/Zero/accelerators/distributed nodes — implementation options, а не roadmap requirements до измеренной необходимости.
+Stage 9: одинаковый workload на ПК и Pi 5, контроль ресурсов и надёжности. Pico/CM5/Zero/NPU не обязательны до измерений.
 
 ## Интерфейсы и действия
 
-**Accepted boundary:** предложение действия и фактический результат — разные события. Выполнение требует independent Observation/Verification; текст `success` от модели не является evidence исполнения.
-
-Для независимых узлов до выбора транспорта нужны versioned contracts: sender/receiver, schema, units, timeout, errors, retry/idempotency, ordering/conflicts и minimal behavior при отказе узла. Общий mutable state не становится сетевым контрактом автоматически.
+Предложение ≠ разрешение ≠ эффект ≠ receipt ≠ подтверждение. Внешний адаптер должен описывать права, версии, идентификаторы, ошибки и повторы.
 
 ### Research Track: perception and interaction
 
-**Planned Stage 10.** Начать с доступных laptop camera/microphone/audio. Stable source/output interfaces должны позволять замену устройств без изменения cognitive ownership.
-
-Raw continuous media не становится long-term Memory автоматически. Perception должен выдавать bounded observations/events с provenance и quality metadata.
+Начать с ноутбучной камеры и микрофона; сырые потоки преобразуются в ограниченные события с указанием происхождения, а не автоматически сохраняются в Memory.
 
 ## Research Track: physical expansion
 
-**Stage 11+, intentionally broad.** Dedicated cameras, microphone arrays, IMU, actuators, power architecture, cooling и distributed compute выбираются только из измеренных Stage 9–10 requirements. Physical form не определяет ANIMA identity.
+Форма корпуса, приводы и питание выбираются после измерений на Stage 9–10; физическая форма не определяет Identity.
 
 ## Research Track: identity and personality
 
-**Accepted principle:** continuity несут Identity + Memory + rules/state, а не одна model или prompt. Отдельный personality module остаётся Research; большой скрытый system prompt не должен превращаться во вторую неаудируемую базу состояния.
+Identity + Memory + правила изменений отделены от сменной модели и prompt; «личность» как отдельный компонент пока не подтверждена.
 
 ## Mini Experiments
 
-Mini Experiments сохраняют стабильные IDs как исторические/research anchors. Их status ниже обновлён по текущему состоянию проекта.
+Идентификаторы EXP сохраняются для старых ссылок. Их статусы не объявляют обязательства реализации.
 
 ### EXP-001 — Internal weight for memory selection
 
-**Planned / no result.** Проверить, улучшает ли bounded state-derived weighting отбор полезного опыта при ограниченном memory budget по сравнению с обычным retrieval/selection.
+Запланировано: сравнить отбор памяти с факторами Internal State и без них при одинаковом бюджете.
 
 ### EXP-002 — Selected experience improves FAST
 
-**Planned / no result.** Раздельно сравнивать context/rule updates и weight training; нужны fixed model, independent evaluation set, rollback и quality/resource metrics.
+Запланировано: отделить контекстные изменения от обучения весов на независимом наборе.
 
 ### EXP-003
 
-**Planned / no result.** Local reinforcement for peripheral task: проверить локальное подкрепление на одной bounded simulation/peripheral-control задаче. Глобальная reward-функция личности из этого не следует.
+Запланировано: локальное подкрепление на одной периферийной задаче, без глобального reward личности.
 
 ### EXP-004 — Request more context
 
-**Mechanism Accepted; quality effect Inconclusive.** System-mediated дополнительный retrieval архитектурно допустим; production enablement не подтверждён.
+Механизм допустим; прирост качества при независимой проверке пока не установлен.
 
 ### EXP-005 — FAST/DEEP routing baseline
 
-**Partly Accepted / Partly Rejected / quality Inconclusive.** Conservative explicit routing принят; naive uncertainty-only escalation отвергнут; общий incremental DEEP quality не доказан.
+Частичное принятие маршрутизации; часть эвристик отвергнута, общий выигрыш не доказан.
 
 ### EXP-006 — Semantic conflict lifecycle
 
-**Planned Stage 7.** Проверять semantic relation/lifecycle только после принятия DP-08/09/10b/11; read-only relation classification предшествует write-through experiment.
+После решения DP-08/09/10b/11: проверяемые переходы без переписывания происхождения.
 
 ### EXP-007 — Virtual memory/noise corpus
 
-**Planned Stage 8.** Контролируемая смесь important/noise/repeated/stale/contradictory experience с известным ground truth.
+Stage 8: набор значимых, шумовых, повторных, устаревших и противоречивых событий с известной истиной.
 
 ### EXP-008 — PC/Pi endurance parity
 
-**Planned Stage 9.** Один фиксированный Virtual ANIMA workload на PC и Pi 5 с сопоставлением correctness, latency, resources и endurance.
+Stage 9: один сценарий на ПК и Pi 5, сравнение корректности, времени и ресурсов.
 
 ## Current research priority
 
-```text
-1. finish documentation/conformance fixation for accepted Stage 7 boundary
-2. build owner-reviewed 40–50 root conformance corpus
-3. implement read-only deterministic evaluator / typed boundary
-4. add constrained generation for true semantic residual
-5. rerun vanilla Qwen on a fresh corpus
-6. decide whether a model classifier adds value at all
-7. only then consider LoRA/SFT
-8. review DP-08/09/10b/11 before Knowledge write integration
-```
+1. Независимо перепроверить Core v0.1 и определить доверенную границу P6.
+2. Утвердить отрицательные и conformance-тесты Stage 7.
+3. Сравнить детерминированные правила и модель на независимом корпусе.
+4. Закрыть DP-08/09/10b/11 до записи Knowledge.
+5. Остальное — только после измеренной необходимости.
 
-Этот порядок намеренный: проект не должен искусственно оставлять работу LLM там, где deterministic semantics уже дают точный ответ.
