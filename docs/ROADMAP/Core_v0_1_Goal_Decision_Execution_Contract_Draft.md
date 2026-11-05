@@ -188,16 +188,16 @@ These fixtures extend existing C0–C8 and S01–S10; not a third separate accep
 
 ## 10. Decisions proposed to owner before P1/P3
 
-**E1 — Goal lifecycle (recommended):** v0.1 implements `ensure_once`, not open-ended `maintain`; finish Goal from independently checked condition even when no action was needed.
+**E1 — Goal lifecycle (Accepted in principle, 2026-11-05):** v0.1 implements `ensure_once`, not open-ended `maintain`; finish Goal from independently checked condition even when no action was needed.
 
-**E2 — Criterion binding (recommended):** keep Stage 2 `GoalStore` canonical, add versioned typed criterion sidecar/registry, reject/unbound Goals from active work until reconciliation; no silent DB migration.
+**E2 — Criterion binding (Accepted in principle, 2026-11-05):** keep Stage 2 `GoalStore` canonical, add versioned typed criterion sidecar/registry, reject/unbound Goals from active work until reconciliation; no silent DB migration.
 
-**E3 — Decision / policy separation (recommended):** bounded deterministic `NOOP/REQUEST_OBSERVATION/PROPOSE_ACTION/DEFER` + separate non-bypassable system policy; existing ChoiceEngine reused only for supported multiple-candidate cases.
+**E3 — Decision / policy separation (Accepted in principle, 2026-11-05):** bounded deterministic `NOOP/REQUEST_OBSERVATION/PROPOSE_ACTION/DEFER` + separate non-bypassable system policy; existing ChoiceEngine reused only for supported multiple-candidate cases.
 
-**E4 — World execution/verification (recommended):** keep Stage 6 ExecutionAction/Store/Receipt semantics; add registered world adapter and `world.property_equals` independent verifier, including observation-only completion; no faux successful action for NOOP.
+**E4 — World execution/verification (Accepted in principle, 2026-11-05):** keep Stage 6 ExecutionAction/Store/Receipt semantics; add registered world adapter and `world.property_equals` independent verifier, including observation-only completion; no faux successful action for NOOP.
 
-**E5 — Recovery (recommended):** Core recovery without hard Sleep dependency, explicit post-crash `uncertain` and reconciliation before retry, no arbitrary exactly-once claim.
+**E5 — Recovery (Accepted in principle, 2026-11-05):** Core recovery without hard Sleep dependency, explicit post-crash `uncertain` and reconciliation before retry, no arbitrary exactly-once claim.
 
-**E6 — Cross-store persistence (recommended):** adopt journal/work-intent/outbox and idempotent reconciliation protocol spanning Core journal→Task/Goal→Execution. Only Core Event/Observation/Belief changes are atomically committed in single SQLite DB; no cross-DB transaction guarantee.
+**E6 — Cross-store persistence (Accepted in principle, 2026-11-05):** adopt journal/work-intent/outbox and idempotent reconciliation protocol spanning Core journal→Task/Goal→Execution. Only Core Event/Observation/Belief changes are atomically committed in single SQLite DB; no cross-DB transaction guarantee.
 
-After owner review and initial regression baseline, define exact wire schemas, data migration/readback semantics and P1 assembly. No production code change authorized by this draft.
+Owner has agreed to E1–E6 as architectural direction. Exact wire schemas, readback semantics and fault-test details remain implementation gates; baseline regression remains unmeasured in this session. Agreement is not a passing P0 gate or proof of operational reliability. A separate P1 bootstrap slice can be developed without enabling any of the P2–P4 semantics prematurely.
