@@ -409,6 +409,11 @@ class CoreDoorExecution:
                     # uncertain; no implicit tool retry or fabricated receipt.
             confirm_id, confirm_tick, confirmed = self._observe()
             if self._verified(goal_id, confirm_id, confirm_tick, confirmed):
+                if operations and operation["status"] == "prepared":
+                    self.store.transition_operation(
+                        operation["id"], "cancelled",
+                        reason="P3-B independent readback makes prepared effect unnecessary",
+                    )
                 self._complete(
                     goal_id, task_id=decision.task_id, event_id=confirm_id,
                     operation_id=recovered_operation_id,
