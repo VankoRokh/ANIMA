@@ -114,8 +114,25 @@ func _initialize() -> void:
 	if stale["ok"] or stale["error"] != "STALE_WORLD":
 		_finish(lab, false, "stale action after intervention accepted")
 		return
+	# Bounded operator fixtures: the 9th active obstacle must be rejected.
+	for index in range(8):
+		var added := _call(lab, 30 + index, "operator", "set_obstacle", {
+			"at": {"x": index + 1, "y": 1}, "blocked": true,
+		})
+		if not added["ok"]:
+			_finish(lab, false, "failed to add in-capacity obstacle")
+			return
+	var overflow := _call(lab, 39, "operator", "set_obstacle", {
+		"at": {"x": 9, "y": 1}, "blocked": true,
+	})
+	if overflow["ok"] or overflow["error"] != "OBSTACLE_CAPACITY":
+		_finish(lab, false, "obstacle capacity did not fail closed")
+		return
 	lab._scenario = "detour"
 	lab._reset_world()
+	if not lab._dynamic_obstacles.is_empty():
+		_finish(lab, false, "reset retained previous temporary obstacles")
+		return
 	if lab._epoch != 2 or Vector2i(7, 4) not in lab._walls:
 		_finish(lab, false, "detour profile did not reset to new geometry")
 		return
