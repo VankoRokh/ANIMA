@@ -4,7 +4,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-from scripts.run_core_acceptance import render_markdown, summarize_junit, required_coverage, P4_REQUIRED
+from scripts.run_core_acceptance import render_markdown, summarize_junit, required_coverage, P4_REQUIRED, _checkout_unchanged
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -121,3 +121,21 @@ def test_core_audit_manifest_rejects_same_names_from_unrelated_module():
         for name in P4_REQUIRED
     ]
     assert set(required_coverage(impostors).values()) == {"MISSING"}
+
+
+
+def test_core_audit_release_report_rejects_dirty_or_changing_checkout():
+    stable = {
+        "commit": "abc123", "tree": "tree123", "clean": True,
+        "porcelain": "",
+    }
+    assert _checkout_unchanged(stable, dict(stable))
+    for modified in (
+        {**stable, "clean": False, "porcelain": " M anima/core/ingress.py"},
+        {**stable, "commit": "another-commit"},
+        {**stable, "tree": "another-tree"},
+        {**stable, "tree": None},
+    ):
+        assert not _checkout_unchanged(stable, modified)
+    assert not _checkout_unchanged({**stable, "clean": False}, stable)
+    assert not _checkout_unchanged({**stable, "commit": None}, stable)
