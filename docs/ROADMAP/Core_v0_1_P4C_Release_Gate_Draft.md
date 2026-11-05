@@ -1,6 +1,6 @@
 # ANIMA Core v0.1 — P4-C Release Candidate Acceptance
 
-**Статус:** implementation/test-plan drafted on `work/core-v0-1-p4c-release-gate`; **UNVERIFIED** until owner-local tests. Core v0.1 **not frozen** and no release claim.  
+**Статус:** **P4-C owner-local PASS** on exact `aabe6553cec19d4cf1962dc4f26129eeca436328`: 1380 PASS / 0 FAIL / 0 SKIP, mandatory 19/19. **Independent Work audit found four runtime blockers B1–B4; Core v0.1 remains BLOCKED and is not frozen.** Fix branch: `work/core-v0-1-audit-fixes`.  
 **Дата:** 2026-11-05.  
 **Предыдущий gate:** [P4-B — verified owner-local](Core_v0_1_P4B_Endurance_Recovery_Draft.md), exact tested commit `f6536f32c825897ef96168caa52ac45ece514b75`.  
 **Acceptance baseline:** [P0 boundary & C0–C8 matrix](Core_v0_1_P0_Boundary_Draft.md); [P4-A integrated tests](Core_v0_1_P4_Integrated_Acceptance_Draft.md).
@@ -40,7 +40,7 @@ The seeds, episode count, restart cadence and zero-duplicate requirement are fix
 
 ## 3. Requirement matrix C0–C8
 
-The matrix maps to **existing named checks** and additional P4-C cases. Status for *new P4-C checks* remains Pending.
+The matrix maps to **existing named checks** and additional P4-C cases. The P4-C tests passed in the owner-local run on the pinned snapshot, but independent adversarial cases B1–B4 failed on that same snapshot. Passing this matrix does not resolve those blockers.
 
 | ID | Required behavior | Strongest bounded evidence | Scope / unresolved gap |
 |---|---|---|---|
@@ -102,6 +102,12 @@ sed -n '1,85p' "$report_dir/summary.md"
 ```
 
 Keep the `report_dir` path and exact `git rev-parse HEAD` in the acceptance message. Do not commit each temporary JUnit/log or Core instance snapshot to GitHub.
+
+## 5.1 Owner-local P4-C result and independent mini-audit
+
+On 2026-11-05 the owner supplied an exact-SHA `--suite full` acceptance report: `aabe6553cec19d4cf1962dc4f26129eeca436328`, Python 3.14.4, 1380 passed, zero failed/skipped, 19/19 mandatory P4 scenarios, 29.213 s sum of case durations, p95 per test 0.071 s, exit 0. The result was reproducible by independent Work using a separate Python 3.13.5 runtime.
+
+**However:** the same independent reviewer ran 29 additional probes and confirmed four Core recovery/lifecycle defects. See [B1–B4 remediation](Core_v0_1_Independent_Audit_Remediation_Draft.md). Therefore **P4-C stock test acceptance PASS does NOT imply Core v0.1 release acceptance**. The new fix branch must pass additional fault/crash negative controls before owner release sign-off.
 
 ## 6. Final release decision (not yet made)
 
