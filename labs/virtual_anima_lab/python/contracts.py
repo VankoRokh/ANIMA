@@ -8,7 +8,10 @@ from __future__ import annotations
 
 from typing import Any
 
-from .lab_client import _exact_protocol_integer
+try:
+    from .lab_client import _exact_protocol_integer
+except ImportError:  # Direct script invocation from this directory.
+    from lab_client import _exact_protocol_integer
 
 
 class LabContractError(ValueError):
@@ -101,9 +104,10 @@ def validate_observation(data: Any, envelope: dict[str, Any]) -> dict[str, Any]:
         if predicate == "state":
             _require(
                 subject == "lab.door.01"
-                and typed == {"type": "symbol", "value": "open"} or
-                subject == "lab.door.01"
-                and typed == {"type": "symbol", "value": "closed"},
+                and typed in (
+                    {"type": "symbol", "value": "open"},
+                    {"type": "symbol", "value": "closed"},
+                ),
                 "invalid typed door state",
             )
             _require(set(item) == {"subject_ref", "predicate_ref", "typed_value", "position"},
