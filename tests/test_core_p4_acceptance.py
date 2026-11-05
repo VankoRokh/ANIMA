@@ -287,3 +287,134 @@ def test_p4_many_irrelevant_events_advance_cursor_without_effects(tmp_path):
             "SELECT integer_value FROM core_autonomy_meta WHERE name='event_cursor'"
         ).fetchone()[0]
     assert cursor >= 130
+
+
+
+# P4-B: multi-restart endurance and scheduler-audit crash boundaries.
+
+
+def test_p4b_crash_after_goal_completed_before_scheduler_audit(tmp_path):
+    core = _core(tmp_path)
+    goal = core.internal_state.goals.create_goal(
+        source="test.operator", priority=5, description="close once",
+        success_criterion="closed", reason="P4-B audit crash injection",
+    )
+    original_run = core.core_autonomy.executor.run
+
+    def lose_scheduler_result(goal_id):
+        result = original_run(goal_id)
+        assert result.outcome == "VERIFIED_SUCCESS"
+        raise RuntimeError("P4-B lost autonomous attempt result")
+
+    core.core_autonomy.executor.run = lose_scheduler_result
+    with pytest.raises(RuntimeError, match="P4-B lost autonomous attempt result"):
+        core.runtime.bind_core_goal(GoalCriterion(
+            goal_id=goal["id"], subject_ref=DOOR_SUBJECT,
+            predicate_ref=DOOR_PREDICATE, expected=dict(EXPECTED),
+        ))
+    assert _status(core, goal["id"]) == ("completed", ["completed"])
+    assert _effects(core) == 1
+    assert core.core_autonomy.attempts()[0]["status"] == "started"
+
+    restarted = _core(tmp_path)
+    restarted.runtime.wake()
+    assert _status(restarted, goal["id"]) == ("completed", ["completed"])
+    assert _effects(restarted) == 1
+    attempts = restarted.core_autonomy.attempts()
+    assert len(attempts) == 1
+    assert attempts[0]["status"] == "finished"
+    assert attempts[0]["outcome"] == "RECOVERED_VERIFIED_SUCCESS"
+    assert attempts[0]["reason_code"] == "PERSISTED_VERIFICATION_PROOF"
+    assert attempts[0]["evidence_event_id"]
+    assert restarted.core_autonomy.pending_count() == 0
+    assert restarted.runtime.run_core_autonomous().turns == ()
+
+
+def test_p4b_cancelled_started_attempt_finishes_deferred_without_effect(tmp_path):
+    core = _core(tmp_path)
+    goal = core.internal_state.goals.create_goal(
+        source="test.operator", priority=5, description="cancelled",
+        success_criterion="closed", reason="P4-B cancellation",
+    )
+    def fail_before_effect(goal_id):
+        raise RuntimeError("P4-B lost attempt before execution")
+
+    core.core_autonomy.executor.run = fail_before_effect
+    with pytest.raises(RuntimeError, match="P4-B lost attempt"):
+        core.runtime.bind_core_goal(GoalCriterion(
+            goal_id=goal["id"], subject_ref=DOOR_SUBJECT,
+            predicate_ref=DOOR_PREDICATE, expected=dict(EXPECTED),
+        ))
+    assert core.core_autonomy.attempts()[0]["status"] == "started"
+    assert _effects(core) == 0
+    core.internal_state.goals.transition_goal(
+        goal["id"], to_status="cancelled", reason="operator cancelled Goal"
+    )
+
+    restarted = _core(tmp_path)
+    restarted.runtime.wake()
+    assert _effects(restarted) == 0
+    attempts = restarted.core_autonomy.attempts()
+    assert attempts[0]["status"] == "finished"
+    assert attempts[0]["outcome"] == "DEFERRED"
+    assert attempts[0]["reason_code"] == "GOAL_NOT_ACTIVE"
+    assert attempts[0]["evidence_event_id"] is None
+    assert restarted.core_autonomy.pending_count() == 0
+
+
+@pytest.mark.parametrize("restarts_every", [2, 4])
+def test_p4b_multi_episode_cold_restart_and_noise_stay_bounded(
+    tmp_path, restarts_every
+):
+    core = _core(tmp_path, state="closed")
+    instance_id = core.identity.get()["instance_id"]
+    core.runtime.wake()
+    expected_effects = 0
+    goals = []
+
+    for i in range(12):
+        if i and i % restarts_every == 0:
+            core.runtime.sleep()
+            core = _core(tmp_path)
+            assert core.identity.get()["instance_id"] == instance_id
+            core.runtime.wake()
+            assert _effects(core) == expected_effects
+
+        initial = "open" if i % 2 == 0 else "closed"
+        core.core_execution.world.change_by_environment(initial)
+        previous = _effects(core)
+        # Invalid noisy sensor data arrives independently from the test world.
+        for j in range(2):
+            report = core.runtime.ingest_core_event(
+                _event(
+                    f"noise:{restarts_every}:{i}:{j}",
+                    source=NOISE, subject="entity.noise",
+                    tick=300 + i * 3 + j,
+                ),
+                source_ref=NOISE,
+            )
+            assert report.status == "ACCEPTED"
+            assert core.core_events.ingress.observation_outcome(
+                report.event_id
+            )["outcome"] == "REJECTED_INVALID"
+        assert _effects(core) == previous
+
+        goal_id = _goal(core, title=f"P4-B episode {i}")
+        goals.append(goal_id)
+        assert _status(core, goal_id) == ("completed", ["completed"])
+        expected_effects += (initial == "open")
+        assert _effects(core) == expected_effects
+        assert core.core_execution.world.current()["state"] == "closed"
+        assert len(core.core_execution.store.list_operations(goal_id=goal_id)) == (
+            1 if initial == "open" else 0
+        )
+        assert core.core_autonomy.pending_count() == 0
+
+    assert len(set(goals)) == 12
+    assert _effects(core) == 6
+    attempts = core.core_autonomy.attempts()
+    assert len(attempts) == 12
+    assert all(a["status"] == "finished" for a in attempts)
+    assert all(a["outcome"] == "VERIFIED_SUCCESS" for a in attempts)
+    assert len(core.core_decision.tasks.list_tasks()) == 12
+    assert core.runtime.run_core_autonomous().turns == ()
