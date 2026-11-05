@@ -137,7 +137,7 @@ def render_text(records):
         f"  Belief: {_name(result['belief_status'])}, "
         f"{_name((result['belief_value'] or {}).get('value'))}",
         f"  Мир*  : {_name(result['operator_ground_truth'])}",
-        f"  Эффектов: {len(g.get('execution_ledger', []))} | "
+        f"  Операций: {len(g.get('execution_ledger', []))} | "
         f"Ожидающих триггеров: {result['pending_auto_triggers']}",
         "",
         "ПРОВЕРКИ",
