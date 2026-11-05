@@ -1,6 +1,7 @@
 from anima.core.dispatch import CoreEventDispatcher
 from anima.core.goal_decision import CoreGoalDecision
 from anima.core.door_execution import CoreDoorExecution
+from anima.core.autonomy import CoreAutonomy
 from anima.internal_state.runtime_integration import InternalStateRuntime
 from anima.sleep.runtime_integration import SleepRuntimeIntegration
 
@@ -25,6 +26,7 @@ class Runtime:
         core_events=None,
         core_decision=None,
         core_execution=None,
+        core_autonomy=None,
     ):
         if internal_state is not None and not isinstance(
             internal_state,
@@ -53,6 +55,10 @@ class Runtime:
             core_execution, CoreDoorExecution
         ):
             raise TypeError("Runtime core_execution must be CoreDoorExecution or null")
+        if core_autonomy is not None and not isinstance(core_autonomy, CoreAutonomy):
+            raise TypeError("Runtime core_autonomy must be CoreAutonomy or null")
+        if core_autonomy is not None and core_autonomy.executor is not core_execution:
+            raise ValueError("Autonomy must share registered Core executor")
 
         self.trace = trace
         self.metrics = metrics
@@ -68,6 +74,7 @@ class Runtime:
         self.core_events = core_events
         self.core_decision = core_decision
         self.core_execution = core_execution
+        self.core_autonomy = core_autonomy
         self._recovery_checked = False
 
     def _session_id(self):
@@ -112,6 +119,8 @@ class Runtime:
         admitted = self.core_events.ingress.admit(raw, source_ref=source_ref)
         if admitted.status in {"ACCEPTED", "ALREADY_SEEN"}:
             self._drain_core_events()
+            if self.core_autonomy is not None:
+                self.run_core_autonomous()
         return admitted
 
     def read_core_belief(self, subject_ref, predicate_ref, *, as_of_tick=None):
@@ -127,8 +136,11 @@ class Runtime:
         return self.core_decision
 
     def bind_core_goal(self, criterion):
-        """Bind a typed criterion to an existing Goal; no implicit authority."""
-        return self._require_core_decision().bind(criterion)
+        """Bind typed criterion; opt-in P3-C treats a new binding as work."""
+        inserted = self._require_core_decision().bind(criterion)
+        if inserted and self.core_autonomy is not None:
+            self.run_core_autonomous()
+        return inserted
 
     def plan_core_step(self, goal_id, *, as_of_tick):
         """Bounded proposal step; no Tool invocation or Goal completion."""
@@ -154,6 +166,22 @@ class Runtime:
         finally:
             # World observations are canonical in Core DB first. Legacy outbox
             # catch-up remains bounded and replay-safe on the next Runtime entry.
+            self._drain_core_events()
+
+    def run_core_autonomous(
+        self, *, max_steps=4, max_triggers=32, max_new_events=64
+    ):
+        """Bounded synchronous scheduler; no thread or unbounded polling."""
+        if self.core_autonomy is None:
+            raise RuntimeError("Core autonomous scheduler is not configured")
+        self._ensure_recovered()
+        try:
+            return self.core_autonomy.drain(
+                max_steps=max_steps,
+                max_triggers=max_triggers,
+                max_new_events=max_new_events,
+            )
+        finally:
             self._drain_core_events()
 
     def _process_events(self):
@@ -200,7 +228,10 @@ class Runtime:
             source="runtime",
             session_id=self._session_id(),
         )
-        return self._process_events()
+        processed = self._process_events()
+        if self.core_autonomy is not None:
+            self.run_core_autonomous()
+        return processed
 
     def user_input(self, text):
         self._trace("runtime: user_input received")
