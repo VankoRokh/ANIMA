@@ -1,4 +1,5 @@
 from anima.core.dispatch import CoreEventDispatcher
+from anima.core.goal_decision import CoreGoalDecision
 from anima.internal_state.runtime_integration import InternalStateRuntime
 from anima.sleep.runtime_integration import SleepRuntimeIntegration
 
@@ -21,6 +22,7 @@ class Runtime:
         internal_state=None,
         sleep_runtime=None,
         core_events=None,
+        core_decision=None,
     ):
         if internal_state is not None and not isinstance(
             internal_state,
@@ -41,6 +43,10 @@ class Runtime:
             core_events, CoreEventDispatcher
         ):
             raise TypeError("Runtime core_events must be CoreEventDispatcher or null")
+        if core_decision is not None and not isinstance(
+            core_decision, CoreGoalDecision
+        ):
+            raise TypeError("Runtime core_decision must be CoreGoalDecision or null")
 
         self.trace = trace
         self.metrics = metrics
@@ -54,6 +60,7 @@ class Runtime:
         self.internal_state = internal_state
         self.sleep_runtime = sleep_runtime
         self.core_events = core_events
+        self.core_decision = core_decision
         self._recovery_checked = False
 
     def _session_id(self):
@@ -106,6 +113,26 @@ class Runtime:
         return self.core_events.ingress.read_belief(
             subject_ref, predicate_ref, as_of_tick=as_of_tick
         )
+
+    def _require_core_decision(self):
+        if self.core_decision is None:
+            raise RuntimeError("Core Goal/Decision is not configured")
+        return self.core_decision
+
+    def bind_core_goal(self, criterion):
+        """Bind a typed criterion to an existing Goal; no implicit authority."""
+        return self._require_core_decision().bind(criterion)
+
+    def plan_core_step(self, goal_id, *, as_of_tick):
+        """Bounded proposal step; no Tool invocation or Goal completion."""
+        planner = self._require_core_decision()
+        self._ensure_recovered()
+        return planner.step(goal_id, as_of_tick=as_of_tick)
+
+    def plan_next_core_step(self, *, as_of_tick):
+        planner = self._require_core_decision()
+        self._ensure_recovered()
+        return planner.step_next(as_of_tick=as_of_tick)
 
     def _process_events(self):
         processed = []
