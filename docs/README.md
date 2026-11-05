@@ -1,39 +1,26 @@
 # Документация ANIMA
 
-[О проекте](../README.md) → [текущая работа и этапы](ROADMAP/README.md) →
-нужный раздел. Этот же вход используется после перерыва и новым помощником.
+**Начать здесь:** [проект](../README.md) → [план и статус](ROADMAP/README.md) → [архитектура](ARCHITECTURE/README.md). Вся рабочая документация ведётся на русском языке; имена схем, функций, модулей и статусов оставлены в исходном написании.
 
-| Вопрос | Каноническое место |
+| Нужна информация | Канонический источник |
 |---|---|
-| Зачем создаётся ANIMA? | [О проекте](../README.md) |
-| Текущая работа и статусы этапов? | [project.json](project.json); представление в [Roadmap](ROADMAP/README.md) |
-| Какой semantic boundary принят для текущего Stage 7 interface slice? | [Stage 7 Semantic Boundary v0](ROADMAP/Stage_7_Semantic_Boundary_v0.md); решение [ADR-010](DECISIONS/ADR-010_Stage_7_Semantic_Boundary.md) |
-| Как выглядит первый принятый JSON renderer `classify_relation/0.1`? | [classify_relation_0_1.schema.json](SCHEMAS/classify_relation_0_1.schema.json) |
-| Какие root cases приняты как Stage 7 conformance gold? | [Stage 7 Conformance Corpus v0](TESTING/Stage7_Conformance_Corpus_v0.md); история review — [Owner Review Log](TESTING/Stage7_Conformance_Review_Log.md) |
-| Как проверять Stage 7 semantic contract до обучения? | [Stage 7 Semantic Conformance v0](TESTING/Stage7_Conformance_v0.md) |
-| Что и как проверять дальше? | [Roadmap](ROADMAP/README.md); [идеи и эксперименты](ROADMAP/Research.md) |
-| Как работает подтверждённый код? | [Architecture](ARCHITECTURE/README.md) |
-| Почему принято решение? | [Decisions](DECISIONS/README.md) и отдельные ADR-файлы |
-| Как проверять и наблюдать процесс? | [Testing](TESTING/README.md) |
-| Что доказали показательные прогоны? | [Results](TESTING/Results/README.md) |
-| Как установить, обновить, резервировать и вести документацию? | [Operations](OPERATIONS/README.md) |
-| Куда переехали прежние документы? | [Archive](ARCHIVE/README.md) |
+| Текущие этапы и зависимости | [`project.json`](project.json); читаемый [план](ROADMAP/README.md) |
+| Что реально реализовано | [Архитектура](ARCHITECTURE/README.md) |
+| Зачем приняты решения | [ADR](DECISIONS/README.md) |
+| Как запускать, проверять и восстанавливать | [Эксплуатация](OPERATIONS/README.md) и [тестирование](TESTING/README.md) |
+| Доказательства и проверенные SHA | [Результаты испытаний](TESTING/Results/README.md) |
+| Core v0.1: риски и повторная ревизия | [Границы аудита](ROADMAP/Core_v0_1_Audit_Boundaries.md) и [исправления B1–B4](ROADMAP/Core_v0_1_Independent_Audit_Remediation_Draft.md) |
+| Принятые семантические правила Stage 7 | [Semantic Boundary v0](ROADMAP/Stage_7_Semantic_Boundary_v0.md), [ADR-010](DECISIONS/ADR-010_Stage_7_Semantic_Boundary.md), [проверки](TESTING/Stage7_Conformance_v0.md), [схема](SCHEMAS/classify_relation_0_1.schema.json) |
+| Готовность Virtual Lab | [Сводка полигона](ROADMAP/Virtual_ANIMA_Lab_P5C_Scenario_Replay_Draft.md) |
+| Идеи, не принятые в реализацию | [Исследовательские вопросы](ROADMAP/Research.md) |
+| Устаревшие черновики и прежние версии | [Карта истории](ARCHIVE/Development_Snapshots.md), [архив миграции](ARCHIVE/README.md), Git |
 
-### Stage 7 design history
+## Правила ведения
 
-Текущий accepted boundary не стирает ранние design baselines. Для контекста и истории решений доступны:
+- **Один факт — одно место.** Статусы и зависимости меняются только в `docs/project.json`, параметры исполнения — в коде, доказательства — в отчётах.
+- **Не путать проверку и доказательство безопасности.** PASS подтверждает конкретный сценарий и снимок, а не все возможные входы.
+- **Не дублировать завершённые планы.** Черновики из предыдущих этапов остаются в Git, а в рабочем дереве — только актуальные требования, риски и ссылки на результаты.
+- Изменившийся источник обновляется один раз; `python3 scripts/update_docs.py` пересобирает автоматические разделы; `bash scripts/check.sh` проверяет ссылки, достижимость и синтаксис.
+- Ручное редактирование блоков `AUTO:...` запрещено. Правила резервирования, отчётности и проверки — в [эксплуатации](OPERATIONS/README.md#ведение-документации).
 
-- [SemanticCandidate v0](ROADMAP/Semantic_Candidate_v0.md);
-- [Knowledge Lifecycle v0](ROADMAP/Knowledge_Lifecycle_v0.md);
-- [Semantic Temporal Conflict v0](ROADMAP/Semantic_Temporal_Conflict_v0.md);
-- [Semantic Verification v0](ROADMAP/Semantic_Verification_v0.md);
-- [Bootstrap Knowledge v0](ROADMAP/Bootstrap_Knowledge_v0.md);
-- [Dynamic Task Arbitration Concept](ROADMAP/Dynamic_Task_Arbitration_Concept.md);
-- [Emergency Response Mode Concept](ROADMAP/Emergency_Response_Mode_Concept.md).
-
-Если старый Stage 7 design-файл расходится с [Stage 7 Semantic Boundary v0](ROADMAP/Stage_7_Semantic_Boundary_v0.md), для текущего pre-training/read-only interface slice приоритет имеет accepted boundary. Исторические TV/audit результаты сохраняют исходную терминологию своего времени.
-
-Правится только изменившийся источник. Затем `python3 scripts/update_docs.py`
-обновляет сводки, а `bash scripts/check.sh` проверяет актуальность, ссылки,
-достижимость и синтаксис. AUTO-блоки вручную не редактируются.
-Схемы и команды — в [Operations](OPERATIONS/README.md#ведение-документации).
+**Ограничение:** технические JSON/GDScript/Python-идентификаторы и некоторые уже принятые текстовые контракты пока сохранены на английском, чтобы не изменить их значение при сокращении. Для оперативной работы использовать русские сводки и неизменные схемы.
