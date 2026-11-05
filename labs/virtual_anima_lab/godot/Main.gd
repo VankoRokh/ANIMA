@@ -23,6 +23,7 @@ var _buffer := ""
 var _port := 46019
 var _seed := 7
 var _scenario := "base"
+var _ui_mode := "normal" # Display-only choice; never changes world truth or agent access.
 var _tick := 0
 var _epoch := 0
 var _revision := 0
@@ -41,6 +42,7 @@ var _dynamic_obstacles: Array[Vector2i] = []
 var _history: Array[Dictionary] = []
 var _hud: Label
 var _diagnostics: Label
+var _guide: Label
 
 
 func _ready() -> void:
@@ -48,6 +50,10 @@ func _ready() -> void:
 	_parse_args()
 	if not _scenario in SCENARIOS:
 		push_error("VAL: unknown lab scenario: %s" % _scenario)
+		get_tree().quit(2)
+		return
+	if not _ui_mode in ["normal", "debug"]:
+		push_error("VAL: unknown lab UI mode: %s" % _ui_mode)
 		get_tree().quit(2)
 		return
 	_reset_world()
@@ -59,7 +65,12 @@ func _ready() -> void:
 	_diagnostics.position = Vector2(WIDTH * CELL + 16, 22)
 	_diagnostics.add_theme_font_size_override("font_size", 15)
 	add_child(_diagnostics)
-	_refresh_hud()
+	_guide = Label.new()
+	_guide.position = Vector2(WIDTH * CELL + 16, 72)
+	_guide.add_theme_font_size_override("font_size", 17)
+	_guide.text = "VIRTUAL ANIMA LAB\n\nHuman: WASD / arrows\nDoor: E (when nearby)\n\nANIMA: Python bridge\n\nF3: Developer diagnostics\n\nWorld: local simulation"
+	add_child(_guide)
+	_set_ui_mode(_ui_mode)
 	var listen_error := _server.listen(_port, "127.0.0.1")
 	if listen_error != OK:
 		push_error("VAL: cannot bind 127.0.0.1:%d (%s)" % [_port, listen_error])
@@ -81,11 +92,26 @@ func _parse_args() -> void:
 		elif args[i] == "--lab-scenario" and i + 1 < args.size():
 			_scenario = args[i + 1]
 			i += 1
+		elif args[i] == "--lab-ui" and i + 1 < args.size():
+			_ui_mode = args[i + 1]
+			i += 1
 		i += 1
 	if _port < 1024 or _port > 65535 or _seed < 0:
 		push_error("VAL: invalid port or seed")
 		get_tree().quit(2)
 		return
+
+
+# Local viewport controls only. No world revision, tick, event or authorization change.
+func _set_ui_mode(mode: String) -> void:
+	if not mode in ["normal", "debug"]:
+		return
+	_ui_mode = mode
+	if _diagnostics != null:
+		_diagnostics.visible = mode == "debug"
+	if _guide != null:
+		_guide.visible = mode == "normal"
+	_refresh_hud()
 
 
 func _reset_world() -> void:
@@ -693,6 +719,17 @@ func _record(actor: String, event_type: String, details: Dictionary) -> Dictiona
 
 func _refresh_hud() -> void:
 	if _hud != null:
+		if _ui_mode == "normal":
+			_hud.text = "Human (blue): arrows / WASD  •  E: nearby door\n"
+			_hud.text += "ANIMA (green): Python bridge  •  F3: Debug panel"
+		else:
+			_refresh_debug_hud()
+	if _diagnostics != null and _ui_mode == "debug":
+		_refresh_diagnostics()
+
+
+func _refresh_debug_hud() -> void:
+	if _hud != null:
 		var pause_word := "PAUSED" if _paused else "RUNNING"
 		var door_word := "OPEN" if _door_open else "CLOSED"
 		_hud.text = "Human (blue): arrows / WASD  •  E opens nearby door\n"
@@ -700,6 +737,7 @@ func _refresh_hud() -> void:
 		_hud.text += "Door: %s  |  %s  |  seed: %d  |  port: %d" % [
 			door_word, pause_word, _seed, _port,
 		]
+func _refresh_diagnostics() -> void:
 	if _diagnostics != null:
 		_diagnostics.text = "OPERATOR / WORLD TRUTH\n"
 		_diagnostics.text += "Epoch: %d\nRevision: %d\nTick: %d\n" % [
@@ -729,7 +767,12 @@ func _refresh_hud() -> void:
 func _unhandled_key_input(event: InputEvent) -> void:
 	if not (event is InputEventKey):
 		return
-	if not event.pressed or event.echo or _paused:
+	if not event.pressed or event.echo:
+		return
+	if event.keycode == KEY_F3:
+		_set_ui_mode("normal" if _ui_mode == "debug" else "debug")
+		return
+	if _paused:
 		return
 	var direction := ""
 	match event.keycode:
