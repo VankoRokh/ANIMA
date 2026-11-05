@@ -328,21 +328,29 @@ def test_p3b_goal_completed_before_task_transition_is_recovered(tmp_path):
 
 
 def test_p3b_recover_prepared_operation_without_verification_spec_fails_closed(tmp_path):
+    # Deliberately emulate an OLD split-commit or legacy partial intent. New
+    # Core preparation is atomic and cannot create this state on its own.
     first = _core(tmp_path)
     goal_id = _goal(first)
+    original = first.core_execution.store.create_operation
 
-    def fail(action, spec):
-        raise RuntimeError("controlled verification spec binding failure")
+    def legacy_partial(action, *, registry, reason, verification_spec):
+        original(action, registry=registry, reason=reason)
+        raise RuntimeError("controlled legacy partial intent")
 
-    first.core_execution.store.save_verification_spec = fail
-    with pytest.raises(RuntimeError, match="controlled verification spec"):
+    first.core_execution.store.create_operation = legacy_partial
+    with pytest.raises(RuntimeError, match="controlled legacy partial"):
         first.runtime.run_core_door_goal(goal_id)
     op = _ops(first, goal_id)[0]
     assert op["status"] == "prepared"
     assert _world_effects(first) == 0
+
     reopened = _core(tmp_path)
-    with pytest.raises(ValueError, match="no persisted VerificationSpec"):
-        reopened.runtime.run_core_door_goal(goal_id)
+    deferred = reopened.runtime.run_core_door_goal(goal_id)
+    assert deferred.outcome == "DEFERRED"
+    assert deferred.reason_code == "INCOMPLETE_EXECUTION_INTENT"
+    assert deferred.operation_id == op["id"]
+    assert reopened.internal_state.goals.get_goal(goal_id)["status"] == "active"
     assert _world_effects(reopened) == 0
 
 
