@@ -42,7 +42,7 @@ def make_core(data_dir: Path, *, port: int = 46019):
         sources={DOOR_SOURCE: SourceRegistration(
             source_ref=DOOR_SOURCE,
             producer_ref=DOOR_PRODUCER,
-            allowed_kinds=("state.property", "state.unknown"),
+            allowed_kinds=("state.property", "sensor.unavailable"),
         )},
         properties={(DOOR_SUBJECT, DOOR_PREDICATE): PropertyRule(
             subject_ref=DOOR_SUBJECT,
