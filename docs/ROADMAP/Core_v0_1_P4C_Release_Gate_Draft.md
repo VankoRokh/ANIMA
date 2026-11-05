@@ -1,6 +1,6 @@
 # ANIMA Core v0.1 — P4-C Release Candidate Acceptance
 
-**Статус:** implementation/test-plan drafted on `work/core-v0-1-p4c-release-gate`; **UNVERIFIED** until owner-local tests. Core v0.1 **not frozen** and no release claim.  
+**Статус:** **P4-C PASS по локальному полному прогону владельца** на точном SHA `aabe6553cec19d4cf1962dc4f26129eeca436328` (2026-11-05). **Core v0.1 Release Candidate; independent audit and explicit owner release sign-off pending.** Не считать Core Complete.  
 **Дата:** 2026-11-05.  
 **Предыдущий gate:** [P4-B — verified owner-local](Core_v0_1_P4B_Endurance_Recovery_Draft.md), exact tested commit `f6536f32c825897ef96168caa52ac45ece514b75`.  
 **Acceptance baseline:** [P0 boundary & C0–C8 matrix](Core_v0_1_P0_Boundary_Draft.md); [P4-A integrated tests](Core_v0_1_P4_Integrated_Acceptance_Draft.md).
@@ -40,7 +40,7 @@ The seeds, episode count, restart cadence and zero-duplicate requirement are fix
 
 ## 3. Requirement matrix C0–C8
 
-The matrix maps to **existing named checks** and additional P4-C cases. Status for *new P4-C checks* remains Pending.
+The matrix maps to **existing named checks** and additional P4-C cases. P4-C checks have **owner-local PASS evidence** on the pinned snapshot; independent audit and explicit release decision remain pending.
 
 | ID | Required behavior | Strongest bounded evidence | Scope / unresolved gap |
 |---|---|---|---|
@@ -102,6 +102,19 @@ sed -n '1,85p' "$report_dir/summary.md"
 ```
 
 Keep the `report_dir` path and exact `git rev-parse HEAD` in the acceptance message. Do not commit each temporary JUnit/log or Core instance snapshot to GitHub.
+
+## 5.1. P4-C actual local evidence (owner-supplied)
+
+On 2026-11-05, owner supplied a human-readable excerpt of the `--suite full` acceptance report and the exact tested HEAD: `aabe6553cec19d4cf1962dc4f26129eeca436328` (not the prior P4-B commit). Report metadata: Python `3.14.4`, timestamp `2026-11-05T15:30:13.005526+00:00`, process exit code `0`.
+
+- **1380 passed, 0 failed, 0 skipped** (full suite).
+- Mandatory P4 evidence **19/19 PASS**, including seeds **7, 31, 73**, same-seed repetition, no-work idle, initial unknown Belief, unauthorized sensor negative case, and all P4-A/B controls.
+- Sum of per-test durations **29.213 s**, observed per-test p95 **0.071 s**. These are **not** the complete process elapsed wall time or a platform-wide performance SLO.
+- Tests and `scripts/check.sh` were reported successful by the owner. No independent assistant/CI execution; raw JUnit/JSON files were **not** supplied in this conversation.
+
+P4-C test gate is accepted **for the pinned one-door Core profile**. This is not a declaration of immunity to disk corruption, real device failures, hostile IPC, multiple concurrent writers, autonomous self-created Goals, or LLM-derived actions.
+
+**Independent review brief:** [Core v0.1 — Work Mini Audit](Core_v0_1_Work_Mini_Audit_Brief.md). The review must target the **immutable tested commit**, not later documentation-only changes.
 
 ## 6. Final release decision (not yet made)
 
