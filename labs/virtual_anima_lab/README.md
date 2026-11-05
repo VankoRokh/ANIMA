@@ -262,6 +262,60 @@ This proves only scripted command-order replay under fixed seeds/profile.
 Interactive GUI keyboard interleaving and crash recovery are not replayed.
 See the [P5-C acceptance plan](../../docs/ROADMAP/Virtual_ANIMA_Lab_P5C_Scenario_Replay_Draft.md).
 
+## UI presentation modes and Ubuntu launcher (post-P5-C slice)
+
+**Status: implemented on `work/val-ui-mode-launcher`, real Godot UI/native
+verification pending.** This is presentation-only: neither the typed bridge
+nor existing Core/goal/evidence boundaries are changed.
+
+- `--lab-ui normal` (default): the operator truth/debug panel is hidden;
+  a static, non-privileged control guide replaces it and the bottom HUD
+  omits clock, state, seed and TCP port.
+- `--lab-ui debug`: the full P5-B developer panel and detailed HUD appear.
+- Press **F3** to switch either way, including while the simulated world is
+  paused. Toggling the view never increments world revision/tick or alters
+  event history. The Godot executable may still append **`(DEBUG)` to the
+  OS window title** for non-exported/debug runs; that engine-build suffix is
+  not the Lab's F3 view state.
+- `--lab-scenario base|detour|clutter` works independently of display mode.
+  The existing `val.bridge/0.1` and `val.bridge/0.2` interfaces are
+  unchanged. **Normal UI is not a security boundary**: a client that can
+  impersonate the unauthenticated operator role still has debug access.
+
+On Ubuntu, install/replace the existing user-local `.desktop` launcher:
+
+```bash
+bash labs/virtual_anima_lab/install_desktop_launcher.sh
+gtk-launch virtual-anima-lab
+```
+
+The installer checks the Godot binary at
+`~/.local/opt/godot/Godot_v4.7.2-stable_linux.x86_64` (override with
+`GODOT_BIN=/path/to/binary`), resolves the current Lab project directory,
+and writes **only** the user's
+`~/.local/share/applications/virtual-anima-lab.desktop` by default. It
+overwrites that exact filename if already present, leaving other launchers
+untouched. It can be run again after moving the repository. The regular
+click opens **base/normal**; right-click actions offer **Detour**,
+**Clutter** (normal) and **Debug Mode** (base). F3 remains available in
+all maps. Close the existing Lab instance before launching another one
+because they share local TCP port `46019`.
+
+Verification:
+
+```bash
+.venv/bin/python -m pytest -q tests/test_val_ui_launcher.py
+GODOT_BIN="$HOME/.local/opt/godot/Godot_v4.7.2-stable_linux.x86_64"
+"$GODOT_BIN" --headless --path labs/virtual_anima_lab/godot \
+  --script res://BridgeUiModeTest.gd
+# Expected: VAL_UI_MODE_PASS
+```
+
+After these isolated tests, rerun P5-A/P5-B/P5-C headless suites and visually
+confirm F3, both launcher actions and independent Human/ANIMA controls. A
+Godot release export is a distinct packaging task, **not** part of this UI
+slice.
+
 ## Tests and next gate
 
 ```bash
