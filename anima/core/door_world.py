@@ -8,6 +8,7 @@ are produced by a separate readback path that does not use tool receipts.
 import sqlite3
 from contextlib import closing
 from pathlib import Path
+from typing import Protocol, runtime_checkable
 
 from anima.agent.executor import SandboxHandler, SandboxToolError
 from anima.agent.tools import ToolDescriptor, ToolRegistry
@@ -154,6 +155,22 @@ def door_handlers():
     )}
 
 
+@runtime_checkable
+class DoorWorldPort(Protocol):
+    """Narrow injected capability boundary; adapter implementation stays outside Core.
+
+    Implementations must expose independent sensor readback and a read-only
+    reconciliation method that NEVER retries ambiguous effects.
+    This protocol alone does not authenticate any external process.
+    """
+
+    root: Path
+
+    def sense(self) -> tuple[dict, int]: ...
+
+    def reconcile(self, arguments: dict, operation_id: str) -> tuple[str, dict | None]: ...
+
+
 class VirtualDoorWorld:
     """Explicitly seeded fixture with a sensor independent of action receipts."""
 
@@ -163,6 +180,9 @@ class VirtualDoorWorld:
         self.path = self.root / WORLD_FILE
         with closing(sqlite3.connect(self.path)) as connection, connection:
             connection.executescript(_SCHEMA)
+
+    def reconcile(self, arguments: dict, operation_id: str) -> tuple[str, dict | None]:
+        return _door_reconcile(self.root, arguments, operation_id)
 
     def seed(self, *, state="open", tick=40):
         """Seed once, never reset an existing world when rebuilding Core."""
@@ -245,6 +265,6 @@ class VirtualDoorWorld:
 
 __all__ = [
     "DOOR_SUBJECT", "DOOR_PREDICATE", "DOOR_SOURCE", "DOOR_PRODUCER",
-    "DOOR_TOOL", "DOOR_VERSION", "VirtualDoorWorld", "door_tool_registry",
+    "DOOR_TOOL", "DOOR_VERSION", "VirtualDoorWorld", "DoorWorldPort", "door_tool_registry",
     "door_handlers",
 ]
