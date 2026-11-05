@@ -1,7 +1,7 @@
 """Single composition root for the existing ANIMA runtime.
 
-P1 bootstrap only: this is not the autonomous Event→Belief→Action loop.
-No model, GUI, world adapter, or Sleep worker is required to construct it.
+Incremental Core v0.1 composition: P1 runtime, P2 observations and optional
+P3-A Goal→Task→Decision. Action execution and verification are not wired.
 """
 
 from dataclasses import dataclass
@@ -65,9 +65,9 @@ def build_core(
 ) -> CoreAssembly:
     """Build the current, proven runtime stack once for CLI and headless use.
 
-    No wakeup is implicit. Caller owns lifecycle. Registered Core inputs can
-    be opted into the same Runtime; autonomous scheduling and actions are not
-    assembled in P2-C.
+    No wakeup is implicit. Caller owns lifecycle. Registered Core inputs and
+    a bounded decision driver may be opted in; this does NOT execute actions
+    or complete Goals.
     """
 
     if (sources is None) != (properties is None):
