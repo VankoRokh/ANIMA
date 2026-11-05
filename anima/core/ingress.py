@@ -12,6 +12,7 @@ from contextlib import closing
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
+from types import MappingProxyType
 from typing import Callable, Mapping
 from uuid import uuid4
 
@@ -122,7 +123,7 @@ class CoreIngress:
     ):
         if not isinstance(sources, Mapping):
             raise TypeError("sources must be a trusted registration mapping")
-        self.sources = dict(sources)
+        self.sources = MappingProxyType(dict(sources))
         if any(
             not isinstance(entry, SourceRegistration) or key != entry.source_ref
             for key, entry in self.sources.items()
@@ -185,7 +186,8 @@ class CoreIngress:
         occurrence_id = raw["occurrence_id"]
         if not isinstance(occurrence_id, str) or not 1 <= len(occurrence_id) <= 128:
             return None
-        if type(raw["occurrence_version"]) is not int or raw["occurrence_version"] < 1:
+        if (type(raw["occurrence_version"]) is not int
+                or not 1 <= raw["occurrence_version"] <= 2**63 - 1):
             return None
         if raw["kind"] not in registration.allowed_kinds or type(raw["payload"]) is not dict:
             return None
