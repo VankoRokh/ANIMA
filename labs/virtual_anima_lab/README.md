@@ -166,7 +166,7 @@ unobserved door states. No in-process Core source registry receives these yet.
 
 ## P5-B experimental typed world contract
 
-**Status:** implemented, **Godot execution unverified**. P5-A `val.bridge/0.1`
+**Status:** real Godot↔Python P5-B headless **10/10 PASS, 29 requests (owner-reported)**; typed GUI controller **24/24 accepted moves**. Native Godot contract test, standalone Python regression, legacy P5-A rerun and pinned SHA remain pending. P5-A `val.bridge/0.1`
 remains supported for the original controllers and smoke tests. The *new*
 `val.bridge/0.2` must be selected explicitly through
 `LabClient(protocol="val.bridge/0.2")`.
