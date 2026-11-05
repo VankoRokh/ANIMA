@@ -183,9 +183,18 @@ class CoreAutonomy:
             if goal["status"] == "completed":
                 proof = self.executor._proof(row["goal_id"])
                 if proof is None:
-                    raise ValueError(
-                        "Completed Goal has no verified proof for started attempt"
+                    # Stage2 may be completed independently by the operator.
+                    # Reconcile attempt bookkeeping, but NEVER invent a
+                    # successful Core verification or a sensor evidence ID.
+                    connection.execute(
+                        "UPDATE core_auto_attempts SET status='finished',"
+                        " outcome='DEFERRED',"
+                        " reason_code='COMPLETED_WITHOUT_CORE_PROOF',"
+                        " operation_id=NULL, evidence_event_id=NULL, updated_at=?"
+                        " WHERE trigger_key=? AND goal_id=? AND status='started'",
+                        (_now(), row["trigger_key"], row["goal_id"]),
                     )
+                    continue
                 if proof["goal_id"] != row["goal_id"]:
                     raise ValueError("Mismatched autonomous verification proof")
                 connection.execute(
