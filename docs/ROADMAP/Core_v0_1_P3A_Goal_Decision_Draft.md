@@ -54,7 +54,7 @@ The sidecar does not duplicate Stage2 Goal status, Stage6 Task status or world B
 |---|---|---|
 | No active Goal | `step_next()=None` or `DEFER` for explicitly requested inactive Goal | none |
 | Active Goal without typed criterion | `DEFER / UNBOUND_GOAL` | none |
-| Unknown, disputed or stale observation | `REQUEST_OBSERVATION / BELIEF_NOT_ACTIONABLE` | may reserve queued Task, **no tool** |
+| Unknown, disputed or stale observation | `REQUEST_OBSERVATION / BELIEF_NOT_ACTIONABLE` | may reserve queued Task; interrupts previously active Task, **no tool** |
 | Fresh known equals expected | `NOOP / TARGET_ALREADY_OBSERVED` | Task becomes active pending independent verification |
 | Fresh known differs and registered action candidate exists | `PROPOSE_ACTION / TARGET_DIFFERS` | Task active; **proposal only** |
 | Fresh known differs without permitted registered candidate | `DEFER / NO_REGISTERED_ACTION` | none |
@@ -70,7 +70,7 @@ Task creation spans `core_work.db` and `tasks.db`, so there is **no cross-DB ato
 1. Atomically reserve a UUIDv4 task_id in `core_task_intents`.
 2. Create Task with the **same** pre-reserved ID in the existing TaskStore.
 3. On retry, use `TaskStore.get_task(task_id)` to resume, verifying matching Goal and owner.
-4. Repeated `step()` does not allocate a different Task ID.
+4. Repeated `step()` does not allocate a different Task ID. If evidence becomes stale/disputed, an active Task transitions to `interrupted`; fresh actionable evidence reactivates that same Task via the existing TaskStore lifecycle.
 
 A crash after task creation but before decision audit is also recoverable by rerunning `step()`. The current support is for **one task intent per ensure_once Goal**, not general multi-step work DAGs, and not multi-writer concurrent scheduling. P3-B will add persistent execution intent/reconciliation and needs stronger cross-store controls.
 
@@ -90,7 +90,7 @@ bash scripts/check.sh
 .venv/bin/python -m pytest -q
 ```
 
-Checks: no implicit scheduler, typed criteria, idempotent binding, missing/disputed/stale observation requests, permitted proposal only, NOOP without goal completion, single task identity after process failure, GoalArbitrator priority, legacy runtime still preserved, no `execution.db` from P3-A. `scripts/check.sh` and full pytest are blocking.
+Checks: no implicit scheduler, typed criteria, idempotent binding, missing/disputed/stale observation requests, permitted proposal only, NOOP without goal completion, single task identity after process failure, GoalArbitrator priority, legacy runtime still preserved, interrupted→active reactivation on new evidence, no `execution.db` from P3-A. `scripts/check.sh` and full pytest are blocking.
 
 **Current status: UNVERIFIED.** GitHub commits are not evidence of executed tests or autonomous operation. Do not mark P3 complete until P3-A and later P3-B/P3-C are explicitly accepted.
 
