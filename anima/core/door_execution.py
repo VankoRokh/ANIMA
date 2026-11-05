@@ -208,6 +208,13 @@ class CoreDoorExecution:
         if task is None or task.goal_id != goal_id or task.status in {"failed", "cancelled"}:
             raise ValueError("Verified Task no longer belongs to an eligible Goal")
         self._remember_proof(goal_id, task_id, event_id, operation_id, candidate_id)
+        proof = self._proof(goal_id)
+        # Stage2 source request identity must remain byte-for-byte stable.
+        # Recover an interrupted Stage2 source operation even without a cold
+        # Core reconstruction before reissuing the original observation.
+        if goal["status"] == "active":
+            self.internal_state.recovery.recover_pending()
+            goal = self.decisions.goals.get_goal(goal_id)
         if goal["status"] == "active":
             self.internal_state.observe_goal(GoalObservation(
                 goal_id=goal_id,
@@ -218,7 +225,7 @@ class CoreDoorExecution:
                 candidate_id=candidate_id,
                 importance=1,
                 criterion_satisfied=True,
-                timestamp=_now(),
+                timestamp=proof["verified_at"],
             ))
         elif goal["status"] != "completed":
             raise ValueError("Cannot apply verified Goal success to inactive Goal")
