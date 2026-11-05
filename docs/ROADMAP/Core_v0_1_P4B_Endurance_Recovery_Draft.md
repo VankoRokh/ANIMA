@@ -1,6 +1,6 @@
 # ANIMA Core v0.1 — P4-B Recovery Bookkeeping / Repeated-Run Endurance
 
-**Статус:** implemented in isolated branch; **PENDING owner-local tests**. Это не финальное закрытие P4/Core v0.1.  
+**Статус:** **P4-B PASS** — локальный прогон владельца, точный snapshot `f6536f32c825897ef96168caa52ac45ece514b75` (2026-11-05). P4-C и Core v0.1 release gate ещё открыты.  
 **Дата:** 2026-11-05.  
 **Ветка:** `work/core-v0-1-p4b-endurance`, основана на owner-accepted [P4-A](Core_v0_1_P4_Integrated_Acceptance_Draft.md).  
 **Исходные контракты:** [P0 System Acceptance](Core_v0_1_P0_Boundary_Draft.md) и [P3-C](Core_v0_1_P3C_Autonomous_Loop_Draft.md).
@@ -91,7 +91,7 @@ sed -n '1,55p' "$report_dir/summary.md"
 
 Для одного только нового P4 набора использовать `--suite p4`, для P4 + предыдущих Core модулей `--suite core`.
 
-**P4-B PASS gate:** `scripts/check.sh` green, all targeted + full tests PASS, mandatory scenario matrix all PASS, tested exact SHA and sample `summary.md`/JSON preserved by owner. **Пока результатов прогона нет; статус UNVERIFIED.**
+**P4-B acceptance (owner-local):** получен читаемый вывод `scripts/run_core_acceptance.py --suite full` для `f6536f32c825897ef96168caa52ac45ece514b75` (Python 3.14.4, UTC 2026-11-05T15:06:19.321542+00:00): **1373 PASS, 0 FAIL, 0 SKIP**, exit code 0. Все **12 mandatory P4 evidence** отмечены PASS, включая обе параметризации `test_p4b_multi_episode_cold_restart_and_noise_stay_bounded[2]` и `[4]`. Сумма длительностей test cases **22.620s**, наблюдаемый per-case p95 **0.069s**. Это пользовательский локальный прогон, а не запуск ассистента или CI. `summary.md`, `summary.json`, `junit.xml`, `pytest.log` созданы во временном каталоге; пользователь передал часть `summary.md` и терминальный вывод, не сами файлы. `scripts/check.sh` также сообщил PASS, но его числовой вывод отдельно не предоставлен.
 
 ## 6. Следующий P4 gate
 
