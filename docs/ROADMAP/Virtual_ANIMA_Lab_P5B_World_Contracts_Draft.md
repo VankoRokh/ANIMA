@@ -1,6 +1,6 @@
 # Virtual ANIMA Lab — P5-B Versioned World Contracts
 
-**Status:** **P5-B real Godot↔Python headless integration PASS (owner-reported: 10/10 checks, 29 requests)** and typed GUI controller 24/24 moves PASS. Remaining evidence gates: native Godot V2, standalone Python V3, P5-A regression V1 and full-suite V8; exact tested SHA not provided. The branch is not yet formally accepted or independently audited.  
+**Status:** **P5-B real Godot↔Python headless integration PASS (owner-reported: 10/10 checks, 29 requests)** and typed GUI controller 24/24 moves PASS. Backward-compatibility P5-A smoke rerun on this branch PASS (9/9, 22 commands, seed 7). Remaining evidence gates: native Godot V2, standalone Python V3 and full-suite V8; exact tested SHA not provided. The branch is not yet formally accepted or independently audited.  
 **Date:** 2026-11-05.  
 **Branch:** `work/val-p5b-world-contracts` (based on last owner-observed P5-A doc commit `788a04c3d93f59e05068474572044f577f9cfcb8`).  
 **Scope:** isolated P5 Lab only. **No import of `anima` and no changes to Core, Stage6 execution, Goals, Belief, Memory, or `docs/project.json`.**  
@@ -158,7 +158,7 @@ The same operator fixture controls (`human_move`, `set_door`, `pause`,
 | V7 | Reset, epoch and truncated event sequence | No old-epoch action accepted, IDs not reused, bounded diagnostics |
 | V8 | `scripts/check.sh` and full Python regression | Existing Core unaffected; clean checked SHA provided |
 
-**Owner-reported on the P5-B working tree:** V4 PASS (10/10 check groups, 29 requests); smoke directly exercises V5 and V6 and the reset/epoch and paged-event portions of V7. Earlier P5-A GUI success and P5-B 24/24 typed controller moves were also reported. **Still not supported by provided output:** V1 P5-A headless rerun on this branch; V2 native Godot-only contract test; V3 Python unit contracts; V7 truncation/expired cursor stress specifically; V8 full regression; exact tested SHA/clean checkout. This is not independent verification and does not imply P6 readiness.
+**Owner-reported on the P5-B working tree:** V4 PASS (10/10 check groups, 29 requests); smoke directly exercises V5 and V6 and the reset/epoch and paged-event portions of V7. Earlier P5-A GUI success and P5-B 24/24 typed controller moves were also reported. **V1 headless P5-A rerun is now owner-reported PASS** (9/9, 22 commands, seed 7); prior GUI success was reported separately. **Still not supported by provided output:** V2 native Godot-only contract test; V3 Python unit contracts; V7 truncation/expired cursor stress specifically; V8 full regression; exact tested SHA/clean checkout. This is not independent verification and does not imply P6 readiness.
 
 ## 4.1 First owner-side v0.2 controller result (2026-11-05)
 
@@ -203,6 +203,21 @@ bounded-log expiration, or the full set of separately defined V1/V2/V3/V8
 gates. The owner has not supplied the run's `git rev-parse HEAD`,
 `git status --short`, complete `trace.jsonl`/`godot.log` or native
 Godot test output. Do not misstate this as a final release gate.
+
+## 4.3 Legacy P5-A headless regression on the P5-B branch (2026-11-05)
+
+The owner reported a fresh `smoke.py` run with `val.p5a.acceptance/0.1`,
+seed `7`, world `p5a-grid/0.1`, **22 commands** and **9/9 PASS**:
+independent Human/ANIMA positions; bounded observations; rejection of
+agent-side operator commands; pause/step; collision and closed door; external
+door opening; read-after-change observation; seeded reset; and both actors'
+event history.
+
+**Interpretation:** P5-B retained P5-A's *tested headless behavior*. This
+does not independently prove the original GUI keyboard route on this exact
+P5-B commit, nor native v0.2 contract tests, full Python regression or clean
+checkout. The owner states the result was recorded; no `trace.jsonl`,
+`godot.log` or exact tested Git SHA was supplied here.
 
 ## 5. Local verification (from repo root)
 
