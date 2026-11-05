@@ -14,7 +14,7 @@ from datetime import datetime, timezone
 from anima.agent.tools import ToolRegistry
 from anima.core.door_world import (
     DOOR_PREDICATE, DOOR_SOURCE, DOOR_SUBJECT, DOOR_TOOL, DOOR_VERSION,
-    VirtualDoorWorld, _door_reconcile,
+    DoorWorldPort,
 )
 from anima.core.goal_decision import CoreGoalDecision
 from anima.execution.contracts import (
@@ -77,7 +77,7 @@ class CoreDoorExecution:
             raise TypeError("CoreDoorExecution requires CoreGoalDecision")
         if not isinstance(internal_state, InternalStateRuntime):
             raise TypeError("CoreDoorExecution requires InternalStateRuntime")
-        if not isinstance(world, VirtualDoorWorld):
+        if not isinstance(world, DoorWorldPort):
             raise TypeError("CoreDoorExecution requires VirtualDoorWorld")
         if not isinstance(execution_store, ExecutionStore):
             raise TypeError("CoreDoorExecution requires ExecutionStore")
@@ -470,8 +470,8 @@ class CoreDoorExecution:
                     )
                     operation = self.store.get_operation(action.operation_id)
                 if operation["status"] == "uncertain":
-                    outcome, _ = _door_reconcile(
-                        self.world.root, action.to_dict()["arguments"], action.operation_id
+                    outcome, _ = self.world.reconcile(
+                        action.to_dict()["arguments"], action.operation_id
                     )
                     if outcome == "succeeded":
                         self.store.transition_operation(
@@ -544,8 +544,8 @@ class CoreDoorExecution:
             if status == "uncertain":
                 # Reconcile ONLY; do not call SandboxExecutor, which is allowed
                 # to retry keyed operations when it finds a missing effect.
-                state, _ = _door_reconcile(
-                    self.world.root, action.to_dict()["arguments"], action.operation_id
+                state, _ = self.world.reconcile(
+                    action.to_dict()["arguments"], action.operation_id
                 )
                 if state == "succeeded":
                     self.store.transition_operation(
