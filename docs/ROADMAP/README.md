@@ -7,6 +7,8 @@ Roadmap описывает цель, границы и проверяемый р
 [Testing Results](../TESTING/Results/README.md), а неутверждённые направления и
 эксперименты — в [Research](Research.md).
 
+**Рабочий проектный план (не утверждён как новый Stage):** [Core v0.1 и Virtual ANIMA Lab v0.1](Core_v0_1_VAL_v0_1_Plan_Draft.md). Он описывает порядок подготовки standalone Core, его проверок и последующего подключения к виртуальной среде; статусы `project.json` не меняет.
+
 <!-- AUTO:roadmap:START -->
 **Текущая работа:** Stage 6 Cognitive Integration Core завершён и подтверждён TV-0051. Для Stage 7 принят pre-training semantic boundary v0: immutable qualified/time-scoped Claim, отдельные Evidence/Source/Producer/provenance, typed Value v0, explicit temporal semantics, независимые CONTENT/REVISION results и read-only classify_relation/0.1 с deterministic-first processing. Stage 7 implementation остаётся Planned; DP-08, DP-09, полная dependency policy DP-10 и production integration DP-11 открыты. До model training обязательны conformance corpus и измерение реального model residual; LoRA/SFT не начаты.
 
