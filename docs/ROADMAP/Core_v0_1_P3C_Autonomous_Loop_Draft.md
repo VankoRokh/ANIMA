@@ -1,6 +1,6 @@
 # ANIMA Core v0.1 — P3-C Bounded Autonomous Event Loop
 
-**Status:** implementation in isolated work branch; **UNVERIFIED** until owner-local full regression + isolated system demonstration.  
+**Status:** **P3-C PASS по сообщению владельца** (2026-11-05). Все предложенные проверки прошли успешно; приведены два демонстрационных трассировочных прогона. Точный `git rev-parse HEAD` и числовые результаты pytest не приложены. P4 integrated acceptance — отдельный gate, ещё не пройден.  
 **Date:** 2026-11-05.  
 **Branch:** `work/core-v0-1-p3c-autonomy`.  
 **Dependency:** [P3-B Door Execution](Core_v0_1_P3B_Door_Execution_Draft.md), [P3-A Goal/Task/Decision](Core_v0_1_P3A_Goal_Decision_Draft.md), [P2-C Event/Belief Runtime](Core_v0_1_P2C_Runtime_Integration_Draft.md).
@@ -115,7 +115,13 @@ demo_closed="$(mktemp -d)"
 
 The structured output contains `stage=bootstrap`, `goal_registered`, `decision`, `scheduler_attempt`, optional `execution_ledger`, and `result`. `operator_ground_truth` is explicitly **privileged test operator context**, not input to the Core decision system.
 
-**Until the owner provides test output + exact SHA, P3-C stays UNVERIFIED.** GitHub write, code reading and fixture definitions alone are not evidence of successful execution.
+**P3-C owner-local acceptance (2026-11-05):** владелец подтвердил успешное выполнение всех предложенных проверок и прислал два самостоятельных демонстрационных JSONL-прогона. Формальные итоги targeted/full `pytest`, `scripts/check.sh` и точный локальный SHA не предоставлены; не выдавать эти числа за известные или за CI.
+
+- **Initial open:** decisions `PROPOSE_ACTION` на ревизиях Belief 1 и 2, один `keyed` ExecutionOperation со статусом `succeeded`, scheduler `VERIFIED_SUCCESS / GOAL_SATISFIED`, финальные Goal+Task `completed`, Belief `closed`, operator ground truth `closed`, pending triggers 0.
+- **Initial closed:** `NOOP / TARGET_ALREADY_OBSERVED`, scheduler `VERIFIED_SUCCESS / NO_EFFECT_REQUIRED`, `operation_id=null`, финальные Goal+Task `completed`, Belief `closed`, ground truth `closed`, pending triggers 0.
+- Evidence: original owner-supplied JSONL in conversation, **не** синтетические тестовые данные. `goal_id`/`operation_id` уникальны для каждого запуска; воспроизводимый SHA ещё требуется.
+
+Проверены только два демонстрационных сценария и заявлено прохождение тестов; длительный soak, диск-коррупция, распределённый scheduler, много типов объектов и общий Core acceptance относятся к P4.
 
 ## 6. Next after P3-C PASS
 
