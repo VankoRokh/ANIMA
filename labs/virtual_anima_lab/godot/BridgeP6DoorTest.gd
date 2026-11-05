@@ -73,8 +73,16 @@ func _initialize() -> void:
 	if not replay["ok"] or not replay["data"]["replayed"]:
 		_finish(lab, false, "operation was not replayed safely")
 		return
-	if replay["event_seq"] != first["event_seq"]:
+	# The intervening observe legitimately advances event_seq.
+	# A replay must not create another event beyond that observation.
+	if replay["event_seq"] != after["event_seq"]:
 		_finish(lab, false, "replay created additional effect event")
+		return
+	if replay["revision"] != after["revision"] or replay["tick"] != after["tick"]:
+		_finish(lab, false, "replay changed world revision or tick")
+		return
+	if replay["data"]["event_id"] != first["data"]["event_id"]:
+		_finish(lab, false, "replay returned a different effect identity")
 		return
 	var status := _call(lab, 7, "agent", "door_operation_status", {
 		"operation_id": "p6:native:1",
