@@ -1,6 +1,6 @@
 # Virtual ANIMA Lab — P5-A Independent Godot Feasibility
 
-**Status:** **P5-A real-Godot headless smoke PASS (owner-reported); GUI keyboard/Human + live Python ANIMA interaction PENDING**. This is NOT P5 Complete, NOT P6, and does not change the Core v0.1 independent-audit gate.  
+**Status:** **P5-A functional feasibility PASS (owner-reported): headless 9/9 and GUI dual-actor controls successful**. Formal evidence gate remains PARTIAL: exact tested SHA, Python protocol regression / full-repository check output, and separately checked negative-version handshake were not supplied. This is NOT P5 Complete, NOT P6, and does not change the Core v0.1 independent-audit gate.  
 **Date:** 2026-11-05.  
 **Branch:** `work/val-p5a-godot-feasibility`, branched from the exact Core audit-fixes owner-tested snapshot `b639a52281eeaece1b5b00d8223d8f31bd492ca1`. Production `anima/`, Core stores, `docs/project.json` and official Stage statuses remain untouched.  
 **Plan:** [Core v0.1 / VAL v0.1](Core_v0_1_VAL_v0_1_Plan_Draft.md) §4 P5/P6; independent prototype: [`labs/virtual_anima_lab/README.md`](../../labs/virtual_anima_lab/README.md).
@@ -15,7 +15,7 @@ Why test it first:
 - Standard Linux binary supports interactive and headless operation.
 - MIT license; no Godot engine internals or custom renderer are maintained by ANIMA.
 
-**Owner-run evidence now supplied:** Godot 4.7.2 native protocol regression PASS, followed by actual Godot↔Python headless smoke PASS with seed 7 and 22 protocol commands. A real GUI Human keyboard + simultaneous Python-controlled ANIMA test remains **PENDING**; headless smoke is not a substitute for it. Exact Git commit for the smoke run was not provided, so the successful run is not yet SHA-pinned. Alternative MultiGrid remains fallback if Godot fails required P5 acceptance, not an implementation target now.
+**Owner-run evidence now supplied:** Godot 4.7.2 native protocol regression PASS, followed by actual Godot↔Python headless smoke PASS with seed 7 and 22 protocol commands. A real GUI Human keyboard + Python-controlled ANIMA interaction was subsequently **reported successful by the owner**; no GUI trace/video or exact tested SHA was provided. Exact Git commit for the smoke run was not provided, so the successful run is not yet SHA-pinned. Alternative MultiGrid remains fallback if Godot fails required P5 acceptance, not an implementation target now.
 
 ## 2. Isolated implementation
 
@@ -56,7 +56,7 @@ Pause blocks Human and ANIMA movement; explicit `step` increments logical time; 
 | F9 | headless trace/report | Human readable PASS/FAIL, JSON trace saved with explicit report dir |
 | F10 | Python framing unit tests and existing regression | No imported Core coupling; no unexpected Core tests regressed |
 
-**P5-A acceptance is blocked until F1–F10 pass on a real local Godot binary.** Passing `pytest` alone is insufficient.
+**P5-A primary functional gates F1–F2 and F4–F9 are owner-reported PASS** (GUI controls + 9/9 headless smoke). F3 basic ping is demonstrated, but unsupported-protocol negative test was not included in the reported smoke. F10 targeted Python unit / whole-repository regression outputs and exact tested SHA remain **unverified**. Do not mark all F1–F10 Complete based solely on 9/9 headless assertions.
 
 ## 4.1 Owner-local runtime results (2026-11-05)
 
@@ -65,8 +65,14 @@ Reported **after** the numeric JSON identifier correction:
 - Real Godot version `4.7.2.stable.official.ed1daf0bf`: `BridgeProtocolTest.gd` reported `VAL_BRIDGE_ID_CONTRACT_PASS`. Its first invocation emitted off-tree resource leak warnings; a cleanup change was subsequently committed but a separate post-cleanup Godot test was not provided.
 - Real `smoke.py` headless integration: `Result: PASS`, protocol `val.p5a.acceptance/0.1`, world `p5a-grid/0.1`, seed `7`, **22 commands**.
 - Its reported Markdown summary lists **9/9 checks PASS**: independent actor positions, restricted observable state, protocol role guard, pause/step, walls/door collision, operator door intervention, follow-up observation, seeded reset, Human/ANIMA event trace.
-- Evidence provided in chat is the terminal summary and `summary.md` excerpt. **Exact tested Git SHA, full `trace.jsonl`, `summary.json`, `godot.log` and interactive GUI keyboard run were not provided.** Do not claim these were independently inspected.
-- This result closes the **headless Godot feasibility subgate only**. The real GUI/keyboard independence F1–F2 and any unreported full-regression F10 remain pending. `F3` protocol version negative check is not separately demonstrated by this smoke.
+- Evidence provided in chat is the terminal summary and `summary.md` excerpt. **Exact tested Git SHA, full `trace.jsonl`, `summary.json` and `godot.log` were not provided.** GUI interaction was subsequently confirmed verbally by the owner, not independently inspected.
+- This result plus the following owner-confirmed visual test establishes **headless and GUI functional feasibility**. F10 and the F3 unsupported-version negative test remain unreported; the exact runtime SHA has not been pinned.
+
+### Owner-confirmed GUI result (2026-11-05)
+
+After the headless PASS, the owner reported: **“Визуальный тест запустился успешно. Управление так же работает.”** The visible test was requested to run native Godot GUI with keyboard Human and a separate Python controller for ANIMA. Mark **F1 (GUI launch) and F2 (dual controls) as owner-reported PASS**; do not extrapolate a separate verified account of every collision or door-key edge case, since no detailed GUI trace was provided.
+
+Next formal gate: record `git rev-parse HEAD` and a clean worktree; run `bash scripts/check.sh`, `.venv/bin/python -m pytest -q tests/test_val_p5a_client.py`, and optionally the full regression. Add an explicit unsupported-protocol negative transport test before final P5-A evidence closure. P5-B design may proceed in isolation without prematurely integrating Core.
 
 ### Next owner-side gate — two independent live actors
 
