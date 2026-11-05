@@ -14,12 +14,15 @@ const CELL := 56
 const SENSE_RADIUS := 3
 const MAX_LINE_BYTES := 8192
 const MAX_EVENTS := 256
+const MAX_DYNAMIC_OBSTACLES := 8
+const SCENARIOS := ["base", "detour", "clutter"]
 
 var _server: TCPServer = TCPServer.new()
 var _peer: StreamPeerTCP = null
 var _buffer := ""
 var _port := 46019
 var _seed := 7
+var _scenario := "base"
 var _tick := 0
 var _epoch := 0
 var _revision := 0
@@ -34,6 +37,7 @@ var _door := Vector2i(6, 3)
 var _door_open := false
 var _marker := Vector2i(8, 2)
 var _walls: Array[Vector2i] = []
+var _dynamic_obstacles: Array[Vector2i] = []
 var _history: Array[Dictionary] = []
 var _hud: Label
 var _diagnostics: Label
@@ -42,6 +46,10 @@ var _diagnostics: Label
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
 	_parse_args()
+	if not _scenario in SCENARIOS:
+		push_error("VAL: unknown lab scenario: %s" % _scenario)
+		get_tree().quit(2)
+		return
 	_reset_world()
 	_hud = Label.new()
 	_hud.position = Vector2(24, 466)
@@ -70,6 +78,9 @@ func _parse_args() -> void:
 		elif args[i] == "--lab-seed" and i + 1 < args.size():
 			_seed = int(args[i + 1])
 			i += 1
+		elif args[i] == "--lab-scenario" and i + 1 < args.size():
+			_scenario = args[i + 1]
+			i += 1
 		i += 1
 	if _port < 1024 or _port > 65535 or _seed < 0:
 		push_error("VAL: invalid port or seed")
@@ -90,6 +101,7 @@ func _reset_world() -> void:
 	_anima = Vector2i(9, 5)
 	_door_open = false
 	_walls.clear()
+	_dynamic_obstacles.clear()
 	_history.clear()
 	for x in range(WIDTH):
 		_walls.append(Vector2i(x, 0))
@@ -99,13 +111,20 @@ func _reset_world() -> void:
 		_walls.append(Vector2i(WIDTH - 1, y))
 	_walls.append(Vector2i(4, 3))
 	_walls.append(Vector2i(4, 4))
+	if _scenario == "detour":
+		_walls.append(Vector2i(7, 4))
+	elif _scenario == "clutter":
+		_walls.append(Vector2i(5, 5))
+		_walls.append(Vector2i(8, 3))
 	var choices: Array[Vector2i] = [
 		Vector2i(8, 2), Vector2i(8, 4), Vector2i(3, 5),
 	]
 	var rng := RandomNumberGenerator.new()
 	rng.seed = _seed
 	_marker = choices[rng.randi_range(0, choices.size() - 1)]
-	_record("lab", "reset", {"seed": _seed, "world_version": WORLD_VERSION})
+	_record("lab", "reset", {
+		"seed": _seed, "world_version": WORLD_VERSION, "scenario": _scenario,
+	})
 	queue_redraw()
 
 
@@ -298,6 +317,17 @@ func _typed_observation() -> Dictionary:
 						"x": item["at"]["x"], "y": item["at"]["y"],
 					},
 				})
+			"obstacle":
+				readings.append({
+					"subject_ref": "lab.obstacle.%d.%d" % [
+						item["at"]["x"], item["at"]["y"],
+					],
+					"predicate_ref": "position",
+					"typed_value": {
+						"type": "grid_cell",
+						"x": item["at"]["x"], "y": item["at"]["y"],
+					},
+				})
 			"wall":
 				readings.append({
 					"subject_ref": "lab.wall.%d.%d" % [
@@ -444,9 +474,10 @@ func _request_v2(req: Dictionary, request_id: int) -> Dictionary:
 			"source_ref": "lab.sensor.anima.proximity",
 			"capabilities": ["observe", "act"] if role == "agent" else [
 				"inspect", "events", "set_door", "human_move", "reset",
-				"pause", "resume", "step",
+				"pause", "resume", "step", "set_obstacle", "emit_noise",
 			],
 			"max_action_keys": MAX_ACTION_KEYS,
+			"scenario": _scenario,
 		})
 	if role == "agent":
 		match op:
@@ -463,9 +494,18 @@ func _request_v2(req: Dictionary, request_id: int) -> Dictionary:
 			snapshot["revision"] = _revision
 			snapshot["event_seq"] = _event_seq
 			snapshot["last_agent_observation"] = _last_sample.duplicate(true)
+			snapshot["scenario"] = _scenario
+			var obstacles: Array[Dictionary] = []
+			for point in _dynamic_obstacles:
+				obstacles.append(_cell(point))
+			snapshot["dynamic_obstacles"] = obstacles
 			return _reply_v2(request_id, true, snapshot)
 		"events":
 			return _typed_events(req, request_id)
+		"set_obstacle":
+			return _set_dynamic_obstacle(req, request_id)
+		"emit_noise":
+			return _emit_noise(req, request_id)
 		"human_move", "set_door", "pause", "resume", "step", "reset":
 			# Operator interventions reuse the verified P5-A fixture.
 			var legacy := req.duplicate(true)
@@ -518,7 +558,7 @@ func _move(who: String, direction: String) -> Dictionary:
 	var other := _human if who == "anima" else _anima
 	var target := before + delta
 	var reason := "ok"
-	if not _inside(target) or target in _walls:
+	if not _inside(target) or target in _walls or target in _dynamic_obstacles:
 		reason = "wall"
 	elif target == other:
 		reason = "other_actor"
@@ -548,6 +588,9 @@ func _agent_observation() -> Dictionary:
 	for wall in _walls:
 		if _distance(_anima, wall) <= SENSE_RADIUS:
 			visible.append({"kind": "wall", "at": _cell(wall)})
+	for obstacle in _dynamic_obstacles:
+		if _distance(_anima, obstacle) <= SENSE_RADIUS:
+			visible.append({"kind": "obstacle", "at": _cell(obstacle)})
 	if _distance(_anima, _door) <= SENSE_RADIUS:
 		visible.append({
 			"kind": "door", "at": _cell(_door),
@@ -608,6 +651,8 @@ func _refresh_hud() -> void:
 		_diagnostics.text += "Human: (%d,%d)\n" % [_human.x, _human.y]
 		_diagnostics.text += "ANIMA: (%d,%d)\n" % [_anima.x, _anima.y]
 		_diagnostics.text += "Door: %s\n" % ("open" if _door_open else "closed")
+		_diagnostics.text += "Scenario: %s\n" % _scenario
+		_diagnostics.text += "Dynamic blocks: %d\n" % _dynamic_obstacles.size()
 		_diagnostics.text += "Event seq: %d\n\n" % _event_seq
 		_diagnostics.text += "ANIMA / LAST SENSOR\n"
 		if _last_sample.is_empty():
@@ -666,6 +711,11 @@ func _draw() -> void:
 		draw_rect(
 			Rect2(Vector2(p.x * CELL + 2, p.y * CELL + 2), Vector2(CELL - 4, CELL - 4)),
 			Color("#6a7687"),
+		)
+	for p in _dynamic_obstacles:
+		draw_rect(
+			Rect2(Vector2(p.x * CELL + 6, p.y * CELL + 6), Vector2(CELL - 12, CELL - 12)),
+			Color("#d34d61"),
 		)
 	var door_color := Color("#3ebc80") if _door_open else Color("#e7a54c")
 	draw_rect(
