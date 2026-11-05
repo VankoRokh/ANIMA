@@ -4,11 +4,22 @@ extends SceneTree
 ## This exercises Godot's real JSON parser, not a Python-only mock.
 
 
+func _finish(lab: Node, passed: bool, message: String) -> void:
+	# _initialize() creates an off-tree Node2D; SceneTree does not own it.
+	# Explicitly release its CanvasItem RID and script references before exit.
+	if is_instance_valid(lab):
+		lab.free()
+	if passed:
+		print(message)
+	else:
+		printerr(message)
+	quit(0 if passed else 1)
+
+
 func _initialize() -> void:
 	var lab = load("res://Main.gd").new()
 	if lab == null:
-		printerr("VAL_BRIDGE_ID_CONTRACT_FAIL: Main.gd did not instantiate")
-		quit(1)
+		_finish(lab, false, "VAL_BRIDGE_ID_CONTRACT_FAIL: Main.gd did not instantiate")
 		return
 	var valid = [
 		'{"protocol":"val.bridge/0.1","id":1,"role":"agent","op":"ping"}',
@@ -17,12 +28,10 @@ func _initialize() -> void:
 	for data in valid:
 		var reply = lab._request(data)
 		if not reply.get("ok", false):
-			printerr("VAL_BRIDGE_ID_CONTRACT_FAIL: valid request rejected: ", reply)
-			quit(1)
+			_finish(lab, false, "VAL_BRIDGE_ID_CONTRACT_FAIL: valid request rejected: %s" % str(reply))
 			return
 		if typeof(reply.get("id")) != TYPE_INT:
-			printerr("VAL_BRIDGE_ID_CONTRACT_FAIL: reply ID is not an int: ", reply)
-			quit(1)
+			_finish(lab, false, "VAL_BRIDGE_ID_CONTRACT_FAIL: reply ID is not an int: %s" % str(reply))
 			return
 	var invalid = [
 		'{"protocol":"val.bridge/0.1","id":1.5,"role":"agent","op":"ping"}',
@@ -34,15 +43,12 @@ func _initialize() -> void:
 	for data in invalid:
 		var reply = lab._request(data)
 		if reply.get("ok", false) or reply.get("error") != "INVALID_ID":
-			printerr("VAL_BRIDGE_ID_CONTRACT_FAIL: invalid request accepted: ", reply)
-			quit(1)
+			_finish(lab, false, "VAL_BRIDGE_ID_CONTRACT_FAIL: invalid request accepted: %s" % str(reply))
 			return
 	var restricted = lab._request(
 		'{"protocol":"val.bridge/0.1","id":3,"role":"agent","op":"debug_snapshot"}'
 	)
 	if restricted.get("ok", false) or restricted.get("error") != "FORBIDDEN":
-		printerr("VAL_BRIDGE_ID_CONTRACT_FAIL: role guard: ", restricted)
-		quit(1)
+		_finish(lab, false, "VAL_BRIDGE_ID_CONTRACT_FAIL: role guard: %s" % str(restricted))
 		return
-	print("VAL_BRIDGE_ID_CONTRACT_PASS: valid integer IDs normalized; invalid IDs rejected")
-	quit(0)
+	_finish(lab, true, "VAL_BRIDGE_ID_CONTRACT_PASS: valid integer IDs normalized; invalid IDs rejected")
