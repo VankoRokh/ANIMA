@@ -22,7 +22,6 @@ from anima.execution.contracts import (
 )
 from anima.execution.sandbox import SandboxExecutor
 from anima.execution.store import ExecutionStore
-from anima.execution.verification import GoalVerificationBridge
 from anima.internal_state.goal_progress import (
     GoalObservation, GoalObservationKind, VerificationKind,
 )
@@ -110,7 +109,6 @@ class CoreDoorExecution:
         self.executor = executor
         self.after_effect_hook = after_effect_hook
         self.before_execute_hook = before_execute_hook
-        self.bridge = GoalVerificationBridge(internal_state)
         # This table is only a durable verification receipt, not another GoalStore.
         with closing(self.decisions._connect()) as connection:
             connection.executescript(_VERIFY_SQL)
@@ -203,8 +201,13 @@ class CoreDoorExecution:
 
     def _complete(self, goal_id, *, task_id, event_id, operation_id, candidate_id):
         """Persist verified evidence before separate Goal and Task commits."""
-        self._remember_proof(goal_id, task_id, event_id, operation_id, candidate_id)
         goal = self.decisions.goals.get_goal(goal_id)
+        task = self.decisions.tasks.get_task(task_id)
+        if goal is None or goal["status"] not in {"active", "completed"}:
+            raise ValueError("Verified Goal is not active/completed")
+        if task is None or task.goal_id != goal_id or task.status in {"failed", "cancelled"}:
+            raise ValueError("Verified Task no longer belongs to an eligible Goal")
+        self._remember_proof(goal_id, task_id, event_id, operation_id, candidate_id)
         if goal["status"] == "active":
             self.internal_state.observe_goal(GoalObservation(
                 goal_id=goal_id,
@@ -338,6 +341,26 @@ class CoreDoorExecution:
         recovered = self._recover_proof(goal_id)
         if recovered is not None:
             return recovered
+        goal = self.decisions.goals.get_goal(goal_id)
+        if goal is None:
+            raise ValueError("Unknown Goal")
+        binding = self.decisions._binding(goal_id)
+        if goal["status"] != "active" or binding is None:
+            return CoreDoorTurn(
+                goal_id, None, "DEFERRED",
+                "GOAL_NOT_ACTIVE" if goal["status"] != "active" else "UNBOUND_GOAL",
+                None, None, None,
+            )
+        if (
+            binding["mode"] != "ensure_once"
+            or binding["criterion_kind"] != "world.property_equals"
+            or binding["subject_ref"] != DOOR_SUBJECT
+            or binding["predicate_ref"] != DOOR_PREDICATE
+            or binding["expected_json"] != _json({"type": "symbol", "value": "closed"})
+        ):
+            return CoreDoorTurn(
+                goal_id, None, "DENIED", "UNSUPPORTED_WORLD_GOAL", None, None, None
+            )
         event_id, tick, snapshot = self._observe()
         decision = self.decisions.step(goal_id, as_of_tick=tick)
         if decision.kind in {"REQUEST_OBSERVATION", "DEFER"}:
@@ -346,15 +369,54 @@ class CoreDoorExecution:
                 None, event_id, None,
             )
         if decision.kind == "NOOP":
+            # A prior effect may have committed just before a crash. Consult
+            # the durable ledger before declaring that no operation occurred.
+            operations = self.store.list_operations(task_id=decision.task_id)
+            if len(operations) > 1:
+                raise ValueError("Multiple operations for one ensure_once Task")
+            recovered_operation_id = None
+            recovered_candidate_id = "world.noop"
+            if operations:
+                operation = operations[0]
+                action = self.store.load_action(operation["id"])
+                self.store.load_verification_spec(operation["id"])
+                if (
+                    action.goal_id != goal_id
+                    or action.persistent_task_id != decision.task_id
+                    or action.tool != DOOR_TOOL or action.tool_version != DOOR_VERSION
+                    or action.to_dict()["arguments"] != {"subject_ref": DOOR_SUBJECT}
+                ):
+                    raise ValueError("Recovered NOOP operation identity mismatch")
+                recovered_operation_id = action.operation_id
+                recovered_candidate_id = action.candidate_id
+                if operation["status"] == "executing":
+                    self.store.transition_operation(
+                        action.operation_id, "uncertain",
+                        reason="P3-B recovery: executing may have applied its effect",
+                    )
+                    operation = self.store.get_operation(action.operation_id)
+                if operation["status"] == "uncertain":
+                    outcome, _ = _door_reconcile(
+                        self.world.root, action.to_dict()["arguments"], action.operation_id
+                    )
+                    if outcome == "succeeded":
+                        self.store.transition_operation(
+                            action.operation_id, "succeeded",
+                            reason="P3-B read-only keyed effect reconciliation",
+                        )
+                    # If world is closed but effect absent, the Goal can still
+                    # succeed via independent observation. Ledger remains
+                    # uncertain; no implicit tool retry or fabricated receipt.
             confirm_id, confirm_tick, confirmed = self._observe()
             if self._verified(goal_id, confirm_id, confirm_tick, confirmed):
                 self._complete(
                     goal_id, task_id=decision.task_id, event_id=confirm_id,
-                    operation_id=None, candidate_id="world.noop",
+                    operation_id=recovered_operation_id,
+                    candidate_id=recovered_candidate_id,
                 )
                 return CoreDoorTurn(
                     goal_id, decision.task_id, "VERIFIED_SUCCESS",
-                    "NO_EFFECT_REQUIRED", None, confirm_id, None,
+                    "NO_EFFECT_REQUIRED", recovered_operation_id, confirm_id, None,
                 )
             return CoreDoorTurn(
                 goal_id, decision.task_id, "UNVERIFIED", "NOOP_READBACK_CHANGED",
