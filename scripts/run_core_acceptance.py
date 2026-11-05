@@ -219,6 +219,17 @@ def _git_snapshot():
     return results
 
 
+def _checkout_unchanged(before, after):
+    """Release reports may say PASS only for stable, clean Git provenance."""
+    return (
+        before["clean"] and after["clean"]
+        and before["commit"] is not None
+        and before["commit"] == after["commit"]
+        and before["tree"] is not None
+        and before["tree"] == after["tree"]
+    )
+
+
 def main(argv=None):
     parser = argparse.ArgumentParser(
         description="Run Core v0.1 tests and produce a readable acceptance report"
@@ -254,13 +265,7 @@ def main(argv=None):
     )
     elapsed_wall_seconds = round(time.monotonic() - started, 6)
     git_after = _git_snapshot()
-    checkout_unchanged = (
-        git_before["clean"] and git_after["clean"]
-        and git_before["commit"] is not None
-        and git_before["commit"] == git_after["commit"]
-        and git_before["tree"] is not None
-        and git_before["tree"] == git_after["tree"]
-    )
+    checkout_unchanged = _checkout_unchanged(git_before, git_after)
     (destination / "pytest.log").write_text(
         completed.stdout, encoding="utf-8"
     )
