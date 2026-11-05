@@ -9,6 +9,8 @@ import argparse
 import json
 import subprocess
 import sys
+import time
+from math import ceil
 from datetime import datetime, timezone
 from pathlib import Path
 from xml.etree import ElementTree
@@ -29,6 +31,39 @@ CORE_MODULES = P4_MODULES + (
     "tests/test_core_p2a_ingress.py",
     "tests/test_core_p1_bootstrap.py",
 )
+
+
+P4_REQUIRED = (
+    "test_p4_priority_two_goals_and_repeat_goal_after_restart",
+    "test_p4_conflicts_duplicates_late_and_noise_not_trusted_as_truth",
+    "test_p4_false_success_then_new_external_evidence_completes_without_retry",
+    "test_p4_crash_after_applied_effect_reconciles_without_double_execution",
+    "test_p4_missing_capability_never_acts_even_after_restart",
+    "test_p4_recover_verified_goal_without_task_completion",
+    "test_p4_many_irrelevant_events_advance_cursor_without_effects",
+    "test_p4b_crash_after_goal_completed_before_scheduler_audit",
+    "test_p4b_cancelled_started_attempt_finishes_deferred_without_effect",
+    "test_p4b_multi_episode_cold_restart_and_noise_stay_bounded",
+)
+
+
+def required_coverage(cases):
+    """A green run cannot silently omit or skip required P4 scenarios."""
+    statuses = {}
+    for name in P4_REQUIRED:
+        matched = [
+            case for case in cases
+            if case["name"] == name or case["name"].startswith(name + "[")
+        ]
+        if not matched:
+            statuses[name] = "MISSING"
+        elif any(case["status"] == "FAIL" for case in matched):
+            statuses[name] = "FAIL"
+        elif any(case["status"] == "SKIP" for case in matched):
+            statuses[name] = "SKIP"
+        else:
+            statuses[name] = "PASS"
+    return statuses
 
 
 def summarize_junit(path):
@@ -57,6 +92,9 @@ def summarize_junit(path):
 def render_markdown(record):
     totals = record["totals"]
     verdict = record["result"]
+    coverage = record.get("required_coverage", {})
+    times = sorted(case["seconds"] for case in record["cases"])
+    p95 = times[ceil(0.95 * len(times)) - 1] if times else 0.0
     lines = [
         "# ANIMA Core v0.1 — Acceptance Run",
         "",
@@ -73,6 +111,18 @@ def render_markdown(record):
         f"- Failed: **{totals['failed']}**",
         f"- Skipped: **{totals['skipped']}**",
         f"- Total: **{totals['total']}**",
+        f"- Sum of case durations: **{sum(times):.3f}s**",
+        f"- Case duration p95 (observed): **{p95:.3f}s**",
+        "",
+        "## Mandatory P4 evidence",
+        "",
+    ]
+    if coverage:
+        for name, status in coverage.items():
+            lines.append(f"- {name}: **{status}**")
+    else:
+        lines.append("- Not evaluated.")
+    lines.extend([
         "",
         "## Cases",
         "",
@@ -83,6 +133,13 @@ def render_markdown(record):
         label = (case["classname"] + "::" + case["name"]).replace("|", "\\|")
         lines.append(
             f"| {case['status']} | `{label}` | {case['seconds']:.3f} |"
+        )
+    lines.extend(["", "## Slowest test cases (observed baseline)", ""])
+    for case in sorted(
+        record["cases"], key=lambda row: row["seconds"], reverse=True
+    )[:5]:
+        lines.append(
+            f"- {case['seconds']:.3f}s : {case['classname']}::{case['name']}"
         )
     failed = [x for x in record["cases"] if x["status"] == "FAIL"]
     if failed:
@@ -138,11 +195,13 @@ def main(argv=None):
         sys.executable, "-m", "pytest", "-q", *files,
         f"--junitxml={junit}",
     ]
+    started = time.monotonic()
     completed = subprocess.run(
         command, cwd=ROOT, text=True,
         stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
         check=False,
     )
+    elapsed_wall_seconds = round(time.monotonic() - started, 6)
     (destination / "pytest.log").write_text(
         completed.stdout, encoding="utf-8"
     )
@@ -150,9 +209,12 @@ def main(argv=None):
         totals, cases = summarize_junit(junit)
     else:
         totals, cases = {"passed": 0, "failed": 0, "skipped": 0, "total": 0}, []
+    coverage = required_coverage(cases)
     verdict = (
         "PASS" if completed.returncode == 0
-        and totals["total"] > 0 and totals["failed"] == 0 else "FAIL"
+        and totals["total"] > 0 and totals["failed"] == 0
+        and all(status == "PASS" for status in coverage.values())
+        else "FAIL"
     )
     record = {
         "schema": "anima.core.acceptance-report/0.1",
@@ -162,6 +224,8 @@ def main(argv=None):
         "timestamp": datetime.now(timezone.utc).isoformat(),
         "exit_code": completed.returncode,
         "result": verdict,
+        "elapsed_wall_seconds": elapsed_wall_seconds,
+        "required_coverage": coverage,
         "totals": totals,
         "cases": cases,
     }
