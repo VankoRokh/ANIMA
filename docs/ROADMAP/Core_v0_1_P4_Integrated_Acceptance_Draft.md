@@ -1,6 +1,6 @@
 # ANIMA Core v0.1 — P4-A Integrated Acceptance & Readable Diagnostics
 
-**Status:** implementation + scenario tests in isolated branch, **UNVERIFIED** until owner-local evidence. This is **P4-A**, not a declaration of full P4/Core v0.1 Complete.  
+**Status:** **P4-A PASS по сообщению владельца** (2026-11-05): проверки пройдены, новый читаемый формат демонстрации подтверждён удобным. Числа тестов, артефакты `summary.json` и точный SHA тестового checkout не представлены; это не независимый CI/provenance. Полный Core v0.1 release gate ещё открыт.  
 **Date:** 2026-11-05.  
 **Branch:** `work/core-v0-1-p4-acceptance`.  
 **Upstream:** [P3-C event loop](Core_v0_1_P3C_Autonomous_Loop_Draft.md), [P0 system acceptance contracts](Core_v0_1_P0_Boundary_Draft.md), [Core/VAL roadmap](Core_v0_1_VAL_v0_1_Plan_Draft.md).
@@ -119,7 +119,7 @@ bash scripts/check.sh
 
 Then optionally generate one **separate** readable regression report with the acceptance runner. A green script/report does not replace the full regression run unless `--suite full` was executed.
 
-**P4-A PASS gate:** `scripts/check.sh`, new P4 tests, exact committed HEAD, targeted Core modules and full pytest reported green by owner. No claim is made about these results before they are supplied.
+**P4-A acceptance evidence:** владелец сообщил, что проверки пройдены успешно, и подтвердил, что демонстрационный формат стал заметно читаемее. Не предоставлены полные терминальные/отчётные показатели или SHA локального прогона. Обозначение PASS означает owner-reported успешность ранее предложенного набора, **не** независимое выполнение тестов ассистентом. Воспроизводимый `summary.json` с SHA будет полезен для финального Core v0.1 release gate.
 
 ## 6. Remaining Core v0.1 release gate
 
