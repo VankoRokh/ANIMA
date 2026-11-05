@@ -267,6 +267,11 @@ def test_p2b_upgrades_p2a_schema_without_losing_prior_events(tmp_path):
     legacy = CoreIngress(db, sources=_sources())
     old = legacy.admit(_event("old"), source_ref=SOURCE_A)
     with sqlite3.connect(db) as connection:
+        for table in (
+            "core_belief_revisions", "core_beliefs",
+            "core_observation_outcomes", "core_observations",
+        ):
+            connection.execute(f"DROP TABLE {table}")
         connection.execute("UPDATE schema_meta SET value='1' WHERE key='schema_version'")
     upgraded = _ingress(tmp_path)
     assert upgraded.get_event(old.event_id) is not None
