@@ -87,7 +87,7 @@ def required_coverage(cases):
         matched = [
             case for case in cases
             if case.get("classname") == module
-            and (case.get("name") == name or case.get("name", "").startswith(name + "["))
+            and case.get("name") == name
         ]
         if not matched:
             statuses[name] = "MISSING"
