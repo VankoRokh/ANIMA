@@ -80,7 +80,7 @@ cat "$report_dir/summary.md"
 
 ```bash
 GODOT_BIN="$HOME/.local/opt/godot/Godot_v4.7.2-stable_linux.x86_64"
-"$GODOT_BIN" --path labs/virtual_anima_lab/godot -- \\
+"$GODOT_BIN" --path labs/virtual_anima_lab/godot -- \
   --lab-port 46019 --lab-seed 7 --lab-scenario p6_door --lab-ui debug
 ```
 
@@ -88,7 +88,7 @@ GODOT_BIN="$HOME/.local/opt/godot/Godot_v4.7.2-stable_linux.x86_64"
 
 ```bash
 P6_DATA="$(mktemp -d)"
-.venv/bin/python -m labs.virtual_anima_lab.python.run_core_demo \\
+.venv/bin/python -m labs.virtual_anima_lab.python.run_core_demo \
   --port 46019 --data-dir "$P6_DATA"
 ```
 
