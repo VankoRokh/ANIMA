@@ -303,12 +303,30 @@ class ExecutionStore:
             ).fetchone()
         return int(row["value"])
 
-    def create_operation(self, action, *, registry, reason="operation prepared"):
+    def create_operation(
+        self, action, *, registry, reason="operation prepared",
+        verification_spec=None, fault_hook=None,
+    ):
+        """Prepare an operation and its optional VerificationSpec atomically.
+
+        Stage6 legacy callers may omit verification_spec. Core v0.1 MUST supply
+        it: no prepared Core operation may commit without its exact criterion.
+        fault_hook is a test-only mid-transaction failure injection point.
+        """
         if not isinstance(action, ExecutionAction):
             raise TypeError("ExecutionStore.create_operation requires ExecutionAction")
         if not isinstance(registry, ToolRegistry):
             raise TypeError("ExecutionStore registry must be ToolRegistry")
         reason = _require_text(reason, "Execution operation reason")
+        if fault_hook is not None and not callable(fault_hook):
+            raise TypeError("Execution preparation fault_hook must be callable")
+        spec_json = None
+        if verification_spec is not None:
+            if not isinstance(verification_spec, VerificationSpec):
+                raise TypeError("verification_spec must be VerificationSpec")
+            if verification_spec.goal_id != action.goal_id:
+                raise ValueError("VerificationSpec Goal does not match ExecutionAction Goal")
+            spec_json = _verification_spec_json(verification_spec)
         descriptor = registry.get(action.tool, action.tool_version)
         descriptor.validate_input(thaw(action.arguments))
         created_at = _validate_timestamp(action.created_at, "Execution operation created_at")
@@ -344,6 +362,19 @@ class ExecutionStore:
                     """,
                     (action.operation_id, action.public_id, _action_json(action)),
                 )
+                if fault_hook is not None:
+                    fault_hook("after_action_insert")
+                if spec_json is not None:
+                    connection.execute(
+                        """
+                        INSERT INTO execution_verification_specs(
+                            operation_id, verification_spec_id, spec_json
+                        ) VALUES (?, ?, ?)
+                        """,
+                        (
+                            action.operation_id, verification_spec.public_id, spec_json,
+                        ),
+                    )
         except sqlite3.IntegrityError as error:
             raise ValueError(
                 f"Cannot create ExecutionOperation {action.operation_id}: {error}"
