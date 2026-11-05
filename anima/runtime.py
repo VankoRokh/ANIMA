@@ -138,7 +138,9 @@ class Runtime:
     def bind_core_goal(self, criterion):
         """Bind typed criterion; opt-in P3-C treats a new binding as work."""
         inserted = self._require_core_decision().bind(criterion)
-        if inserted and self.core_autonomy is not None:
+        if self.core_autonomy is not None:
+            # An idempotent repeat after an interrupted notification must
+            # still be able to resume the durable Goal-bound trigger.
             self.run_core_autonomous()
         return inserted
 
