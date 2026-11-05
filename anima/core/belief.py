@@ -165,7 +165,7 @@ class BeliefProjection:
         payload = record["payload"]
         if type(payload) is not dict:
             return None, "INVALID_OBSERVATION"
-        required = {"subject_ref", "predicate_ref", "observed_at", "source_revision"}
+        required = {"subject_ref", "predicate_ref", "observed_at", "temporal_scope", "source_revision"}
         if kind == "state.property":
             required.add("value")
         else:
@@ -187,6 +187,14 @@ class BeliefProjection:
             or observed["domain"] != rule.clock_domain
             or not _nonneg(observed["value"])
             or not _nonneg(payload["source_revision"])
+        ):
+            return None, "INVALID_OBSERVATION"
+        scope = payload["temporal_scope"]
+        if (
+            type(scope) is not dict
+            or set(scope) != {"kind", "at"}
+            or scope["kind"] != "instant"
+            or scope["at"] != observed
         ):
             return None, "INVALID_OBSERVATION"
         value = None
