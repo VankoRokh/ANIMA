@@ -369,10 +369,22 @@ class CoreDoorExecution:
                 "SELECT goal_id,task_id FROM core_world_proofs"
                 " ORDER BY rowid"
             ).fetchall()
+        if not rows:
+            return ()
+        # Historical successful proofs are revisited on every scheduler drain.
+        # Load Goal/Task status once per batch instead of opening two separate
+        # SQLite connections for each historical proof. This preserves
+        # exhaustive identity checks and the existing proof ordering.
+        goals = {
+            goal["id"]: goal for goal in self.decisions.goals.list_goals()
+        }
+        tasks = {
+            task.public_id: task for task in self.decisions.tasks.list_tasks()
+        }
         recovered = []
         for row in rows:
-            goal = self.decisions.goals.get_goal(row["goal_id"])
-            task = self.decisions.tasks.get_task(row["task_id"])
+            goal = goals.get(row["goal_id"])
+            task = tasks.get(row["task_id"])
             if goal is None or task is None:
                 raise ValueError("Persisted proof references missing Goal or Task")
             if goal["status"] == "completed" and task.status == "completed":
