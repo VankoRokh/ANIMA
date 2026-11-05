@@ -1,6 +1,6 @@
 # ANIMA Core v0.1 — Independent Audit Remediation (B1–B4, T1–T2)
 
-**Status:** **IMPLEMENTED / UNVERIFIED** — changes are present in `work/core-v0-1-audit-fixes`; neither local acceptance nor independent re-review has been performed on this branch. **Core v0.1 remains BLOCKED; do not freeze/merge or update project.json automatically.**  
+**Status:** **PATCHED / OWNER-LOCAL PASS / INDEPENDENT RE-REVIEW PENDING** — exact tested commit `b639a52281eeaece1b5b00d8223d8f31bd492ca1`, Git tree `6c96904dfbf2a7f579b3eed693827c1f01419772`, 1392/1392 tests PASS, 31/31 mandatory checks PASS. **Core v0.1 remains release-BLOCKED pending independent audit confirmation and explicit owner sign-off.** The reviewed snapshot remains immutable; this documentation-only rereview branch is not the runtime subject.  
 **Date:** 2026-11-05.  
 **Base:** independent-audited snapshot `aabe6553cec19d4cf1962dc4f26129eeca436328`.  
 **Original independent result:** 1380/1380 stock PASS; 29 additional probes = 20 PASS / 9 FAIL; four confirmed runtime bugs B1–B4, one release-gate deficiency T1, and two tests expressing stronger than promised scheduler behavior. Full original audit and reproducible ZIP evidence were provided by the owner. Do not count stock PASS as proof that B1–B4 are repaired.
@@ -58,7 +58,9 @@ git rev-parse HEAD
 git status --short
 ```
 
-**Gate:** all new B1–B4 and T1–T2 regressions PASS, old P1–P4 PASS, mandatory matrix complete, clean/unchanged HEAD/tree and test count/trace captured. Do not expect exact baseline 1380 because new tests were added. No production release claim until new SHA is accepted and preferably an independent Work spot re-review of repaired boundaries has completed.
+**Owner-local gate completed (2026-11-05):** `scripts/run_core_acceptance.py --suite full` reported **1392 PASS / 0 FAIL / 0 SKIP**, **31/31 mandatory P4 controls PASS**, Python **3.14.4**, exit code **0** at **2026-11-05T16:31:59.863153+00:00**. Commit **`b639a52281eeaece1b5b00d8223d8f31bd492ca1`**, tree **`6c96904dfbf2a7f579b3eed693827c1f01419772`**, `Clean/unchanged checkout: True`. Summed case durations **30.779s**; observed per-case p95 **0.079s**. Owner reported `scripts/check.sh` and targeted checks successful. Owner supplied terminal output and first lines of `summary.md`, not complete raw JUnit/JSON files. This is **not independent re-review evidence**.
+
+**Independent re-review remains mandatory before the freeze decision.** Repeat original adversarial B1–B4 on exact tested commit, accounting for the intentionally moved B1 cut point, and check that changes did not introduce queue/recovery regressions. See [review brief](Core_v0_1_Work_ReAudit_Brief.md).
 
 ## 4. Remaining sign-off
 
