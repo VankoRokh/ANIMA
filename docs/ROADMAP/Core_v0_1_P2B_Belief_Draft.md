@@ -1,6 +1,6 @@
 # ANIMA Core v0.1 — P2-B Typed Observation / Belief Projection
 
-**Status:** implementation in isolated branch; **PENDING owner-local validation**.  
+**Status:** **P2-B PASS** — user-reported local regression at exact snapshot `d08e0d4b5b603ebbc22924682f7cc38b734acd68` (2026-11-05). No claim of autonomous Runtime, world actions, or full P2 completion.  
 **Date:** 2026-11-05.  
 **Branch:** `work/core-v0-1-p2b-belief` (derived from owner-verified P2-A).  
 **Parent:** [P2-A SQLite Event Ingress](Core_v0_1_P2A_Ingress_Draft.md).  
@@ -111,7 +111,7 @@ bash scripts/check.sh
 
 Coverage includes: atomic event+outbox+Observation+Belief, fresh/stale, new/later/replay, conflict, independent support, source-local revision, missing source authorization, unavailable sensor, crash rollback, schema upgrade from v1 and opt-in backward compatibility.
 
-**P2-B PASS gate:** all targeted/new tests and full regression, check script, and confirmed cross-transaction rollback. No PASS is declared based on GitHub code insertion alone.
+**P2-B gate: PASS** based on the owner-supplied local terminal outputs. `scripts/check.sh` PASS (89 documentation pages, 505 local links, syntax checked for 295 Python, 3 JSON, and 3 Bash files; Python 3.14.4). Targeted pytest: **44 passed in 0.75s**. Full regression: **1292 passed in 19.85s**. Verified local commit **`d08e0d4b5b603ebbc22924682f7cc38b734acd68`**. These outputs were supplied by the user, not executed by the assistant or CI. The controlled rollback is covered by the passing test suite; real power failure was not tested.
 
 ## 7. Remaining work
 
