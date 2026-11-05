@@ -1,6 +1,6 @@
 # ANIMA Core v0.1 — P1 Standalone Bootstrap (implementation slice)
 
-**Статус:** Implementation present; **UNVERIFIED** pending local pytest and documentation checks. Не обозначать P1 Complete или автономность Core.  
+**Статус:** P1 bootstrap **PASS** по предоставленным owner результатам локального прогона (2026-11-05). Проверена только сборка/жизненный цикл, **не** автономная работа. P0 / P2–P4 остаются отдельными контрольными точками.  
 **Дата:** 2026-11-05.  
 **Ветка:** `work/core-v0-1-p1-bootstrap` (происходит из `work/core-v0-1-planning`).  
 **План:** [Core v0.1 + Virtual Lab](Core_v0_1_VAL_v0_1_Plan_Draft.md).  
@@ -79,8 +79,31 @@ tmp_dir="$(mktemp -d)"
 | P1-F | нет обязательного Sleep processor при запуске | code review + pending tests |
 | P1-G | документация/все регрессионные тесты | pending `scripts/check.sh` и full pytest |
 
-**Gate PASS** возможен только после полученных выходных данных проверок. Code-reviewed ✓, executed tests pending. P0 также сохраняет открытый baseline gate, который необходимо закрыть перед объявлением P1 Complete.
+**P1 bootstrap gate:** PASS по результатам локальных проверок владельца проекта; точный `git rev-parse HEAD` пользователь не приложил. Ветка в момент получения результатов указывала на commit `64e774bd561d41211f4e8666a1be004e326b4f44`, но его нельзя без дополнительного подтверждения объявлять точным исполненным snapshot. Статусы Stage и `docs/project.json` не изменяются. P0 replay/authority design и P2–P4 остаются открытыми.
 
-## 5. Дальше
+## 5. Evidence — owner-reported local execution, 2026-11-05
+
+Пользователь выполнил проверки локально и предоставил терминальный вывод. Ассистент **не** запускал тесты на своём окружении и не выдаёт эти результаты за CI.
+
+- `bash scripts/check.sh`: PASS. Documentation: **87 pages**, **493 local links**; generated blocks current, architecture references valid; Python syntax **291 files**, VS Code JSON **3 files**, Bash syntax **3 files**; no instance/private data in tracked paths. Python **3.14.4**.
+- Targeted `pytest` (P1/Runtime/CLI/D1): **9 passed in 0.57s**.
+- Full `pytest -q`: **1252 passed in 18.48s**.
+- Isolated smoke run 1: `phase=P1_BOOTSTRAP_ONLY`, `autonomous_loop=false`, `events_processed=2`, `session=1`, `status=sleeping`, `memories=0`.
+- Isolated smoke run 2 (same data directory): same `instance_id`, `events_processed=4`, `session=2`, `status=sleeping`, `memories=0`.
+- Identity (instance UUID) совпадает между двумя smoke-прогонами. Полный UUID намеренно не дублируется в отчёте: проверяется равенство, а не персональный ID.
+
+| P1 gate | Verdict | Evidence |
+|---|---|---|
+| P1-A | PASS (targeted smoke + code review) | headless CLI запускается без обязательной модели/GUI |
+| P1-B | PASS (targeted pytest) | `build_core` не вызывает wake автоматически |
+| P1-C | PASS (smoke + pytest) | два события за wake→sleep |
+| P1-D | PASS (smoke + pytest) | instance identity и жизненный цикл переживают рестарт |
+| P1-E | PASS (targeted + full pytest) | CLI и D1 regression |
+| P1-F | PASS (smoke + code review) | Sleep processor не required в bootstrap |
+| P1-G | PASS (owner-local execution) | scripts/check.sh и full pytest |
+
+**Границы доказательства:** не тестировались здесь ни real-world sensor inputs, ни Belief State, ни автономный Goal/Task→Action, ни cross-database crash recovery, ни долгосрочный soak-test. Точный коммит локального исполнения можно закрепить отдельно через `git rev-parse HEAD`.
+
+## 6. Дальше
 
 После P1 gate: P2 typed CoreIngress/Observation/Belief в единой SQLite transaction, с одобренным D1 journal + replay; затем P3 Goal/Decision/Action/Verification. Нельзя смешивать «запустился без модели» с «принял автономное решение».
