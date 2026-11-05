@@ -175,12 +175,12 @@ EventSubscriber.notify(committed_revision) -> WakeSignal
 
 **D1 — Store boundary (Accepted in principle, 2026-11-05).** Owner согласовал выделенный SQLite-журнал нового Core и одну транзакцию для ingress/Observation/Belief, с сохранением legacy `EventLog`/Memory и downstream bridge/outbox для совместимости. Статус **не означает**, что реализованы durable outbox, schema migration или power-loss proof: детали и тесты остаются blocking. JSONL-first как основной вариант для новых Core-входов отклонён.
 
-**D2 — Conflict policy.** В v0.1 опираться только на registered source, comparable logical time/revision и explicit equal-scope conflict; без глобального source ranking и universal probabilistic score? Рекомендация — да.
+**D2 — Conflict policy (Accepted in principle, 2026-11-05).** В v0.1 опираться только на registered source, comparable logical time/revision и explicit equal-scope conflict; без глобального source ranking и universal probabilistic score? Рекомендация — да.
 
-**D3 — Freshness rule.** Ввести per-predicate logical-tick TTL/refresh requirements (для физических каналов — policy с отдельным clock mapping). Для неизвестных clock domains не объявлять `fresh`. Рекомендация — да.
+**D3 — Freshness rule (Accepted in principle, 2026-11-05).** Ввести per-predicate logical-tick TTL/refresh requirements (для физических каналов — policy с отдельным clock mapping). Для неизвестных clock domains не объявлять `fresh`. Рекомендация — да.
 
-**D4 — Scope.** Ограничить first belief profile зарегистрированными canonical entities / single-valued exact predicates / known scope и typed atomic values. Рекомендация — да.
+**D4 — Scope (Accepted in principle, 2026-11-05).** Ограничить first belief profile зарегистрированными canonical entities / single-valued exact predicates / known scope и typed atomic values. Рекомендация — да.
 
-**D5 — Compatibility gate.** Старые `Event` и `EventLog` сохраняют contract; новый Core ingress — адаптер к ним, а не изменение historical event schema. Рекомендация — да.
+**D5 — Compatibility gate (Accepted in principle, 2026-11-05).** Старые `Event` и `EventLog` сохраняют contract; новый Core ingress — адаптер к ним, а не изменение historical event schema. Рекомендация — да.
 
-До P1/P2: отдельно рассмотреть D2–D5, source/predicate registry fixtures, explicit crash test protocol, baseline `scripts/check.sh` и `pytest`. D1 согласован концептуально, но требует проверяемого implementation/replay contract. P0 не считается Complete одним только созданием этого draft.
+D1–D5 согласованы владельцем концептуально. До P1/P2 остаются concrete source/predicate registry fixtures, explicit crash test protocol, wire-shape and replay details, а также baseline `scripts/check.sh` и `pytest`. Согласование подхода не означает implementation validation или закрытие P0.
