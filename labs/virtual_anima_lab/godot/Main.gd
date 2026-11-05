@@ -15,7 +15,7 @@ const SENSE_RADIUS := 3
 const MAX_LINE_BYTES := 8192
 const MAX_EVENTS := 256
 const MAX_DYNAMIC_OBSTACLES := 8
-const SCENARIOS := ["base", "detour", "clutter"]
+const SCENARIOS := ["base", "detour", "clutter", "p6_door"]
 
 var _server: TCPServer = TCPServer.new()
 var _peer: StreamPeerTCP = null
@@ -31,6 +31,7 @@ var _event_seq := 0
 var _sample_seq := 0
 var _last_sample: Dictionary = {}
 var _action_ledger: Dictionary = {}
+var _world_instance_id := Crypto.new().generate_random_bytes(16).hex_encode()
 var _paused := false
 var _human := Vector2i(2, 2)
 var _anima := Vector2i(9, 5)
@@ -124,8 +125,8 @@ func _reset_world() -> void:
 	_last_sample.clear()
 	_action_ledger.clear()
 	_human = Vector2i(2, 2)
-	_anima = Vector2i(9, 5)
-	_door_open = false
+	_anima = Vector2i(6, 4) if _scenario == "p6_door" else Vector2i(9, 5)
+	_door_open = _scenario == "p6_door"
 	_walls.clear()
 	_dynamic_obstacles.clear()
 	_history.clear()
@@ -458,6 +459,82 @@ func _typed_action(req: Dictionary, request_id: int) -> Dictionary:
 	return _reply_v2(request_id, true, receipt)
 
 
+# P6 demo agent capability: no operator role and no full-world reads.
+func _typed_door_action(req: Dictionary, request_id: int) -> Dictionary:
+	var operation_id = req.get("operation_id")
+	if not _valid_operation_key(operation_id):
+		return _reply_v2(request_id, false, {}, "INVALID_OPERATION_ID")
+	if req.size() != 8:
+		return _reply_v2(request_id, false, {}, "UNKNOWN_ACTION_FIELD")
+	var action = req.get("action")
+	if typeof(action) != TYPE_DICTIONARY or action != {
+		"schema": "val.door_action/0.1", "kind": "close_door",
+	}:
+		return _reply_v2(request_id, false, {}, "INVALID_ACTION")
+	if not _valid_uint(req.get("expected_epoch")) or not _valid_uint(req.get("expected_revision")):
+		return _reply_v2(request_id, false, {}, "INVALID_PRECONDITION")
+	var expected_epoch: int = int(req["expected_epoch"])
+	var expected_revision: int = int(req["expected_revision"])
+	var fingerprint := "val.door_action/0.1:%d:%d:close_door" % [
+		expected_epoch, expected_revision,
+	]
+	if _action_ledger.has(operation_id):
+		var previous: Dictionary = _action_ledger[operation_id]
+		if previous["fingerprint"] != fingerprint:
+			return _reply_v2(request_id, false, {}, "OPERATION_ID_CONFLICT")
+		var replay: Dictionary = previous["receipt"].duplicate(true)
+		replay["replayed"] = true
+		return _reply_v2(request_id, true, replay)
+	if expected_epoch != _epoch or expected_revision != _revision:
+		return _reply_v2(request_id, false, {}, "STALE_WORLD")
+	if _paused:
+		return _reply_v2(request_id, false, {}, "PAUSED")
+	if _action_ledger.size() >= MAX_ACTION_KEYS:
+		return _reply_v2(request_id, false, {}, "LEDGER_CAPACITY")
+	var reason := "ok"
+	if _distance(_anima, _door) > 1:
+		reason = "not_adjacent"
+	elif _human == _door or _anima == _door:
+		reason = "occupied"
+	elif not _door_open:
+		reason = "already_closed"
+	var applied := reason == "ok"
+	if applied:
+		_door_open = false
+		_revision += 1
+	_tick += 1
+	var event := _record("anima", "close_door", {
+		"applied": applied, "reason": reason,
+	})
+	var receipt := {
+		"schema": "val.door_receipt/0.1", "operation_id": operation_id,
+		"status": "APPLIED" if applied else "BLOCKED",
+		"effect_applied": applied, "reason": reason,
+		"event_id": event["event_id"], "world_epoch": _epoch,
+		"world_revision": _revision, "tick": _tick, "replayed": false,
+	}
+	_action_ledger[operation_id] = {
+		"fingerprint": fingerprint, "receipt": receipt.duplicate(true),
+	}
+	queue_redraw()
+	_refresh_hud()
+	return _reply_v2(request_id, true, receipt)
+
+
+# Read-only key lookup for lost-response recovery; never retries an effect.
+func _door_operation_status(req: Dictionary, request_id: int) -> Dictionary:
+	if req.size() != 5 or not _valid_operation_key(req.get("operation_id")):
+		return _reply_v2(request_id, false, {}, "INVALID_OPERATION_ID")
+	var operation_id: String = req["operation_id"]
+	if not _action_ledger.has(operation_id):
+		return _reply_v2(request_id, true, {"found": false})
+	var entry: Dictionary = _action_ledger[operation_id]
+	if not str(entry["fingerprint"]).begins_with("val.door_action/0.1:"):
+		return _reply_v2(request_id, false, {}, "OPERATION_TYPE_MISMATCH")
+	return _reply_v2(request_id, true, {
+		"found": true, "receipt": entry["receipt"].duplicate(true),
+	})
+
 
 # P5-C operator fixture hooks. No agent capability may set world truth.
 func _set_dynamic_obstacle(req: Dictionary, request_id: int) -> Dictionary:
@@ -552,10 +629,11 @@ func _request_v2(req: Dictionary, request_id: int) -> Dictionary:
 	if op == "hello":
 		return _reply_v2(request_id, true, {
 			"world_version": WORLD_VERSION,
+			"world_instance_id": _world_instance_id,
 			"observation_schema": OBSERVATION_VERSION,
 			"action_schema": ACTION_VERSION,
 			"source_ref": "lab.sensor.anima.proximity",
-			"capabilities": ["observe", "act"] if role == "agent" else [
+			"capabilities": ["observe", "act", "act_door", "door_operation_status"] if role == "agent" else [
 				"inspect", "events", "set_door", "human_move", "reset",
 				"pause", "resume", "step", "set_obstacle", "emit_noise",
 			],
@@ -568,6 +646,10 @@ func _request_v2(req: Dictionary, request_id: int) -> Dictionary:
 				return _reply_v2(request_id, true, _typed_observation())
 			"act":
 				return _typed_action(req, request_id)
+			"act_door":
+				return _typed_door_action(req, request_id)
+			"door_operation_status":
+				return _door_operation_status(req, request_id)
 			_:
 				return _reply_v2(request_id, false, {}, "FORBIDDEN")
 	match op:
