@@ -432,6 +432,63 @@ func _typed_action(req: Dictionary, request_id: int) -> Dictionary:
 	return _reply_v2(request_id, true, receipt)
 
 
+
+# P5-C operator fixture hooks. No agent capability may set world truth.
+func _set_dynamic_obstacle(req: Dictionary, request_id: int) -> Dictionary:
+	if req.size() != 6:
+		return _reply_v2(request_id, false, {}, "INVALID_FIXTURE_REQUEST")
+	var point = req.get("at")
+	var blocked = req.get("blocked")
+	if typeof(point) != TYPE_DICTIONARY or point.size() != 2:
+		return _reply_v2(request_id, false, {}, "INVALID_OBSTACLE_CELL")
+	if not _valid_uint(point.get("x")) or not _valid_uint(point.get("y")):
+		return _reply_v2(request_id, false, {}, "INVALID_OBSTACLE_CELL")
+	if typeof(blocked) != TYPE_BOOL:
+		return _reply_v2(request_id, false, {}, "INVALID_OBSTACLE_STATE")
+	var cell := Vector2i(int(point["x"]), int(point["y"]))
+	if (
+		not _inside(cell) or cell in _walls or cell == _door
+		or cell == _anima or cell == _human or cell == _marker
+	):
+		return _reply_v2(request_id, false, {}, "INVALID_OBSTACLE_CELL")
+	var present := cell in _dynamic_obstacles
+	if blocked and not present and _dynamic_obstacles.size() >= MAX_DYNAMIC_OBSTACLES:
+		return _reply_v2(request_id, false, {}, "OBSTACLE_CAPACITY")
+	var changed: bool = bool(blocked) != present
+	if changed:
+		if bool(blocked):
+			_dynamic_obstacles.append(cell)
+		else:
+			_dynamic_obstacles.erase(cell)
+		_revision += 1
+	_tick += 1
+	var event := _record("operator", "set_obstacle", {
+		"at": _cell(cell), "blocked": blocked, "changed": changed,
+	})
+	queue_redraw()
+	_refresh_hud()
+	return _reply_v2(request_id, true, {
+		"at": _cell(cell), "blocked": blocked, "changed": changed,
+		"event_id": event["event_id"],
+	})
+
+
+func _emit_noise(req: Dictionary, request_id: int) -> Dictionary:
+	if req.size() != 5:
+		return _reply_v2(request_id, false, {}, "INVALID_FIXTURE_REQUEST")
+	var label = req.get("label")
+	if not _valid_operation_key(label) or label.length() > 32:
+		return _reply_v2(request_id, false, {}, "INVALID_NOISE_LABEL")
+	# Ambient noise is an operator-authored test event, not agent evidence.
+	# It advances logical time and event seq, NOT world state revision.
+	_tick += 1
+	var event := _record("ambient", "noise", {"label": label})
+	_refresh_hud()
+	return _reply_v2(request_id, true, {
+		"event_id": event["event_id"], "label": label,
+	})
+
+
 func _typed_events(req: Dictionary, request_id: int) -> Dictionary:
 	var from_seq = req.get("after_seq", 0)
 	if not _valid_uint(from_seq):
