@@ -1,7 +1,7 @@
 """Single composition root for the existing ANIMA runtime.
 
 Incremental Core composition: P1 runtime, P2 observations, P3-A decisions,
-and optional P3-B sandbox-local door action with independent readback.
+optional P3-B sandbox-local door actions, and P3-C bounded auto scheduling.
 """
 
 from dataclasses import dataclass
@@ -15,6 +15,7 @@ from anima.core.event_bus import EventBus
 from anima.core.ingress import CoreIngress, SourceRegistration
 from anima.core.goal_decision import CoreGoalDecision
 from anima.core.door_execution import CoreDoorExecution
+from anima.core.autonomy import CoreAutonomy
 from anima.core.door_world import VirtualDoorWorld, door_tool_registry, door_handlers
 from anima.core.identity import Identity
 from anima.core.state import AnimaState
@@ -59,6 +60,7 @@ class CoreAssembly:
     core_events: CoreEventDispatcher | None
     core_decision: CoreGoalDecision | None
     core_execution: CoreDoorExecution | None
+    core_autonomy: CoreAutonomy | None
 
 
 def build_core(
@@ -68,12 +70,13 @@ def build_core(
     properties: Mapping[tuple[str, str], PropertyRule] | None = None,
     goal_actions: Mapping[tuple[str, str, str], ActionSpec] | None = None,
     virtual_door_root: str | Path | None = None,
+    auto_core: bool = False,
 ) -> CoreAssembly:
     """Build the current, proven runtime stack once for CLI and headless use.
 
     No wakeup is implicit. Caller owns lifecycle. Registered Core inputs and
     a bounded decision driver and explicit virtual-world adapter can be opted
-    in. No background autonomy or model-generated action is configured.
+    in. P3-C automation is opt-in, synchronous and bounded per trigger.
     """
 
     if (sources is None) != (properties is None):
@@ -82,6 +85,10 @@ def build_core(
         raise ValueError("Core goal decisions require registered Core input and Belief")
     if virtual_door_root is not None and goal_actions is None:
         raise ValueError("Core world execution requires typed Goal decision configuration")
+    if type(auto_core) is not bool:
+        raise TypeError("auto_core must be boolean")
+    if auto_core and virtual_door_root is None:
+        raise ValueError("Autonomous Core requires explicitly registered virtual world")
     root = (get_data_dir() if data_dir is None else Path(data_dir)).expanduser().resolve()
     state = AnimaState(root / "state.json")
     identity = Identity(root / "identity.json")
@@ -149,6 +156,10 @@ def build_core(
             registry=registry,
             executor=executor,
         )
+    core_autonomy = (
+        CoreAutonomy(decisions=core_decision, executor=core_execution)
+        if auto_core else None
+    )
     runtime = Runtime(
         anima=state,
         identity=identity,
@@ -163,6 +174,7 @@ def build_core(
         core_events=core_events,
         core_decision=core_decision,
         core_execution=core_execution,
+        core_autonomy=core_autonomy,
     )
     return CoreAssembly(
         data_dir=root,
@@ -184,6 +196,7 @@ def build_core(
         core_events=core_events,
         core_decision=core_decision,
         core_execution=core_execution,
+        core_autonomy=core_autonomy,
     )
 
 
