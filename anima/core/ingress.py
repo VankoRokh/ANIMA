@@ -396,6 +396,29 @@ class CoreIngress:
         with closing(self._connect()) as connection:
             return self.beliefs.observation_outcome(connection, event_id)
 
+    def observation_triggers_after(self, rowid=0, *, limit=64):
+        """Bounded read-only scan of committed ingress observations.
+
+        rowid is a local journal cursor, not an event ID or a semantic clock.
+        Invalid raw events are included so consumers can advance their cursor
+        without treating a rejected report as trusted world observation.
+        """
+        if type(rowid) is not int or rowid < 0:
+            raise ValueError("rowid must be a nonnegative integer")
+        if type(limit) is not int or not 1 <= limit <= 256:
+            raise ValueError("limit must be between 1 and 256")
+        with closing(self._connect()) as connection:
+            rows = connection.execute(
+                "SELECT e.rowid AS rowid, e.event_id, e.source_ref,"
+                " e.kind, o.outcome, b.subject_ref, b.predicate_ref"
+                " FROM core_events AS e"
+                " LEFT JOIN core_observation_outcomes AS o ON o.event_id=e.event_id"
+                " LEFT JOIN core_observations AS b ON b.event_id=e.event_id"
+                " WHERE e.rowid>? ORDER BY e.rowid LIMIT ?",
+                (rowid, limit),
+            ).fetchall()
+        return tuple(dict(row) for row in rows)
+
     def rejection_count(self):
         with closing(self._connect()) as connection:
             row = connection.execute(
