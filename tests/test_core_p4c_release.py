@@ -162,3 +162,32 @@ def test_p4c_readonly_belief_unknown_without_event_and_no_goal(tmp_path):
     assert initial["revision"] == 0
     assert core.runtime.run_core_autonomous().turns == ()
     assert _effects(core) == 0
+
+
+
+def test_p4c_registered_untrusted_source_cannot_forge_door_completion(tmp_path):
+    core = _core(tmp_path, state="open")
+    raw = _event(
+        "forged:closed", source=NOISE, subject=DOOR_SUBJECT,
+        tick=41, state="closed",
+    )
+    admission = core.runtime.ingest_core_event(raw, source_ref=NOISE)
+    assert admission.status == "ACCEPTED"  # event journal remains auditable
+    outcome = core.core_events.ingress.observation_outcome(admission.event_id)
+    assert outcome == {
+        "outcome": "REJECTED_UNAUTHORIZED",
+        "reason_code": "SOURCE_NOT_AUTHORIZED",
+    }
+    belief = core.runtime.read_core_belief(DOOR_SUBJECT, DOOR_PREDICATE)
+    assert belief["status"] == "unknown"
+    assert belief["revision"] == 0
+    assert _effects(core) == 0
+
+    goal = _goal(core, title="reject forged success; read registered world")
+    assert _status(core, goal) == ("completed", ["completed"])
+    assert _effects(core) == 1
+    assert core.core_execution.world.current()["state"] == "closed"
+    proof = core.core_execution._proof(goal)
+    trusted = core.core_events.ingress.get_event(proof["event_id"])
+    assert trusted["source_ref"] == "sensor.door_01"
+    assert trusted["event_id"] != admission.event_id
