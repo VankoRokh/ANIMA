@@ -12,6 +12,10 @@ ROOT = Path(__file__).resolve().parents[1]
 def _canonical_module(name):
     if name.startswith("test_p4c_"):
         return "tests.test_core_p4c_release"
+    if name.startswith((
+        "test_core_audit_manifest_", "test_core_audit_release_report_"
+    )):
+        return "tests.test_core_p4_report"
     if name.startswith("test_core_audit_"):
         return "tests.test_core_audit_blockers"
     return "tests.test_core_p4_acceptance"
