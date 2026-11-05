@@ -7,6 +7,7 @@ through the P3-B authorized adapter and independent observer.
 
 import random
 import sqlite3
+from contextlib import closing
 
 import pytest
 
@@ -109,7 +110,7 @@ def _run_seeded(root, *, seed, episodes=EPISODES, restart_every=RESTART_EVERY):
         a["outcome"] == "VERIFIED_SUCCESS"
         for a in cold.core_autonomy.attempts()
     )
-    with sqlite3.connect(cold.core_execution.world.path) as connection:
+    with closing(sqlite3.connect(cold.core_execution.world.path)) as connection:
         assert connection.execute(
             "SELECT COUNT(DISTINCT operation_id) FROM door_effects"
         ).fetchone()[0] == total_effects
