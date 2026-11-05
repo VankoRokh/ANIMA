@@ -14,7 +14,7 @@ from pathlib import Path
 from anima.core.assembly import build_core
 from anima.core.belief import PropertyRule
 from anima.core.door_world import (
-    DOOR_PREDICATE, DOOR_PRODUCER, DOOR_SOURCE, DOOR_SUBJECT,
+    DOOR_PREDICATE, DOOR_SOURCE, DOOR_SUBJECT,
     DOOR_TOOL, DOOR_VERSION,
 )
 from anima.core.goal_decision import GoalCriterion
@@ -41,7 +41,7 @@ def make_core(data_dir: Path, *, port: int = 46019):
         root / "core",
         sources={DOOR_SOURCE: SourceRegistration(
             source_ref=DOOR_SOURCE,
-            producer_ref=DOOR_PRODUCER,
+            producer_ref="adapter.val_door_port/0.1",
             allowed_kinds=("state.property", "sensor.unavailable"),
         )},
         properties={(DOOR_SUBJECT, DOOR_PREDICATE): PropertyRule(
