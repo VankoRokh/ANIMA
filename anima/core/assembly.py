@@ -6,9 +6,13 @@ No model, GUI, world adapter, or Sleep worker is required to construct it.
 
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Mapping
 
 from anima.config.paths import get_data_dir
+from anima.core.belief import PropertyRule
+from anima.core.dispatch import CoreEventDispatcher
 from anima.core.event_bus import EventBus
+from anima.core.ingress import CoreIngress, SourceRegistration
 from anima.core.identity import Identity
 from anima.core.state import AnimaState
 from anima.diagnostics.metrics import DiagnosticMetrics
@@ -45,16 +49,24 @@ class CoreAssembly:
     internal_state_store: InternalStateStore
     internal_state: InternalStateRuntime
     runtime: Runtime
+    core_events: CoreEventDispatcher | None
 
 
-def build_core(data_dir: str | Path | None = None) -> CoreAssembly:
+def build_core(
+    data_dir: str | Path | None = None,
+    *,
+    sources: Mapping[str, SourceRegistration] | None = None,
+    properties: Mapping[tuple[str, str], PropertyRule] | None = None,
+) -> CoreAssembly:
     """Build the current, proven runtime stack once for CLI and headless use.
 
-    No wakeup is implicit. The caller owns lifecycle and must explicitly call
-    runtime.wake()/sleep(). World Belief, autonomous scheduling and actions are
-    intentionally not created in P1.
+    No wakeup is implicit. Caller owns lifecycle. Registered Core inputs can
+    be opted into the same Runtime; autonomous scheduling and actions are not
+    assembled in P2-C.
     """
 
+    if (sources is None) != (properties is None):
+        raise ValueError("Core inputs require both source and property registries")
     root = (get_data_dir() if data_dir is None else Path(data_dir)).expanduser().resolve()
     state = AnimaState(root / "state.json")
     identity = Identity(root / "identity.json")
@@ -78,6 +90,18 @@ def build_core(data_dir: str | Path | None = None) -> CoreAssembly:
         event_log=event_log,
         trace=trace,
     )
+    core_events = None
+    if sources is not None and properties is not None:
+        ingress = CoreIngress(
+            root / "core_state.db",
+            sources=sources,
+            properties=properties,
+        )
+        core_events = CoreEventDispatcher(
+            ingress=ingress,
+            event_log=event_log,
+            event_processing=event_processing,
+        )
     metrics = DiagnosticMetrics()
     internal_state_store = InternalStateStore(root / "internal_state.db")
     internal_state = InternalStateRuntime(internal_state_store, trace=trace)
@@ -92,6 +116,7 @@ def build_core(data_dir: str | Path | None = None) -> CoreAssembly:
         trace=trace,
         metrics=metrics,
         internal_state=internal_state,
+        core_events=core_events,
     )
     return CoreAssembly(
         data_dir=root,
@@ -110,6 +135,7 @@ def build_core(data_dir: str | Path | None = None) -> CoreAssembly:
         internal_state_store=internal_state_store,
         internal_state=internal_state,
         runtime=runtime,
+        core_events=core_events,
     )
 
 
