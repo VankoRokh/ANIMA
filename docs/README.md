@@ -11,6 +11,7 @@
 | Доказательства и проверенные SHA | [Результаты испытаний](TESTING/Results/README.md) |
 | Core v0.1: риски и повторная ревизия | [Границы аудита](ROADMAP/Core_v0_1_Audit_Boundaries.md) и [исправления B1–B4](ROADMAP/Core_v0_1_Independent_Audit_Remediation_Draft.md) |
 | Принятые семантические правила Stage 7 | [Semantic Boundary v0](ROADMAP/Stage_7_Semantic_Boundary_v0.md), [ADR-010](DECISIONS/ADR-010_Stage_7_Semantic_Boundary.md), [проверки](TESTING/Stage7_Conformance_v0.md), [схема](SCHEMAS/classify_relation_0_1.schema.json) |
+| Принятый корпус и журнал проверки Stage 7 | [Корпус соответствия](TESTING/Stage7_Conformance_Corpus_v0.md) и связанный с ним журнал рецензирования |
 | Готовность Virtual Lab | [Сводка полигона](ROADMAP/Virtual_ANIMA_Lab_P5C_Scenario_Replay_Draft.md) |
 | Идеи, не принятые в реализацию | [Исследовательские вопросы](ROADMAP/Research.md) |
 | Устаревшие черновики и прежние версии | [Карта истории](ARCHIVE/Development_Snapshots.md), [архив миграции](ARCHIVE/README.md), Git |
