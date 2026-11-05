@@ -172,9 +172,11 @@ class CoreAutonomy:
             " FROM core_auto_triggers WHERE status='pending'"
             " ORDER BY rowid LIMIT 64"
         ).fetchall()
+        candidates = []
         for trigger in rows:
             eligible = []
-            for goal in active:
+            for priority_rank, goal in enumerate(active):
+
                 if trigger["kind"] == "goal" and goal.goal_id != trigger["reference_id"]:
                     continue
                 binding = self.decisions._binding(goal.goal_id)
@@ -193,26 +195,32 @@ class CoreAutonomy:
                     DOOR_SUBJECT, DOOR_PREDICATE
                 ):
                     continue
-                eligible.append(goal.goal_id)
-            pending_goal = None
-            for goal_id in eligible:
+                eligible.append((priority_rank, goal.goal_id))
+            outstanding = []
+            for rank, goal_id in eligible:
                 row = connection.execute(
                     "SELECT status FROM core_auto_attempts"
                     " WHERE trigger_key=? AND goal_id=?",
                     (trigger["trigger_key"], goal_id),
                 ).fetchone()
                 if row is None or row["status"] == "started":
-                    pending_goal = goal_id
-                    break
-            if pending_goal is None:
+                    outstanding.append((rank, goal_id))
+            if not outstanding:
                 connection.execute(
                     "UPDATE core_auto_triggers SET status='done'"
                     " WHERE trigger_key=?",
                     (trigger["trigger_key"],),
                 )
                 continue
-            return trigger["trigger_key"], pending_goal
-        return None
+            rank, goal_id = min(outstanding)
+            candidates.append((rank, trigger["trigger_key"], goal_id))
+        if not candidates:
+            return None
+        # Active Goal priority is authoritative across all scanned triggers,
+        # not merely within the oldest event. Existing GoalArbitrator defines
+        # deterministic rank (priority, creation time, ID).
+        _, trigger_key, goal_id = min(candidates, key=lambda x: x[0])
+        return trigger_key, goal_id
 
     def pending_count(self):
         with closing(self.decisions._connect()) as connection:
