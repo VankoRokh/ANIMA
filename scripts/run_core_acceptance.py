@@ -61,9 +61,23 @@ def required_coverage(cases):
     """A green run cannot silently omit or skip required P4 scenarios."""
     statuses = {}
     for name in P4_REQUIRED:
+        # JUnit name alone is not a trustworthy acceptance identity.
+        # Bind every mandatory test to its canonical module as well.
+        module = (
+            "tests.test_core_p4c_release"
+            if name.startswith("test_p4c_")
+            else "tests.test_core_p4_acceptance"
+            if name.startswith(("test_p4_", "test_p4b_"))
+            else "tests.test_core_audit_blockers"
+            if name.startswith("test_core_audit_")
+            else None
+        )
+        if module is None:
+            raise ValueError(f"Unrecognized mandatory P4 test origin: {name}")
         matched = [
             case for case in cases
-            if case["name"] == name or case["name"].startswith(name + "[")
+            if case.get("classname") == module
+            and (case.get("name") == name or case.get("name", "").startswith(name + "["))
         ]
         if not matched:
             statuses[name] = "MISSING"
