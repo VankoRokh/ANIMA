@@ -1,6 +1,6 @@
 # ANIMA Core v0.1 — P2-A SQLite Event Ingress
 
-**Status:** Implemented in isolated branch; **UNVERIFIED** until owner-local `pytest` and `scripts/check.sh` results.  
+**Status:** **P2-A PASS** (owner-reported local checks, 2026-11-05). P2-B and P2-C are not included and remain unverified.  
 **Date:** 2026-11-05.  
 **Branch:** `work/core-v0-1-p2a-ingress` (based on P1 bootstrap PASS branch).  
 **Contracts:** [Event / Observation / Belief](Core_v0_1_Event_Belief_Contract_Draft.md), [P0 audit](Core_v0_1_P0_Boundary_Draft.md).
@@ -89,7 +89,12 @@ Expected cases:
 - no legacy `events.jsonl`, `memory.db` or Runtime lifecycle created by standalone ingress;
 - source registry is frozen after construction.
 
-P2-A gate requires local execution **and** full legacy regression; do not mark it complete solely because code is in GitHub. Tests are deterministic, local, without network, models or Godot.
+**P2-A gate: PASS**, по переданному владельцем терминальному выводу, а не по CI/выполнению на стороне ассистента. Python 3.14.4:
+- `scripts/check.sh`: **PASS** (88 страниц документации, 498 локальных ссылок, 293 Python-файла, 3 JSON, 3 Bash, проверки чистоты репозитория).
+- прицельный `pytest`: **23 passed in 0.41s**.
+- полный `pytest -q`: **1271 passed in 17.25s**.
+- SHA локального тестового checkout не предоставлен: branch head на момент фиксации результата указан в истории GitHub, но не объявляется подтверждённым локальным snapshot. Для следующего отчёта сохранять `git rev-parse HEAD`.
+- Подтверждена только область P2-A. Атомарная Belief-проекция, отложенный outbox dispatch и восстановление между БД ещё не реализованы.
 
 ## 5. Next steps
 
