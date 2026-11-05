@@ -69,15 +69,7 @@ tmp_dir="$(mktemp -d)"
 
 ## 4. P1 acceptance matrix
 
-| Check | Expected | Current evidence |
-|---|---|---|
-| P1-A | сборка `build_core` без model/GUI/network | code review + pending subprocess |
-| P1-B | создание assembly не меняет status/session | pending pytest |
-| P1-C | wake→sleep создаёт 2 события и консистентный snapshot | pending pytest |
-| P1-D | restart сохраняет instance identity, history и счётчик | pending pytest |
-| P1-E | interactive CLI остался совместимым | pending legacy D1/CLI tests |
-| P1-F | нет обязательного Sleep processor при запуске | code review + pending tests |
-| P1-G | документация/все регрессионные тесты | pending `scripts/check.sh` и full pytest |
+Сводная матрица P1-A…P1-G и доказательства её прохождения приведены в разделе 5 ниже.
 
 **P1 bootstrap gate:** PASS по результатам локальных проверок владельца проекта; точный `git rev-parse HEAD` пользователь не приложил. Ветка в момент получения результатов указывала на commit `64e774bd561d41211f4e8666a1be004e326b4f44`, но его нельзя без дополнительного подтверждения объявлять точным исполненным snapshot. Статусы Stage и `docs/project.json` не изменяются. P0 replay/authority design и P2–P4 остаются открытыми.
 
