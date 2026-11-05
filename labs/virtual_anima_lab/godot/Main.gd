@@ -461,6 +461,8 @@ func _typed_action(req: Dictionary, request_id: int) -> Dictionary:
 
 # P6 demo agent capability: no operator role and no full-world reads.
 func _typed_door_action(req: Dictionary, request_id: int) -> Dictionary:
+	if _scenario != "p6_door":
+		return _reply_v2(request_id, false, {}, "FORBIDDEN")
 	var operation_id = req.get("operation_id")
 	if not _valid_operation_key(operation_id):
 		return _reply_v2(request_id, false, {}, "INVALID_OPERATION_ID")
@@ -523,6 +525,8 @@ func _typed_door_action(req: Dictionary, request_id: int) -> Dictionary:
 
 # Read-only key lookup for lost-response recovery; never retries an effect.
 func _door_operation_status(req: Dictionary, request_id: int) -> Dictionary:
+	if _scenario != "p6_door":
+		return _reply_v2(request_id, false, {}, "FORBIDDEN")
 	if req.size() != 5 or not _valid_operation_key(req.get("operation_id")):
 		return _reply_v2(request_id, false, {}, "INVALID_OPERATION_ID")
 	var operation_id: String = req["operation_id"]
@@ -627,19 +631,26 @@ func _request_v2(req: Dictionary, request_id: int) -> Dictionary:
 	if typeof(op) != TYPE_STRING:
 		return _reply_v2(request_id, false, {}, "INVALID_OPERATION")
 	if op == "hello":
-		return _reply_v2(request_id, true, {
+		var capabilities := ["observe", "act"] if role == "agent" else [
+			"inspect", "events", "set_door", "human_move", "reset",
+			"pause", "resume", "step", "set_obstacle", "emit_noise",
+		]
+		var welcome := {
 			"world_version": WORLD_VERSION,
-			"world_instance_id": _world_instance_id,
 			"observation_schema": OBSERVATION_VERSION,
 			"action_schema": ACTION_VERSION,
 			"source_ref": "lab.sensor.anima.proximity",
-			"capabilities": ["observe", "act", "act_door", "door_operation_status"] if role == "agent" else [
-				"inspect", "events", "set_door", "human_move", "reset",
-				"pause", "resume", "step", "set_obstacle", "emit_noise",
-			],
+			"capabilities": capabilities,
 			"max_action_keys": MAX_ACTION_KEYS,
 			"scenario": _scenario,
-		})
+		}
+		# Keep P5-C replay responses byte-for-byte stable across fresh processes.
+		if _scenario == "p6_door":
+			welcome["world_instance_id"] = _world_instance_id
+			if role == "agent":
+				capabilities.append("act_door")
+				capabilities.append("door_operation_status")
+		return _reply_v2(request_id, true, welcome)
 	if role == "agent":
 		match op:
 			"observe":
