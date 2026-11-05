@@ -325,7 +325,15 @@ class CoreGoalDecision:
                     kind, reason = "DEFER", "NO_REGISTERED_ACTION"
                 else:
                     kind, reason = "PROPOSE_ACTION", "TARGET_DIFFERS"
-            if kind in {"NOOP", "PROPOSE_ACTION"} and task.status == "queued":
+            if kind == "REQUEST_OBSERVATION" and task.status == "active":
+                self.tasks.transition_task(
+                    task_id, "interrupted",
+                    reason="Core Goal awaits fresh or unambiguous observation",
+                )
+            elif (
+                kind in {"NOOP", "PROPOSE_ACTION"}
+                and task.status in {"queued", "interrupted"}
+            ):
                 self.tasks.transition_task(
                     task_id, "active",
                     reason="Core Goal decision requires active verification/work",
