@@ -6,6 +6,7 @@
 **OLD independently audited subject:** `aabe6553cec19d4cf1962dc4f26129eeca436328` (original verdict **BLOCKED**).  
 **Documentation branch:** `work/core-v0-1-audit-rereview` — this is **not** the executable SHA to test.  
 **Issue/fix specification:** [Independent Audit Remediation](Core_v0_1_Independent_Audit_Remediation_Draft.md).
+**Parallel conceptual review:** [Core v0.1 — Concept Fidelity & Extensibility](Core_v0_1_Concept_Extensibility_Review_Brief.md). This is a **separate architecture verdict**: assess original ANIMA design principles, extension seams and P5/P6 readiness without treating missing future layers as B1–B4 failures. Both reviews inspect the same immutable runtime commit.
 
 ## Task and role
 
@@ -82,3 +83,5 @@ Provide a **Russian report**, with:
 - Clear **freeze decision**: whether owner can consider signing off narrowly scoped Core v0.1, or precisely what remains blocked.
 
 No GitHub modifications or PRs. Do not merge the branch or alter `docs/project.json`; owner alone makes the release decision after reviewing your report.
+
+**If performing the parallel conceptual review in the same Work session:** return **two clearly separated verdicts** — (1) B1–B4 safety/recovery and (2) concept fidelity / extension readiness. A passing bug re-audit does not automatically establish scalability, and a near-term extension refactor does not automatically block the deliberately narrow Core v0.1 freeze.
