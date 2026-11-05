@@ -5,6 +5,7 @@ The hard-process cut uses a disposable subprocess to verify transactional
 rollback beyond Python exception handling.
 """
 
+import sqlite3
 import subprocess
 import sys
 from pathlib import Path
@@ -170,7 +171,13 @@ def test_core_audit_b4_blocked_to_active_resumes_parked_goal(tmp_path):
     first = core.runtime.run_core_autonomous()
     assert first.turns == ()
     assert _status(core, goal)[0] == "blocked"
-    assert core.core_autonomy.pending_count() == 1
+    assert core.core_autonomy.pending_count() == 0
+    with sqlite3.connect(core.core_decision.database_file) as connection:
+        parked = connection.execute(
+            "SELECT trigger_key FROM core_parked_goal_triggers WHERE goal_id=?",
+            (goal,),
+        ).fetchone()
+    assert parked == ("goal:" + goal,)
     assert core.core_autonomy.attempts() == ()
     assert _effects(core) == 0
 
@@ -204,3 +211,40 @@ def test_core_audit_t1_mandatory_test_identity_includes_module():
         for name in P4_REQUIRED
     ]
     assert set(required_coverage(forged).values()) == {"MISSING"}
+
+
+
+def test_core_audit_b4_many_blocked_goals_do_not_hide_new_work(tmp_path):
+    core = _core(tmp_path, state="closed")
+    old = [
+        _goal(core, priority=1, title=f"parked-{i}", notify=False)
+        for i in range(64)
+    ]
+    for goal in old:
+        core.internal_state.goals.transition_goal(
+            goal, to_status="blocked", reason="temporary operator hold",
+        )
+    assert core.runtime.run_core_autonomous().turns == ()
+    assert core.core_autonomy.pending_count() == 0
+    with sqlite3.connect(core.core_decision.database_file) as connection:
+        assert connection.execute(
+            "SELECT COUNT(*) FROM core_parked_goal_triggers"
+        ).fetchone()[0] == 64
+
+    fresh = _goal(core, priority=9, title="new eligible Goal", notify=False)
+    assert len(core.runtime.run_core_autonomous(max_steps=1).turns) == 1
+    assert _status(core, fresh) == ("completed", ["completed"])
+    assert all(_status(core, goal)[0] == "blocked" for goal in old)
+    assert _effects(core) == 0
+
+    reopened = _core(tmp_path)
+    reopened.internal_state.goals.transition_goal(
+        old[0], to_status="active", reason="resume just one parked Goal",
+    )
+    reopened.runtime.wake()
+    assert _status(reopened, old[0]) == ("completed", ["completed"])
+    assert _effects(reopened) == 0
+    with sqlite3.connect(reopened.core_decision.database_file) as connection:
+        assert connection.execute(
+            "SELECT COUNT(*) FROM core_parked_goal_triggers"
+        ).fetchone()[0] == 63
