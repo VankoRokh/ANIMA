@@ -16,7 +16,7 @@ from anima.core.ingress import CoreIngress, SourceRegistration
 from anima.core.goal_decision import CoreGoalDecision
 from anima.core.door_execution import CoreDoorExecution
 from anima.core.autonomy import CoreAutonomy
-from anima.core.door_world import VirtualDoorWorld, door_tool_registry, door_handlers
+from anima.core.door_world import DoorWorldPort, VirtualDoorWorld, door_tool_registry, door_handlers
 from anima.core.identity import Identity
 from anima.core.state import AnimaState
 from anima.execution.contracts import ActionSpec
@@ -70,6 +70,8 @@ def build_core(
     properties: Mapping[tuple[str, str], PropertyRule] | None = None,
     goal_actions: Mapping[tuple[str, str, str], ActionSpec] | None = None,
     virtual_door_root: str | Path | None = None,
+    world_port: DoorWorldPort | None = None,
+    world_handlers: Mapping[tuple[str, str], object] | None = None,
     auto_core: bool = False,
 ) -> CoreAssembly:
     """Build the current, proven runtime stack once for CLI and headless use.
@@ -85,9 +87,16 @@ def build_core(
         raise ValueError("Core goal decisions require registered Core input and Belief")
     if virtual_door_root is not None and goal_actions is None:
         raise ValueError("Core world execution requires typed Goal decision configuration")
+    if world_port is not None:
+        if not isinstance(world_port, DoorWorldPort):
+            raise TypeError("world_port must implement DoorWorldPort")
+        if virtual_door_root is not None or goal_actions is None or world_handlers is None:
+            raise ValueError("Injected world requires a Goal registry and explicit handlers, not virtual_door_root")
+    elif world_handlers is not None:
+        raise ValueError("world_handlers require explicit world_port")
     if type(auto_core) is not bool:
         raise TypeError("auto_core must be boolean")
-    if auto_core and virtual_door_root is None:
+    if auto_core and virtual_door_root is None and world_port is None:
         raise ValueError("Autonomous Core requires explicitly registered virtual world")
     root = (get_data_dir() if data_dir is None else Path(data_dir)).expanduser().resolve()
     state = AnimaState(root / "state.json")
@@ -138,15 +147,15 @@ def build_core(
             actions=goal_actions,
         )
     core_execution = None
-    if virtual_door_root is not None:
-        world = VirtualDoorWorld(virtual_door_root)
+    if virtual_door_root is not None or world_port is not None:
+        world = world_port if world_port is not None else VirtualDoorWorld(virtual_door_root)
         registry = door_tool_registry()
         execution_store = ExecutionStore(root / "execution.db")
         executor = SandboxExecutor(
             root=world.root,
             registry=registry,
             store=execution_store,
-            handlers=door_handlers(),
+            handlers=world_handlers if world_port is not None else door_handlers(),
         )
         core_execution = CoreDoorExecution(
             decisions=core_decision,
