@@ -3,11 +3,27 @@
 from __future__ import annotations
 
 import json
+import math
 import socket
 from typing import Any
 
 PROTOCOL = "val.bridge/0.1"
 MAX_LINE_BYTES = 8192
+MAX_PROTOCOL_INTEGER = 2147483647
+
+
+def _exact_protocol_integer(value: Any) -> int | None:
+    """Accept JSON 1 and 1.0, but never bool, fractions, NaN or infinity."""
+    if type(value) is int and 0 <= value <= MAX_PROTOCOL_INTEGER:
+        return value
+    if (
+        type(value) is float
+        and math.isfinite(value)
+        and 0.0 <= value <= float(MAX_PROTOCOL_INTEGER)
+        and value.is_integer()
+    ):
+        return int(value)
+    return None
 
 
 class LabProtocolError(RuntimeError):
@@ -102,15 +118,26 @@ class LabClient:
             response = json.loads(raw)
         except (UnicodeError, ValueError) as error:
             raise LabProtocolError("non-JSON bridge response") from error
+        if type(response) is not dict:
+            raise LabProtocolError("bridge response is not an object")
+        reply_id = _exact_protocol_integer(response.get("id"))
+        tick = _exact_protocol_integer(response.get("tick"))
         if (
-            type(response) is not dict
-            or response.get("protocol") != PROTOCOL
-            or type(response.get("id")) is not int
-            or response.get("id") != self._sequence
+            response.get("protocol") != PROTOCOL
+            or reply_id != self._sequence
+            or tick is None
             or type(response.get("ok")) is not bool
-            or type(response.get("tick")) is not int
         ):
-            raise LabProtocolError("bridge response contract/id mismatch")
+            raise LabProtocolError(
+                f"bridge response contract/id mismatch "
+                f"(expected id={self._sequence}; "
+                f"got id={response.get('id')!r}, tick={response.get('tick')!r}, "
+                f"protocol={response.get('protocol')!r})"
+            )
+        # Normalize a numeric JSON transport detail before exposing it to
+        # the caller; the agent still has no operator privileges.
+        response["id"] = reply_id
+        response["tick"] = tick
         if not response["ok"]:
             error = response.get("error")
             if not isinstance(error, str) or not error:
