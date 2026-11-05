@@ -273,7 +273,7 @@ def main():
     parser.add_argument("--godot", type=Path, default=(
         Path.home() / ".local/opt/godot/Godot_v4.7.2-stable_linux.x86_64"))
     parser.add_argument("--phase", choices=["main", "crash", "recover"], default="main")
-    parser.add_argument("--mode", choices=["before", "after", "both"), default="both")
+    parser.add_argument("--mode", choices=["before", "after", "both"], default="both")
     parser.add_argument("--port", type=int)
     parser.add_argument("--data-dir", type=Path)
     parser.add_argument("--report", type=Path,
