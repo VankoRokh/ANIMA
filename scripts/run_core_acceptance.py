@@ -64,6 +64,9 @@ P4_REQUIRED = (
     "test_core_audit_b4_blocked_to_active_resumes_parked_goal",
     "test_core_audit_b4_many_blocked_goals_do_not_hide_new_work",
     "test_core_audit_t1_mandatory_test_identity_includes_module",
+    "test_core_audit_manifest_rejects_same_names_from_unrelated_module",
+    "test_core_audit_manifest_rejects_wrong_parameter_identifiers",
+    "test_core_audit_release_report_rejects_dirty_or_changing_checkout",
 )
 
 
@@ -78,6 +81,11 @@ def required_coverage(cases):
             if name.startswith("test_p4c_")
             else "tests.test_core_p4_acceptance"
             if name.startswith(("test_p4_", "test_p4b_"))
+            else "tests.test_core_p4_report"
+            if name.startswith((
+                "test_core_audit_manifest_",
+                "test_core_audit_release_report_",
+            ))
             else "tests.test_core_audit_blockers"
             if name.startswith("test_core_audit_")
             else None
