@@ -224,6 +224,44 @@ moves on the keyboard. Without `--typed`, the controller uses the original
 new v0.2 tests, so a new protocol cannot silently break our established
 visual/world fixtures.
 
+## P5-C scenario profiles and deterministic script replay
+
+**Status: work branch only; real-Godot and full regression tests pending.**
+
+The default world remains `base` and retains P5-A/P5-B behavior. To inspect
+two additional fixed spatial variants, launch Godot with
+`--lab-scenario detour` or `--lab-scenario clutter`. The v0.2 local
+operator harness also supports bounded `set_obstacle(at, blocked)` and
+`emit_noise(label)`; the agent role may not call them. A dynamic obstacle
+is included in bounded agent proximity readings only if visible. A noise
+event is written to the **operator journal only**, not reclassified as
+agent knowledge, and does not change the world-state revision.
+
+The declarative fixture `scenarios/p5c_suite.json` has four scripts:
+`noise_and_obstacle`, `door_intervention`, `detour_injection`,
+`clutter_reset`. `scenario_runner.py` runs each script **twice in fresh
+headless Godot processes** and compares every normalized JSON request/reply
+and the final operator snapshot. It emits summary, trace, digest and log
+evidence. The operator-only trace contains world truth and is **not** an
+observation feed for ANIMA.
+
+```bash
+GODOT_BIN="$HOME/.local/opt/godot/Godot_v4.7.2-stable_linux.x86_64"
+.venv/bin/python -m pytest -q tests/test_val_p5c_scenarios.py
+
+"$GODOT_BIN" --headless --path labs/virtual_anima_lab/godot \
+  --script res://BridgeP5CScenarioTest.gd
+
+report_dir="$(mktemp -d)"
+.venv/bin/python labs/virtual_anima_lab/python/scenario_runner.py \
+  --godot "$GODOT_BIN" --report-dir "$report_dir"
+cat "$report_dir/summary.md"
+```
+
+This proves only scripted command-order replay under fixed seeds/profile.
+Interactive GUI keyboard interleaving and crash recovery are not replayed.
+See the [P5-C acceptance plan](../../docs/ROADMAP/Virtual_ANIMA_Lab_P5C_Scenario_Replay_Draft.md).
+
 ## Tests and next gate
 
 ```bash
