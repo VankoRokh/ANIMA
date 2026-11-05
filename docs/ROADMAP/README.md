@@ -1,15 +1,15 @@
-# План развития
+# План развития ANIMA
 
-Статусы, зависимости и текущая работа берутся из [project.json](../project.json).
-Roadmap описывает цель, границы и проверяемый результат этапов. Реализованные детали
-находятся в [Architecture](../ARCHITECTURE/README.md), причины решений — в
-[ADR](../DECISIONS/README.md), показательные доказательства — в
-[Testing Results](../TESTING/Results/README.md), а неутверждённые направления и
-эксперименты — в [Research](Research.md).
+**Источник статусов и зависимостей — [`docs/project.json`](../project.json).** Таблица ниже создаётся автоматически. Этот документ содержит только ближайшие задачи и минимальные критерии этапов, а не повторяет историю всех промежуточных коммитов.
 
-**Рабочий проектный план (не утверждён как новый Stage):** [Core v0.1 и Virtual ANIMA Lab v0.1](Core_v0_1_VAL_v0_1_Plan_Draft.md). Он описывает порядок подготовки standalone Core, его проверок и последующего подключения к виртуальной среде; статусы `project.json` не меняет.
+## Ближайший маршрут
 
-**Core v0.1 baseline:** [P4-C — 1380/1380 на `aabe6553`](Core_v0_1_P4C_Release_Gate_Draft.md); независимый аудит выявил B1–B4, после чего [исправления прошли локально 1392/1392 на `b639a522`](Core_v0_1_Independent_Audit_Remediation_Draft.md). Повторный независимый аудит и финальная заморозка отложены; Core не объявлен Complete. **Параллельный изолированный P5-A:** [Godot Virtual ANIMA Lab feasibility](Virtual_ANIMA_Lab_P5A_Feasibility_Draft.md) — headless-интеграция Godot↔Python (9/9, 22 команды, seed 7) и визуальное управление двумя акторами подтверждены владельцем. Точный SHA прогона и результаты отдельной общей регрессии ещё не предоставлены. **Текущая изолированная работа:** [P5-B — типизированные world contracts, keyed actions и журнал](Virtual_ANIMA_Lab_P5B_World_Contracts_Draft.md): интеграционный Godot↔Python smoke локально PASS (10/10, 29 запросов), typed-контроллер 24/24; нативные/регрессионные проверки и фиксация точного SHA ещё ожидаются. **Изолированный P5-C — Complete (по результатам владельца):** [сценарные профили, внешние события и воспроизводимый headless replay](Virtual_ANIMA_Lab_P5C_Scenario_Replay_Draft.md) — реальные два запуска каждого из 4 сценариев Godot дали идентичные трассы (4/4 PASS), полная Python-регрессия 1450/1450 PASS на чистом `e995169e`; владелец дополнительно подтвердил native-Godot, обратные smoke-прогоны и GUI на всех трёх картах. Независимый аудит и интеграция Core не выполнялись. `project.json` не меняем.
+1. **Core v0.1:** завершить повторный независимый аудит источников наблюдений, Belief, Goals/Tasks, допуска действий, независимой Verification, повторов и recovery; зафиксировать точный проверенный SHA. [Критерии ревизии](Core_v0_1_Audit_Boundaries.md).
+2. **Virtual Lab:** P5-A/B/C и интерфейс Normal/Debug завершили локальные испытания, **Core не подключён**. [Сводка полигона](Virtual_ANIMA_Lab_P5C_Scenario_Replay_Draft.md).
+3. **P6 — интеграция Core ↔ Lab:** только после аудита проектировать доверенный адаптер с реальными полномочиями источников и повторной проверкой результатов.
+4. **Stage 7:** принят [семантический контракт](Stage_7_Semantic_Boundary_v0.md) для ограниченного read-only интерфейса, но полный жизненный цикл Knowledge остаётся Planned. Открыты DP-08/09/10b/11; [корпус соответствия](../TESTING/Stage7_Conformance_v0.md).
+
+**Технические ориентиры:** [архитектура](../ARCHITECTURE/README.md), [рабочий план Core/VAL](Core_v0_1_VAL_v0_1_Plan_Draft.md), [результаты испытаний](../TESTING/Results/README.md), [принятые решения](../DECISIONS/README.md), [исследовательский backlog](Research.md), [старые редакции](../ARCHIVE/Development_Snapshots.md).
 
 <!-- AUTO:roadmap:START -->
 **Текущая работа:** Stage 6 Cognitive Integration Core завершён и подтверждён TV-0051. Для Stage 7 принят pre-training semantic boundary v0: immutable qualified/time-scoped Claim, отдельные Evidence/Source/Producer/provenance, typed Value v0, explicit temporal semantics, независимые CONTENT/REVISION results и read-only classify_relation/0.1 с deterministic-first processing. Stage 7 implementation остаётся Planned; DP-08, DP-09, полная dependency policy DP-10 и production integration DP-11 открыты. До model training обязательны conformance corpus и измерение реального model residual; LoRA/SFT не начаты.
@@ -36,293 +36,60 @@ Roadmap описывает цель, границы и проверяемый р
 
 ## D0
 
-Документация вынесена в репозиторий и имеет канонические источники истины.
-Изменения статусов идут через `project.json`; динамические сводки не должны иметь
-несколько независимых ручных источников.
+**Документация — Complete.** Источники истины, генерируемые сводки и сохранение истории в Git. [Результаты](../TESTING/Results/TV-0003.md).
 
 ## Stage 0
 
-**Foundation — Complete.** Постоянный instance ID, lifecycle/state, sessions, raw
-Events, безопасная запись и перенос data directory переживают restart/restore.
-Доказательство: [TV-0001](../TESTING/Results/TV-0001.md).
+**Основа — Complete.** Идентичность экземпляра, состояние, журнал событий и восстановление. [TV-0001](../TESTING/Results/TV-0001.md).
 
 ## D1
 
-**Runtime, Tests & Observability — Complete.** Headless Runtime, ScenarioRunner,
-trace и изолированный test harness позволяют воспроизводимо наблюдать поведение.
-Доказательство: [TV-0002](../TESTING/Results/TV-0002.md).
+**Среда исполнения и проверки — Complete.** Изолированные тесты, наблюдаемость, запуск без GUI. [TV-0002](../TESTING/Results/TV-0002.md).
 
 ## Stage 1
 
-**Cognitive Memory — Complete.** Проверен цикл
-`Event → Memory → Knowledge → Retrieval → Context Builder` с provenance,
-bounded context, recovery и performance baseline.
-Доказательства: [TV-0004 — TV-0015](../TESTING/Results/README.md).
+**Когнитивная память — Complete.** Эпизоды, знания, происхождение сведений, извлечение и ограниченный контекст. [Результаты](../TESTING/Results/README.md).
 
 ## Stage 2
 
-**Internal State — Complete.** Goals, ограниченные состояния, Choice и причинная
-история подтверждены как отдельный регулирующий слой, а не самостоятельный владелец
-решений. Доказательства: [TV-0016 — TV-0017](../TESTING/Results/README.md).
+**Внутреннее состояние — Complete.** Состояние влияет на выбор, но не владеет решениями. [Результаты](../TESTING/Results/README.md).
 
 ## Stage 3
 
-**Sleep — Complete.** Persistent bounded orchestration, checkpoint/resume,
-derived results и provenance подтверждены. Доказательства:
-[TV-0018 — TV-0030](../TESTING/Results/README.md).
+**Сон и консолидация — Complete.** Ограниченная обработка, контрольные точки и продолжение после прерывания. [Результаты](../TESTING/Results/README.md).
 
 ## Stage 4
 
-**Agent / LLM Planner Experiment — Stopped after 4.12.** Эксперимент доказал
-полезные свойства Executor/Tool/Observation/Verification/recovery, но показал, что
-LLM Planner как владелец proposal generation противоречит архитектуре ANIMA.
-Результаты 4.0–4.12 сохранены; полезный исполнительный код возвращён позднее под
-system ownership без возврата Planner ownership.
-
-Доказательства: [TV-0031 — TV-0042](../TESTING/Results/README.md).
-Решения: [ADR-008](../DECISIONS/README.md#adr-008),
-[ADR-009](../DECISIONS/README.md#adr-009).
+**Эксперимент LLM Planner — Stopped.** Полезные проверки Executor/Observation/Recovery сохранены; передача системных полномочий LLM признана ошибочной. [ADR-008/009](../DECISIONS/README.md#adr-008), [результаты](../TESTING/Results/README.md).
 
 ## Stage 5
 
-**FAST Cognition & Memory Integration — Complete.** Авторитетный scope сохранён в
-[Cognitive Resolution Integration Spec](Cognitive_Resolution_Integration_Spec.md).
-Stage доказал model-independent boundary:
-
-```text
-input
-  ↓
-Canonical IR + bounded context
-  ↓
-deterministic resolution
-  ├─ deterministic result / no admissible action
-  ├─ insufficient data
-  └─ cognitive remainder → projection → FAST
-                              ↓
-                        final validation
-```
-
-FAST остаётся сменяемым cognitive consumer и не владеет Memory, Identity, Goals,
-routing или Runtime. Cross-session read, backend replacement, observability,
-projected cognition и failure audit подтверждены representative acceptance.
-Доказательство: [TV-0043](../TESTING/Results/TV-0043.md).
-
-Отложенные старые цели 5.5/5.6 — semantic interpretation-to-write,
-write/update/revision и temporal lifecycle — **не считаются выполненными** и
-перенесены в Stage 7.
+**FAST и когнитивная память — Complete.** Детерминированное разрешение до вызова модели, проверка ответа и сменяемый FAST без владения состоянием. [TV-0043](../TESTING/Results/TV-0043.md).
 
 ## Stage 6
 
-**Cognitive Integration Core — Complete.** Утверждённый target/decomposition сохранён в
-[Stage 6 Cognitive Integration Core](Stage_6_Cognitive_Integration_Core.md), а
-реализованная архитектура — в
-[Architecture: Stage 6 Cognitive Integration Core](../ARCHITECTURE/Stage_6_Cognitive_Integration_Core.md).
-
-Stage 6 объединил под system ownership:
-
-- persistent Tasks и Goal linkage;
-- CognitiveCoordinator и явный FAST/DEEP routing;
-- первый DEEP backend/role без отдельной личности или authority;
-- Internal State и Choice как причинные факторы, а не владельцы решения;
-- bounded Executor/Observation/independent Verification;
-- Sleep в общем Task lifecycle;
-- recovery и UnifiedTrace;
-- разделение Action → Receipt → Observation → Verification → Goal progress.
-
-Модель остаётся proposal-only: routing, persistence, execution, verification и системные переходы принадлежат ANIMA. Stage 6 не доказал преимущество DEEP по качеству во всех задачах и не превратил `request_more_context` или adaptive routing в обязательную production policy — эти вопросы остаются research.
-
-Доказательства: [TV-0044 — TV-0051](../TESTING/Results/README.md), итоговая приёмка — [TV-0051](../TESTING/Results/TV-0051.md).
+**Когнитивная интеграция — Complete (официальный Stage).** Системный Coordinator, Tasks/Goals, FAST/DEEP, допуск и подтверждение действий, Sleep и восстановление. Статус Stage 6 **не равен** окончательной заморозке отдельно аудируемого Core v0.1. [Реализованная архитектура](../ARCHITECTURE/Stage_6_Cognitive_Integration_Core.md), [TV-0051](../TESTING/Results/TV-0051.md).
 
 ## Stage 7
 
-**Semantic Lifecycle & Refinement — Planned. Semantic boundary v0 accepted; production implementation not started.**
-
-Канонический pre-training/read-only контракт:
-[Stage 7 Semantic Boundary v0](Stage_7_Semantic_Boundary_v0.md).
-Причина решения: [ADR-010](../DECISIONS/ADR-010_Stage_7_Semantic_Boundary.md).
-Conformance-план: [Stage 7 Semantic Conformance v0](../TESTING/Stage7_Conformance_v0.md).
-
-### Принятый первый slice
-
-Перед production write lifecycle вводится ограниченный read-only/shadow semantic interface:
-
-- immutable qualified/time-scoped Claim;
-- Evidence identity отдельно от Claim equality;
-- Source отдельно от Producer;
-- typed Value v0 + registry-owned predicate/cardinality/qualifiers;
-- `observed_at`, `asserted_at`, `received_at`, `created_at` и world-valid scope не смешиваются;
-- `Unknown != Unbounded`;
-- CONTENT и REVISION — независимые facet results;
-- `SUPPORT`, `CONTRADICTION`, `COMPATIBLE_DISTINCT`, `TEMPORAL_SUCCESSION`, `CORRECTION`, insufficiency/not-comparable/unsupported;
-- `classify_relation/0.1` сравнивает ровно два supplied Claims и bounded Evidence;
-- deterministic-decidable cases не должны вызывать LLM;
-- conformance corpus и измерение реального semantic residual предшествуют LoRA/SFT.
-
-### Открытые решения
-
-До write-through lifecycle остаются открыты:
-
-- DP-08 — authority/lifecycle actions/correction rights;
-- DP-09 — public Knowledge read semantics и mapping на текущие statuses;
-- DP-10b — полная re-evaluation policy для derived descendants;
-- DP-11 — production integration с Stage 6 routing/validators.
-
-Stage 7 не считается начатым только из-за принятия semantic boundary. Первый implementation slice должен быть отдельным read-only/shadow capability после фиксации conformance fixtures.
-
-### Design history и scoped concepts
-
-Ранние design baselines сохранены для контекста; при конфликте с accepted boundary текущий slice следует `Stage_7_Semantic_Boundary_v0.md`:
-
-- [SemanticCandidate v0](Semantic_Candidate_v0.md);
-- [Knowledge Lifecycle v0](Knowledge_Lifecycle_v0.md);
-- [Semantic Temporal Conflict v0](Semantic_Temporal_Conflict_v0.md);
-- [Semantic Verification v0](Semantic_Verification_v0.md);
-- [Bootstrap Knowledge v0](Bootstrap_Knowledge_v0.md).
-
-Отдельные будущие concepts не входят автоматически в текущий Stage 7 slice:
-
-- [Dynamic Task Arbitration](Dynamic_Task_Arbitration_Concept.md);
-- [Emergency Response Mode](Emergency_Response_Mode_Concept.md).
-
-### Bootstrap Knowledge
-
-Финальная часть Stage 7 может загрузить первый небольшой набор настоящих
-фундаментальных знаний ANIMA: собственная архитектура и ограничения, базовые
-понятия мира и системные определения. Bootstrap остаётся versioned curated source,
-проходит общий provenance/lifecycle и не является искусственной биографией.
-Synthetic memories предназначены для Stage 8 test instances.
-
-**Definition of Done (предварительная).** Новая, уточняющая и противоречащая
-информация проходит system-owned semantic lifecycle; история не переписывается
-молча, provenance сохраняется, а bootstrap dataset не требует особых обходных
-правил памяти. До этого read-only interface и conformance являются подготовительным
-slice, а не доказательством полного Stage 7.
+**Семантический жизненный цикл — Planned.** [Принятый read-only boundary](Stage_7_Semantic_Boundary_v0.md) отделяет Claim/Evidence/Source/Producer, область времени, CONTENT/REVISION и правило «сначала детерминированное». Write/update/revision Knowledge требуют отдельной политики полномочий и проверки. [ADR-010](../DECISIONS/ADR-010_Stage_7_Semantic_Boundary.md).
 
 ## Stage 8
 
-**Virtual ANIMA — Planned.**
-
-### Главный вопрос
-
-Как ведёт себя интегрированная ANIMA в непрерывной среде, где события существуют
-независимо от скорости inference и имеют объективный ground truth?
-
-### Планируемая среда
-
-Создать понятное 2D-пространство с наблюдаемым интерфейсом. Мир должен отделять:
-
-1. **Ground truth** — фактическое состояние виртуального мира;
-2. **Synthetic history** — искусственные воспоминания только тестового экземпляра;
-3. **Live events** — события, произошедшие уже во время запуска.
-
-Интерфейс должен позволять видеть мир и основные диагностические представления:
-Events, Memory selection, Tasks/Goals, Internal State, FAST/DEEP route, Actions и
-trace, не делая UI источником истины.
-
-### Режимы проверки
-
-**Manual sandbox:** ручное создание/изменение объектов, задач, конфликтов, ошибок
-и разговоров с ANIMA.
-
-**Automated scenarios:** воспроизводимые сценарии с десятками/сотнями/тысячами
-событий, в том числе шумом, повторениями, устареванием, противоречиями,
-причинными цепочками и multi-hop зависимостями.
-
-Мир не должен останавливаться на время inference. Fault injection и recovery
-являются частью среды, а не декоративным эффектом.
-
-**Definition of Done (предварительная).** ANIMA длительно живёт в виртуальном мире,
-использует прошлый и текущий опыт, а её поведение можно проверять против ground
-truth автоматическими и ручными сценариями.
+**Виртуальная ANIMA — Planned.** Взаимодействие Core с независимым миром, где отделены истина среды, тестовая история и реальные события. Подготовительный [Virtual Lab](Virtual_ANIMA_Lab_P5C_Scenario_Replay_Draft.md) не является реализацией Stage 8.
 
 ## Stage 9
 
-**Raspberry Pi Validation — Planned.**
-
-### Главный вопрос
-
-Может ли доказанный software workload работать на Raspberry Pi 5 с приемлемой
-стабильностью и измеримыми ресурсными характеристиками?
-
-### Scope
-
-Reference platform остаётся PC. На Pi 5 последовательно проверяются конфигурации,
-в которых локально размещаются Core, Memory, FAST, DEEP и orchestration в разных
-сочетаниях. Pico используется только для оправданных realtime/telemetry/watchdog/
-GPIO задач; когнитивные компоненты на Pico не переносятся ради самого переноса.
-
-Один и тот же workload Stage 8 должен использоваться для сравнения PC и Pi 5.
-Измеряются CPU, RAM, storage I/O, temperature/throttling, FAST/DEEP/retrieval
-latency, Active/Standby/Sleep workload, restart/error rate и рост persistent data.
-
-Планируются endurance tiers: короткий functional run, средний прогон и
-representative soak примерно 12–24 часа, если предыдущие проверки стабильны.
-
-**Definition of Done (предварительная).** Для одинакового сценария существуют
-воспроизводимые PC/Pi 5 показатели и понятна конфигурация, в которой Pi 5 может
-быть вычислительным носителем ANIMA без скрытых потерь функциональности.
+**Raspberry Pi — Planned.** Одинаковая нагрузка на ПК и Pi 5, корректность, ресурсы и длительная стабильность; дополнительное железо — по измеренным требованиям.
 
 ## Stage 10
 
-**Perception & Interaction — Planned.**
-
-### Главный вопрос
-
-Может ли ANIMA получать реальные visual/audio observations и отвечать через
-физический output, не привязывая cognition к конкретному устройству?
-
-Первый стенд использует уже доступную периферию ноутбука: camera, microphone и
-audio output. Источники оформляются через стабильные interfaces (`CameraSource`,
-`AudioInput`, `AudioOutput` или их будущие эквиваленты), чтобы позже заменить
-устройство без изменения cognitive ownership.
-
-Планируемые конвейеры:
-
-```text
-camera → frames → preprocessing → observations/events
-microphone → VAD/STT → events
-ANIMA output → text/speech intent → TTS → speaker
-```
-
-Сырые непрерывные потоки не должны автоматически становиться Memory. Perception
-сначала формирует bounded observations/events с provenance и quality/confidence.
-
-**Definition of Done (предварительная).** Замена конкретной камеры/микрофона не
-требует изменения cognition; perception имеет наблюдаемый latency/error profile и
-не захламляет долговременную память необработанными потоками.
+**Восприятие и взаимодействие — Planned.** Камера, микрофон и вывод звука через заменяемые интерфейсы, без автоматической записи сырого потока в Memory.
 
 ## Stage 11
 
-**Physical Expansion — Planned, intentionally broad.**
+**Физическое расширение — Planned.** Форма, приводы, питание и дополнительные узлы выбираются после проверки этапов 9–10, а не заранее.
 
-Этап не фиксирует заранее форму корпуса или конкретный набор устройств. После
-Stage 9–10 реальные измерения определяют, какие dedicated cameras, microphones,
-speakers, IMU/accelerometers, приводы, питание, охлаждение и физические interfaces
-имеют смысл.
+## Порядок изменений
 
-Цель — первое устойчивое физическое воплощение ANIMA, где отказ/замена периферии
-не уничтожают Identity/Memory и имеют наблюдаемое безопасное поведение.
-Конкретная форма тела, distributed nodes и дополнительные вычислители остаются
-Research до появления измеренной необходимости.
-
-## Параллельные Research и mini experiments
-
-Roadmap — обязательная магистраль. Не каждая полезная гипотеза становится Stage.
-Параллельные направления ведутся в [Research](Research.md):
-
-- **Research Track** — долгоживущий вопрос, который может пересекать несколько Stage;
-- **Mini Experiment** — ограниченная проверка одной гипотезы с явным результатом;
-- успешный experiment не становится production architecture автоматически;
-- результат фиксируется как Accepted / Rejected / Inconclusive и при необходимости
-  приводит к ADR или изменению roadmap.
-
-## Правила приоритета
-
-- LLM — сменяемый когнитивный орган, не хранилище личности и не главный runtime loop.
-- Рутинные операции и ownership данных остаются у обычных системных компонентов.
-- Сначала минимальный работающий контур, затем только измеренно нужное усложнение.
-- Каждый новый механизм должен иметь наблюдаемый сценарий и regression test.
-- Один и тот же workload предпочтительно переносится между платформами для честного
-  сравнения, а не переписывается под желаемый результат.
-- Обсуждённая идея не считается частью архитектуры, пока её статус явно не повышен
-  до Accepted или Planned с конкретным местом в roadmap.
+Изменение архитектуры требует ADR и тестового критерия. Обычный успешный прогон не порождает новый документ; значимые результаты сохраняются в [журнале испытаний](../TESTING/Results/README.md). Исторические черновики доступны через [неизменяемую ссылку на Git](../ARCHIVE/Development_Snapshots.md).
