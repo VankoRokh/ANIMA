@@ -1,6 +1,6 @@
 # ANIMA Core v0.1 — P3-A Typed Goal → Task → Decision
 
-**Status:** implementation present in isolated branch; **PENDING local check/pytest**. P3 autonomy and action execution are **not** complete.  
+**Status:** **P3-A PASS по сообщению владельца** (2026-11-05): предложенные проверки прошли успешно. Точный локальный SHA и численные итоги pytest не приложены. P3-B/P3-C и автономное исполнение остаются открытыми.  
 **Date:** 2026-11-05.  
 **Branch:** `work/core-v0-1-p3a-goal-decision` (derived from P2-C owner-reported PASS branch).  
 **Relevant contracts:** [P0 Goal/Decision/Execution proposal](Core_v0_1_Goal_Decision_Execution_Contract_Draft.md), [P2-C Runtime](Core_v0_1_P2C_Runtime_Integration_Draft.md), [P2-B Belief](Core_v0_1_P2B_Belief_Draft.md).
@@ -92,7 +92,7 @@ bash scripts/check.sh
 
 Checks: no implicit scheduler, typed criteria, idempotent binding, missing/disputed/stale observation requests, permitted proposal only, NOOP without goal completion, single task identity after process failure, GoalArbitrator priority, legacy runtime still preserved, interrupted→active reactivation on new evidence, no `execution.db` from P3-A. `scripts/check.sh` and full pytest are blocking.
 
-**Current status: UNVERIFIED.** GitHub commits are not evidence of executed tests or autonomous operation. Do not mark P3 complete until P3-A and later P3-B/P3-C are explicitly accepted.
+**P3-A gate:** owner сообщает об успешном прохождении всех предложенных проверок. Это пользовательское свидетельство без приложенного терминального вывода/точного SHA, а не CI и не запуск ассистента. Для воспроизводимости при следующем прогоне сохранить `git rev-parse HEAD` и итоговое число тестов. Не объявлять P3 Complete: P3-B/P3-C не реализованы/не проверены.
 
 ## 7. Next
 
