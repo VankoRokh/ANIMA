@@ -1,6 +1,6 @@
 # Virtual ANIMA Lab — P5-A standalone feasibility
 
-**Status:** Godot real headless smoke **owner-reported PASS** (9/9 scenarios, 22 commands, seed 7); **visual keyboard + live dual-actor gate still PENDING**, tested Git SHA not supplied.  
+**Status:** Godot real headless smoke **owner-reported PASS** (9/9 checks, 22 commands, seed 7) and **GUI dual-actor controls owner-reported PASS**. Exact tested Git SHA and independent unit/full regression output are not yet supplied; no ANIMA Core integration.  
 **Branch:** `work/val-p5a-godot-feasibility`.  
 **Base:** `b639a52281eeaece1b5b00d8223d8f31bd492ca1` (Core audit fixes, independently re-reviewed later).  
 **Isolation:** no import of `anima`, no changes to `build_core`, Core stores, `project.json` or execution authority.
