@@ -164,7 +164,52 @@ class CoreAutonomy:
                 raise
         return len(observations) == max_new_events
 
+    def _reconcile_terminal_attempts(self, connection):
+        """Close orphaned 'started' attempts without running tools or inventing proof.
+
+        Crash after verified Goal completion but before scheduler audit can
+        leave a started attempt. Only an existing durable Core proof permits
+        a success outcome. Cancellation is recorded as deferred, not success.
+        Called under the scheduler's existing BEGIN IMMEDIATE transaction.
+        """
+        rows = connection.execute(
+            "SELECT trigger_key, goal_id FROM core_auto_attempts"
+            " WHERE status='started' ORDER BY rowid"
+        ).fetchall()
+        for row in rows:
+            goal = self.decisions.goals.get_goal(row["goal_id"])
+            if goal is None:
+                raise ValueError("Autonomy attempt references missing Goal")
+            if goal["status"] == "completed":
+                proof = self.executor._proof(row["goal_id"])
+                if proof is None:
+                    raise ValueError(
+                        "Completed Goal has no verified proof for started attempt"
+                    )
+                if proof["goal_id"] != row["goal_id"]:
+                    raise ValueError("Mismatched autonomous verification proof")
+                connection.execute(
+                    "UPDATE core_auto_attempts SET status='finished',"
+                    " outcome='RECOVERED_VERIFIED_SUCCESS',"
+                    " reason_code='PERSISTED_VERIFICATION_PROOF',"
+                    " operation_id=?, evidence_event_id=?, updated_at=?"
+                    " WHERE trigger_key=? AND goal_id=? AND status='started'",
+                    (
+                        proof["operation_id"], proof["event_id"], _now(),
+                        row["trigger_key"], row["goal_id"],
+                    ),
+                )
+            elif goal["status"] == "cancelled":
+                connection.execute(
+                    "UPDATE core_auto_attempts SET status='finished',"
+                    " outcome='DEFERRED', reason_code='GOAL_NOT_ACTIVE',"
+                    " operation_id=NULL, evidence_event_id=NULL, updated_at=?"
+                    " WHERE trigger_key=? AND goal_id=? AND status='started'",
+                    (_now(), row["trigger_key"], row["goal_id"]),
+                )
+
     def _next_attempt(self, connection):
+        self._reconcile_terminal_attempts(connection)
         # Highest priority first according to existing Stage 2 arbitration.
         active = self.decisions.arbitrator.evaluate().entries
         rows = connection.execute(
