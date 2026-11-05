@@ -1,5 +1,6 @@
 import math
 import sqlite3
+from contextlib import closing
 from datetime import datetime, timezone
 from uuid import UUID, uuid4
 
@@ -185,7 +186,7 @@ class GoalStore:
 
     def get_goal(self, public_id):
         _validate_prefixed_uuid4(public_id, GOAL_ID_PREFIX, "Goal public_id")
-        with self._connect() as connection:
+        with closing(self._connect()) as connection:
             row = connection.execute(
                 "SELECT * FROM goals WHERE public_id = ?",
                 (public_id,),
@@ -203,7 +204,7 @@ class GoalStore:
             values = (status,)
         query += " ORDER BY priority DESC, row_id"
 
-        with self._connect() as connection:
+        with closing(self._connect()) as connection:
             rows = connection.execute(query, values).fetchall()
         return [self._row_to_goal(row) for row in rows]
 
@@ -307,7 +308,7 @@ class GoalStore:
             GOAL_TRANSITION_ID_PREFIX,
             "GoalTransition public_id",
         )
-        with self._connect() as connection:
+        with closing(self._connect()) as connection:
             row = connection.execute(
                 "SELECT * FROM goal_transitions WHERE public_id = ?",
                 (public_id,),
@@ -340,7 +341,7 @@ class GoalStore:
             limit_sql = " LIMIT ?"
             values.append(limit)
 
-        with self._connect() as connection:
+        with closing(self._connect()) as connection:
             rows = connection.execute(
                 f"""
                 SELECT * FROM goal_transitions
@@ -366,6 +367,6 @@ class GoalStore:
             query += " WHERE status = ?"
             values = (status,)
 
-        with self._connect() as connection:
+        with closing(self._connect()) as connection:
             row = connection.execute(query, values).fetchone()
         return row["count"]
