@@ -391,6 +391,19 @@ class CoreDoorExecution:
                 break
         return tuple(recovered)
 
+    def _safe_load_verification_spec(self, operation_id):
+        """Quarantine legacy incomplete intent without executing or poisoning other Goals.
+
+        No action can be inferred from a prepared operation lacking a bound
+        VerificationSpec. A later explicit operator repair is required.
+        """
+        try:
+            return self.store.load_verification_spec(operation_id)
+        except ValueError as error:
+            if "has no persisted VerificationSpec" not in str(error):
+                raise
+            return None
+
     def run(self, goal_id):
         """One bounded explicit turn; never auto-create Goals or run in background."""
         recovered = self._recover_proof(goal_id)
@@ -434,7 +447,13 @@ class CoreDoorExecution:
             if operations:
                 operation = operations[0]
                 action = self.store.load_action(operation["id"])
-                self.store.load_verification_spec(operation["id"])
+                persisted_spec = self._safe_load_verification_spec(operation["id"])
+                if persisted_spec is None:
+                    return CoreDoorTurn(
+                        goal_id, decision.task_id, "DEFERRED",
+                        "INCOMPLETE_EXECUTION_INTENT",
+                        action.operation_id, event_id, None,
+                    )
                 if (
                     action.goal_id != goal_id
                     or action.persistent_task_id != decision.task_id
@@ -500,7 +519,13 @@ class CoreDoorExecution:
         if ops:
             operation = ops[0]
             action = self.store.load_action(operation["id"])
-            spec = self.store.load_verification_spec(operation["id"])
+            spec = self._safe_load_verification_spec(operation["id"])
+            if spec is None:
+                return CoreDoorTurn(
+                    goal_id, task_id, "DEFERRED",
+                    "INCOMPLETE_EXECUTION_INTENT",
+                    action.operation_id, guard_id, None,
+                )
             if (
                 action.goal_id != goal_id or action.persistent_task_id != task_id
                 or action.tool != DOOR_TOOL or action.tool_version != DOOR_VERSION
@@ -570,11 +595,12 @@ class CoreDoorExecution:
                     "expected": {"type": "symbol", "value": "closed"},
                 },
             )
+            # Operation, Action and VerificationSpec commit atomically in
+            # the existing Stage6 SQLite DB. No partial new Core intent.
             self.store.create_operation(
-                action, registry=self.registry,
+                action, registry=self.registry, verification_spec=spec,
                 reason="P3-B admitted typed Goal action",
             )
-            self.store.save_verification_spec(action, spec)
 
         # Boundary check again: Task/Goal could be cancelled after preparation.
         if self.before_execute_hook is not None:
