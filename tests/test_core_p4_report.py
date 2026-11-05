@@ -139,3 +139,16 @@ def test_core_audit_release_report_rejects_dirty_or_changing_checkout():
         assert not _checkout_unchanged(stable, modified)
     assert not _checkout_unchanged({**stable, "clean": False}, stable)
     assert not _checkout_unchanged({**stable, "commit": None}, stable)
+
+
+
+def test_core_audit_manifest_rejects_wrong_parameter_identifiers():
+    # Same real module is insufficient when a parametrized test variant is
+    # different from the release manifest's required [2]/[4]/[goal]/[task].
+    param = next(name for name in P4_REQUIRED if name.endswith("[goal]"))
+    row = {
+        "name": param + "[impostor]",
+        "classname": _canonical_module(param),
+        "status": "PASS", "seconds": 0.0,
+    }
+    assert required_coverage([row])[param] == "MISSING"
