@@ -1,73 +1,30 @@
-# ANIMA Core v0.1 — Independent Audit Remediation (B1–B4, T1–T2)
+# Core v0.1 — исправления после независимого аудита
 
-**Status:** **IMPLEMENTED / UNVERIFIED** — changes are present in `work/core-v0-1-audit-fixes`; neither local acceptance nor independent re-review has been performed on this branch. **Core v0.1 remains BLOCKED; do not freeze/merge or update project.json automatically.**  
-**Date:** 2026-11-05.  
-**Base:** independent-audited snapshot `aabe6553cec19d4cf1962dc4f26129eeca436328`.  
-**Original independent result:** 1380/1380 stock PASS; 29 additional probes = 20 PASS / 9 FAIL; four confirmed runtime bugs B1–B4, one release-gate deficiency T1, and two tests expressing stronger than promised scheduler behavior. Full original audit and reproducible ZIP evidence were provided by the owner. Do not count stock PASS as proof that B1–B4 are repaired.
+**Статус:** исправления B1–B4 и усиление тестов T1–T2 внесены. Владелец сообщил **1392/1392 PASS** на `b639a52281eeaece1b5b00d8223d8f31bd492ca1`. **Повторный независимый аудит и решение о заморозке Core ещё нужны.** Эта страница — краткая карта исправлений, а не декларация готовности production.
 
-## 1. Remediation changes
+**Исходный снимок:** `aabe6553cec19d4cf1962dc4f26129eeca436328`; штатные **1380/1380 PASS** не выявили ошибок, но дополнительные независимые пробы обнаружили четыре дефекта. Полная первоначальная спецификация исправлений сохранена в [Git-истории](https://github.com/VankoRokh/ANIMA/blob/0bf027c1c2c85f91d21e47fdf03382e0ff030cd5/docs/ROADMAP/Core_v0_1_Independent_Audit_Remediation_Draft.md).
 
-| ID | Changed component | Fix and safety policy | Blocking regression |
-|---|---|---|---|
-| **B1** | `anima/execution/store.py`, `anima/core/door_execution.py` | Core passes the exact typed VerificationSpec into `ExecutionStore.create_operation(..., verification_spec=...)`; operation + action + spec are now inserted in **one Stage6 SQLite transaction**. Mid-transaction exception/real `os._exit(73)` must leave **no partial operation**. Old split-commit `prepared` rows missing spec are **not reconstructed** from current instructions: return `DEFERRED/INCOMPLETE_EXECUTION_INTENT` for that one Goal; other Goals may continue. Operator repair needed for quarantined legacy records. | `test_core_audit_b1_atomic_prepare_failure_rolls_back_all_rows`; `test_core_audit_b1_os_exit_inside_atomic_prepare_recovers`; `test_core_audit_b1_legacy_missing_spec_is_local_and_next_goal_progresses` |
-| **B2** | `anima/core/door_execution.py`, `anima/core/autonomy.py` | Historical proof remains immutable, but if Goal is cancelled/blocked or Task is cancelled/failed, proof recovery neither transitions it to `completed` nor blocks all other Goals. `started` scheduler attempt cannot be recorded as verified when its Task is terminally cancelled. | `test_core_audit_b2_cancel_after_proof_does_not_poison_other_goals[goal/task]` |
-| **B3** | `anima/core/door_execution.py` | Stage2 `GoalObservation` always reuses the original durable `core_world_proofs.verified_at` as timestamp. On same-runtime retry, Stage2 `RecoveryCoordinator.recover_pending()` completes partial source operations before any new `observe_goal` call. No new source ID, Goal or Task. | `test_core_audit_b3_same_runtime_retry_uses_identical_stage2_request` |
-| **B4** | `anima/core/autonomy.py` | A `blocked` Goal is temporarily unavailable: its original `goal:` trigger is moved to durable `core_parked_goal_triggers` and marked non-runnable in the first-64 pending window. On `blocked→active`, `sync()` reactivates **the same trigger key**; completed/cancelled Goals are not resurrected. Existing finished attempts still require new external evidence to retry, per previously documented bounded contract. This prevents 64 blocked Goals from permanently hiding unrelated work. | `test_core_audit_b4_blocked_to_active_resumes_parked_goal`; `test_core_audit_b4_many_blocked_goals_do_not_hide_new_work` |
-| **T1** | `scripts/run_core_acceptance.py` | Mandatory test identity now requires **exact JUnit module/classname + test name + parameter ID**. Fake passing tests in another module cannot satisfy required coverage. | `test_core_audit_t1_mandatory_test_identity_includes_module`; `test_core_audit_manifest_rejects_same_names_from_unrelated_module` |
-| **T2** | `scripts/run_core_acceptance.py` | Capture HEAD, Git tree, clean porcelain status **before and after** tests. If missing, dirty or changed, acceptance verdict must be `FAIL`; recorded metadata remains available for diagnosis. | `test_core_audit_release_report_rejects_dirty_or_changing_checkout` |
+## Исправления
 
-These changes do **not** grant new tools, additional sources, continuous scheduling, unrelated Goal completion, LLM model authority or real-world device control. Stage6 legacy callers may still omit VerificationSpec under their existing contract; **P3-B Core never does**.
+| ID | Суть | Обязательная отрицательная проверка |
+|---|---|---|
+| **B1** | Операция, действие и `VerificationSpec` сохраняются одной SQLite-транзакцией. Старые неполные записи переводятся в `DEFERRED/INCOMPLETE_EXECUTION_INTENT`, а не восстанавливаются догадкой. | Ошибка или аварийный выход посреди транзакции не оставляет частичного эффекта в хранилище; дефект одной Goal не блокирует другие. |
+| **B2** | Отменённая Goal/Task не переводится в `completed` историческим подтверждением. | Доказательство, пришедшее после отмены, не меняет терминальный статус и не останавливает планировщик. |
+| **B3** | Повтор наблюдения использует исходные `verified_at` и идентичность Stage 2 запроса. | Повтор в том же Runtime не создаёт новое свидетельство и не дублирует действие. |
+| **B4** | Триггеры заблокированных целей временно припаркованы; при `blocked→active` возобновляется тот же ключ. | Множество заблокированных Goals не скрывает другие задачи в ограниченном окне планировщика. |
+| **T1** | Обязательные тесты идентифицируются по точному модулю/классу/имени/параметру. | Подставной тест с похожим именем не проходит контроль приёмки. |
+| **T2** | SHA, Git tree и чистота рабочего дерева контролируются до и после прогона. | Изменённый или грязный checkout даёт FAIL, а не ложный релизный PASS. |
 
-## 2. Distinguish modified behavior from older audit probes
+Ключевые файлы: `anima/execution/store.py`, `anima/core/door_execution.py`, `anima/core/autonomy.py`, `scripts/run_core_acceptance.py`; регрессии — `tests/test_core_audit_blockers.py` и профильные Core-тесты.
 
-The original Work ZIP contains a `crash_worker.py` that intercepts `save_verification_spec` **after** `create_operation` had already committed. Core no longer performs those two separate calls. That old hook therefore cannot be reused unmodified as a mid-commit test: **its former failure point no longer exists**. Instead `tests/core_audit_crash_worker.py` injects a hard process exit after the Stage6 operation/action INSERTs **before** the spec INSERT/commit, inside the actual transaction. A separate regression deliberately emulates the old partial data and asserts local fail-closed behavior.
+## Что ещё не доказано
 
-Do **not** claim that the original 29 audit probes all pass unchanged. Only execute their still applicable cases (or explicitly adapt the obsolete B1 hook) and report which were adapted.
+- Изначальные независимые пробы нельзя объявлять пройденными без повторного запуска: у B1 изменилось место перехвата аварии после объединения транзакции.
+- Остаются риски неопределённого эффекта внешней операции, ограниченного окна scheduler, стоимости replay больших журналов и отсутствия физически независимого сенсора.
+- Короткий seeded-прогон не равнозначен длительному soak-тесту. `success` модели или `receipt` исполнителя не является независимой Verification.
 
-Original Work findings still tracked as **not current release blockers in scoped one-door profile**:
-- R1: history scan/JSONL replay work is not globally time-bounded;
-- R2: no atomic world CAS or independent physical observer;
-- T4: priority window of 64 pending triggers and finished NOOP race awaiting new external evidence;
-- T5: sequential seeded workload is not a multi-hour wall-clock soak, demo proof strength is limited.
+## Следующая проверка
 
-If wider autonomous behavior is claimed later, reevaluate these limitations as hard gates.
+Из **чистого снимка Core**, а не из случайной ветки Lab: `bash scripts/check.sh`, полная `pytest` и `scripts/run_core_acceptance.py --suite full`. Указать SHA, список изменённых тестов и результаты дополнительных отрицательных сценариев, затем выполнить **независимый повторный аудит**. Пока его нет — не отмечать Core как frozen/complete и не начинать интеграцию P6.
 
-## 3. Required verification
-
-From clean checkout on `work/core-v0-1-audit-fixes`:
-
-```bash
-git rev-parse HEAD
-git status --short
-bash scripts/check.sh
-
-.venv/bin/python -m pytest -q \
-  tests/test_core_audit_blockers.py \
-  tests/test_core_p4_report.py \
-  tests/test_core_p3b_execution.py \
-  tests/test_core_p3c_autonomy.py \
-  tests/test_core_p4_acceptance.py \
-  tests/test_core_p4c_release.py
-
-report_dir="$(mktemp -d)"
-.venv/bin/python scripts/run_core_acceptance.py \
-  --suite full --output-dir "$report_dir"
-
-sed -n '1,100p' "$report_dir/summary.md"
-git rev-parse HEAD
-git status --short
-```
-
-**Gate:** all new B1–B4 and T1–T2 regressions PASS, old P1–P4 PASS, mandatory matrix complete, clean/unchanged HEAD/tree and test count/trace captured. Do not expect exact baseline 1380 because new tests were added. No production release claim until new SHA is accepted and preferably an independent Work spot re-review of repaired boundaries has completed.
-
-## 4. Remaining sign-off
-
-If the local gate passes, check *especially*:
-
-1. Has any source of observed Goal success been substituted for actual independent World observation? **Must remain NO.**
-2. Do hard process cuts and historical partial operation records fail closed without blocking other Goals? **Must be YES.**
-3. Does cancelled Goal/Task retain terminal authority even when a verified proof exists? **Must be YES.**
-4. Does same-Runtime Stage2 replay preserve request identity? **Must be YES.**
-5. Does `blocked→active` resume parked work with no duplicate Stage6 operation? **Must be YES.**
-
-Only then make a separate owner decision on freezing the narrowly scoped Core v0.1 Release Candidate.
+Связанные документы: [инварианты аудита](Core_v0_1_Audit_Boundaries.md), [рабочий план](Core_v0_1_VAL_v0_1_Plan_Draft.md), [история документации](../ARCHIVE/Development_Snapshots.md).
