@@ -264,9 +264,7 @@ See the [P5-C acceptance plan](../../docs/ROADMAP/Virtual_ANIMA_Lab_P5C_Scenario
 
 ## UI presentation modes and Ubuntu launcher (post-P5-C slice)
 
-**Status: implemented on `work/val-ui-mode-launcher`, real Godot UI/native
-verification pending.** This is presentation-only: neither the typed bridge
-nor existing Core/goal/evidence boundaries are changed.
+**Status: owner-reported PASS for UI and desktop-launcher verification** on `work/val-ui-mode-launcher`, after the Godot type-inference test fix (`a90d013969307e7b502be9de1b2c28265e74923d`). The owner reported that all requested checks worked, including the visual Normal/Debug workflow. This is owner attestation without pasted individual test transcripts or a pinned final clean-worktree SHA; a fresh full-project regression on this branch is not independently established. This is presentation-only: neither the typed bridge nor existing Core/goal/evidence boundaries are changed.
 
 - `--lab-ui normal` (default): the operator truth/debug panel is hidden;
   a static, non-privileged control guide replaces it and the bottom HUD
@@ -315,6 +313,10 @@ After these isolated tests, rerun P5-A/P5-B/P5-C headless suites and visually
 confirm F3, both launcher actions and independent Human/ANIMA controls. A
 Godot release export is a distinct packaging task, **not** part of this UI
 slice.
+
+### Owner validation (2026-11-06)
+
+The first native `BridgeUiModeTest.gd` attempt exposed two GDScript parser errors (`denied` and `permitted` could not infer types from dynamically loaded `lab._request`). They were fixed using explicit `Dictionary` annotations in `a90d013969307e7b502be9de1b2c28265e74923d`. The owner subsequently confirmed: **«Отлично, всё проверил, всё работает»**. Record this as **owner-accepted UI/launcher behavior**; do not manufacture a native test output, a full pytest count or evidence of an independent code audit. The P5-C acceptance baseline remains a separate completed feasibility slice.
 
 ## Tests and next gate
 
