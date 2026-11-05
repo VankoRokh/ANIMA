@@ -295,3 +295,28 @@ def test_p3a_invalid_ticks_and_no_implicit_planner(tmp_path):
     with pytest.raises(RuntimeError, match="not configured"):
         default.runtime.plan_core_step(goal["id"], as_of_tick=40)
     assert not (tmp_path / "default" / "core_work.db").exists()
+
+
+def test_p3a_rechecks_updated_belief_and_interrupts_stale_active_task(tmp_path):
+    core = _core(tmp_path)
+    goal = _goal(core)
+    core.runtime.bind_core_goal(_criterion(goal))
+    core.runtime.ingest_core_event(_event("open", tick=40), source_ref=SOURCE_A)
+    proposed = core.runtime.plan_core_step(goal["id"], as_of_tick=40)
+    assert proposed.kind == "PROPOSE_ACTION"
+    assert core.core_decision.tasks.get_task(proposed.task_id).status == "active"
+
+    stale = core.runtime.plan_core_step(goal["id"], as_of_tick=44)
+    assert stale.kind == "REQUEST_OBSERVATION"
+    assert core.core_decision.tasks.get_task(proposed.task_id).status == "interrupted"
+
+    core.runtime.ingest_core_event(
+        _event("closed", tick=45, value="closed"), source_ref=SOURCE_A
+    )
+    no_op = core.runtime.plan_core_step(goal["id"], as_of_tick=45)
+    assert no_op.kind == "NOOP"
+    assert no_op.task_id == proposed.task_id
+    assert no_op.candidate is None
+    assert core.core_decision.tasks.get_task(proposed.task_id).status == "active"
+    assert len(core.core_decision.tasks.list_tasks(goal_id=goal["id"])) == 1
+    assert core.internal_state.goals.get_goal(goal["id"])["status"] == "active"
