@@ -1,6 +1,6 @@
 # Virtual ANIMA Lab — P5-C Scenario Profiles & Replay
 
-**Status: implemented in an isolated work branch; NOT YET EXECUTED IN GODOT.**  
+**Status: owner-local P5-C scenario replay PASS (4/4 cases × 2 fresh Godot runs) and full project regression PASS (1450/1450) on exact code commit `e995169e61385a3e1c2e44a60b27e6bf501211e2`, clean worktree. Native Godot-only C1, legacy real-Godot reruns C5, and interactive GUI variants C6 remain pending; P5-C is not formally closed.**  
 **Date:** 2026-11-05.  
 **Branch:** `work/val-p5c-scenarios-replay`, based on P5-B `a512faceb4e2e12376424ad20662758f6fd82651`.  
 **Scope:** only standalone Godot Lab, Python test harness, tests and documentation. No `anima/` code, no external policies or Core authority; `docs/project.json` is unchanged.  
@@ -105,10 +105,38 @@ a deterministic isolated test fixture under fixed preconditions.
 | C6 | GUI base mode and optional detour/clutter modes render; Human/ANIMA remain independently controlled. |
 | C7 | `scripts/check.sh`, full `pytest -q`, clean worktree and precise tested SHA recorded. |
 
-**All P5-C gates are PENDING owner execution.** Existing P5-B V2/V3/V8
-formal requirements are also still open, even though its integrations passed
-their owner-local smoke tests. Do not merge P5-C into production or mark
-Core/P6 complete based on these provisional Lab experiments.
+**Owner-provided evidence:** C2 (P5-C Python unit tests as part of 1450 PASS), C3 (4/4 scenarios twice), C4 (the scripted Human/door/obstacle/noise invariants) and C7 (`scripts/check.sh`, full 1450 PASS, tested SHA and clean tree) are **PASS for the reported code snapshot**. **C1, C5 and C6 remain unreported**, and no complete `trace.jsonl` or engine logs were supplied for independent inspection. Existing P5-B native-only V2 and explicitly pinned branch-level acceptance are separate matters. Do not merge P5-C into production or mark Core/P6 complete based on these provisional Lab experiments.
+
+## 5.1 Owner-local acceptance evidence (2026-11-05)
+
+**Tested code commit:** `e995169e61385a3e1c2e44a60b27e6bf501211e2`  
+**Worktree:** `clean=True` reported by runner  
+**Runner:** `val.p5c.acceptance/0.1`; four scenarios, each run twice in a new real Godot process; canonical JSON traces compared for byte-for-byte equality.
+
+| Scenario | Steps per run | Seed | World | SHA-256 prefix (from console) |
+|---|---:|---:|---|---|
+| `noise_and_obstacle` | 14 | 7 | `base` | `296e6ff9e504306b` |
+| `door_intervention` | 18 | 7 | `base` | `f4639d8ce76a73c9` |
+| `detour_injection` | 15 | 9 | `detour` | `f5bb251eb6b0d759` |
+| `clutter_reset` | 15 | 11 | `clutter` | `ac788b96615a379e` |
+
+**Result:** `PASS 4/4 scenarios, 2 runs each` — 8 fresh Godot processes,
+62 declared steps per suite or **124 scripted steps across the two runs**.
+Only the 16-character digest prefixes were provided in chat; full SHA-256
+digests are available in the local report, **not** independently inspected.
+
+**Project-level check:** `bash scripts/check.sh` reported 100 documentation
+pages, 579 internal links, syntax validation of 316 Python source files,
+CLI extraction and tracked-file hygiene PASS on Python 3.14.4.
+`.venv/bin/python -m pytest -q` reported **1450 passed in 39.29s** with
+zero failures. No new code modifications were made as part of the test.
+
+**Evidence limits:** native Godot-only `BridgeP5CScenarioTest.gd` output not
+provided; P5-A `smoke.py` and P5-B `p5b_smoke.py` were not explicitly
+rerun after P5-C changes; GUI testing of `detour` and `clutter` unreported.
+The full local `trace.jsonl`/Godot logs were not supplied. The Code SHA
+above remains the exact tested version; subsequent documentation-only
+commits do **not** change that tested source.
 
 ## 6. Local commands
 
