@@ -43,6 +43,7 @@ P4_REQUIRED = (
     "test_p4_many_irrelevant_events_advance_cursor_without_effects",
     "test_p4b_crash_after_goal_completed_before_scheduler_audit",
     "test_p4b_cancelled_started_attempt_finishes_deferred_without_effect",
+    "test_p4b_operator_completed_goal_does_not_invent_core_evidence",
     "test_p4b_multi_episode_cold_restart_and_noise_stay_bounded",
 )
 
