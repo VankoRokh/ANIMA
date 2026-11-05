@@ -1,6 +1,6 @@
 # Virtual ANIMA Lab — P5-B Versioned World Contracts
 
-**Status:** **IMPLEMENTED IN WORK BRANCH / UNVERIFIED IN REAL GODOT**.  
+**Status:** **P5-B typed Python controller live bridge PASS (owner-reported: 24/24 admitted moves); negative contract/headless gates V2–V8 PENDING**. The P5-B branch is not yet accepted or independently verified.  
 **Date:** 2026-11-05.  
 **Branch:** `work/val-p5b-world-contracts` (based on last owner-observed P5-A doc commit `788a04c3d93f59e05068474572044f577f9cfcb8`).  
 **Scope:** isolated P5 Lab only. **No import of `anima` and no changes to Core, Stage6 execution, Goals, Belief, Memory, or `docs/project.json`.**  
@@ -162,6 +162,24 @@ The same operator fixture controls (`human_move`, `set_door`, `pause`,
 re-run regression on this change pending. **V2–V8: not yet executed** in the
 authoring environment. No number of passing tests or closed-stage claim is
 invented.
+
+## 4.1 First owner-side v0.2 controller result (2026-11-05)
+
+The owner reported successful connection to the live Godot instance using
+`controller.py --typed --auto --steps 24`. Console showed
+`Virtual Lab: p5a-grid/0.1 / val.bridge/0.2`, followed by **24/24** accepted
+moves (`E→N→S→W` repeated six times), each with `reason=ok`; the test
+actor returned to `(9, 5)` after each loop. This supports **basic v0.2
+transport, typed observation validation and conditional action submission**
+for this deterministic route. The earlier `ConnectionRefusedError` occurred
+when no Godot server was accepting the connection, and did not recur in the
+successful run.
+
+**Not established by this result:** duplicate-effect suppression, stale-world
+failure, reset/epoch behavior, event paging, operator interventions during the
+v0.2 run, GUI diagnostic display, standalone native Godot contract test,
+full `p5b_smoke.py` run, complete `pytest` regression, or exact tested SHA.
+Those gates remain open. No Core integration was present.
 
 ## 5. Local verification (from repo root)
 
