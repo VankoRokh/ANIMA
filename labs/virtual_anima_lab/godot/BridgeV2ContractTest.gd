@@ -40,6 +40,20 @@ func _initialize() -> void:
 	if _call(lab, 3, "agent", "inspect")["error"] != "FORBIDDEN":
 		_finish(lab, false, "privileged debug leaked to agent")
 		return
+	var unsupported = lab._request(
+		'{"protocol":"val.bridge/9.0","id":14,"role":"agent","op":"hello"}'
+	)
+	if unsupported["ok"] or unsupported["error"] != "UNSUPPORTED_PROTOCOL":
+		_finish(lab, false, "unsupported wire version was not rejected")
+		return
+	var malformed := _call(lab, 15, "agent", "act", {
+		"operation_id": "bad?key",
+		"action": {"schema": "val.action/0.1", "direction": "E"},
+		"expected_epoch": 1, "expected_revision": 0,
+	})
+	if malformed["ok"] or malformed["error"] != "INVALID_OPERATION_ID":
+		_finish(lab, false, "invalid operation key was accepted")
+		return
 	var first := _call(lab, 4, "agent", "act", {
 		"operation_id": "test:step:1",
 		"action": {"schema": "val.action/0.1", "direction": "W"},
