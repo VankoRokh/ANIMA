@@ -248,6 +248,231 @@ func _request(line: String) -> Dictionary:
 			return _reply(request_id, false, {}, "UNKNOWN_OPERATION")
 
 
+
+# A separate v0.2 world contract. v0.1 stays untouched for comparison.
+# Roles here are self-declared: NEVER expose this P5 test bridge remotely.
+func _valid_uint(value) -> bool:
+	if typeof(value) != TYPE_INT and typeof(value) != TYPE_FLOAT:
+		return false
+	var number: float = float(value)
+	return number >= 0.0 and number <= 2147483647.0 and number == floor(number)
+
+
+func _reply_v2(request_id, ok: bool, data: Dictionary = {}, error: String = "") -> Dictionary:
+	var response := {
+		"protocol": PROTOCOL_V2, "id": request_id, "ok": ok,
+		"epoch": _epoch, "revision": _revision,
+		"event_seq": _event_seq, "tick": _tick,
+	}
+	if ok:
+		response["data"] = data
+	else:
+		response["error"] = error
+	return response
+
+
+func _typed_observation() -> Dictionary:
+	# Derive from the bounded sensor, NEVER _debug_snapshot().
+	var sample := _agent_observation()
+	var readings: Array[Dictionary] = []
+	for item in sample["visible"]:
+		match item["kind"]:
+			"door":
+				readings.append({
+					"subject_ref": "lab.door.01",
+					"predicate_ref": "state",
+					"typed_value": {"type": "symbol", "value": item["state"]},
+					"position": item["at"],
+				})
+			"actor":
+				readings.append({
+					"subject_ref": "lab.actor.human",
+					"predicate_ref": "position",
+					"typed_value": {
+						"type": "grid_cell",
+						"x": item["at"]["x"], "y": item["at"]["y"],
+					},
+				})
+			"wall":
+				readings.append({
+					"subject_ref": "lab.wall.%d.%d" % [
+						item["at"]["x"], item["at"]["y"],
+					],
+					"predicate_ref": "position",
+					"typed_value": {
+						"type": "grid_cell",
+						"x": item["at"]["x"], "y": item["at"]["y"],
+					},
+				})
+			"marker":
+				readings.append({
+					"subject_ref": "lab.marker.01",
+					"predicate_ref": "position",
+					"typed_value": {
+						"type": "grid_cell",
+						"x": item["at"]["x"], "y": item["at"]["y"],
+					},
+				})
+	_sample_seq += 1
+	var observation := {
+		"schema": OBSERVATION_VERSION,
+		"observation_id": "val_obs:%d:%d" % [_epoch, _sample_seq],
+		"source_ref": "lab.sensor.anima.proximity",
+		"producer_ref": "lab.godot",
+		"observer_ref": "lab.actor.anima",
+		"observed_at": {"epoch": _epoch, "tick": _tick},
+		"world_revision": _revision,
+		"event_cursor": _event_seq,
+		"visibility": {"type": "manhattan_radius", "radius": SENSE_RADIUS},
+		"self_position": sample["self"],
+		"readings": readings,
+	}
+	_last_sample = observation.duplicate(true)
+	return observation
+
+
+func _valid_operation_key(value) -> bool:
+	if typeof(value) != TYPE_STRING:
+		return false
+	if value.is_empty() or value.length() > 64:
+		return false
+	var allowed := "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789._:-"
+	for i in range(value.length()):
+		if allowed.find(value.substr(i, 1)) == -1:
+			return false
+	return true
+
+
+func _typed_action(req: Dictionary, request_id: int) -> Dictionary:
+	var operation_id = req.get("operation_id")
+	if not _valid_operation_key(operation_id):
+		return _reply_v2(request_id, false, {}, "INVALID_OPERATION_ID")
+	var action = req.get("action")
+	if typeof(action) != TYPE_DICTIONARY or action.size() != 2:
+		return _reply_v2(request_id, false, {}, "INVALID_ACTION")
+	if action.get("schema") != ACTION_VERSION:
+		return _reply_v2(request_id, false, {}, "INVALID_ACTION")
+	var direction = action.get("direction")
+	if typeof(direction) != TYPE_STRING or not direction in ["N", "S", "E", "W"]:
+		return _reply_v2(request_id, false, {}, "INVALID_DIRECTION")
+	if req.size() != 8:
+		return _reply_v2(request_id, false, {}, "UNKNOWN_ACTION_FIELD")
+	if not _valid_uint(req.get("expected_epoch")) or not _valid_uint(req.get("expected_revision")):
+		return _reply_v2(request_id, false, {}, "INVALID_PRECONDITION")
+	var expected_epoch: int = int(req["expected_epoch"])
+	var expected_revision: int = int(req["expected_revision"])
+	var fingerprint := "%s:%d:%d:%s" % [
+		ACTION_VERSION, expected_epoch, expected_revision, direction,
+	]
+	if _action_ledger.has(operation_id):
+		var prior: Dictionary = _action_ledger[operation_id]
+		if prior["fingerprint"] != fingerprint:
+			return _reply_v2(request_id, false, {}, "OPERATION_ID_CONFLICT")
+		var replay: Dictionary = prior["receipt"].duplicate(true)
+		replay["replayed"] = true
+		return _reply_v2(request_id, true, replay)
+	if expected_epoch != _epoch or expected_revision != _revision:
+		return _reply_v2(request_id, false, {}, "STALE_WORLD")
+	if _paused:
+		return _reply_v2(request_id, false, {}, "PAUSED")
+	if _action_ledger.size() >= MAX_ACTION_KEYS:
+		return _reply_v2(request_id, false, {}, "LEDGER_CAPACITY")
+	var movement := _move("anima", direction)
+	var receipt := {
+		"schema": "val.receipt/0.1",
+		"operation_id": operation_id,
+		"status": "APPLIED" if movement["moved"] else "BLOCKED",
+		"effect_applied": movement["moved"],
+		"reason": movement["reason"],
+		"position": movement["position"],
+		"event_id": movement["event_id"],
+		"world_epoch": _epoch, "world_revision": _revision,
+		"tick": _tick, "replayed": false,
+	}
+	_action_ledger[operation_id] = {
+		"fingerprint": fingerprint,
+		"receipt": receipt.duplicate(true),
+	}
+	return _reply_v2(request_id, true, receipt)
+
+
+func _typed_events(req: Dictionary, request_id: int) -> Dictionary:
+	var from_seq = req.get("after_seq", 0)
+	if not _valid_uint(from_seq):
+		return _reply_v2(request_id, false, {}, "INVALID_CURSOR")
+	var after_seq: int = int(from_seq)
+	if after_seq > _event_seq:
+		return _reply_v2(request_id, false, {}, "INVALID_CURSOR")
+	var limit = req.get("limit", 8)
+	if not _valid_uint(limit) or int(limit) < 1 or int(limit) > 8:
+		return _reply_v2(request_id, false, {}, "INVALID_PAGE_LIMIT")
+	if not _history.is_empty() and after_seq < int(_history[0]["event_seq"]) - 1:
+		return _reply_v2(request_id, false, {}, "CURSOR_EXPIRED")
+	var events: Array[Dictionary] = []
+	for entry in _history:
+		if int(entry["event_seq"]) > after_seq:
+			events.append(entry.duplicate(true))
+			if events.size() >= int(limit):
+				break
+	var next_cursor := after_seq
+	if not events.is_empty():
+		next_cursor = int(events[-1]["event_seq"])
+	return _reply_v2(request_id, true, {
+		"events": events, "next_cursor": next_cursor,
+		"has_more": next_cursor < _event_seq,
+	})
+
+
+func _request_v2(req: Dictionary, request_id: int) -> Dictionary:
+	var role = req.get("role")
+	var op = req.get("op")
+	if typeof(role) != TYPE_STRING or not role in ["agent", "operator"]:
+		return _reply_v2(request_id, false, {}, "INVALID_ROLE")
+	if typeof(op) != TYPE_STRING:
+		return _reply_v2(request_id, false, {}, "INVALID_OPERATION")
+	if op == "hello":
+		return _reply_v2(request_id, true, {
+			"world_version": WORLD_VERSION,
+			"observation_schema": OBSERVATION_VERSION,
+			"action_schema": ACTION_VERSION,
+			"source_ref": "lab.sensor.anima.proximity",
+			"capabilities": ["observe", "act"] if role == "agent" else [
+				"inspect", "events", "set_door", "human_move", "reset",
+				"pause", "resume", "step",
+			],
+			"max_action_keys": MAX_ACTION_KEYS,
+		})
+	if role == "agent":
+		match op:
+			"observe":
+				return _reply_v2(request_id, true, _typed_observation())
+			"act":
+				return _typed_action(req, request_id)
+			_:
+				return _reply_v2(request_id, false, {}, "FORBIDDEN")
+	match op:
+		"inspect":
+			var snapshot := _debug_snapshot()
+			snapshot["epoch"] = _epoch
+			snapshot["revision"] = _revision
+			snapshot["event_seq"] = _event_seq
+			snapshot["last_agent_observation"] = _last_sample.duplicate(true)
+			return _reply_v2(request_id, true, snapshot)
+		"events":
+			return _typed_events(req, request_id)
+		"human_move", "set_door", "pause", "resume", "step", "reset":
+			# Operator interventions reuse the verified P5-A fixture.
+			var legacy := req.duplicate(true)
+			legacy["protocol"] = PROTOCOL
+			var response := _request(JSON.stringify(legacy))
+			return _reply_v2(
+				request_id, bool(response["ok"]), response.get("data", {}),
+				str(response.get("error", "")),
+			)
+		_:
+			return _reply_v2(request_id, false, {}, "UNKNOWN_OPERATION")
+
+
 func _reply(request_id, ok: bool, data: Dictionary, error: String = "") -> Dictionary:
 	var response := {
 		"protocol": PROTOCOL, "id": request_id,
