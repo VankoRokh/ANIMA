@@ -161,7 +161,7 @@ class VirtualDoorWorld:
         self.root = Path(root).expanduser().resolve()
         self.root.mkdir(parents=True, exist_ok=True)
         self.path = self.root / WORLD_FILE
-        with sqlite3.connect(self.path) as connection:
+        with closing(sqlite3.connect(self.path)) as connection, connection:
             connection.executescript(_SCHEMA)
 
     def seed(self, *, state="open", tick=40):
