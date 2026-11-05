@@ -9,6 +9,14 @@ from scripts.run_core_acceptance import render_markdown, summarize_junit, requir
 
 ROOT = Path(__file__).resolve().parents[1]
 
+def _canonical_module(name):
+    if name.startswith("test_p4c_"):
+        return "tests.test_core_p4c_release"
+    if name.startswith("test_core_audit_"):
+        return "tests.test_core_audit_blockers"
+    return "tests.test_core_p4_acceptance"
+
+
 
 def test_p4_junit_parser_and_markdown_are_human_readable(tmp_path):
     junit = tmp_path / "junit.xml"
@@ -59,7 +67,7 @@ def test_p4_runner_refuses_nonempty_output_directory(tmp_path):
 def test_p4b_required_coverage_blocks_missing_or_skipped_cases():
     cases = [
         {
-            "name": name, "status": "PASS", "classname": "tests.test_core_p4_acceptance",
+            "name": name, "status": "PASS", "classname": _canonical_module(name),
             "seconds": 0.01,
         }
         for name in P4_REQUIRED
@@ -81,7 +89,7 @@ def test_p4b_required_coverage_blocks_missing_or_skipped_cases():
 def test_p4b_report_displays_measured_baselines_not_unsupported_thresholds():
     cases = [
         {
-            "name": name, "classname": "tests.test_core_p4_acceptance",
+            "name": name, "classname": _canonical_module(name),
             "status": "PASS", "seconds": 0.01 + index * 0.005,
             "message": "",
         }
@@ -101,3 +109,15 @@ def test_p4b_report_displays_measured_baselines_not_unsupported_thresholds():
     assert "Slowest test cases (observed baseline)" in result
     assert "reproducible-sha" in result
     assert "MISSING" not in result
+
+
+
+def test_core_audit_manifest_rejects_same_names_from_unrelated_module():
+    impostors = [
+        {
+            "name": name, "classname": "tests.unrelated_placeholder",
+            "status": "PASS", "seconds": 0.0,
+        }
+        for name in P4_REQUIRED
+    ]
+    assert set(required_coverage(impostors).values()) == {"MISSING"}
