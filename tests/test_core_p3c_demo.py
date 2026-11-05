@@ -70,7 +70,7 @@ def test_p3c_human_report_is_default_and_explains_decisions(tmp_path, state, exp
     assert "ХОД ВЫПОЛНЕНИЯ" in run.stdout
     assert "ПРОВЕРКИ" in run.stdout
     assert "РЕЗУЛЬТАТ: PASS" in run.stdout
-    assert f"Эффектов: {expected_effect}" in run.stdout
+    assert f"Операций: {expected_effect}" in run.stdout
     assert ("предложить действие" if expected_effect else "действие не требуется") in run.stdout
     assert "Мир — привилегированная проверка оператора" in run.stdout
 
