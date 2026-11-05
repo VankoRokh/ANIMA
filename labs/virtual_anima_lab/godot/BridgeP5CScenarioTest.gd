@@ -64,6 +64,28 @@ func _initialize() -> void:
 	if not noise["ok"] or noise["revision"] != before_noise:
 		_finish(lab, false, "noise improperly changed world revision")
 		return
+	var audit := _call(lab, 12, "operator", "events", {
+		"after_seq": 0, "limit": 8,
+	})
+	var noise_logged := false
+	for entry in audit["data"]["events"]:
+		if (
+			entry["actor"] == "ambient" and entry["event"] == "noise"
+			and entry["details"]["label"] == "fan_hum"
+		):
+			noise_logged = true
+	if not audit["ok"] or not noise_logged:
+		_finish(lab, false, "operator ambient noise absent from event log")
+		return
+	var after_noise := _call(lab, 13, "agent", "observe")
+	for reading in after_noise["data"]["readings"]:
+		if reading["subject_ref"].begins_with("lab.noise"):
+			_finish(lab, false, "operator-authored ambient event leaked as agent belief")
+			return
+	var bad_noise := _call(lab, 14, "operator", "emit_noise", {"label": "bad label"})
+	if bad_noise["ok"] or bad_noise["error"] != "INVALID_NOISE_LABEL":
+		_finish(lab, false, "unbounded or malformed noise label accepted")
+		return
 	var attempted := _call(lab, 7, "agent", "act", {
 		"operation_id": "p5c:blocked:01",
 		"action": {"schema": "val.action/0.1", "direction": "E"},
