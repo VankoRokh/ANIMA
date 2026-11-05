@@ -14,13 +14,14 @@ from anima.core.door_world import (
     DOOR_SUBJECT, DOOR_PREDICATE, DOOR_SOURCE, DOOR_PRODUCER,
     DOOR_TOOL, DOOR_VERSION, VirtualDoorWorld,
 )
+from anima.core.demo_report import evaluate, render_text, save_markdown
 from anima.core.goal_decision import GoalCriterion
 from anima.core.ingress import SourceRegistration
 from anima.execution.contracts import ActionSpec
 
 
-def _emit(stage, data):
-    print(json.dumps({"stage": stage, **data}, sort_keys=True, ensure_ascii=False), flush=True)
+def _emit(records, stage, data):
+    records.append({"stage": stage, **data})
 
 
 def main(argv=None):
@@ -29,11 +30,26 @@ def main(argv=None):
     )
     parser.add_argument("--data-dir", required=True, type=Path)
     parser.add_argument("--initial-state", choices=("open", "closed"), default="open")
+    parser.add_argument(
+        "--format", choices=("text", "json"), default="text",
+        help="human-readable terminal summary (default) or machine JSONL",
+    )
+    parser.add_argument(
+        "--report-md", type=Path, default=None,
+        help="create a Markdown report without overwriting an existing file",
+    )
+    parser.add_argument(
+        "--snapshot", default=None,
+        help="optional exact commit SHA to include in the Markdown report",
+    )
     args = parser.parse_args(argv)
 
     root = args.data_dir.expanduser().resolve()
     if root.exists() and (not root.is_dir() or any(root.iterdir())):
         parser.error("Demo data-dir must be absent or empty; existing instance data is protected")
+    if args.report_md is not None and args.report_md.expanduser().exists():
+        parser.error("Markdown report already exists; refusing to overwrite")
+    records = []
     world = VirtualDoorWorld(root / "world")
     world.seed(state=args.initial_state, tick=40)
 
@@ -69,7 +85,7 @@ def main(argv=None):
         virtual_door_root=root / "world", auto_core=True,
     )
     core.runtime.wake()
-    _emit("bootstrap", {
+    _emit(records, "bootstrap", {
         "phase": "P3C_ONE_DOOR_ONLY", "autonomous": True,
         "model_required": False, "initial_state": args.initial_state,
     })
@@ -79,17 +95,17 @@ def main(argv=None):
         success_criterion="world.door_state equals closed",
         reason="P3-C isolated acceptance demo",
     )
-    _emit("goal_registered", {"goal_id": goal["id"]})
+    _emit(records, "goal_registered", {"goal_id": goal["id"]})
     core.runtime.bind_core_goal(GoalCriterion(
         goal_id=goal["id"], subject_ref=DOOR_SUBJECT,
         predicate_ref=DOOR_PREDICATE, expected=typed_target,
     ))
     for entry in core.core_decision.history(goal["id"]):
-        _emit("decision", entry)
+        _emit(records, "decision", entry)
     for attempt in core.core_autonomy.attempts():
-        _emit("scheduler_attempt", attempt)
+        _emit(records, "scheduler_attempt", attempt)
     for operation in core.core_execution.store.list_operations(goal_id=goal["id"]):
-        _emit("execution_ledger", {
+        _emit(records, "execution_ledger", {
             "operation_id": operation["id"], "status": operation["status"],
             "idempotency_class": operation["idempotency_class"],
         })
@@ -98,7 +114,7 @@ def main(argv=None):
         DOOR_SUBJECT, DOOR_PREDICATE, as_of_tick=current["tick"]
     )
     tasks = core.core_decision.tasks.list_tasks(goal_id=goal["id"])
-    _emit("result", {
+    _emit(records, "result", {
         "goal_status": core.internal_state.goals.get_goal(goal["id"])["status"],
         "task_statuses": [task.status for task in tasks],
         "belief_status": belief["status"],
@@ -108,6 +124,17 @@ def main(argv=None):
         "pending_auto_triggers": core.core_autonomy.pending_count(),
     })
     core.runtime.sleep()
+    if args.report_md is not None:
+        save_markdown(records, args.report_md, snapshot=args.snapshot)
+    if args.format == "json":
+        for record in records:
+            print(json.dumps(record, sort_keys=True, ensure_ascii=False), flush=True)
+    else:
+        print(render_text(records), end="", flush=True)
+        if args.report_md is not None:
+            print(f"Markdown-отчёт: {args.report_md.expanduser().resolve()}")
+    if not all(evaluate(records).values()):
+        raise SystemExit(1)
 
 
 if __name__ == "__main__":
