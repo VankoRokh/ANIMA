@@ -226,7 +226,7 @@ visual/world fixtures.
 
 ## P5-C scenario profiles and deterministic script replay
 
-**Status: owner-reported REAL-GODOT REPLAY PASS (4/4 scenarios × 2 identical runs) and FULL PYTEST PASS (1450/1450, 0 failed) on clean code SHA `e995169e61385a3e1c2e44a60b27e6bf501211e2`. Native Godot-only contract test, legacy P5-A/P5-B reruns on P5-C and new GUI variants remain pending.**
+**Status: P5-C Complete for isolated Lab feasibility (owner-accepted).** Real-Godot replay 4/4 scenarios × 2 runs, full pytest 1450/1450 PASS on clean code SHA `e995169e61385a3e1c2e44a60b27e6bf501211e2`; owner later confirmed native Godot, legacy P5-A/P5-B reruns, and GUI checks of all 3 maps. This is owner-reported evidence, not independent audit; ANIMA Core remains disconnected.
 
 The default world remains `base` and retains P5-A/P5-B behavior. To inspect
 two additional fixed spatial variants, launch Godot with
