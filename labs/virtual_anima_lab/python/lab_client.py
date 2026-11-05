@@ -8,6 +8,7 @@ import socket
 from typing import Any
 
 PROTOCOL = "val.bridge/0.1"
+PROTOCOL_V2 = "val.bridge/0.2"
 MAX_LINE_BYTES = 8192
 MAX_PROTOCOL_INTEGER = 2147483647
 
@@ -48,7 +49,8 @@ class LabClient:
     """
 
     def __init__(
-        self, port: int = 46019, *, role: str = "agent", timeout: float = 3.0
+        self, port: int = 46019, *, role: str = "agent",
+        timeout: float = 3.0, protocol: str = PROTOCOL
     ) -> None:
         if type(port) is not int or not 1024 <= port <= 65535:
             raise ValueError("port must be an integer in 1024..65535")
@@ -56,9 +58,12 @@ class LabClient:
             raise ValueError("role must be agent or operator")
         if timeout <= 0:
             raise ValueError("timeout must be positive")
+        if protocol not in (PROTOCOL, PROTOCOL_V2):
+            raise ValueError("unsupported Lab bridge protocol")
         self.port = port
         self.role = role
         self.timeout = timeout
+        self.protocol = protocol
         self._socket: socket.socket | None = None
         self._reader = None
         self._sequence = 0
@@ -97,7 +102,7 @@ class LabClient:
                 raise ValueError(f"reserved protocol field: {protected}")
         self._sequence += 1
         request = {
-            "protocol": PROTOCOL,
+            "protocol": self.protocol,
             "id": self._sequence,
             "role": self.role,
             "op": op,
@@ -123,7 +128,7 @@ class LabClient:
         reply_id = _exact_protocol_integer(response.get("id"))
         tick = _exact_protocol_integer(response.get("tick"))
         if (
-            response.get("protocol") != PROTOCOL
+            response.get("protocol") != self.protocol
             or reply_id != self._sequence
             or tick is None
             or type(response.get("ok")) is not bool
@@ -138,6 +143,12 @@ class LabClient:
         # the caller; the agent still has no operator privileges.
         response["id"] = reply_id
         response["tick"] = tick
+        if self.protocol == PROTOCOL_V2:
+            for key in ("epoch", "revision", "event_seq"):
+                value = _exact_protocol_integer(response.get(key))
+                if value is None:
+                    raise LabProtocolError(f"invalid v0.2 world {key}")
+                response[key] = value
         if not response["ok"]:
             error = response.get("error")
             if not isinstance(error, str) or not error:
