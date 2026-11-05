@@ -1,412 +1,235 @@
-# Stage 7 Semantic Boundary v0
+# Stage 7 — семантическая граница v0
 
-Status: **Accepted semantic boundary for pre-training/read-only Stage 7 work. Stage 7 implementation remains Planned.**
-
-Accepted on 2026-11-03 after owner review of the pre-training Stage 7 design proposal and audit results.
-
-This document is the current canonical semantic boundary for the first Stage 7 interface slice. It supersedes conflicting semantic clauses in the earlier provisional Stage 7 design notes while preserving those documents as design history.
+**Статус:** принятый контракт первого семантического интерфейса до обучения модели и до записи Knowledge; **реализация полного Stage 7 — Planned**. Решение принято 3 ноября 2026 года. Это русская редакция принятого описания; при сомнении в точной формулировке сверяться с [исходной версией](https://github.com/VankoRokh/ANIMA/blob/0bf027c1c2c85f91d21e47fdf03382e0ff030cd5/docs/ROADMAP/Stage_7_Semantic_Boundary_v0.md) и [ADR-010](../DECISIONS/ADR-010_Stage_7_Semantic_Boundary.md). Имена типов, полей и результатов не переводятся: они являются программными контрактами.
 
 ## 1. Scope
 
-This boundary stabilizes the concepts required to build and test a **read-only/shadow semantic interface** before production Knowledge write integration or model training.
+Эта граница определяет **read-only/shadow semantic interface** до production-записи Knowledge и обучения модели. Уже приняты: идентичность и область применимости Claim; независимая идентичность Evidence и ограниченное происхождение; различие Source/Producer; типизированное значение Value v0; qualifiers/polarity/cardinality; временные правила; независимые фасеты CONTENT/REVISION; профиль `classify_relation/0.1`; сначала детерминированное разрешение; подтверждение корпуса тестов до заморозки; учёт повторов и зависимости Evidence.
 
-Accepted now:
-
-- Claim identity and scope;
-- Evidence identity and bounded provenance;
-- Source vs Producer;
-- typed Value v0;
-- qualifiers, polarity and predicate cardinality;
-- explicit temporal semantics;
-- CONTENT and REVISION as independent facets;
-- `classify_relation/0.1` as the first versioned operation profile;
-- deterministic-first evaluation;
-- conformance-first version freeze;
-- evidence replay/dependence semantics needed for read-only evaluation.
-
-Still open:
-
-- DP-08: lifecycle actions, source authority and correction rights;
-- DP-09: public Knowledge read semantics vs existing storage statuses;
-- DP-10b: full descendant re-evaluation/dependency policy after premise revision;
-- DP-11: production routing/integration with Stage 6 dispatcher contracts.
-
-No accepted item in this document grants a model direct persistence, Task/Goal, routing, execution or lifecycle authority.
+**Открыто:** DP-08 — права на коррекцию и жизненный цикл; DP-09 — публичная семантика чтения Knowledge; DP-10b — пересмотр производных утверждений; DP-11 — production-интеграция со Stage 6. Принятие этого контракта **не даёт модели** прав на запись, Goals/Tasks, routing, execution и управление жизненным циклом.
 
 ## 2. Layering
 
-The semantic boundary separates four questions that must not collapse into one enum:
+Нельзя объединять в один enum четыре разных вопроса:
 
-1. **Evidence relation** — how supplied claims/evidence relate in a bounded comparison scope.
-2. **Evidence sufficiency** — whether the supplied information is enough for a specific facet.
-3. **Knowledge state** — what ANIMA currently accepts, disputes, rejects or treats historically.
-4. **Lifecycle decision** — what system-owned state transition, if any, is allowed.
+1. **Отношение Evidence:** как утверждения соотносятся в конкретной ограниченной области сравнения.
+2. **Достаточность Evidence:** хватает ли информации для запрошенного аспекта.
+3. **Состояние Knowledge:** что ANIMA принимает, оспаривает, отвергает или хранит как историю.
+4. **Решение жизненного цикла:** какой системный переход, если вообще какой-либо, разрешён.
 
-A relation can be known while truth remains unresolved. For example, two single-valued claims can be confidently classified as contradictory without deciding which one is true.
+Противоречие между утверждениями может быть доказано даже тогда, когда неизвестно, какое из них истинно.
 
 ## 3. Claim
 
-A `Claim` is an immutable qualified/time-scoped proposition.
-
-Public semantic identity consists of:
+`Claim` — неизменяемое утверждение с qualifiers и временной областью. Его публичная семантическая идентичность:
 
 ```text
-subject
-+ predicate
-+ typed value
-+ polarity
-+ meaning-bearing qualifiers/context
-+ temporal scope
+subject + predicate + typed value + polarity
++ meaning-bearing qualifiers/context + temporal scope
 ```
 
-The following do **not** belong to Claim semantic identity:
-
-```text
-Source
-Evidence occurrence
-Producer
-confidence
-Knowledge status
-support count
-storage row ID
-```
-
-Changing value, polarity, a meaning-bearing qualifier or temporal scope creates a new semantic Claim/revision. Internal storage may factor or intern shared atomic components as long as the public semantics remain identical.
+**Не входят** в семантическую идентичность Claim: `Source`, отдельный случай `Evidence`, `Producer`, confidence, текущий статус Knowledge, число подтверждений и ID строки хранилища. Изменение значения, полярности, смыслового qualifier либо временной области создаёт новый Claim/ревизию. Внутреннее хранилище может переиспользовать атомарные компоненты, не изменяя публичного смысла.
 
 ## 4. EntityRef and PredicateRef
 
 ### EntityRef
 
-An entity reference is either:
-
-- a system-resolved canonical entity binding with revision/version context; or
-- an explicitly unresolved mention tied to source evidence.
-
-Equal names do not prove equal identity. Unresolved does not mean different.
+Ссылка на сущность либо (а) разрешена системой в каноническую сущность с версией/ревизией, либо (б) остаётся явным неразрешённым упоминанием, связанным с Evidence. Совпадение имён не доказывает идентичность; неразрешённость не означает различие.
 
 ### PredicateRef
 
-A predicate reference identifies a registry-owned meaning/version. The registry defines at least:
-
-- expected Value type;
-- cardinality;
-- allowed/required qualifiers;
-- unit semantics when relevant;
-- temporal behavior needed by deterministic comparison;
-- comparison mode.
-
-Changing predicate meaning requires an explicit semantic revision; matching strings alone do not prove matching semantics.
+Смысл и версия предиката принадлежат реестру. Реестр задаёт тип значения, cardinality, обязательные/допустимые qualifiers, единицы измерения, правила времени и сравнения. Изменение смысла требует семантической ревизии. Одинаковые строки не гарантируют равных предикатов.
 
 ## 5. typed Value v0
 
-The first semantic core supports only atomic typed values:
+Допустимые атомарные типы первой версии:
 
 ```text
-string
-symbol
-boolean
-integer
-decimal
-quantity
-entity
+string | symbol | boolean | integer | decimal | quantity | entity
 ```
 
-Rules:
+- `integer` и `decimal` имеют **точную** семантику; `float` не является канонической заменой.
+- `quantity` = точное десятичное значение + зарегистрированная единица; преобразование единиц выполняет детерминированный код.
+- `symbol` задаётся контролируемым словарём; `entity` содержит `EntityRef`.
+- Неизвестное/неизвлечённое значение нельзя заменять придуманным литералом.
+- `boolean false` не равен отрицательной polarity без явного правила предиката.
 
-- integer/decimal semantics are exact; float approximation is not the canonical representation;
-- `quantity = exact decimal + registered unit`;
-- unit normalization/conversion is deterministic code;
-- `symbol` is used for registry/controlled vocabulary values;
-- `entity` is an EntityRef-valued atom;
-- unknown/missing extraction is not represented by an invented literal;
-- `boolean false` and negative polarity are not silently treated as equivalent unless predicate semantics explicitly define an equivalence.
-
-The first comparison mode is `exact` only.
-
-Not in v0 unless enabled by a separate capability/version:
-
-- arbitrary nested objects;
-- fuzzy similarity;
-- implicit synonymy;
-- approximate/distribution values;
-- general n-ary logic;
-- recursive/model-generated rules.
+В первом профиле допустимо только сравнение `exact`. Вне v0: произвольные вложенные объекты, fuzzy-сходство, неявная синонимия, приблизительные распределения, общая n-арная логика и рекурсивные правила модели. Для них потребуется отдельная версия/capability.
 
 ## 6. Qualifiers, polarity and cardinality
 
 ### Qualifiers
 
-Qualifiers are registry-defined typed context that changes proposition meaning. They are not a free metadata dump.
-
-A complete empty qualifier set differs from an unknown/partial qualifier set. Missing qualifier data never means universal context by default.
+Qualifiers — типизированный контекст, меняющий смысл, определённый реестром, а не свободный контейнер метаданных. **Полный пустой набор** отличается от неизвестного/неполного. Отсутствие qualifier не означает универсальную область применимости.
 
 ### Polarity
 
-Polarity is explicit:
-
-```text
-positive
-negative
-```
-
-Unknown is not a polarity.
+Только явно заданные `positive` и `negative`. `Unknown` не является третьей polarity.
 
 ### Cardinality
 
-Predicate cardinality v0:
-
 ```text
-single
-multi
-unknown
+single | multi | unknown
 ```
 
-`single` means at most one positive value in the same effective entity/context/time scope. It does not assert that a value exists.
+`single` означает **не более одного положительного значения** в совпадающей сущности, контексте и времени; существование значения не предполагается.
 
-Consequences:
-
-- multi-valued positive A and positive B may coexist;
-- the same atom with opposite polarity conflicts in the same scope;
-- single-valued positive A and positive B with `A != B` conflict in the same scope;
-- two different negative atoms can be compatible.
+Следствия при доказанно общей области:
+- разные положительные значения `multi` могут сосуществовать;
+- одинаковый атом с противоположной polarity конфликтует;
+- разные положительные значения `single` конфликтуют;
+- разные отрицательные атомы могут быть совместимы.
 
 ## 7. Evidence, Source and Producer
 
 ### Evidence
 
-Evidence is an identifiable occurrence/record that grounds a claim or an interpretation act. Evidence is not the Claim itself and is not truth by existence.
+`Evidence` — идентифицируемый случай/запись, на который опирается утверждение или интерпретация. Само существование Evidence **не доказывает истинность Claim**.
 
-Evidence preserves:
-
-- stable occurrence/record identity;
-- versioned immutable content/locator identity;
-- claim associations;
-- evidence form/stance;
-- SourceRef or derivation premises;
-- ProducerRef for the interpretation/record;
-- relevant temporal markers;
-- bounded provenance/lineage references.
-
-Two independent sensors may support one semantic Claim with two different Evidence occurrences. Re-reading or redelivering the same immutable occurrence does not create new independent support.
+Запись сохраняет стабильную идентичность случая, неизменяемый контент или версионированный locator, связи с Claim, форму/позицию Evidence, SourceRef либо исходные посылки, ProducerRef, временные отметки и ограниченную цепочку происхождения. Два независимых датчика могут дать разные Evidence одному Claim. Повторное чтение того же случая не создаёт независимое подтверждение.
 
 ### Source
 
-`Source` is the origin of the information/observation/statement, such as a person, sensor, document, system tool observation or versioned curated bootstrap artifact.
-
-Source authority is system-owned and is **not** a universal ranking such as user > sensor > DEEP > FAST.
+`Source` — происхождение информации: человек, сенсор, документ, наблюдение инструмента или курируемый версионированный набор начальных знаний. Полномочия Source определяются системой, **без универсальной шкалы** вида «user > sensor > DEEP > FAST».
 
 ### Producer
 
-`Producer` is the component/method that created a particular interpretation or record. A parser/FAST/DEEP that extracts a Claim from a user's message is the Producer; the user/message remains the Source.
-
-Producer identity does not grant source authority.
+`Producer` — компонент/метод, создавший конкретную запись или интерпретацию. Если FAST извлёк Claim из сообщения пользователя, FAST — Producer, а сообщение/пользователь — Source. Идентичность Producer сама по себе не даёт полномочий Source.
 
 ## 8. Observation, Report, Hypothesis and Derived claim
 
-These are orthogonal evidence/epistemic facets, not alternative world states that replace Claim.
+Это независимые признаки Evidence/познания, **не** взаимоисключающие состояния мира.
 
 ### Observation
 
-A registered observation/measurement from a source adapter. A statement saying "I observed X" is still a Report unless the ingress source is actually registered as the observer/measurement channel.
+Наблюдение или измерение через зарегистрированный адаптер. Сообщение «я наблюдал X» остаётся Report, пока источник получения не зарегистрирован как канал реального наблюдения.
 
 ### Assertion / Report
 
-A source reports a proposition. The existence of the report proves that the statement occurred, not that its content is true.
+Источник сообщил утверждение. Наличие Report доказывает факт сообщения, но не истинность содержания.
 
 ### Hypothesis
 
-A claim explicitly marked as hypothetical. It may carry basis references or explicitly have none. A hypothesis never silently becomes accepted factual Knowledge.
+Гипотеза явно помечена и может ссылаться на основания либо не иметь их. Нельзя незаметно повышать её до фактического Knowledge.
 
 ### Derived claim
 
-A claim produced from premises by a recorded method/rule/model. Provenance must preserve premise refs and method identity. `derived` is not automatically weaker or stronger than `direct`; reliability depends on source, method, proof/verification and lineage.
+Утверждение, выведенное из посылок зарегистрированным методом/правилом/моделью. Сохраняются ссылки на посылки и идентичность метода. `derived` не всегда менее/более надёжно, чем `direct`; необходимы происхождение, метод и проверка.
 
 ## 9. Evidence identity and dependence — DP-10a
 
-Accepted for the read-only prototype:
+Для read-only прототипа принято:
+- уникальность случая/версии Evidence отделена от равенства Claim;
+- повторная доставка одного случая не увеличивает число независимых подтверждений;
+- разные EvidenceRef могут иметь **общий корень происхождения** и оставаться зависимыми;
+- цепочка «сообщение → пересказ → извлечение LLM» не образует трёх независимых свидетелей;
+- подсчёт поддержки учитывает зависимость/lineage, а не число ссылок;
+- производные Evidence сохраняют посылки и метод;
+- безусловное правило `DIRECT > DERIVED` запрещено.
 
-- Evidence has stable occurrence/version identity separate from Claim equality;
-- replay/redelivery of one occurrence is not new independent support;
-- different EvidenceRefs can remain dependent when they share a provenance root;
-- a chain such as source report → summary → LLM extraction may create multiple records but not multiple independent witnesses;
-- support accounting must use lineage/dependence, not raw EvidenceRef count;
-- derived evidence keeps premise/method provenance;
-- no unconditional `DIRECT > DERIVED` rule is allowed.
-
-Full policy for cascading descendant re-evaluation after premise revision remains open DP-10b.
+Политика каскадного пересмотра зависимых утверждений после изменения посылки остаётся открытым DP-10b.
 
 ## 10. Time semantics
 
-The following temporal concepts are distinct:
+Временные понятия различаются и не подменяют друг друга.
 
 ### observed_at
 
-When the source actually observed/measured the referenced event/state, if known.
+Когда источник реально наблюдал/измерил состояние, если известно.
 
 ### asserted_at
 
-When a source made the report/assertion, if known.
+Когда источник высказал утверждение, если известно.
 
 ### received_at
 
-When ANIMA first received the occurrence. This is system/ingress-owned.
+Когда ANIMA впервые получила случай Evidence; значение принадлежит системному ingress.
 
 ### created_at
 
-When ANIMA created a specific internal record/interpretation. This is system/producer-owned.
+Когда ANIMA создала внутреннюю запись или интерпретацию; значение принадлежит системе/Producer.
 
-None of these automatically defines world validity.
-
-No global invariant such as `observed_at <= asserted_at <= received_at <= created_at` is assumed across independent clocks. Clock domains require explicit mapping/normalization before exact comparison.
+Ни одно из этих времён **само по себе не определяет время истинности в мире**. Для независимых часов нет универсальной цепочки `observed_at <= asserted_at <= received_at <= created_at`; перед точным сравнением необходима явная нормализация доменов времени.
 
 ### World-valid temporal scope
 
 ```text
 TemporalScope = UnknownScope | Instant | Interval
+Interval.from  = Known | Unknown | Unbounded
+Interval.until = Known | Unknown | Unbounded
 ```
 
-For an interval:
+Принят полуоткрытый интервал `[valid_from, valid_until)`.
 
-```text
-from  = Known | Unknown | Unbounded
-until = Known | Unknown | Unbounded
-```
-
-Accepted interval convention:
-
-```text
-[valid_from, valid_until)
-```
-
-Rules:
-
-- `Unknown` means the boundary is not known;
-- `Unknown` never defaults to infinity;
-- `Unbounded` requires explicit semantic grounds;
-- equal known interval bounds are invalid/empty; a point is represented by `Instant`;
-- partial intervals are allowed, but only conclusions logically implied by known bounds may be drawn;
-- two point observations at different times do not establish continuous validity between them or an exact transition boundary.
+- `Unknown` означает «граница неизвестна», **не** бесконечность.
+- `Unbounded` требует явного смыслового основания.
+- Равные известные границы дают пустой/недопустимый интервал; точечное время — `Instant`.
+- Частичные интервалы допускаются, но выводить можно лишь следствия известных границ.
+- Два точечных наблюдения в разное время не доказывают непрерывность состояния между ними или точный момент изменения.
 
 ## 11. Relation taxonomy
 
-`classify_relation/0.1` separates `CONTENT` from `REVISION`.
+Профиль `classify_relation/0.1` отдельно возвращает фасеты `CONTENT` и `REVISION`.
 
 ### CONTENT results
 
 #### SUPPORT
 
-Same normalized proposition/polarity in a provably common scope. It does not mean confirmed Knowledge.
+Нормализованное утверждение и polarity совпадают в доказанно общей области. Это **не** означает подтверждённое Knowledge.
 
 #### CONTRADICTION
 
-Claims are incompatible in a common entity/predicate/context/time comparison scope. It does not choose a winner.
+Утверждения несовместимы в общей области entity/predicate/context/time. Результат не выбирает победителя.
 
 #### COMPATIBLE_DISTINCT
 
-Claims are comparable and semantically compatible, but do not support the same proposition. Typical examples include distinct members of a multi-valued predicate.
+Сопоставимые утверждения совместимы, но не поддерживают одну и ту же пропозицию; пример — разные элементы `multi`-предиката.
 
 #### TEMPORAL_SUCCESSION
 
-Claims describe a compatible ordered succession of locally incompatible states where temporal/context/cardinality preconditions are known and the predicate permits change.
-
-`TEMPORAL_SUCCESSION` does **not** mean:
-
-- a proven world-change event;
-- truth of both claims;
-- continuous history between observations;
-- a known exact transition boundary.
-
-The legacy label `TEMPORAL_CHANGE` remains only in historical documents/audits where it described the earlier baseline.
+Совместимая упорядоченная последовательность локально несовместимых состояний при известных временных, контекстных и cardinality-предпосылках, если предикат допускает изменения. **Не доказывает:** реальное событие изменения, истинность обоих Claim, непрерывную историю или точную границу перехода. Старый термин `TEMPORAL_CHANGE` остаётся лишь в исторических документах.
 
 #### NOT_COMPARABLE
 
-Claims are proven outside the common atomic comparison domain, such as different canonical entity, different predicate meaning or disjoint context.
-
-Unresolved identity/context is not `NOT_COMPARABLE`; it is insufficient information.
+Доказанно разные области атомарного сравнения: иная каноническая сущность, иной смысл предиката или несовместимый контекст. **Неразрешённая** идентичность/область — это недостаточность данных, а не `NOT_COMPARABLE`.
 
 #### INSUFFICIENT
 
-The operation supports the requested question but required evidence, binding, temporal scope or semantics are missing/unclear.
+Запрошенная операция поддерживается, но не хватает Evidence, привязки, временных сведений либо точной семантики.
 
 #### UNSUPPORTED
 
-The requested feature/semantics is known but not implemented by this profile/capability.
-
-Protocol/backend failures are not semantic `INSUFFICIENT` or `UNSUPPORTED` results.
+Известная функция/семантика не реализована данным профилем/capability. Ошибки протокола или backend не являются семантическими `INSUFFICIENT`/`UNSUPPORTED`.
 
 ### REVISION results
 
 #### CORRECTION
 
-A bounded source fragment explicitly declares a correction and the correction target is identifiable.
+Фрагмент источника **явно заявляет исправление**, а цель исправления идентифицируема. Это не доказывает ложность прошлого Claim и **не разрешает** изменение Knowledge автоматически.
 
-`CORRECTION` means **source-declared correction act**, not:
-
-- proof that the old Claim was false;
-- permission to revise Knowledge;
-- automatic lifecycle supersession.
-
-A result can simultaneously be:
-
-```text
-CONTENT = CONTRADICTION
-REVISION = CORRECTION
-```
-
-or, for example:
-
-```text
-CONTENT = INSUFFICIENT(temporal_scope)
-REVISION = CORRECTION
-```
-
-Partial outcomes are valid.
+Возможны частичные результаты, например одновременно `CONTENT=CONTRADICTION` и `REVISION=CORRECTION`, либо `CONTENT=INSUFFICIENT(temporal_scope)` и `REVISION=CORRECTION`.
 
 ## 12. No universal RESOLVED/UNRESOLVED axis
 
-The old audit v0.2 coupling of relation and resolution is not part of the accepted contract.
-
-There is no universal semantic `RESOLVED/UNRESOLVED` result in `classify_relation/0.1`.
-
-Each facet returns its own typed result such as relation, insufficient, unsupported, not-comparable or not-requested. Knowledge state and lifecycle action remain separate system-owned contracts.
+Прежняя связка «отношение + разрешённость конфликта» из audit v0.2 исключена. Общего семантического `RESOLVED/UNRESOLVED` в `classify_relation/0.1` нет. Каждая фасета возвращает собственный типизированный результат (классификация, insufficiency, unsupported, not-comparable, not-requested); Knowledge и lifecycle остаются независимыми системными контрактами.
 
 ## 13. `classify_relation/0.1`
 
-Purpose: classify the bounded relation of **exactly two supplied Claims** using a bounded Evidence slice.
+Назначение — классифицировать отношение **ровно двух переданных Claims** по ограниченному набору Evidence.
 
-It does not:
-
-- extract new entities/predicates;
-- perform unrestricted coreference resolution;
-- select the true/winning Claim;
-- choose a lifecycle action;
-- write Memory/Knowledge;
-- assign source authority;
-- execute tools/actions.
+Операция **не** извлекает новые сущности/предикаты, не выполняет свободную coreference-resolution, не выбирает истинное утверждение, не меняет Knowledge/Memory, не назначает права Source и не исполняет инструменты.
 
 ### Canonical request semantics
 
-The request contains at least:
+Запрос содержит: `profile`; запрошенные `CONTENT`/`REVISION`; необходимые features; определения предикатов; **два** Claim view; ограниченные Evidence; сведения о полноте/покрытии; системные факты сравнения областей.
 
+Начальные ограничения экспериментального renderer (не онтологические):
 ```text
-profile = classify_relation/0.1
-requested aspects = CONTENT and/or REVISION
-required feature set
-predicate definitions needed by the pair
-exactly two Claim views
-bounded Evidence views
-coverage/completeness metadata
-system-owned scope comparison facts
-```
-
-Resource bounds for the first experimental renderer are profile limits, not ontology:
-
-```text
-claims: exactly 2
+claims: ровно 2
 evidence: 1..8
 predicate definitions: 0..2
-qualifiers per claim: bounded, initial target <= 8
-text fragment: bounded, initial target <= 4096 Unicode characters
+qualifiers per claim: целевой предел <= 8
+text fragment: целевой предел <= 4096 Unicode characters
 ```
 
 ### Result semantics
@@ -417,125 +240,73 @@ Assessment
 └── revision: RevisionResult
 ```
 
-Each facet can independently return a positive classification, insufficiency, unsupported feature or not-requested where applicable.
-
-Evidence references in results must point only to supplied evidence and mean "grounds considered for this facet", not "system-verified truth".
+Каждая фасета независимо даёт классификацию, недостаточность, неподдерживаемую возможность или `not-requested`, когда применимо. Ссылки на Evidence в ответе могут указывать **только на переданные Evidence** и означают «учтённые основания», а не «проверенную системой истину».
 
 ## 14. Deterministic-first rule
 
-If a result is exactly computable from typed structured data, the LLM must not be invoked.
+**Если структурированные данные позволяют вычислить точный результат, LLM не вызывается.** Примеры: нормализованная поддержка в общей области, несовместимые значения `single`, одинаковый атом противоположной polarity, совместимые разные `multi`, доказанно разные области, порядок интервалов после нормализации часов, зарегистрированное исправление и ошибки preflight/capability.
 
-Examples suitable for deterministic evaluation include:
-
-- exact normalized support in a known common scope;
-- single-valued incompatible positive values in the same scope;
-- same-atom positive/negative contradiction;
-- multi-valued compatible distinct membership;
-- proven different entity/predicate/context;
-- interval order/overlap where clocks and bounds are already normalized;
-- structured registered correction declarations;
-- capability/preflight failures.
-
-A partial deterministic result is preserved. A model may only process the unresolved requested facet and may not overwrite a system-computed facet.
+Частичный детерминированный ответ сохраняется. Модель может обрабатывать только ещё не разрешённую запрошенную фасету и **не переписывает** системный результат.
 
 ## 15. Model-facing boundary
 
-The model may be given only the bounded semantic information required by the operation. It must not receive authority-bearing implementation details merely as answer hints.
+Модель получает лишь ограниченное семантическое представление, нужное операции. Не передавать как подсказки к ответу: SQL/ID строк хранилища, команды persistence, статусы Knowledge для изменения, пороги routing, размеры/квантизацию/параметры модели, секреты и пути, неограниченный граф provenance, рейтинг полномочий и команды изменения Tasks/Goals/Execution.
 
-Do not expose as semantic vocabulary unless specifically required by another profile:
-
-- storage row IDs / SQL layout;
-- persistence commands;
-- accepted/challenged Knowledge status as model-owned output;
-- routing thresholds;
-- model size/quantization/sampling settings;
-- credentials/paths;
-- unrestricted provenance graph;
-- system priority/authority ranking;
-- Task/Goal/execution mutation commands.
-
-The model may propose an interpretation; the system validates structure, references, type compatibility, scope, capability and authority boundaries.
+Модель предлагает интерпретацию; система проверяет структуру, ссылки, типы, область, поддерживаемые возможности и полномочия.
 
 ## 16. Versioning and freeze policy — DP-12
 
-The following are versioned independently:
+Раздельно версионируются: семантическая схема/смысл, профиль операции, реестр предикатов, renderer, constrained decoder и адаптер/LoRA. Профиль `classify_relation/0.1` замораживается **только после** принятия владельцем conformance-набора и детерминированного baseline.
 
-- semantic schema/meaning;
-- operation profile;
-- predicate registry revisions;
-- projection renderer;
-- constrained decoder grammar/schema;
-- model adapter/LoRA.
-
-`classify_relation/0.1` is frozen only after owner-reviewed conformance fixtures validate the semantics and deterministic baseline.
-
-Any incompatible semantic change requires a new profile version such as `0.2`; historical benchmark results keep their original contract.
-
-No floating `latest` semantic profile is used in reproducible tests.
+Несовместимое изменение требует новой версии (например, `0.2`). Старые benchmark сохраняют собственный контракт. В воспроизводимых тестах не допускается плавающий профиль `latest`.
 
 ## 17. Conformance before model training
 
-Before implementation is considered ready for model evaluation:
+До оценки моделей необходимо:
+- рассмотреть не менее 30 корневых semantic fixtures (целевой первый корпус — 40–50);
+- покрыть SUPPORT, CONTRADICTION, COMPATIBLE_DISTINCT, TEMPORAL_SUCCESSION, CORRECTION, недостаточность, несопоставимость, неподдерживаемые функции, unknown/unbounded, дубли/зависимые Evidence, частичное покрытие, ошибки протокола;
+- проверить метаморфные преобразования порядка полей/Evidence и переименования aliases;
+- проверить изменения **смысла** при смене cardinality/polarity/time/correction target/completeness;
+- добиться нуля вызовов модели во всех детерминированно разрешимых случаях;
+- не допускать превращения инструкций внутри Source текста в новые полномочия;
+- измерять точность смысла, частоту отказов/ошибок, атрибуцию Evidence **отдельно** от валидности JSON.
 
-- review at least 30 semantic root fixtures; target 40–50 for the first corpus;
-- include SUPPORT, CONTRADICTION, COMPATIBLE_DISTINCT, TEMPORAL_SUCCESSION, CORRECTION, insufficiency, not-comparable, unsupported, unknown/unbounded, replay/dependent evidence, partial coverage and protocol failures;
-- include metamorphic transformations such as field/evidence order and alias renaming;
-- include meaning-changing transformations for cardinality, polarity, validity, correction target and fragment completeness;
-- all deterministic-decidable cases must pass with model backend call count = 0;
-- source text injection must remain data and must not grant authority;
-- semantic accuracy, abstention/error and evidence attribution are measured separately from JSON/shape validity.
+Произвольный порог accuracy модели до измерения реального остатка не устанавливается.
 
-No arbitrary model-accuracy threshold is accepted before the real semantic residual is measured.
-
-Training sequence:
-
+Последовательность:
 ```text
-accepted semantic boundary
-→ reviewed conformance corpus
-→ deterministic baseline
-→ constrained renderer / vanilla model evaluation
-→ measure real semantic residual
-→ only then decide whether LoRA/SFT is justified
+принятый semantic boundary
+→ проверенный conformance corpus
+→ детерминированный baseline
+→ constrained renderer и оценка обычной модели
+→ измерение остаточных semantic ошибок
+→ только затем решение о LoRA/SFT
 ```
 
-The current audit corpus is regression/history, not the untouched future training/evaluation set.
+Текущий audit corpus — исторический/регрессионный, а не неизменённый будущий обучающий и оценочный набор.
 
 ## 18. Open decisions after this boundary
 
 ### DP-08 — lifecycle actions / authority
 
-Open. A relation/correction must never directly perform Knowledge mutation. Exact action mapping and source correction rights require separate owner review.
+**Открыто.** Relation/Correction не должны напрямую менять Knowledge. Допустимые действия и права источников на исправления требуют отдельного решения.
 
 ### DP-09 — Knowledge read semantics
 
-Open. Existing production statuses must not be replaced by documentation-only enums. Retrieval projection for accepted/pending/rejected, temporal applicability and disputes/revisions needs a separate contract.
+**Открыто.** Нельзя заменять существующие статусы хранения только документальными enum. Правила чтения принятого/ожидающего/отвергнутого, временной применимости, споров и ревизий требуют отдельного контракта.
 
 ### DP-10b — dependency re-evaluation
 
-Open. The read-only boundary fixes Evidence identity/dependence, but not the full algorithm for cascading or selective re-evaluation when a premise is revised.
+**Открыто.** Идентичность и зависимость Evidence приняты, но не алгоритм полного каскадного либо выборочного пересмотра после изменения посылки.
 
 ### DP-11 — Stage 6 integration
 
-Open. The first implementation should be an isolated read-only/shadow capability. Production dispatcher/routing integration requires a separate decision and must not bypass current Stage 6 proposal/candidate guards.
+**Открыто.** Первый implementation slice должен оставаться изолированным read-only/shadow capability. Production-интеграция требует отдельного решения без обхода Stage 6 proposal/candidate guards.
 
 ## 19. Relationship to earlier Stage 7 documents
 
-The following files remain useful design history and scoped concepts:
-
-- `Semantic_Candidate_v0.md`;
-- `Semantic_Temporal_Conflict_v0.md`;
-- `Knowledge_Lifecycle_v0.md`;
-- `Semantic_Verification_v0.md`;
-- `Bootstrap_Knowledge_v0.md`;
-- `Dynamic_Task_Arbitration_Concept.md`;
-- `Emergency_Response_Mode_Concept.md`.
-
-Where they conflict with this accepted boundary, **this document wins for the pre-training/read-only Stage 7 interface slice**.
-
-Historical TV reports, Stage 5/6 specs and old audit labels are not rewritten retroactively.
+Прежние `Semantic_Candidate_v0.md`, `Semantic_Temporal_Conflict_v0.md`, `Knowledge_Lifecycle_v0.md`, `Semantic_Verification_v0.md`, `Bootstrap_Knowledge_v0.md` и концепции arbitration/emergency сохранены в [историческом снимке](../ARCHIVE/Development_Snapshots.md). При расхождении для первого read-only/pre-training slice **приоритет имеет данный принятый контракт**. Исторические результаты TV и прежние ярлыки не редактируются задним числом.
 
 ## 20. Implementation boundary
 
-This document authorizes documentation and conformance work only. It does not claim that the new semantic interface is implemented or production-proven.
-
-The first implementation slice should remain read-only/shadow until a later owner decision explicitly accepts DP-08/09/10b/11 integration semantics.
+Этот документ разрешает работу над документацией и conformance, **не** объявляет semantic interface реализованным или проверенным для production. Начальная реализация остаётся read-only/shadow до отдельного принятия DP-08/09/10b/11.
