@@ -7,7 +7,8 @@
 **Общий план:** [Core v0.1 + VAL](Core_v0_1_VAL_v0_1_Plan_Draft.md).
 **Первый технический контракт (на согласование):** [Event / Observation / Belief](Core_v0_1_Event_Belief_Contract_Draft.md).
 **Второй технический контракт (на согласование):** [Belief → Goal / Task → Decision → Execution / Verification](Core_v0_1_Goal_Decision_Execution_Contract_Draft.md).
-**P1 pilot implementation:** [Standalone Bootstrap — test gates pending](Core_v0_1_P1_Bootstrap_Draft.md).  
+**P1 standalone bootstrap:** [P1 — owner-verified bootstrap PASS](Core_v0_1_P1_Bootstrap_Draft.md).
+**P2-A implementation (tests pending):** [SQLite Core Event Ingress](Core_v0_1_P2A_Ingress_Draft.md).  
 **Референс реализованной архитектуры:** [Architecture](../ARCHITECTURE/README.md).  
 **Актуальные статусы:** [project.json](../project.json); никакой Stage не объявляется закрытым этим документом.
 
