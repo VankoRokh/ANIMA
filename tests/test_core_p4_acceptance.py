@@ -6,6 +6,7 @@ the bounded one-door ensure_once profile, not unrestricted LLM autonomy.
 
 import json
 import sqlite3
+from contextlib import closing
 
 import pytest
 
@@ -92,7 +93,7 @@ def _event(tag, *, source=EXTERNAL, tick=39, state="open", subject=DOOR_SUBJECT)
 
 
 def _effects(core):
-    with sqlite3.connect(core.core_execution.world.path) as connection:
+    with closing(sqlite3.connect(core.core_execution.world.path)) as connection:
         return connection.execute("SELECT COUNT(*) FROM door_effects").fetchone()[0]
 
 
