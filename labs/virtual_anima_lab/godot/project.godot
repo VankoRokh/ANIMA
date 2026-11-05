@@ -1,0 +1,16 @@
+; P5-A standalone virtual test world. Do not couple this project to ANIMA Core.
+config_version=5
+
+[application]
+config/name="Virtual ANIMA Lab — P5-A"
+run/main_scene="res://Main.tscn"
+
+[display]
+window/size/viewport_width=960
+window/size/viewport_height=640
+window/stretch/mode="canvas_items"
+
+[rendering]
+renderer/rendering_method="gl_compatibility"
+renderer/rendering_method.mobile="gl_compatibility"
+textures/default_filters/use_nearest_mipmap_filter=false
