@@ -300,6 +300,17 @@ def _git_sha() -> str:
         return "unavailable"
 
 
+def _git_worktree_clean() -> bool | None:
+    try:
+        status = subprocess.check_output([
+            "git", "-C", str(GODOT_PROJECT.parents[2]),
+            "status", "--porcelain", "--untracked-files=normal",
+        ], text=True, timeout=5)
+        return not bool(status.strip())
+    except (OSError, subprocess.CalledProcessError, subprocess.TimeoutExpired):
+        return None
+
+
 def main(argv=None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--godot", default=None)
@@ -327,7 +338,9 @@ def main(argv=None) -> int:
                 "schema": "val.p5c.acceptance/0.1",
                 "result": "PASS",
                 "suite": str(args.suite.name),
+                "suite_sha256": hashlib.sha256(args.suite.read_bytes()).hexdigest(),
                 "git_sha": _git_sha(),
+                "git_worktree_clean": _git_worktree_clean(),
                 "run_count": 2,
                 "world_versions": "p5a-grid/0.1",
                 "scenarios": [],
@@ -358,6 +371,7 @@ def main(argv=None) -> int:
                 print(f"  PASS {scenario['id']}: {len(scenario['steps'])} steps, replay SHA256 {digest[:16]}", flush=True)
             print(f"Virtual ANIMA Lab / P5-C: PASS {len(cases)}/{len(cases)} scenarios, 2 runs each")
             print("Scripted headless command replay only. ANIMA Core NOT connected.")
+            print(f"Git SHA: {summary['git_sha']}  clean: {summary['git_worktree_clean']}")
             if output:
                 (output / "summary.json").write_text(
                     json.dumps(summary, indent=2, ensure_ascii=False) + "\n",
