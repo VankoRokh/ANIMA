@@ -129,9 +129,21 @@ func _request(line: String) -> Dictionary:
 	var req = JSON.parse_string(line)
 	if typeof(req) != TYPE_DICTIONARY:
 		return _reply(null, false, {}, "MALFORMED_JSON")
-	var request_id = req.get("id")
-	if typeof(request_id) != TYPE_INT or int(request_id) < 0:
-		return _reply(request_id, false, {}, "INVALID_ID")
+	# Godot's JSON parser represents JSON numbers as TYPE_FLOAT, even
+	# when Python sends an integer such as {"id": 1}. Validate the numeric
+	# contract first and normalize the reply ID to a true Godot int so Python
+	# json.loads receives 1, not 1.0.
+	var raw_id = req.get("id")
+	if typeof(raw_id) != TYPE_INT and typeof(raw_id) != TYPE_FLOAT:
+		return _reply(null, false, {}, "INVALID_ID")
+	var numeric_id: float = float(raw_id)
+	if not (
+		numeric_id >= 0.0
+		and numeric_id <= 2147483647.0
+		and numeric_id == floor(numeric_id)
+	):
+		return _reply(null, false, {}, "INVALID_ID")
+	var request_id: int = int(raw_id)
 	if req.get("protocol") != PROTOCOL:
 		return _reply(request_id, false, {}, "UNSUPPORTED_PROTOCOL")
 	var role: String = str(req.get("role", ""))
