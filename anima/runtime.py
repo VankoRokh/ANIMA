@@ -1,3 +1,4 @@
+from anima.core.dispatch import CoreEventDispatcher
 from anima.internal_state.runtime_integration import InternalStateRuntime
 from anima.sleep.runtime_integration import SleepRuntimeIntegration
 
@@ -19,6 +20,7 @@ class Runtime:
         metrics=None,
         internal_state=None,
         sleep_runtime=None,
+        core_events=None,
     ):
         if internal_state is not None and not isinstance(
             internal_state,
@@ -35,6 +37,11 @@ class Runtime:
                 "Runtime sleep_runtime must be a SleepRuntimeIntegration or null"
             )
 
+        if core_events is not None and not isinstance(
+            core_events, CoreEventDispatcher
+        ):
+            raise TypeError("Runtime core_events must be CoreEventDispatcher or null")
+
         self.trace = trace
         self.metrics = metrics
         self.anima = anima
@@ -46,6 +53,7 @@ class Runtime:
         self.event_processing = event_processing
         self.internal_state = internal_state
         self.sleep_runtime = sleep_runtime
+        self.core_events = core_events
         self._recovery_checked = False
 
     def _session_id(self):
@@ -56,17 +64,48 @@ class Runtime:
 
         return f"session_{session:08d}"
 
-    def _ensure_recovered(self):
-        if self._recovery_checked:
-            return
+    def _drain_core_events(self, *, max_events=32):
+        if self.core_events is None:
+            return ()
+        try:
+            turns = self.core_events.drain(max_events=max_events)
+            self.anima.reconcile_events_processed(
+                self.event_processing.finalized_count()
+            )
+            return turns
+        except Exception:
+            self._recovery_checked = False
+            raise
 
-        self.event_processing.recover()
-        self.anima.reconcile_events_processed(
-            self.event_processing.finalized_count()
+    def _ensure_recovered(self):
+        if not self._recovery_checked:
+            self.event_processing.recover()
+            self.anima.reconcile_events_processed(
+                self.event_processing.finalized_count()
+            )
+            if self.sleep_runtime is not None:
+                self.sleep_runtime.recover()
+            self._recovery_checked = True
+        # Persistent outbox is the wake signal: after crash or on each normal
+        # lifecycle entry, dispatch a bounded batch without needing RAM queue.
+        self._drain_core_events()
+
+    def ingest_core_event(self, raw, *, source_ref):
+        """Trusted adapter path; raw caller names are not authentication."""
+        if self.core_events is None:
+            raise RuntimeError("Core event ingress is not configured")
+        self._ensure_recovered()
+        admitted = self.core_events.ingress.admit(raw, source_ref=source_ref)
+        if admitted.status in {"ACCEPTED", "ALREADY_SEEN"}:
+            self._drain_core_events()
+        return admitted
+
+    def read_core_belief(self, subject_ref, predicate_ref, *, as_of_tick=None):
+        if self.core_events is None:
+            raise RuntimeError("Core event ingress is not configured")
+        return self.core_events.ingress.read_belief(
+            subject_ref, predicate_ref, as_of_tick=as_of_tick
         )
-        if self.sleep_runtime is not None:
-            self.sleep_runtime.recover()
-        self._recovery_checked = True
 
     def _process_events(self):
         processed = []
