@@ -15,8 +15,11 @@ from xml.etree import ElementTree
 
 
 ROOT = Path(__file__).resolve().parents[1]
-CORE_MODULES = (
+P4_MODULES = (
     "tests/test_core_p4_acceptance.py",
+    "tests/test_core_p4_report.py",
+)
+CORE_MODULES = P4_MODULES + (
     "tests/test_core_p3c_autonomy.py",
     "tests/test_core_p3c_demo.py",
     "tests/test_core_p3b_execution.py",
@@ -126,7 +129,7 @@ def main(argv=None):
         parser.error("output-dir must be absent or empty; refusing to overwrite")
     destination.mkdir(parents=True, exist_ok=True)
     files = (
-        (CORE_MODULES[0],) if args.suite == "p4"
+        P4_MODULES if args.suite == "p4"
         else CORE_MODULES if args.suite == "core"
         else ()
     )
