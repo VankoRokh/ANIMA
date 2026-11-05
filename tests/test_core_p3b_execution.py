@@ -366,3 +366,28 @@ def test_p3b_world_sensor_is_not_derived_from_action_receipt(tmp_path):
     assert new_tick > tick
     assert changed["payload"]["value"] == {"type": "symbol", "value": "open"}
     assert _world_effects(core) == 0
+
+
+
+def test_p3b_external_close_cancels_prepared_effect_after_independent_readback(tmp_path):
+    first = _core(tmp_path)
+    goal_id = _goal(first)
+
+    def crash(_goal):
+        raise RuntimeError("controlled crash after preparing operation")
+
+    first.core_execution.before_execute_hook = crash
+    with pytest.raises(RuntimeError, match="controlled crash after preparing"):
+        first.runtime.run_core_door_goal(goal_id)
+    operation = _ops(first, goal_id)[0]
+    assert operation["status"] == "prepared"
+    assert _world_effects(first) == 0
+
+    first.core_execution.world.change_by_environment("closed")
+    reopened = _core(tmp_path)
+    done = reopened.runtime.run_core_door_goal(goal_id)
+    assert done.outcome == "VERIFIED_SUCCESS"
+    assert done.operation_id == operation["id"]
+    assert reopened.core_execution.store.get_operation(operation["id"])["status"] == "cancelled"
+    assert _world_effects(reopened) == 0
+    assert reopened.internal_state.goals.get_goal(goal_id)["status"] == "completed"
