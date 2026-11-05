@@ -328,6 +328,23 @@ class CoreDoorExecution:
         proof = self._proof(goal_id)
         if proof is None:
             return None
+        goal = self.decisions.goals.get_goal(goal_id)
+        task = self.decisions.tasks.get_task(proof["task_id"])
+        if goal is None or task is None or task.goal_id != goal_id:
+            raise ValueError("Persisted Core proof references missing/mismatched identity")
+        if goal["status"] == "cancelled" or task.status in {"cancelled", "failed"}:
+            # A valid historical proof must not reverse a terminal cancellation.
+            return CoreDoorTurn(
+                goal_id, proof["task_id"], "DEFERRED",
+                "PROOF_SUPERSEDED_BY_TERMINAL_STATE",
+                proof["operation_id"], proof["event_id"], None,
+            )
+        if goal["status"] == "blocked":
+            return CoreDoorTurn(
+                goal_id, proof["task_id"], "DEFERRED",
+                "GOAL_BLOCKED_WITH_VERIFIED_PROOF",
+                proof["operation_id"], proof["event_id"], None,
+            )
         # Never invent a new success; only resume a proof already persisted
         # after a verified accepted sensor observation.
         existing = self.decisions.ingress.get_event(proof["event_id"])
@@ -359,6 +376,13 @@ class CoreDoorExecution:
             if goal is None or task is None:
                 raise ValueError("Persisted proof references missing Goal or Task")
             if goal["status"] == "completed" and task.status == "completed":
+                continue
+            # Proof is durable evidence, not authority to complete a
+            # terminally cancelled Task or Goal or to unblock a paused Goal.
+            # Skip these records and continue recovering unrelated Goals.
+            if goal["status"] in {"blocked", "cancelled"}:
+                continue
+            if task.status in {"cancelled", "failed"}:
                 continue
             if goal["status"] not in {"active", "completed"}:
                 raise ValueError("Persisted proof references invalid Goal state")
