@@ -336,6 +336,30 @@ class CoreDoorExecution:
             proof["event_id"], None
         )
 
+    def recover_proofs(self, *, limit=4):
+        """Finish persisted Goal/Task transitions without executing an effect."""
+        if type(limit) is not int or not 1 <= limit <= 32:
+            raise ValueError("Recovery limit must be 1..32")
+        with closing(self.decisions._connect()) as connection:
+            rows = connection.execute(
+                "SELECT goal_id,task_id FROM core_world_proofs"
+                " ORDER BY rowid"
+            ).fetchall()
+        recovered = []
+        for row in rows:
+            goal = self.decisions.goals.get_goal(row["goal_id"])
+            task = self.decisions.tasks.get_task(row["task_id"])
+            if goal is None or task is None:
+                raise ValueError("Persisted proof references missing Goal or Task")
+            if goal["status"] == "completed" and task.status == "completed":
+                continue
+            if goal["status"] not in {"active", "completed"}:
+                raise ValueError("Persisted proof references invalid Goal state")
+            recovered.append(self._recover_proof(row["goal_id"]))
+            if len(recovered) == limit:
+                break
+        return tuple(recovered)
+
     def run(self, goal_id):
         """One bounded explicit turn; never auto-create Goals or run in background."""
         recovered = self._recover_proof(goal_id)
