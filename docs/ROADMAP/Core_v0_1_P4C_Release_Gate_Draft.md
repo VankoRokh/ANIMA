@@ -19,7 +19,7 @@ Owner provided readable output of `scripts/run_core_acceptance.py --suite full` 
 | Observed per-case p95 | **0.069s** |
 | Full runner exit code | **0** |
 
-This is an **owner-local result**, not independently executed by an assistant or CI. Owner supplied terminal output and a rendered excerpt of `summary.md`, not the underlying JSON/JUnit files. It validates **P4-B**, not this new P4-C branch.
+This is an **owner-local result**, not independently executed by an assistant or CI. Owner supplied terminal output and a rendered excerpt of `summary.md`, not the underlying JSON/JUnit files. It validates **P4-B**, not this new P4-C branch. The exact `f6536f3` tested tree remains an immutable reference; the P4-C branch includes new tests and documentation, and requires a fresh run.
 
 ## 2. P4-C additional measured workload
 
@@ -32,7 +32,7 @@ New [`tests/test_core_p4c_release.py`](../../tests/test_core_p4c_release.py) add
 - Up to three registered-but-invalid noise events per episode. A subset is redelivered under the same occurrence ID; Core must dedupe these without mutating Belief.
 - At every episode: assert Goal=completed, Task=completed, one independent accepted evidence event per Goal, ground truth=closed only in the test operator, exact expected 0/1 operations, zero pending scheduler triggers. After restart: check instance ID unchanged, exactly one Stage6 operation ID per effect, all attempts finished and no pending work.
 - Two additional **independent 8-episode runs** with seed 101 must produce identical aggregate results regardless of random Goal/Task UUIDs.
-- Negative C0/C8 controls: idle Core without goals has zero world mutations; unauthenticated/unauthorized property source can be admitted as raw event but cannot insert a `known` Belief or satisfy a Goal.
+- Negative C0/C8 controls: idle Core without goals has zero world mutations; a registered source lacking property-level authority may still be admitted as a raw event but cannot insert a `known` Belief or satisfy a Goal.
 
 **Important quantitative meaning:** this is **72 test episodes** and seeded restart/negative checks, **not 72 wall-clock hours or a long-lived background service**. Since only one `world.door.close@0.1` is registered, these tests do not establish reliability for other capabilities or general decision planning.
 
