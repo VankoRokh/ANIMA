@@ -1,6 +1,6 @@
 # ANIMA Core v0.1 — P2-C Runtime / Durable Dispatch Integration
 
-**Статус:** implementation present; **PENDING owner-local test evidence**. P2-C is not declared complete.  
+**Статус:** **P2-C PASS по сообщению владельца** (2026-11-05): все предложенные проверки выполнены успешно. Точный SHA локального тестового коммита и числовой итог pytest не предоставлены; не приписывать их этому отчёту.  
 **Дата:** 2026-11-05.  
 **Ветка:** `work/core-v0-1-p2c-runtime` (from owner-verified P2-B).  
 **Родитель:** [P2-B Belief State](Core_v0_1_P2B_Belief_Draft.md), [P2-A Ingress](Core_v0_1_P2A_Ingress_Draft.md).  
@@ -91,7 +91,7 @@ bash scripts/check.sh
 
 Check that the default CLI (without registries) behaves exactly as before and that `core_state.db` is absent in that configuration. Fault injection, restart, invalid observations, duplicate event IDs, migration v2→v3, bounded pending queue and idempotent receipts are covered.
 
-**P2-C requires owner-local tests before PASS.** Do not claim it was executed by GitHub connector or that a green P2-B proves P2-C. The user-supplied output plus exact SHA is the acceptance evidence.
+**P2-C acceptance evidence:** владелец проекта сообщил «Все проверки прошли успешно» после выполнения предложенных проверок. Это подтверждение **без приложенного терминального вывода/точного SHA**, поэтому повторный воспроизводимый прогон на зафиксированном коммите остаётся желательной контрольной проверкой перед объединением веток. Ни CI, ни ассистент эти тесты не запускали. Обязательные P2-C сценарии присутствуют в тестовом наборе; дальнейшая разработка P3 не означает независимую проверку P2-C на иных условиях.
 
 ## 6. Later work
 
