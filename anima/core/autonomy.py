@@ -11,7 +11,7 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 
 from anima.core.door_execution import CoreDoorExecution
-from anima.core.door_world import DOOR_SUBJECT, DOOR_PREDICATE
+from anima.core.door_world import DOOR_SUBJECT, DOOR_PREDICATE, DOOR_SOURCE
 from anima.core.goal_decision import CoreGoalDecision
 
 
@@ -137,6 +137,10 @@ class CoreAutonomy:
                     if (
                         row["rowid"] <= cursor
                         or row["kind"] != "state.property"
+                        # The trusted internal readback sensor is NOT a
+                        # scheduler trigger; otherwise every verification
+                        # creates a self-sustaining loop of new triggers.
+                        or row["source_ref"] == DOOR_SOURCE
                         or row["subject_ref"] is None
                         or row["predicate_ref"] is None
                         or row["outcome"] not in {
@@ -244,6 +248,25 @@ class CoreAutonomy:
         more = self.sync(max_new_events=max_new_events)
         turns = []
         examined = 0
+        # Recover committed independent proofs BEFORE checking active Goals:
+        # the Goal may already be completed while its Task transition was
+        # interrupted by a crash. No sensor or world effect is required.
+        for recovered in self.executor.recover_proofs(limit=max_steps):
+            turns.append(
+                AutoStep(
+                    "proof:" + recovered.goal_id,
+                    recovered.goal_id,
+                    recovered.outcome,
+                    recovered.reason_code,
+                    recovered.operation_id,
+                    recovered.evidence_event_id,
+                )
+            )
+            if len(turns) >= max_steps:
+                return AutoDrain(
+                    turns=tuple(turns), examined_triggers=examined,
+                    pending_triggers=self.pending_count(), more_input_events=more,
+                )
         while len(turns) < max_steps and examined < max_triggers:
             with closing(self.decisions._connect()) as connection:
                 connection.execute("BEGIN IMMEDIATE")
