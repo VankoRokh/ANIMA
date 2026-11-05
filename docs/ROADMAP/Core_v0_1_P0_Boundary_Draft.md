@@ -4,7 +4,8 @@
 **Дата:** 2026-11-05.  
 **Исходный code snapshot:** `e2a1e6bfdb6126b82ac36873dce92e7c6876aa4b` на `work/stage7-semantic-boundary-v0`.  
 **Рабочая ветка:** `work/core-v0-1-planning` (только документация).  
-**Общий план:** [Core v0.1 + VAL](Core_v0_1_VAL_v0_1_Plan_Draft.md).  
+**Общий план:** [Core v0.1 + VAL](Core_v0_1_VAL_v0_1_Plan_Draft.md).
+**Первый технический контракт (на согласование):** [Event / Observation / Belief](Core_v0_1_Event_Belief_Contract_Draft.md).  
 **Референс реализованной архитектуры:** [Architecture](../ARCHITECTURE/README.md).  
 **Актуальные статусы:** [project.json](../project.json); никакой Stage не объявляется закрытым этим документом.
 
