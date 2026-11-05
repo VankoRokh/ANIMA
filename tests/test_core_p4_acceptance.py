@@ -283,7 +283,7 @@ def test_p4_many_irrelevant_events_advance_cursor_without_effects(tmp_path):
     assert third.turns == ()
     assert core.core_autonomy.pending_count() == 0
     assert _effects(core) == 0
-    with sqlite3.connect(core.data_dir / "core_work.db") as connection:
+    with closing(sqlite3.connect(core.data_dir / "core_work.db")) as connection:
         cursor = connection.execute(
             "SELECT integer_value FROM core_autonomy_meta WHERE name='event_cursor'"
         ).fetchone()[0]
