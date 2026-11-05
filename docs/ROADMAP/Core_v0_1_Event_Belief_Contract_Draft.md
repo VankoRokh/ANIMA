@@ -171,9 +171,9 @@ EventSubscriber.notify(committed_revision) -> WakeSignal
 
 **Core v0.1 does not require** generic natural-language claim extraction, LLM arbitration, source-ranking heuristics, probabilistic confidence, or global ontology fusion to pass these fixtures.
 
-## 9. Remaining P0 owner decisions (do not silently treat as accepted)
+## 9. P0 decisions and remaining review
 
-**D1 — Store boundary.** Принимаем single-transaction SQLite journal/projection для новых Core inputs и downstream legacy outbox? Альтернатива — на первом этапе использовать EventLog JSONL как canonical source + replay/reconcile для Belief (проще миграционно, сложнее доказать транзакционность).
+**D1 — Store boundary (Accepted in principle, 2026-11-05).** Owner согласовал выделенный SQLite-журнал нового Core и одну транзакцию для ingress/Observation/Belief, с сохранением legacy `EventLog`/Memory и downstream bridge/outbox для совместимости. Статус **не означает**, что реализованы durable outbox, schema migration или power-loss proof: детали и тесты остаются blocking. JSONL-first как основной вариант для новых Core-входов отклонён.
 
 **D2 — Conflict policy.** В v0.1 опираться только на registered source, comparable logical time/revision и explicit equal-scope conflict; без глобального source ranking и universal probabilistic score? Рекомендация — да.
 
@@ -183,4 +183,4 @@ EventSubscriber.notify(committed_revision) -> WakeSignal
 
 **D5 — Compatibility gate.** Старые `Event` и `EventLog` сохраняют contract; новый Core ingress — адаптер к ним, а не изменение historical event schema. Рекомендация — да.
 
-До P1/P2: owner approval D1–D5, source/predicate registry fixtures, explicit crash test protocol, baseline `scripts/check.sh` и `pytest`. P0 не считается Complete одним только созданием этого draft.
+До P1/P2: отдельно рассмотреть D2–D5, source/predicate registry fixtures, explicit crash test protocol, baseline `scripts/check.sh` и `pytest`. D1 согласован концептуально, но требует проверяемого implementation/replay contract. P0 не считается Complete одним только созданием этого draft.
