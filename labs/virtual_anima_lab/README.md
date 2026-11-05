@@ -52,6 +52,29 @@ without `--auto` for manual `w/a/s/d` movement and `o` observation.
 If the binary isn't named `godot`, run the executable by its full path.
 The Godot GUI does not launch ANIMA Core or any model.
 
+## Protocol compatibility check (Godot JSON integer IDs)
+
+**Fixed after first real Godot↔Python run:** Godot's `JSON.parse_string()`
+represents JSON numeric identifiers as floats (`1.0`), while our initial
+bridge mistakenly required `TYPE_INT`. The scene now validates integral
+numeric IDs and normalizes them to `int`; Python accepts either `1` or
+exact `1.0` on replies while rejecting fractions, booleans, NaN and
+out-of-range values.
+
+Close any running Godot window **before** testing the updated bridge, then:
+
+```bash
+godot --headless --path labs/virtual_anima_lab/godot \\
+  --script res://BridgeProtocolTest.gd
+
+.venv/bin/python -m pytest -q tests/test_val_p5a_client.py
+```
+
+Expected Godot output contains `VAL_BRIDGE_ID_CONTRACT_PASS`. The first
+command uses the **real Godot parser**, while the Python tests check response
+framing independently. Neither alone demonstrates the full bidirectional
+world scenario; run the `smoke.py` test as the next gate.
+
 ## Headless feasibility gate
 
 From repository root, with a Godot binary installed:
