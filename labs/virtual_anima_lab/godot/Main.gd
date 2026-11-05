@@ -36,6 +36,7 @@ var _marker := Vector2i(8, 2)
 var _walls: Array[Vector2i] = []
 var _history: Array[Dictionary] = []
 var _hud: Label
+var _diagnostics: Label
 
 
 func _ready() -> void:
@@ -46,6 +47,10 @@ func _ready() -> void:
 	_hud.position = Vector2(24, 466)
 	_hud.add_theme_font_size_override("font_size", 17)
 	add_child(_hud)
+	_diagnostics = Label.new()
+	_diagnostics.position = Vector2(WIDTH * CELL + 16, 22)
+	_diagnostics.add_theme_font_size_override("font_size", 15)
+	add_child(_diagnostics)
 	_refresh_hud()
 	var listen_error := _server.listen(_port, "127.0.0.1")
 	if listen_error != OK:
@@ -328,6 +333,7 @@ func _typed_observation() -> Dictionary:
 		"readings": readings,
 	}
 	_last_sample = observation.duplicate(true)
+	_refresh_hud()
 	return observation
 
 
@@ -594,6 +600,28 @@ func _refresh_hud() -> void:
 		_hud.text += "Door: %s  |  %s  |  seed: %d  |  port: %d" % [
 			door_word, pause_word, _seed, _port,
 		]
+	if _diagnostics != null:
+		_diagnostics.text = "OPERATOR / WORLD TRUTH\n"
+		_diagnostics.text += "Epoch: %d\nRevision: %d\nTick: %d\n" % [
+			_epoch, _revision, _tick,
+		]
+		_diagnostics.text += "Human: (%d,%d)\n" % [_human.x, _human.y]
+		_diagnostics.text += "ANIMA: (%d,%d)\n" % [_anima.x, _anima.y]
+		_diagnostics.text += "Door: %s\n" % ("open" if _door_open else "closed")
+		_diagnostics.text += "Event seq: %d\n\n" % _event_seq
+		_diagnostics.text += "ANIMA / LAST SENSOR\n"
+		if _last_sample.is_empty():
+			_diagnostics.text += "No typed sample yet\n"
+		else:
+			_diagnostics.text += "ID: %s\n" % _last_sample["observation_id"]
+			_diagnostics.text += "Observed tick: %d\n" % _last_sample["observed_at"]["tick"]
+			_diagnostics.text += "Readings: %d\n" % _last_sample["readings"].size()
+		_diagnostics.text += "\nLAST EVENTS\n"
+		var start: int = maxi(0, _history.size() - 5)
+		for record in _history.slice(start, _history.size()):
+			_diagnostics.text += "%d  %s / %s\n" % [
+				record["event_seq"], record["actor"], record["event"],
+			]
 
 
 func _unhandled_key_input(event: InputEvent) -> void:
