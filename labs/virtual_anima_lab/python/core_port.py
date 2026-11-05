@@ -17,7 +17,7 @@ from typing import Callable
 
 from anima.agent.executor import SandboxHandler, SandboxToolError
 from anima.core.door_world import (
-    DOOR_PREDICATE, DOOR_PRODUCER, DOOR_SOURCE, DOOR_SUBJECT, DOOR_TOOL,
+    DOOR_PREDICATE, DOOR_SOURCE, DOOR_SUBJECT, DOOR_TOOL,
     DOOR_VERSION,
 )
 from anima.core.ingress import CONTRACT
