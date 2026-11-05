@@ -1,0 +1,735 @@
+{
+  "schema": "val.scenario_suite/0.1",
+  "description": "Deterministic ordered command scripts; never ANIMA cognition or GUI timing replay.",
+  "scenarios": [
+    {
+      "id": "noise_and_obstacle",
+      "seed": 7,
+      "world": "base",
+      "steps": [
+        {
+          "role": "agent",
+          "op": "observe",
+          "args": {},
+          "expect": {
+            "ok": true,
+            "absent": [
+              "lab.door.01"
+            ]
+          }
+        },
+        {
+          "role": "operator",
+          "op": "emit_noise",
+          "args": {
+            "label": "fan_tick"
+          },
+          "expect": {
+            "ok": true,
+            "revision_delta": 0,
+            "event_seq_delta": 1
+          }
+        },
+        {
+          "role": "operator",
+          "op": "emit_noise",
+          "args": {
+            "label": "radio_hum"
+          },
+          "expect": {
+            "ok": true,
+            "revision_delta": 0,
+            "event_seq_delta": 1
+          }
+        },
+        {
+          "role": "agent",
+          "op": "act",
+          "args": {
+            "direction": "W"
+          },
+          "expect": {
+            "ok": true,
+            "status": "APPLIED",
+            "revision_delta": 1
+          }
+        },
+        {
+          "role": "agent",
+          "op": "observe",
+          "args": {},
+          "expect": {
+            "ok": true
+          }
+        },
+        {
+          "role": "operator",
+          "op": "set_obstacle",
+          "args": {
+            "at": {
+              "x": 7,
+              "y": 5
+            },
+            "blocked": true
+          },
+          "expect": {
+            "ok": true,
+            "revision_delta": 1
+          }
+        },
+        {
+          "role": "agent",
+          "op": "act",
+          "args": {
+            "direction": "W"
+          },
+          "expect": {
+            "ok": false,
+            "error": "STALE_WORLD",
+            "revision_delta": 0,
+            "event_seq_delta": 0
+          }
+        },
+        {
+          "role": "agent",
+          "op": "observe",
+          "args": {},
+          "expect": {
+            "ok": true,
+            "present": [
+              "lab.obstacle.7.5"
+            ]
+          }
+        },
+        {
+          "role": "agent",
+          "op": "act",
+          "args": {
+            "direction": "W"
+          },
+          "expect": {
+            "ok": true,
+            "status": "BLOCKED",
+            "reason": "wall",
+            "revision_delta": 0
+          }
+        },
+        {
+          "role": "operator",
+          "op": "set_obstacle",
+          "args": {
+            "at": {
+              "x": 7,
+              "y": 5
+            },
+            "blocked": false
+          },
+          "expect": {
+            "ok": true,
+            "revision_delta": 1
+          }
+        },
+        {
+          "role": "agent",
+          "op": "observe",
+          "args": {},
+          "expect": {
+            "ok": true,
+            "absent": [
+              "lab.obstacle.7.5"
+            ]
+          }
+        },
+        {
+          "role": "agent",
+          "op": "act",
+          "args": {
+            "direction": "W"
+          },
+          "expect": {
+            "ok": true,
+            "status": "APPLIED",
+            "revision_delta": 1
+          }
+        },
+        {
+          "role": "operator",
+          "op": "emit_noise",
+          "args": {
+            "label": "clock_tick"
+          },
+          "expect": {
+            "ok": true,
+            "revision_delta": 0,
+            "event_seq_delta": 1
+          }
+        },
+        {
+          "role": "agent",
+          "op": "observe",
+          "args": {},
+          "expect": {
+            "ok": true,
+            "present": [
+              "lab.door.01"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "door_intervention",
+      "seed": 7,
+      "world": "base",
+      "steps": [
+        {
+          "role": "agent",
+          "op": "observe",
+          "args": {},
+          "expect": {
+            "ok": true
+          }
+        },
+        {
+          "role": "agent",
+          "op": "act",
+          "args": {
+            "direction": "W"
+          },
+          "expect": {
+            "ok": true,
+            "status": "APPLIED"
+          }
+        },
+        {
+          "role": "agent",
+          "op": "observe",
+          "args": {},
+          "expect": {
+            "ok": true
+          }
+        },
+        {
+          "role": "agent",
+          "op": "act",
+          "args": {
+            "direction": "N"
+          },
+          "expect": {
+            "ok": true,
+            "status": "APPLIED"
+          }
+        },
+        {
+          "role": "agent",
+          "op": "observe",
+          "args": {},
+          "expect": {
+            "ok": true
+          }
+        },
+        {
+          "role": "agent",
+          "op": "act",
+          "args": {
+            "direction": "W"
+          },
+          "expect": {
+            "ok": true,
+            "status": "APPLIED"
+          }
+        },
+        {
+          "role": "agent",
+          "op": "observe",
+          "args": {},
+          "expect": {
+            "ok": true
+          }
+        },
+        {
+          "role": "agent",
+          "op": "act",
+          "args": {
+            "direction": "N"
+          },
+          "expect": {
+            "ok": true,
+            "status": "APPLIED"
+          }
+        },
+        {
+          "role": "agent",
+          "op": "observe",
+          "args": {},
+          "expect": {
+            "ok": true,
+            "present": [
+              "lab.door.01"
+            ],
+            "states": {
+              "lab.door.01": "closed"
+            }
+          }
+        },
+        {
+          "role": "agent",
+          "op": "act",
+          "args": {
+            "direction": "W"
+          },
+          "expect": {
+            "ok": true,
+            "status": "BLOCKED",
+            "reason": "closed_door",
+            "revision_delta": 0
+          }
+        },
+        {
+          "role": "operator",
+          "op": "set_door",
+          "args": {
+            "open": true
+          },
+          "expect": {
+            "ok": true,
+            "revision_delta": 1
+          }
+        },
+        {
+          "role": "agent",
+          "op": "act",
+          "args": {
+            "direction": "W"
+          },
+          "expect": {
+            "ok": false,
+            "error": "STALE_WORLD",
+            "revision_delta": 0,
+            "event_seq_delta": 0
+          }
+        },
+        {
+          "role": "agent",
+          "op": "observe",
+          "args": {},
+          "expect": {
+            "ok": true,
+            "present": [
+              "lab.door.01"
+            ],
+            "states": {
+              "lab.door.01": "open"
+            }
+          }
+        },
+        {
+          "role": "agent",
+          "op": "act",
+          "args": {
+            "direction": "W"
+          },
+          "expect": {
+            "ok": true,
+            "status": "APPLIED",
+            "revision_delta": 1
+          }
+        },
+        {
+          "role": "operator",
+          "op": "set_door",
+          "args": {
+            "open": false
+          },
+          "expect": {
+            "ok": false,
+            "error": "DOOR_OCCUPIED",
+            "revision_delta": 0
+          }
+        },
+        {
+          "role": "agent",
+          "op": "observe",
+          "args": {},
+          "expect": {
+            "ok": true,
+            "states": {
+              "lab.door.01": "open"
+            }
+          }
+        },
+        {
+          "role": "operator",
+          "op": "emit_noise",
+          "args": {
+            "label": "light_step"
+          },
+          "expect": {
+            "ok": true,
+            "revision_delta": 0
+          }
+        },
+        {
+          "role": "agent",
+          "op": "act",
+          "args": {
+            "direction": "N"
+          },
+          "expect": {
+            "ok": true,
+            "status": "APPLIED",
+            "revision_delta": 1
+          }
+        }
+      ]
+    },
+    {
+      "id": "detour_injection",
+      "seed": 9,
+      "world": "detour",
+      "steps": [
+        {
+          "role": "agent",
+          "op": "observe",
+          "args": {},
+          "expect": {
+            "ok": true,
+            "present": [
+              "lab.wall.7.4"
+            ]
+          }
+        },
+        {
+          "role": "operator",
+          "op": "set_obstacle",
+          "args": {
+            "at": {
+              "x": 10,
+              "y": 5
+            },
+            "blocked": true
+          },
+          "expect": {
+            "ok": true,
+            "revision_delta": 1
+          }
+        },
+        {
+          "role": "agent",
+          "op": "act",
+          "args": {
+            "direction": "E"
+          },
+          "expect": {
+            "ok": false,
+            "error": "STALE_WORLD",
+            "revision_delta": 0
+          }
+        },
+        {
+          "role": "agent",
+          "op": "observe",
+          "args": {},
+          "expect": {
+            "ok": true,
+            "present": [
+              "lab.obstacle.10.5"
+            ]
+          }
+        },
+        {
+          "role": "agent",
+          "op": "act",
+          "args": {
+            "direction": "E"
+          },
+          "expect": {
+            "ok": true,
+            "status": "BLOCKED",
+            "reason": "wall",
+            "revision_delta": 0
+          }
+        },
+        {
+          "role": "operator",
+          "op": "emit_noise",
+          "args": {
+            "label": "chatter"
+          },
+          "expect": {
+            "ok": true,
+            "revision_delta": 0
+          }
+        },
+        {
+          "role": "operator",
+          "op": "set_obstacle",
+          "args": {
+            "at": {
+              "x": 10,
+              "y": 5
+            },
+            "blocked": false
+          },
+          "expect": {
+            "ok": true,
+            "revision_delta": 1
+          }
+        },
+        {
+          "role": "agent",
+          "op": "act",
+          "args": {
+            "direction": "E"
+          },
+          "expect": {
+            "ok": false,
+            "error": "STALE_WORLD",
+            "revision_delta": 0
+          }
+        },
+        {
+          "role": "agent",
+          "op": "observe",
+          "args": {},
+          "expect": {
+            "ok": true,
+            "absent": [
+              "lab.obstacle.10.5"
+            ]
+          }
+        },
+        {
+          "role": "agent",
+          "op": "act",
+          "args": {
+            "direction": "E"
+          },
+          "expect": {
+            "ok": true,
+            "status": "APPLIED"
+          }
+        },
+        {
+          "role": "operator",
+          "op": "human_move",
+          "args": {
+            "direction": "E"
+          },
+          "expect": {
+            "ok": true,
+            "revision_delta": 1
+          }
+        },
+        {
+          "role": "agent",
+          "op": "act",
+          "args": {
+            "direction": "W"
+          },
+          "expect": {
+            "ok": false,
+            "error": "STALE_WORLD",
+            "revision_delta": 0
+          }
+        },
+        {
+          "role": "agent",
+          "op": "observe",
+          "args": {},
+          "expect": {
+            "ok": true
+          }
+        },
+        {
+          "role": "agent",
+          "op": "act",
+          "args": {
+            "direction": "W"
+          },
+          "expect": {
+            "ok": true,
+            "status": "APPLIED"
+          }
+        },
+        {
+          "role": "operator",
+          "op": "emit_noise",
+          "args": {
+            "label": "tap"
+          },
+          "expect": {
+            "ok": true,
+            "revision_delta": 0
+          }
+        }
+      ]
+    },
+    {
+      "id": "clutter_reset",
+      "seed": 11,
+      "world": "clutter",
+      "steps": [
+        {
+          "role": "agent",
+          "op": "observe",
+          "args": {},
+          "expect": {
+            "ok": true,
+            "present": [
+              "lab.wall.8.3"
+            ]
+          }
+        },
+        {
+          "role": "operator",
+          "op": "emit_noise",
+          "args": {
+            "label": "rain"
+          },
+          "expect": {
+            "ok": true,
+            "revision_delta": 0
+          }
+        },
+        {
+          "role": "operator",
+          "op": "emit_noise",
+          "args": {
+            "label": "footsteps"
+          },
+          "expect": {
+            "ok": true,
+            "revision_delta": 0
+          }
+        },
+        {
+          "role": "agent",
+          "op": "act",
+          "args": {
+            "direction": "W"
+          },
+          "expect": {
+            "ok": true,
+            "status": "APPLIED"
+          }
+        },
+        {
+          "role": "agent",
+          "op": "observe",
+          "args": {},
+          "expect": {
+            "ok": true
+          }
+        },
+        {
+          "role": "operator",
+          "op": "human_move",
+          "args": {
+            "direction": "E"
+          },
+          "expect": {
+            "ok": true,
+            "revision_delta": 1
+          }
+        },
+        {
+          "role": "agent",
+          "op": "act",
+          "args": {
+            "direction": "N"
+          },
+          "expect": {
+            "ok": false,
+            "error": "STALE_WORLD",
+            "revision_delta": 0
+          }
+        },
+        {
+          "role": "agent",
+          "op": "observe",
+          "args": {},
+          "expect": {
+            "ok": true
+          }
+        },
+        {
+          "role": "agent",
+          "op": "act",
+          "args": {
+            "direction": "N"
+          },
+          "expect": {
+            "ok": true,
+            "status": "APPLIED"
+          }
+        },
+        {
+          "role": "agent",
+          "op": "observe",
+          "args": {},
+          "expect": {
+            "ok": true,
+            "present": [
+              "lab.wall.8.3"
+            ]
+          }
+        },
+        {
+          "role": "agent",
+          "op": "act",
+          "args": {
+            "direction": "N"
+          },
+          "expect": {
+            "ok": true,
+            "status": "BLOCKED",
+            "reason": "wall",
+            "revision_delta": 0
+          }
+        },
+        {
+          "role": "operator",
+          "op": "emit_noise",
+          "args": {
+            "label": "doorbell"
+          },
+          "expect": {
+            "ok": true,
+            "revision_delta": 0
+          }
+        },
+        {
+          "role": "agent",
+          "op": "observe",
+          "args": {},
+          "expect": {
+            "ok": true,
+            "present": [
+              "lab.wall.8.3"
+            ]
+          }
+        },
+        {
+          "role": "operator",
+          "op": "reset",
+          "args": {},
+          "expect": {
+            "ok": true
+          }
+        },
+        {
+          "role": "agent",
+          "op": "observe",
+          "args": {},
+          "expect": {
+            "ok": true,
+            "present": [
+              "lab.wall.8.3"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}
