@@ -19,6 +19,17 @@ Check — быстрая проверка метаданных/генериру�
 Pytest проверяет функции, Foundation/D1, CLI/headless и саму систему документации.
 Harness создаёт данные в tmp_path; subprocess-тесты явно задают временный ANIMA_DATA_DIR.
 
+## Memory Checkpoint v0
+
+Изолированный [синтетический эксперимент памяти](Memory_Checkpoint_v0.md)
+проверяет 22 события: селекцию MemoryProcessor, связи воспоминаний,
+retrieval, provenance, холодное переоткрытие и отдельно вызываемый Knowledge API.
+Стенд не меняет замороженный Core и не заявляет автоматическую Sleep-консолидацию.
+
+```bash
+.venv/bin/python scripts/run_memory_checkpoint.py --report /tmp/anima-memory-checkpoint-v0.json
+```
+
 ## Stage 7 semantic conformance
 
 Принятый pre-training/read-only semantic boundary проверяется отдельным
