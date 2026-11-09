@@ -166,10 +166,11 @@ def test_c1_late_evidence_and_sensor_unavailable_do_not_become_false(tmp_path):
     assert core.core_events.ingress.observation_outcome(
         old.event_id
     )["outcome"] == "HISTORY_ONLY"
-    assert core.runtime.read_core_belief(SUBJECT, TEMP) == core.runtime.read_core_belief(
-        SUBJECT, TEMP, as_of_tick=None
+    after_late = core.runtime.read_core_belief(
+        SUBJECT, TEMP, as_of_tick=21
     )
-    assert core.runtime.read_core_belief(SUBJECT, TEMP)["revision"] == 3
+    assert after_late == resolved
+    assert after_late["revision"] == 3
 
     core.runtime.ingest_core_event(
         _observation("cool-20", COOLING, tick=20, revision=1, value="on"),
