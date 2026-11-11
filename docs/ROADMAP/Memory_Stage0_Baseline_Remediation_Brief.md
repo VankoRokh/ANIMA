@@ -47,6 +47,16 @@ python -c "from anima.core.assembly import build_core; print('import OK')"
 - Любое предположение о двух одновременных писателях остаётся **UNVERIFIED/UNSUPPORTED**, пока нет claim/terminal guard и соответствующего прогона.
 - Нельзя объявлять все тесты зелёными без фактического исполняемого прогона. Статический review и выполненный pytest фиксируются отдельно.
 
+## Промежуточный результат — 2026-11-11
+
+**Внесено в эту рабочую ветку (ещё без исполняемой приёмки):**
+
+- B0-01: `anima/core/door_execution.py` — в аннотации конструктора используется импортированный `DoorWorldPort`. Добавлен тест `test_core_door_world_annotation_is_importable_on_supported_python` в `tests/test_core_p3b_execution.py`.
+- B0-02: `tests/source_tree.py` — в bounded snapshot включены только пять исходников `labs/exp009`, на которые ссылается `Research.md`. Добавлен отрицательный тест в `tests/test_source_tree.py`, проверяющий отсутствие других lab-файлов в копии.
+- B0-03: в docstring `EventProcessingCoordinator` явно закреплён single-writer контракт и запрет на вывод о concurrent safety. Поведение координации **не менялось**, гонка двух писателей **не исправлена**.
+
+**Ограничение проверки:** среда исполнения полного checkout отсутствует; у коммитов нет результатов GitHub CI. Выполнено чтение изменённых файлов и проверено существование всех пяти referenced lab sources; полноценные `pytest`, `scripts/check.sh` и Python 3.12/3.13/3.14 smoke **не запускались**. Gate остаётся OPEN до результата исполняемых тестов.
+
 ## Приёмка
 
 | Контроль | Состояние при создании brief |
