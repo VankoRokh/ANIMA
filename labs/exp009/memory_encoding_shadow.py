@@ -153,8 +153,8 @@ def pairwise_metrics(assignments, gold):
         "false_split_pairs": len(splits),
         "precision": len(tp) / len(pred_pairs) if pred_pairs else None,
         "recall": len(tp) / len(target_pairs) if target_pairs else None,
-        "false_merge_examples": merges[:15],
-        "false_split_examples": splits[:15],
+        "false_merge_examples": [list(pair) for pair in merges[:15]],
+        "false_split_examples": [list(pair) for pair in splits[:15]],
     }
 
 
