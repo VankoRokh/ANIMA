@@ -37,6 +37,7 @@ jobs:
             tests/test_event_retrieval.py \
             tests/test_event_retrieval_c3.py \
             tests/test_memory_shadow_encoding.py \
+            tests/test_memory_encoding_e2.py \
             tests/test_exp009_retrieval_abcd.py \
             tests/test_documentation.py \
             tests/test_source_tree.py
@@ -86,5 +87,18 @@ jobs:
         with:
           name: memory-encoding-shadow-e1-py314
           path: encoding-results/memory_encoding_shadow.json
+          if-no-files-found: error
+          retention-days: 14
+      - name: Run weak episode-link E2 experiment
+        if: matrix.python-version == '3.14'
+        run: |
+          python -m labs.exp009.memory_encoding_e2 \
+            --report-dir encoding-results
+      - name: Publish E2 candidate/raw decisions
+        if: matrix.python-version == '3.14'
+        uses: actions/upload-artifact@v4
+        with:
+          name: memory-encoding-e2-py314
+          path: encoding-results/memory_encoding_e2_candidates.json
           if-no-files-found: error
           retention-days: 14
