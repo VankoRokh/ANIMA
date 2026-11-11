@@ -39,3 +39,15 @@ jobs:
         run: bash scripts/check.sh
       - name: Import Core assembly
         run: python -c "from anima.core.assembly import build_core; print('import OK')"
+      - name: Run EXP-009 paired comparison (read-only)
+        run: |
+          mkdir -p exp009-results
+          python -m labs.exp009.c2_retrieval_abcd \
+            --report-dir exp009-results --print-summary
+      - name: Publish raw EXP-009 JSONL
+        uses: actions/upload-artifact@v4
+        with:
+          name: exp009-abcd-py${{ matrix.python-version }}
+          path: exp009-results/retrieval_abcd.jsonl
+          if-no-files-found: error
+          retention-days: 14
