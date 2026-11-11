@@ -1,6 +1,6 @@
 # EXP-009 — Stage 1: Controlled Retrieval A/B/C/D
 
-**Статус:** техническое задание принято к подготовке; экспериментальный код и новая приёмка ещё не выполнены.  
+**Статус:** лабораторный harness и отрицательные тесты добавлены; **исполняемая приёмка OPEN** (pytest/JSONL ещё не подтверждены).  
 **Дата:** 2026-11-11.  
 **Ветка:** `experiment/core-memory-information-baseline`.  
 **Основания:** [Memory Roadmap](Memory_Architecture_v1_Roadmap.md), [EXP-009](Research.md), [G1 laboratory](../../labs/exp009/c2_graph_compare.py), [G1 probe](../../labs/exp009/graph_memory_probe.py), [G1 tests](../../tests/test_exp009_g1_graph_memory.py), [Stage 0 gate](Memory_Stage0_Baseline_Remediation_Brief.md).
@@ -78,6 +78,25 @@
 
 **Stage 1 gate:** протокол frozen snapshot, реализованные A/B/C/D, формальные gold и raw output, негативные тесты, отчёт и репродукция. Статус пока **OPEN**. Работаем в лаборатории: `anima/memory`, `project.json`, `KnowledgeLayer` и production routing на этом этапе не менять.
 
-## 9. Первый следующий коммит
+## 9. Лабораторная реализация и воспроизведение
 
-Создать лабораторный сравнительный harness на базе [G1](../../labs/exp009/c2_graph_compare.py), с собственным JSONL форматом и тестами. До написания кода зафиксировать набор gold и одинаковый renderer/packing. После прохождения этих испытаний — обсуждать интерфейс production Event index (шаг 2 Memory roadmap).
+Добавлены [paired harness A/B/C/D](../../labs/exp009/c2_retrieval_abcd.py) и [отрицательные тесты](../../tests/test_exp009_retrieval_abcd.py). В коде реализованы: единый SQLite FTS5 index для всех методов, фиксированный parser, общая сериализация и бюджет, frozen snapshot с hash, Event ID lookup через SQLite, typed source hops только для D, 20 точных запросов, 8 исторических G1 и 4 дополнительных, включая парафразы и отрицательный. Существующий RetrievalEngine/FAST/DEEP добавлен как **отдельный референс**, не как вариант A. Итоговый report — raw JSONL, не только суммарная оценка.
+
+Проверка локально из чистого checkout:
+
+```bash
+.venv/bin/python -m pytest -q -p no:cacheprovider \
+  tests/test_event_processing.py tests/test_exp009_retrieval_abcd.py \
+  tests/test_documentation.py tests/test_source_tree.py
+.venv/bin/python -m pytest -q -p no:cacheprovider
+bash scripts/check.sh
+
+report_dir="$(mktemp -d -t anima-exp009-abcd-XXXXXX)"
+.venv/bin/python -m labs.exp009.c2_retrieval_abcd \
+  --report-dir "$report_dir" --print-summary
+echo "Raw report: $report_dir/retrieval_abcd.jsonl"
+```
+
+**Не объявлять результат PASS до фактического прогона.** В текущем инструментальном окружении отсутствует доступ к полному checkout и отсутствуют CI-результаты для внесённых коммитов. Ни один показатель A/B/C/D пока не опубликован как измеренный.
+
+**Следующий gate:** выполнить указанные команды, изучить JSONL по каждому классу запросов, сравнить Recall/Precision с числом raw Events и проверить, даёт ли D пользу относительно C при одинаковом бюджете. Только после этого утверждать production Event Retrieval design.
