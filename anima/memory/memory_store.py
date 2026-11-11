@@ -366,11 +366,12 @@ class MemoryStore:
             )
 
     @contextmanager
-    def transaction(self):
+    def transaction(self, *, immediate=False):
+        """Use an immediate write lock for operations that must claim first."""
         connection = self._connect()
 
         try:
-            connection.execute("BEGIN")
+            connection.execute("BEGIN IMMEDIATE" if immediate else "BEGIN")
             yield connection
         except Exception:
             connection.rollback()
