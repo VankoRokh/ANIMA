@@ -20,7 +20,11 @@
     {
       "id": "E4-A01",
       "track": "A",
-      "setup": {},
+      "setup": {
+        "episode_scope": "device_incident",
+        "incident_namespace": "user/pi5/cooling-check",
+        "incident_key": "C17"
+      },
       "events": [
         {
           "key": "e1",
@@ -31,7 +35,7 @@
             "source": "user",
             "session_id": "session_e4_a01_s1",
             "payload": {
-              "text": "У Pi5 сейчас температура 82 градуса."
+              "text": "Проверка охлаждения C17: у Pi5 сейчас температура 82 градуса."
             },
             "references": [
               {
@@ -50,7 +54,7 @@
             "source": "user",
             "session_id": "session_e4_a01_s1",
             "payload": {
-              "text": "Pi5 нагрелся до 91, вентилятор не вращается."
+              "text": "В той же проверке охлаждения C17 Pi5 нагрелся до 91, вентилятор не вращается."
             },
             "references": [
               {
@@ -66,7 +70,14 @@
     {
       "id": "E4-A02",
       "track": "A",
-      "setup": {},
+      "setup": {
+        "episode_scope": "device_incident",
+        "story_scope": "same_case",
+        "distinct_entity_registry_keys": [
+          "pi",
+          "pi2"
+        ]
+      },
       "events": [
         {
           "key": "e1",
@@ -112,7 +123,9 @@
     {
       "id": "E4-A03",
       "track": "A",
-      "setup": {},
+      "setup": {
+        "episode_scope": "router_connection_incident"
+      },
       "events": [
         {
           "key": "e1",
@@ -177,7 +190,11 @@
     {
       "id": "E4-A04",
       "track": "A",
-      "setup": {},
+      "setup": {
+        "provenance_authority": "harness_verified_source_reference",
+        "projection_relation": "derived_from_event",
+        "episode_scope": "sensor_observation"
+      },
       "events": [
         {
           "key": "e1",
@@ -202,7 +219,7 @@
           "key": "e2",
           "raw": {
             "id": "ev_00000000-0000-4000-8000-000000050009",
-            "type": "conversation.user",
+            "type": "derived.projection",
             "timestamp": "2026-11-01T12:01:00+00:00",
             "source": "projection.ui",
             "session_id": "session_e4_a04_s1",
@@ -213,6 +230,10 @@
               {
                 "kind": "entity",
                 "id": "ent_00000000-0000-4000-8000-000000000001"
+              },
+              {
+                "kind": "event",
+                "id": "ev_00000000-0000-4000-8000-000000050008"
               }
             ]
           }
@@ -223,7 +244,10 @@
     {
       "id": "E4-A05",
       "track": "A",
-      "setup": {},
+      "setup": {
+        "story_scope": "case",
+        "story_relation_scope": "same_case_not_same_topic"
+      },
       "events": [
         {
           "key": "e1",
@@ -269,7 +293,11 @@
     {
       "id": "E4-B01",
       "track": "B",
-      "setup": {},
+      "setup": {
+        "story_scope": "case",
+        "case_id_namespace": "user/pi5/service",
+        "source_id_scope": "user_report"
+      },
       "events": [
         {
           "key": "e1",
@@ -357,7 +385,10 @@
     {
       "id": "E4-B02",
       "track": "B",
-      "setup": {},
+      "setup": {
+        "story_scope": "case",
+        "candidate_optional": true
+      },
       "events": [
         {
           "key": "e1",
@@ -403,7 +434,10 @@
     {
       "id": "E4-B03",
       "track": "B",
-      "setup": {},
+      "setup": {
+        "story_scope": "case",
+        "ticket_namespace": "user/pi5/tickets"
+      },
       "events": [
         {
           "key": "e1",
@@ -449,7 +483,11 @@
     {
       "id": "E4-B04",
       "track": "B",
-      "setup": {},
+      "setup": {
+        "episode_scope": "device_process",
+        "story_scope": "reported_incident",
+        "reported_incident_id": "A9"
+      },
       "events": [
         {
           "key": "e1",
@@ -518,7 +556,10 @@
     {
       "id": "E4-B05",
       "track": "B",
-      "setup": {},
+      "setup": {
+        "story_scope": "same_case",
+        "world_time_unverified": true
+      },
       "events": [
         {
           "key": "e1",
@@ -559,7 +600,10 @@
     {
       "id": "E4-B06",
       "track": "B",
-      "setup": {},
+      "setup": {
+        "story_scope": "same_case",
+        "clock_domains": "unmapped"
+      },
       "events": [
         {
           "key": "e1",

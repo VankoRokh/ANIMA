@@ -5,7 +5,8 @@
 **Date:** 2026-11-12.  
 **Architecture:** [Memory E4 Architecture Contract (draft)](../ROADMAP/Memory_E4_Architecture_Contract_Draft.md).  
 **Inputs:** [memory_e4_inputs_v0.json](Fixtures/memory_e4_inputs_v0.json).  
-**Independent proposed gold:** [memory_e4_gold_v0.json](Fixtures/memory_e4_gold_v0.json).  
+**Independent proposed gold:** [memory_e4_gold_v0.json](Fixtures/memory_e4_gold_v0.json).
+**Gold audits:** [E4-A/B independent audit](Memory_E4_AB_Gold_Audit_v0.md) · [E4-C/D audit](Memory_E4_CD_Gold_Audit_v0.md) · [E4-U/R/P audit](Memory_E4_URP_Gold_Audit_v0.md).  
 **Baseline:** [Memory E1 Results](../ROADMAP/Memory_Encoding_E1_Results.md); E2/E3 have separate validation gates.
 
 ## Purpose and non-goals
@@ -43,6 +44,13 @@ The generated `Event.timestamp` is a deterministic simulation of **receipt time*
 `uncertainty`, `goal`, `task`, `schedule` and `investigation` labels describe **allowed system-side outcomes**, not new Task/Goal enums. For example `periodic_preflight` is due-tick evaluation **without** automatic expensive work, and `single_claim` requires one idempotent occurrence despite repeated ticks/restart. `replay`, `authority`, `publication`, `budget`, `revision`, `user`, `evidence`, `temporal` likewise assert their own specific invariant. Every case lists prohibited inferences in `forbidden`.
 
 **A PASS for a check must be based on exact raw trace/provenance and allowed transitions.** Do not collapse `candidate_only` and `linked_distinct_episodes`, or `Task.completed` and `Uncertainty.resolved_in_scope`. Do not use one aggregate E4 accuracy number.
+
+
+### Gold review update (2026-11-12)
+
+The E4-A/B review applied **explicit episode scope** and **typed Story semantics** to the *proposed* gold. Story labels for reviewed cases now include `same_case_reported` (source-reported grouping), `not_same_case` (case-specific distinction) and `insufficient` (no required link); these are **not** claims of verified physical causation. `same_topic` is a separate optional relation, not a same-case Story. `E4-B02` accepts `candidate_only` **or** abstaining with `insufficient`; `acceptable` lists are evaluation constraints, not an instruction to the algorithm.
+
+For E4-A04, an explicit Event provenance reference in the derived record replaces string-matching `reading_id` as the independence guard. A source reference is a test precondition with a distinct authority contract; it must not make derived content an independent witness. The new E4-A/B gold remains **unfrozen and owner-adjudication pending**, and no implementation was trained or scored against it.
 
 ## Evaluation tracks and gates
 

@@ -20,7 +20,8 @@
         "rewrite_raw",
         "knowledge_confirm"
       ],
-      "rationale": ""
+      "rationale": "",
+      "review_note": "Shared incident explicitly identified in both reports; same limited device-incident Episode is the proposed unit, not independently proven sensor truth."
     },
     {
       "id": "E4-A02",
@@ -32,20 +33,23 @@
           "kind": "episode_pair",
           "expected": "distinct",
           "a": "e1",
-          "b": "e2"
+          "b": "e2",
+          "scope": "device_incident"
         },
         {
           "kind": "story_pair",
-          "expected": "independent",
+          "expected": "insufficient",
           "a": "e1",
-          "b": "e2"
+          "b": "e2",
+          "scope": "same_case"
         }
       ],
       "forbidden": [
         "auto_merge",
         "assume_alias_globally"
       ],
-      "rationale": ""
+      "rationale": "",
+      "review_note": "Distinct devices forbid single-device episode merge, but do not prove independent Stories or exclude a wider shared outage."
     },
     {
       "id": "E4-A03",
@@ -64,13 +68,21 @@
           "expected": "distinct",
           "a": "e1",
           "b": "e2"
+        },
+        {
+          "kind": "episode_pair",
+          "expected": "distinct",
+          "a": "e2",
+          "b": "e3",
+          "scope": "device_incident"
         }
       ],
       "forbidden": [
         "auto_merge",
         "rewrite_raw"
       ],
-      "rationale": ""
+      "rationale": "",
+      "review_note": "Tests both positive router continuation and negative independence from Pi cooling."
     },
     {
       "id": "E4-A04",
@@ -79,21 +91,23 @@
       "oracle_type": "safe_system_behavior_not_unobservable_world_truth",
       "checks": [
         {
-          "kind": "episode_pair",
-          "expected": "insufficient",
+          "kind": "evidence",
+          "expected": "same_origin_not_independent",
           "a": "e1",
-          "b": "e2"
+          "b": "e2",
+          "scope": "source_event"
         },
         {
-          "kind": "evidence",
-          "expected": "no_duplicate_evidence"
+          "kind": "revision",
+          "expected": "raw_events_preserved"
         }
       ],
       "forbidden": [
         "duplicate_effect",
         "knowledge_confirm"
       ],
-      "rationale": "Matching reading_id from a projection does not make independent witnesses."
+      "rationale": "Matching reading_id from a projection does not make independent witnesses.",
+      "review_note": "Explicit source Event reference provided in derived record; both records remain available but cannot be counted as independent observations. No mandatory Episode merge/split label is imposed."
     },
     {
       "id": "E4-A05",
@@ -105,19 +119,22 @@
           "kind": "episode_pair",
           "expected": "distinct",
           "a": "e1",
-          "b": "e2"
+          "b": "e2",
+          "scope": "fault_incident"
         },
         {
           "kind": "story_pair",
-          "expected": "independent",
+          "expected": "not_same_case",
           "a": "e1",
-          "b": "e2"
+          "b": "e2",
+          "scope": "case"
         }
       ],
       "forbidden": [
         "auto_merge"
       ],
-      "rationale": ""
+      "rationale": "",
+      "review_note": "Reported independent fault case numbers 41/52 distinguish cases, not a possible umbrella recurring-fault topic."
     },
     {
       "id": "E4-B01",
@@ -133,28 +150,46 @@
         },
         {
           "kind": "story_pair",
-          "expected": "linked_distinct_episodes",
+          "expected": "same_case_reported",
           "a": "e1",
-          "b": "e2"
+          "b": "e2",
+          "scope": "case"
         },
         {
           "kind": "story_pair",
-          "expected": "linked_distinct_episodes",
+          "expected": "same_case_reported",
           "a": "e2",
-          "b": "e3"
+          "b": "e3",
+          "scope": "case"
         },
         {
           "kind": "story_pair",
-          "expected": "linked_distinct_episodes",
+          "expected": "same_case_reported",
           "a": "e3",
-          "b": "e4"
+          "b": "e4",
+          "scope": "case"
+        },
+        {
+          "kind": "episode_pair",
+          "expected": "distinct",
+          "a": "e2",
+          "b": "e3",
+          "scope": "service_stage"
+        },
+        {
+          "kind": "episode_pair",
+          "expected": "distinct",
+          "a": "e3",
+          "b": "e4",
+          "scope": "service_stage"
         }
       ],
       "forbidden": [
         "auto_merge",
         "knowledge_confirm"
       ],
-      "rationale": ""
+      "rationale": "",
+      "review_note": "R18 repeated across sessions supports one reported service case while each diagnostic/repair/check stage remains a separate Episode. No automatic truth confirmation."
     },
     {
       "id": "E4-B02",
@@ -172,13 +207,19 @@
           "kind": "story_pair",
           "expected": "candidate_only",
           "a": "e1",
-          "b": "e2"
+          "b": "e2",
+          "scope": "case",
+          "acceptable": [
+            "candidate_only",
+            "insufficient"
+          ]
         }
       ],
       "forbidden": [
         "auto_story_confirm"
       ],
-      "rationale": ""
+      "rationale": "",
+      "review_note": "One device with another overheating a week later may be recurrence; neither a proven same-case Story nor mandatory candidate is justified. Both restrained hypothesis and abstention acceptable."
     },
     {
       "id": "E4-B03",
@@ -194,15 +235,17 @@
         },
         {
           "kind": "story_pair",
-          "expected": "linked_distinct_episodes",
+          "expected": "same_case_reported",
           "a": "e1",
-          "b": "e2"
+          "b": "e2",
+          "scope": "case"
         }
       ],
       "forbidden": [
         "auto_merge"
       ],
-      "rationale": ""
+      "rationale": "",
+      "review_note": "Ticket T77 reference is namespace-scoped and supports reported same-case linkage, not independently verified external ticket metadata."
     },
     {
       "id": "E4-B04",
@@ -214,20 +257,24 @@
           "kind": "episode_pair",
           "expected": "distinct",
           "a": "e1",
-          "b": "e2"
+          "b": "e2",
+          "scope": "device_process"
         },
         {
           "kind": "story_pair",
-          "expected": "linked_distinct_episodes",
+          "expected": "same_case_reported",
           "a": "e1",
-          "b": "e2"
+          "b": "e2",
+          "scope": "reported_incident",
+          "after_event_key": "e3"
         }
       ],
       "forbidden": [
         "auto_merge",
         "knowledge_confirm"
       ],
-      "rationale": "The user reports shared context, which supports organization, not verified physical causality."
+      "rationale": "The user reports shared context, which supports organization, not verified physical causality.",
+      "review_note": "Two device-local process Episodes stay distinct under an explicit segmentation scope; one later reported cross-device A9 event places them into a shared organizational Story without verifying causality."
     },
     {
       "id": "E4-B05",
@@ -250,7 +297,8 @@
         "auto_story_confirm",
         "knowledge_confirm"
       ],
-      "rationale": ""
+      "rationale": "",
+      "review_note": "Pronoun 'всё' is unresolved; receipt time does not establish real-world event time."
     },
     {
       "id": "E4-B06",
@@ -266,16 +314,18 @@
         },
         {
           "kind": "story_pair",
-          "expected": "candidate_only",
+          "expected": "insufficient",
           "a": "e1",
-          "b": "e2"
+          "b": "e2",
+          "scope": "same_case"
         }
       ],
       "forbidden": [
         "invent_observation_time",
         "knowledge_confirm"
       ],
-      "rationale": ""
+      "rationale": "",
+      "review_note": "Unsynchronized clock domains prohibit world-order inference; same Pi and distinct reports do not require proposing one Story."
     },
     {
       "id": "E4-C01",

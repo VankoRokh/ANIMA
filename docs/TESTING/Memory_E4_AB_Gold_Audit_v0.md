@@ -1,12 +1,16 @@
 # ANIMA — Independent E4-A / E4-B Gold Audit v0
 
-**Status:** REVIEW / FREEZE BLOCKED; **not** an acceptance of root labels.  
+**Status:** INITIAL REVIEW COMPLETED; agreed A/B corrections applied to proposed inputs/gold; **corpus FREEZE remains blocked pending full track review**.  
 **Reviewed snapshot:** `eb2193e70ca60aead01cbc2e61e12375d77ae3e9`  
 **Date:** 2026-11-12.  
 **Scope:** 11 root cases (E4-A01…A05, E4-B01…B06), 26 input Events, 23 gold assertions.  
 **Sources:** [input fixture](Fixtures/memory_e4_inputs_v0.json), [proposed gold](Fixtures/memory_e4_gold_v0.json), [corpus protocol](Memory_E4_Conformance_Corpus_v0_Draft.md), [E4 architecture](../ROADMAP/Memory_E4_Architecture_Contract_Draft.md).
 
 > The prior GitHub Actions run `43117914991` passed the **static corpus shape** and regression checks on Python 3.12/3.13/3.14. That is not evidence that these semantic gold labels are correct. This audit reviews the frozen *proposal*, does not feed gold into the encoder, and makes **no edits to the fixtures**.
+
+## Review disposition update (2026-11-12)
+
+The owner agreed to hybrid `episode_scope` and typed Story distinctions. A follow-up corpus edit implements the proposed fixes: A01 gets explicit C17 context; A02 same-case Story abstention; A04 typed source Event reference; A05 case-scoped `not_same_case`; B01/B03/B04 report-scoped case relations; B06 abstention. B02's weak candidate allows `insufficient` as an alternative. The findings below remain as the **historical original audit** and are not claims that new data have been independently accepted or tested.
 
 ## 1. Verdict
 
