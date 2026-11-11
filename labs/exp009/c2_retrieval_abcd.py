@@ -57,12 +57,22 @@ def freeze_runtime(root):
             raise AssertionError("Exactly one user Event per input required")
         inputs.append({**row, "event_id": messages[0].event_id})
     events = [
-        {"id": event["id"], "content": event["payload"]["text"]}
+        {
+            "id": event["id"], "content": event["payload"]["text"],
+            "event_type": event["type"], "source": event["source"],
+            "session_id": event["session_id"],
+            "timestamp": event["timestamp"],
+        }
         for event in core.event_log.load_events()
         if event["type"] == "conversation.user"
     ]
     memories = [
-        {"id": memory["id"], "content": memory["content"]}
+        {
+            "id": memory["id"], "content": memory["content"],
+            "type": memory["type"], "domain": memory["domain"],
+            "status": memory["status"], "created_at": memory["created_at"],
+            "updated_at": memory["updated_at"],
+        }
         for memory in core.memory_store.list_memories()
     ]
     links = {
