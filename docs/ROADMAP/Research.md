@@ -275,6 +275,32 @@ bash scripts/check.sh
 
 **Gate C2-A/B:** зафиксировать SHA/Python/pytest и наличие JSONL; интерпретацию наблюдений сохранять отдельно от исходных записей. Эти сценарии не заменяют независимую проверку C2-C/D/E и не измеряют производительность C3.
 
+**C2-C — реализация лаборатории Memory/Context (2026-11-11; локальный прогон ещё не подтверждён):**
+
+[Наблюдательный модуль](../../labs/exp009/c2_memory_observe.py) и [тесты инвариантов](../../tests/test_exp009_c2_memory_observe.py) используют реальные публичные компоненты `MemoryStore`, `EventLog`, `MemoryProcessor` через `Runtime.user_input`, `RetrievalEngine`, `ContextBuilder` и `ProvenanceResolver`. Ни один retrieval result не подставляется лабораторией.
+
+| Изолированная конфигурация | Исходные данные | Проверяемая граница |
+|---|---|---|
+| `controlled_100` | 100 синтетических Event → 100 Memory через публичный `MemoryStore.create_memory(source_event_id=...)` | Retrieval/Context на объёмном контролируемом корпусе |
+| `controlled_20` | Выбранные 20 *тех же* Event/Memory из корпуса | Контрольное малое хранилище для сравнения |
+| `runtime_20` | Точные тексты тех же 20 сообщений через `Runtime.user_input` (`conversation.user`) | Реальная штатная селекция, композиция и возможное объединение Memory; количество воспоминаний не подгоняется под 20 |
+
+**Статус входов:** сообщения `conversation.user` содержат *синтетические отчёты*, не авторизованные физические сенсорные наблюдения. Контролируемый корпус не является доказательством автоматического формирования Memory в Core. В двух путях могут различаться статус/домен Memory и результат объединения; сравнение описательное, **не** контролируемое измерение влияния одной переменной.
+
+**Корпус и метрики:** 5 сообщений одного условного инцидента охлаждения, 20 temperature, 15 load, 15 maintenance, 15 access, 15 network и 15 noise — итого 100; 20 выбранных индексов совпадают по тексту между режимами. 15 заранее заданных запросов × `top_k=3/5/10`, для каждого: необработанный `RetrievalEngine.retrieve` (score/reasons), FAST/DEEP `ContextBuilder.build` (`max_chars=1200`, item budget `k`), привязанные исходные Events, исходные записи Memory, контекст и `fixture_source_recall` по тематическим меткам. Метки назначены **до** retrieval; показатель означает покрытие source-marker tags, **не** оценку смысловой корректности. Для запроса без gold `fixture_source_recall=null`, никаких выдуманных нулевых оценок. Истинное `memory_count`, которое создаст Runtime, фиксируется как результат, не как требование.
+
+**Hard gates:** целостность ссылки Memory→Event, число входных событий, изоляция двух путей, `top_k`, лимиты Context (символы/элементы), JSONL parseability и запрет перезаписи. **Observation без принудительного PASS/FAIL:** порядок и рейтинг извлечённых воспоминаний, пропуски при ограниченном бюджете, влияние шума, потенциальные противоречия и отличия controlled vs Runtime.
+
+```bash
+git pull --ff-only
+.venv/bin/python -m pytest -q tests/test_exp009_c2_memory_observe.py
+.venv/bin/python -m labs.exp009.c2_memory_observe --mode all --report-dir /tmp/anima-exp009-c2c-first --print-queries
+bash scripts/check.sh
+```
+
+**Ожидаемые отчёты:** `controlled_100.jsonl`, `controlled_20.jsonl`, `runtime_20.jsonl`. Результаты измерений появятся только после локального запуска. Если хочется только наблюдать без длинной печати — убрать `--print-queries`. Повторный запуск требует нового `--report-dir` (файлы не перезаписываются). Входы, исходные Event, Memory, возвраты retrieval/context и метрики хранятся раздельными типами JSONL-записей.
+
+
 
 
 
