@@ -63,6 +63,19 @@ python -c "from anima.core.assembly import build_core; print('import OK')"
 
 **Текущий статус:** исправления B0-01/B0-02 внесены, профильный и общий прогоны **owner-reported PASS**; формальная подтверждённость матрицы Python 3.12/3.13/3.14 и результата `scripts/check.sh` по отдельности — **not evidenced**. Ограничение single-writer B0-03 сохраняется. Технический gate Stage 0 не маркируется как независимо VERIFIED до воспроизводимого протокола; **подготовка Stage 1 разрешена как лабораторная работа без изменения production interfaces**.
 
+## Дополнение после проверки владельца — закрытие B0-03
+
+После сообщения владельца об успешном предыдущем прогоне реализовано ограниченное устранение гонки **между координаторами Memory**:
+
+- `MemoryStore.transaction(immediate=True)` поддерживает атомарный захват SQLite write lock.
+- `EventProcessingCoordinator.process` проверяет финальный статус и записывает эффекты **в одной** write-транзакции.
+- `_record_failure` не может заменить `done/skipped` запоздавшим `failed`, а `_bootstrap_missing` сериализует concurrent adoption.
+- Добавлены `test_parallel_coordinators_share_atomic_event_claim` и `test_late_failed_writer_cannot_downgrade_committed_success`.
+
+**Новый контракт:** несколько coordinator для **одной SQLite memory.db** должны последовательно и безопасно обработать **уже записанный raw Event**. Это не подтверждает безопасность конкурентной записи в `events.jsonl`, поддержку неограниченного числа writer-процессов или отсутствие SQLite busy при долгой блокировке.
+
+**Проверки этих изменений ещё не подтверждены владельцем или CI.** Ранний owner-reported PASS относится к предыдущему состоянию ветки. Дальнейший gate: исполнить обновлённые тесты двух писателей, общий pytest, docs check и импорт по версиям Python на текущем SHA.
+
 ## Приёмка
 
 | Контроль | Состояние при создании brief |
