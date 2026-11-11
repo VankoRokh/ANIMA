@@ -184,9 +184,10 @@ def _observations(core, mode, rows):
     }
     marker_by_event = {}
     for event_id, event in event_by_id.items():
-        marker = event["payload"].get("marker")
+        payload = event["payload"] or {}  # system.wake has null payload
+        marker = payload.get("marker")
         if marker is None:
-            text = event["payload"].get("text", "")
+            text = payload.get("text", "")
             marker = next(
                 (row["marker"] for row in rows if row["marker"] in text),
                 None,
