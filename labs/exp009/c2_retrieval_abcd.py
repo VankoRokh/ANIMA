@@ -141,6 +141,15 @@ class PairedIndex:
         }
         if len(self.nodes) != len(snapshot["events"]) + len(snapshot["memories"]):
             raise AssertionError("Duplicate Event/Memory identifier in snapshot")
+        known_memory_ids = {item["id"] for item in snapshot["memories"]}
+        known_event_ids = {item["id"] for item in snapshot["events"]}
+        if set(self.links) != known_memory_ids:
+            raise ValueError("Incomplete Memory source manifest")
+        for memory_id, source_ids in self.links.items():
+            if len(set(source_ids)) != len(source_ids):
+                raise ValueError("Duplicate source evidence for " + memory_id)
+            if set(source_ids) - known_event_ids:
+                raise ValueError("Unknown source Event for " + memory_id)
         self.snapshot_hash = sha256(canonical(snapshot).encode("utf-8")).hexdigest()
         with closing(self._connect()) as connection, connection:
             connection.executescript("""
