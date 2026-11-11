@@ -31,7 +31,7 @@
 ## Повторяемые команды
 
 ```bash
-python -m pytest -q -p no:cacheprovider tests/test_event_processing.py tests/test_documentation.py tests/test_source_tree.py
+python -m pytest -q -p no:cacheprovider tests/test_core_p3b_execution.py tests/test_event_processing.py tests/test_documentation.py tests/test_source_tree.py
 python -m pytest -q -p no:cacheprovider
 bash scripts/check.sh
 python -c "from anima.core.assembly import build_core; print('import OK')"
