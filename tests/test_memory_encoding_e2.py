@@ -62,3 +62,57 @@ def test_e2_does_not_mutate_parent_episode_sources_on_weak_link(tmp_path):
     assert decision["source_event_ids"] == [
         result["decisions"]["decision"]["event_id"]
     ]
+
+
+def test_e2_replay_cannot_add_second_provisional_edge(tmp_path):
+    from anima.memory.memory_store import MemoryStore
+    from anima.memory.link_store import LinkStore
+    from anima.memory.shadow_encoding import ShadowEpisodeEncoder
+    from labs.exp009.memory_encoding_e2 import CASES, make_event, ENT_CPU_A
+
+    store = MemoryStore(tmp_path / "memory.db")
+    links = LinkStore(store)
+    links.create_entity(
+        entity_type="technology", canonical_name="CPU A",
+        public_id=ENT_CPU_A,
+    )
+    encoder = ShadowEpisodeEncoder(link_store=links)
+    encoder.accept(make_event(0, CASES[0]))
+    original = encoder.accept(make_event(1, CASES[1]))
+    replay = encoder.accept(make_event(1, CASES[1]))
+    assert replay["action"] == "replay"
+    assert replay["possible_related"] == original["possible_related"]
+    assert len(encoder.episodes()) == 2
+    assert store.list_memories() == []
+
+
+def test_e2_candidate_cap_and_stable_recent_order(tmp_path):
+    from anima.core.event_bus import Event
+    from anima.memory.memory_store import MemoryStore
+    from anima.memory.link_store import LinkStore
+    from anima.memory.shadow_encoding import ShadowEpisodeEncoder
+    from labs.exp009.memory_encoding_e2 import ENT_CPU_A, S1, event_id
+
+    store = MemoryStore(tmp_path / "memory.db")
+    links = LinkStore(store)
+    links.create_entity(
+        entity_type="technology", canonical_name="CPU A",
+        public_id=ENT_CPU_A,
+    )
+    encoder = ShadowEpisodeEncoder(link_store=links)
+    labels = ("alpha", "bravo", "charlie", "delta", "echo",
+              "foxtrot", "golf", "hotel")
+    for i, label in enumerate(labels):
+        item = Event(
+            "conversation.user", {"text": label}, source="user",
+            timestamp=f"2026-11-12T12:0{i}:00+00:00",
+            session_id=S1, event_id=event_id(i + 310),
+            references=[{"kind": "entity", "id": ENT_CPU_A}],
+        )
+        outcome = encoder.accept(item)
+        assert outcome["action"] == "new_episode"
+    assert len(outcome["possible_related"]) == 5
+    assert [x["episode_id"] for x in outcome["possible_related"]] == [
+        "shadow_ep_" + event_id(i + 310) for i in range(6, 1, -1)
+    ]
+    assert store.list_memories() == []
