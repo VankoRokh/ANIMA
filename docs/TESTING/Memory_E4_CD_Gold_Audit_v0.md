@@ -7,7 +7,7 @@
 
 ## Correction disposition (2026-11-12)
 
-Revisions: C01 no forced distinct Episodes; C03 source-backed alias reuse; C04 scoped negative alias; C05 explicit affected/unaffected dependent links; C06 distinct physical supply IDs; D01 versioned pre-correction projection; D02/D03 typed sensor payload/replay; D04 unsynchronized sensor clock; D05 stale derived snapshot publication. No raw source mutation or Knowledge admission.
+Revisions: C01 scoped referent clarification without any forced Episode/Story edge; C03 source-backed alias reuse; C04 scoped negative alias; C05 explicit affected/unaffected dependent links; C06 distinct physical supply IDs; D01 versioned pre-correction projection; D02/D03 typed sensor payload/replay; D04 unsynchronized sensor clock; D05 stale derived snapshot publication. No raw source mutation or Knowledge admission.
 
 **Below is the historical original audit**, preserved for traceability. Labels `BLOCK/REVIEW` refer to the *prior fixture revision*; they are not a claim that the revised fixtures have passed independent semantic acceptance.
 

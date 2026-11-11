@@ -136,7 +136,9 @@ def test_e4_cd_gold_has_source_grounded_aliases_and_versions():
     assert c03["events"][0]["key"] == "e0"
     assert c03["setup"]["known_aliases"][0]["source_event_id"] == c03["events"][0]["raw"]["id"]
     assert c03["setup"]["known_aliases"][0]["version"] == 1
-    assert any(x["expected"] == "same_case_reported" for x in gold["E4-C01"]["checks"])
+    assert not any(x["kind"] == "story_pair" for x in gold["E4-C01"]["checks"])
+    assert any(x["kind"] == "uncertainty" and x["expected"] == "resolved_in_scope"
+               for x in gold["E4-C01"]["checks"])
     c05 = inputs["E4-C05"]
     ids = {c["id"] for c in c05["setup"]["derived_links"]}
     assert {"link_c05_affected", "link_c05_unaffected"} == ids
