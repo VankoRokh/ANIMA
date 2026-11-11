@@ -1,3 +1,6 @@
+from concurrent.futures import ThreadPoolExecutor
+from threading import Barrier, Event as ThreadEvent
+
 import pytest
 
 from anima.core.event_bus import Event
@@ -66,6 +69,79 @@ def test_replaying_finalized_event_does_not_duplicate_memory(tmp_path):
     assert record["status"] == "done"
     assert record["attempts"] == 1
     assert record["last_error"] is None
+
+
+def test_parallel_coordinators_share_atomic_event_claim(tmp_path):
+    store, log, _, processor, first = build_stack(tmp_path)
+    second = EventProcessingCoordinator(
+        memory_store=store,
+        memory_processor=processor,
+        event_log=log,
+    )
+    event = user_event(EVENT_1, "Two coordinators, one committed Memory.")
+    log.write(event)
+    start = Barrier(2)
+
+    def worker(coordinator):
+        start.wait(timeout=5)
+        return coordinator.process(event)
+
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        results = [
+            pool.submit(worker, first),
+            pool.submit(worker, second),
+        ]
+        actions = [item.result(timeout=10)["action"] for item in results]
+
+    assert sorted(actions) == ["already_done", "create"]
+    assert store.count() == 1
+    assert store.source_events(store.list_memories()[0]["id"]) == [EVENT_1]
+    ledger = first.get(EVENT_1)
+    assert ledger["status"] == "done"
+    assert ledger["attempts"] == 1
+    assert ledger["last_error"] is None
+
+
+def test_late_failed_writer_cannot_downgrade_committed_success(tmp_path):
+    store, log, _, processor, first = build_stack(tmp_path)
+    second = EventProcessingCoordinator(
+        memory_store=store,
+        memory_processor=processor,
+        event_log=log,
+    )
+    event = user_event(EVENT_2, "A late failure cannot replace final success.")
+    log.write(event)
+
+    def fail_after_effects(event, result, connection):
+        raise RuntimeError("intentional rolled-back first attempt")
+
+    first.fault_hook = fail_after_effects
+    original_record_failure = first._record_failure
+    failed_transaction_released = ThreadEvent()
+    allow_failure_report = ThreadEvent()
+
+    def delayed_failure(event_id, attempt, started_at, error):
+        failed_transaction_released.set()
+        assert allow_failure_report.wait(timeout=10)
+        return original_record_failure(event_id, attempt, started_at, error)
+
+    first._record_failure = delayed_failure
+    with ThreadPoolExecutor(max_workers=1) as pool:
+        failed = pool.submit(first.process, event)
+        try:
+            assert failed_transaction_released.wait(timeout=10)
+            completed = second.process(event)
+            assert completed["action"] == "create"
+        finally:
+            allow_failure_report.set()
+        with pytest.raises(RuntimeError, match="intentional rolled-back"):
+            failed.result(timeout=10)
+
+    assert store.count() == 1
+    ledger = first.get(EVENT_2)
+    assert ledger["status"] == "done"
+    assert ledger["attempts"] == 1
+    assert ledger["last_error"] is None
 
 
 def test_skipped_event_is_final_and_idempotent(tmp_path):
