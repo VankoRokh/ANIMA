@@ -64,6 +64,14 @@ def test_abcd_packing_and_per_query_gold_are_identical(tmp_path):
     records = run_abcd(tmp_path)
     comparisons = [row for row in records if row["type"] == "comparison"]
     gold_by_query = {}
+    source_links = next(
+        row["snapshot"]["links"] for row in records if row["type"] == "snapshot"
+    )
+    reverse_links = {
+        (event_id, memory_id)
+        for memory_id, events in source_links.items()
+        for event_id in events
+    }
     for row in comparisons:
         query_id = row["query_id"]
         gold = tuple(row["target_event_ids"])
@@ -86,6 +94,15 @@ def test_abcd_packing_and_per_query_gold_are_identical(tmp_path):
             assert all(node["via"] == "fts" or
                        node["via"].startswith("source:")
                        for node in row["selected"])
+            for node in row["selected"]:
+                if not node["via"].startswith("source:"):
+                    continue
+                parent = node["via"].removeprefix("source:")
+                edge = (parent, node["id"])
+                if parent in source_links:
+                    assert node["id"] in source_links[parent]
+                else:
+                    assert edge in reverse_links
 
 
 def test_lab_index_is_idempotent_and_refuses_mixed_snapshots(tmp_path):
@@ -112,6 +129,14 @@ def test_lab_index_is_idempotent_and_refuses_mixed_snapshots(tmp_path):
     changed = {**original, "links": {"mem_a": ["ev_a"]}}
     with pytest.raises(ValueError, match="different frozen snapshots"):
         PairedIndex(path, changed)
+
+    forged = {**original, "links": {"mem_a": ["ev_a", "ev_unknown"]}}
+    with pytest.raises(ValueError, match="Unknown source Event"):
+        PairedIndex(tmp_path / "forged.db", forged)
+
+    duplicate = {**original, "links": {"mem_a": ["ev_a", "ev_a"]}}
+    with pytest.raises(ValueError, match="Duplicate source evidence"):
+        PairedIndex(tmp_path / "duplicate.db", duplicate)
 
 
 def test_parser_is_safe_and_budgets_are_enforced(tmp_path):
