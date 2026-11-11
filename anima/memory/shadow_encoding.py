@@ -23,6 +23,7 @@ STOPWORDS = frozenset({
 MAX_GAP_SECONDS = 30 * 60
 MAX_ACTIVE_EPISODES = 64
 MAX_SOURCES_PER_EPISODE = 128
+MAX_POSSIBLE_RELATED = 5
 MIN_PAIR_OVERLAP = 2
 MIN_PAIR_RATIO = 0.4
 
@@ -130,6 +131,7 @@ class ShadowEpisodeEncoder:
                 "episode_id": episode_id, "source_event_ids": sources,
                 "reasons": ["already_seen:verified"],
                 "score": prior["score"],
+                "possible_related": list(prior["possible_related"]),
             }
 
         if event.event_type != "conversation.user":
@@ -142,6 +144,7 @@ class ShadowEpisodeEncoder:
         now = datetime.fromisoformat(event.timestamp)
         text_tokens = _tokens(text)
         scored = []
+        possible = []
         for episode in self._episodes[-MAX_ACTIVE_EPISODES:]:
             score, reasons = self._score(
                 episode, text_tokens=text_tokens, entities=entities,
@@ -150,6 +153,17 @@ class ShadowEpisodeEncoder:
             if score is not None:
                 scored.append((score, episode["_last_at"],
                                episode["_ordinal"], episode, reasons))
+            elif reasons == ["raw_overlap:insufficient"] and entities:
+                # An Entity is a possible link, NOT enough for episode merge.
+                shared = sorted(entities & episode["_entities"])
+                if shared:
+                    possible.append({
+                        "episode_id": episode["episode_id"],
+                        "source_event_ids": list(episode["source_event_ids"][-3:]),
+                        "shared_entity_ids": shared,
+                        "reason": "shared_entity_without_raw_overlap",
+                        "status": "unverified",
+                    })
         if scored:
             score, _, _, chosen, reasons = max(
                 scored, key=lambda row: (row[0], row[1], row[2])
@@ -161,6 +175,7 @@ class ShadowEpisodeEncoder:
             chosen["_entities"] = chosen["_entities"] | entities
             action, episode_id = "append", chosen["episode_id"]
             sources = list(chosen["source_event_ids"])
+            possible_related = []
         else:
             score = 0
             reasons = ["no_qualified_raw_candidate"]
@@ -177,23 +192,30 @@ class ShadowEpisodeEncoder:
             }
             self._episodes.append(chosen)
             action, sources = "new_episode", [event.event_id]
+            # Recent first; no ranking pretense beyond recency, hard caps
+            # and only source-validated, within-session Entity coincidences.
+            possible_related = list(reversed(possible[-MAX_POSSIBLE_RELATED:]))
         self._by_event[event.event_id] = {
             "raw_event": original, "episode_id": episode_id, "score": score,
+            "possible_related": possible_related,
         }
         return {
             "event_id": event.event_id, "action": action,
             "episode_id": episode_id, "source_event_ids": sources,
             "score": score, "reasons": reasons,
+            "possible_related": possible_related,
         }
 
     def _remember_skip(self, original, reason):
         event_id = original["id"]
         self._by_event[event_id] = {
             "raw_event": original, "episode_id": None, "score": 0,
+            "possible_related": [],
         }
         return {
             "event_id": event_id, "action": "skip", "episode_id": None,
             "source_event_ids": [], "score": 0, "reasons": [reason],
+            "possible_related": [],
         }
 
     def episodes(self):
