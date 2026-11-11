@@ -6,6 +6,10 @@ on:
       - experiment/core-memory-information-baseline
   workflow_dispatch:
 
+concurrency:
+  group: exp009-memory-${{ github.ref }}
+  cancel-in-progress: true
+
 permissions:
   contents: read
 

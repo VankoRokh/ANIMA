@@ -88,3 +88,9 @@ python -c "from anima.core.assembly import build_core; print('import OK')"
 | Полный Stage 0 gate | **OPEN** |
 
 После завершения результаты оформлять отдельно в [журнале испытаний](../TESTING/Results/README.md). Старый результат `1478 passed, 3 failed` относится к исследованному snapshot, не считается результатом после исправлений.
+
+## Итоговый CI gate — 2026-11-11
+
+**VERIFIED для заявленного объёма Stage 0 на SHA `5d679e0a7ca9866270d6f13c02175cf7fa46dec0`.** [GitHub Actions run 43086187762](https://github.com/VankoRokh/ANIMA/actions/runs/43086187762): Python 3.12.16 / 3.13.18 / 3.14.10; по каждой версии **63 targeted passed, 1490 full passed**, `scripts/check.sh` PASS, `build_core` import PASS. Новые тесты на две конкурирующие Memory coordinator и запоздалую запись failed вошли в проходящий профиль.
+
+**Ограничение:** проверка подтверждает SQLite-serialized Memory ledger и raw Event уже на диске, но не многопроцессную конкурентную запись в `events.jsonl`, аппаратное power-loss endurance или неограниченный backlog. Отдельные испытания потребуются только при добавлении таких возможностей. Следующий этап — [результаты EXP-009](Memory_EXP009_Retrieval_ABCD_Results.md).

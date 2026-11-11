@@ -1,6 +1,6 @@
 # EXP-009 — Stage 1: Controlled Retrieval A/B/C/D
 
-**Статус:** лабораторный harness и отрицательные тесты добавлены; **исполняемая приёмка OPEN** (pytest/JSONL ещё не подтверждены).  
+**Статус:** **PASS — ограниченная лабораторная приёмка** на SHA `5d679e0a7ca9866270d6f13c02175cf7fa46dec0`; production Event Retrieval не реализован. [Результаты и ограничения](Memory_EXP009_Retrieval_ABCD_Results.md).  
 **Дата:** 2026-11-11.  
 **Ветка:** `experiment/core-memory-information-baseline`.  
 **Основания:** [Memory Roadmap](Memory_Architecture_v1_Roadmap.md), [EXP-009](Research.md), [G1 laboratory](../../labs/exp009/c2_graph_compare.py), [G1 probe](../../labs/exp009/graph_memory_probe.py), [G1 tests](../../tests/test_exp009_g1_graph_memory.py), [Stage 0 gate](Memory_Stage0_Baseline_Remediation_Brief.md).
@@ -100,3 +100,7 @@ echo "Raw report: $report_dir/retrieval_abcd.jsonl"
 **Не объявлять результат PASS до фактического прогона.** В текущем инструментальном окружении отсутствует доступ к полному checkout и отсутствуют CI-результаты для внесённых коммитов. Ни один показатель A/B/C/D пока не опубликован как измеренный.
 
 **Следующий gate:** выполнить указанные команды, изучить JSONL по каждому классу запросов, сравнить Recall/Precision с числом raw Events и проверить, даёт ли D пользу относительно C при одинаковом бюджете. Только после этого утверждать production Event Retrieval design.
+
+## 10. Подтверждённый результат
+
+[Отчёт EXP-009 A/B/C/D](Memory_EXP009_Retrieval_ABCD_Results.md): CI 3.12/3.13/3.14 PASS; Event-only B — 41/45 прямых target Event hits на 10/1200; D — 36/45 прямых и 43/45 достижимых через memory source links. **Выбран базовый Event FTS5**, source-hop — по запросу, не default. Это результаты данного синтетического корпуса, а не доказательство универсального ранжирования.
