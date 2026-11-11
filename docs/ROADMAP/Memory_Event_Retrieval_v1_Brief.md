@@ -15,6 +15,7 @@
 - `status()` возвращает `complete`, `partial`, `source_changed` с объёмом проиндексированного префикса и оставшейся части журнала. **`partial + no_match` не означает отсутствие факта**.
 - `sync(max_events=256, max_bytes=2000000)` обрабатывает ограниченный префикс, не включает незавершённую строку, не допускает дублирующихся ID. Данные и checkpoint фиксируются **одной SQLite-транзакцией**.
 - `get(event_id)` делает точечный SQLite lookup и проверяет исходные байты; `search(query, top_k, event_types, sources)` использует FTS5, тип/источник фильтруются **до** LIMIT; `events_for_memory(memory_id)` идёт только по существующим `memory_sources`.
+- `ProvenanceResolver(..., event_retrieval=index)` — явный быстрый путь для уже существующих Memory/Knowledge provenance views без полного `EventLog.load_events()`; по умолчанию сохраняется прежний режим. Если индекс неполон или повреждён, provenance отказывает, а не выдаёт фиктивное доказательство.
 - `rebuild()` явно удаляет **только производную** SQLite-проекцию, оставляя EventLog нетронутым.
 - По умолчанию чтение требует `complete`; иначе выдаёт ошибку. Ограниченное `require_complete=False` допустимо для диагностики только при `partial`, с явно возвращённым coverage; `source_changed` всегда блокирует чтение.
 
@@ -40,7 +41,7 @@
 
 ## C3 — воспроизводимый PC-baseline
 
-Дополнительно подготовлен [C3 event retrieval workload](../../labs/exp009/event_retrieval_c3.py) с [коротким smoke-тестом](../../tests/test_event_retrieval_c3.py). GitHub Actions на Python 3.14 выполняет **10 000 Events** после полной регрессии и сохраняет JSON c измерениями append/index, p50/p95/p99 по точечному и FTS чтению, задержку дозаписи, объём SQLite/JSONL и peak process RSS.
+Дополнительно подготовлен [C3 event retrieval workload](../../labs/exp009/event_retrieval_c3.py) с [коротким smoke-тестом](../../tests/test_event_retrieval_c3.py). GitHub Actions на Python 3.14 выполняет **10 000 и 100 000 Events** после полной регрессии и сохраняет JSON c измерениями append/index, p50/p95/p99 по точечному и FTS чтению, задержку дозаписи, объём SQLite/JSONL и peak process RSS.
 
 ```bash
 out="$(mktemp -d)"
