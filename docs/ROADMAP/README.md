@@ -11,6 +11,8 @@
 
 **Технические ориентиры:** [архитектура](../ARCHITECTURE/README.md), [рабочий план Core/VAL](Core_v0_1_VAL_v0_1_Plan_Draft.md), [результаты испытаний](../TESTING/Results/README.md), [принятые решения](../DECISIONS/README.md), [исследовательский backlog](Research.md), [старые редакции](../ARCHIVE/Development_Snapshots.md).
 
+**Межэтапная дорожная карта Memory:** [Memory Architecture v1.0 / v1.1](Memory_Architecture_v1_Roadmap.md) — согласованный план укрепления Event Retrieval, Memory Encoding, read-only семантики, SLEEP Consolidation и сквозной проверки. Это рабочий план ветки, **не изменение статусов Stage**; исполнение этапов и их приёмка пока не подтверждены.
+
 <!-- AUTO:roadmap:START -->
 **Текущая работа:** Stage 6 Cognitive Integration Core завершён и подтверждён TV-0051. Для Stage 7 принят pre-training semantic boundary v0: immutable qualified/time-scoped Claim, отдельные Evidence/Source/Producer/provenance, typed Value v0, explicit temporal semantics, независимые CONTENT/REVISION results и read-only classify_relation/0.1 с deterministic-first processing. Stage 7 implementation остаётся Planned; DP-08, DP-09, полная dependency policy DP-10 и production integration DP-11 открыты. До model training обязательны conformance corpus и измерение реального model residual; LoRA/SFT не начаты.
 
