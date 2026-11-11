@@ -35,6 +35,7 @@ jobs:
             tests/test_core_p3b_execution.py \
             tests/test_event_processing.py \
             tests/test_event_retrieval.py \
+            tests/test_event_retrieval_c3.py \
             tests/test_exp009_retrieval_abcd.py \
             tests/test_documentation.py \
             tests/test_source_tree.py
@@ -54,5 +55,19 @@ jobs:
         with:
           name: exp009-abcd-py${{ matrix.python-version }}
           path: exp009-results/retrieval_abcd.jsonl
+          if-no-files-found: error
+          retention-days: 14
+      - name: Event Retrieval C3 PC baseline (10k Events)
+        if: matrix.python-version == '3.14'
+        run: |
+          mkdir -p c3-results
+          python -m labs.exp009.event_retrieval_c3 \
+            --events 10000 --report-dir c3-results
+      - name: Publish Event Retrieval C3 metrics
+        if: matrix.python-version == '3.14'
+        uses: actions/upload-artifact@v4
+        with:
+          name: event-retrieval-c3-pc-py314
+          path: c3-results/event_retrieval_c3_10000.json
           if-no-files-found: error
           retention-days: 14
