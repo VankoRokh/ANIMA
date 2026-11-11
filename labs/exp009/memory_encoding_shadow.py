@@ -131,6 +131,58 @@ def _legacy(root, events, *, composition_budget):
     }
 
 
+def _compression_adversary(root):
+    """A purpose-built boundary counterexample, NOT part of E1 gold scores.
+
+    A typed Entity permits Legacy to associate a paraphrased decision. A
+    small composer then drops the older lexical anchor, changing which next
+    Event can join. Shadow preserves raw anchors but conservatively splits
+    the paraphrased decision: both limitations remain visible.
+    """
+    spec = (
+        ("Copper calibration baseline", ENT_CPU_A),
+        ("Decision selected new supply hardware", ENT_CPU_A),
+        ("Copper calibration checklist", None),
+    )
+    events = []
+    gold = {}
+    for n, (text, entity) in enumerate(spec):
+        item = Event(
+            "conversation.user", {"text": text}, source="user",
+            timestamp=f"2026-11-12T13:0{n}:00+00:00",
+            session_id=S1, event_id=event_id(n + 100),
+            references=[{"kind": "entity", "id": entity}] if entity else [],
+        )
+        events.append(item)
+        gold[item.event_id] = "calibration_incident"
+
+    small = _legacy(root / "legacy_64", events, composition_budget=64)
+    large = _legacy(root / "legacy_512", events, composition_budget=512)
+    shadow = ShadowEpisodeEncoder(link_store=large["_links"])
+    turns = [shadow.accept(item) for item in events]
+    return {
+        "input_events": [e.to_dict() for e in events], "gold": gold,
+        "legacy_64": {
+            "metrics": pairwise_metrics(small["assignments"], gold),
+            "assignments": small["assignments"],
+            "memories": small["memories"],
+            "turns": small["turns"],
+        },
+        "legacy_512": {
+            "metrics": pairwise_metrics(large["assignments"], gold),
+            "assignments": large["assignments"],
+            "memories": large["memories"],
+            "turns": large["turns"],
+        },
+        "shadow": {
+            "metrics": pairwise_metrics(shadow.event_assignments(), gold),
+            "assignments": shadow.event_assignments(),
+            "turns": turns,
+        },
+        "purpose": "isolate composer-loss vs raw-source/Entity-only association",
+    }
+
+
 def pairwise_metrics(assignments, gold):
     ids = sorted(gold)
     target_pairs = {
@@ -187,8 +239,10 @@ def run_shadow(root, *, report_path=None):
             "metrics": pairwise_metrics(data["assignments"], gold),
         }
 
+    compression = _compression_adversary(root / "compression_probe")
     result = {
         "type": "exp009.memory_encoding.shadow/0.1",
+        "compression_adversary": compression,
         "scope": "synthetic conversation.user, deterministic, read-only shadow",
         "gold": gold,
         "input_events": [event.to_dict() for event in events],
