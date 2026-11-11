@@ -16,6 +16,16 @@ _ROOT_SUFFIXES = {
     "anima": {".py"}, "tests": {".py"}, "scripts": {".py", ".sh"},
     "config": {".json"}, ".vscode": {".json"}, "docs": {".md", ".json"},
 }
+# Only these laboratory source files are linked from docs/ROADMAP/Research.md.
+# Documentation fixtures must carry the targets, not arbitrary labs or artifacts.
+_EXP009_DOC_SOURCES = frozenset({
+    Path("labs/exp009/c2_observe.py"),
+    Path("labs/exp009/c2_memory_observe.py"),
+    Path("labs/exp009/c2_memory_forensics.py"),
+    Path("labs/exp009/graph_memory_probe.py"),
+    Path("labs/exp009/c2_graph_compare.py"),
+})
+
 # These are never source subdirectories, even when a filename looks like source.
 _ARTIFACT_DIRS = {"__pycache__", "node_modules", "__pypackages__", "venv", "env",
                   "build", "dist", "target", "htmlcov", "coverage", "cache",
@@ -40,6 +50,8 @@ def _allowed(path):
     tokens = set(re.split(r"[_.-]+", path.name.lower()))
     if tokens & _PRIVATE_TOKENS or (path.suffix == ".json" and tokens & {"key", "keys", "token", "tokens", "auth"}):
         return False
+    if path in _EXP009_DOC_SOURCES:
+        return True
     if len(parts) == 1:
         return path.name in _ROOT_FILES or (path.name.startswith("requirements") and path.suffix == ".txt")
     return (not path.name.startswith(".") and parts[0] in _ROOT_SUFFIXES
@@ -66,6 +78,9 @@ def source_manifest(root):
                                   and name.lower() not in _ARTIFACT_DIRS
                                   and not (Path(parent) / name).is_symlink()]
                 names.extend(str((Path(parent) / name).relative_to(root)) for name in files)
+    # Include only existing, explicitly documented lab sources in both Git and
+    # source-only modes. Keep the general lab tree excluded from source copies.
+    names.extend(str(path) for path in _EXP009_DOC_SOURCES if (root / path).is_file())
     return tuple(sorted({path for name in names if _allowed(path := _relative(name))}))
 
 
