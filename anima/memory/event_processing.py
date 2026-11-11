@@ -9,7 +9,13 @@ FINAL_STATUSES = {"done", "skipped"}
 
 
 class EventProcessingCoordinator:
-    """Persistent exactly-once coordinator for the Stage 1 memory write path."""
+    """Replay-safe Memory coordinator for a single writer per processor key.
+
+    Concurrent instances are not supported: the ledger preflight and claim are
+    not atomic, and a racing failure may overwrite a completed status.
+    Do not add a background writer before introducing a transactional claim,
+    terminal-status guards, and negative interleaving tests.
+    """
 
     def __init__(
         self,
