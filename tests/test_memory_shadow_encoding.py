@@ -151,3 +151,25 @@ def test_compression_is_not_part_of_shadow_decision():
     right = [second.accept(e) for e in events]
     assert left == right
     assert first.episodes() == second.episodes()
+
+
+def test_adversarial_compaction_probe_exposes_both_boundaries(tmp_path):
+    result = run_shadow(tmp_path / "work")
+    probe = result["compression_adversary"]
+    input_ids = [row["id"] for row in probe["input_events"]]
+    first, decision, followup = input_ids
+
+    # Under the short budget, a new high-priority decision displaces the
+    # earlier "Copper calibration" phrase; association of the third Event
+    # changes even though the raw source history has not changed.
+    small = probe["legacy_64"]["assignments"]
+    large = probe["legacy_512"]["assignments"]
+    shadow = probe["shadow"]["assignments"]
+    assert small[first] == small[decision]
+    assert small[followup] != small[first]
+    assert large[first] == large[decision] == large[followup]
+    assert shadow[first] == shadow[followup]
+    assert shadow[decision] != shadow[first]  # entity-only paraphrase missed
+    assert probe["legacy_64"]["metrics"]["false_split_pairs"] > 0
+    assert probe["legacy_512"]["metrics"]["false_split_pairs"] == 0
+    assert probe["shadow"]["metrics"]["false_split_pairs"] > 0
