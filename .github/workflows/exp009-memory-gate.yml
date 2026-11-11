@@ -1,0 +1,41 @@
+name: ANIMA Memory EXP-009 Gate
+
+on:
+  push:
+    branches:
+      - experiment/core-memory-information-baseline
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  memory-regression:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ['3.12', '3.13', '3.14']
+    steps:
+      - name: Checkout branch
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Install tests
+        run: python -m pip install -r requirements-dev.txt
+      - name: Test targeted Memory and EXP-009 regression
+        run: |
+          python -m pytest -q -p no:cacheprovider \
+            tests/test_core_p3b_execution.py \
+            tests/test_event_processing.py \
+            tests/test_exp009_retrieval_abcd.py \
+            tests/test_documentation.py \
+            tests/test_source_tree.py
+      - name: Full regression
+        run: python -m pytest -q -p no:cacheprovider
+      - name: Documentation and syntax gate
+        run: bash scripts/check.sh
+      - name: Import Core assembly
+        run: python -c "from anima.core.assembly import build_core; print('import OK')"
