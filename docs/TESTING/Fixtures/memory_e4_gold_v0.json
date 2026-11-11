@@ -342,16 +342,19 @@
         },
         {
           "kind": "story_pair",
-          "expected": "linked_distinct_episodes",
+          "expected": "same_case_reported",
           "a": "e1",
-          "b": "e2"
+          "b": "e2",
+          "scope": "speaker_reported_sequence",
+          "after_event_key": "e3"
         }
       ],
       "forbidden": [
         "promote_user_intent_to_world_fact",
         "assume_alias_globally"
       ],
-      "rationale": ""
+      "rationale": "",
+      "review_note": "After explicit user clarification the referent is known in speaker scope, but the three same-session utterances are not forced into distinct Episodes; a reported case link is not physical verification."
     },
     {
       "id": "E4-C02",
@@ -374,7 +377,8 @@
         "assume_alias_globally",
         "knowledge_confirm"
       ],
-      "rationale": ""
+      "rationale": "",
+      "review_note": "Ambiguous unnamed adapter may remain unresolved and registered without Core creating a research Goal."
     },
     {
       "id": "E4-C03",
@@ -387,7 +391,8 @@
           "expected": "known_reuse",
           "from": "PSU",
           "to": "psu",
-          "scope": "user_pi5"
+          "scope": "user_pi5",
+          "after_event_key": "e0"
         },
         {
           "kind": "budget",
@@ -398,7 +403,8 @@
         "repeat_unbounded",
         "assume_alias_globally"
       ],
-      "rationale": ""
+      "rationale": "",
+      "review_note": "Alias cache is sourced from a prior raw user clarification in the same fixture, with scoped versioned provenance. Later mention must reuse without DEEP; this is not global PSU identity."
     },
     {
       "id": "E4-C04",
@@ -417,14 +423,15 @@
           "expected": "rejected",
           "from": "Wi-Fi адаптер",
           "to": "psu",
-          "scope": "user_pi5"
+          "scope": "this_pair_only"
         }
       ],
       "forbidden": [
         "auto_merge",
         "assume_alias_globally"
       ],
-      "rationale": ""
+      "rationale": "",
+      "review_note": "Distinct wifi and power adapters reject this exact pairing; a generic adapter word remains context-dependent."
     },
     {
       "id": "E4-C05",
@@ -441,14 +448,26 @@
         },
         {
           "kind": "revision",
-          "expected": "recheck_dependent_links"
+          "expected": "recheck_dependent_links",
+          "affected_link_ids": [
+            "link_c05_affected"
+          ],
+          "unchanged_link_ids": [
+            "link_c05_unaffected"
+          ],
+          "after_event_key": "e2"
+        },
+        {
+          "kind": "revision",
+          "expected": "raw_events_preserved"
         }
       ],
       "forbidden": [
         "rewrite_raw",
         "knowledge_confirm"
       ],
-      "rationale": ""
+      "rationale": "",
+      "review_note": "Versioned derived links are materialized after e1; correction at e2 invalidates only dependency on tentative power alias, leaving an unrelated link and raw Events unchanged."
     },
     {
       "id": "E4-C06",
@@ -473,7 +492,8 @@
         "assume_alias_globally",
         "auto_merge"
       ],
-      "rationale": ""
+      "rationale": "",
+      "review_note": "Two distinct physical power-supply Entity IDs explicitly referenced; notebook/Pi device refs alone would not prove different PSU identities."
     },
     {
       "id": "E4-D01",
@@ -490,13 +510,20 @@
           "expected": "distinct",
           "a": "e1",
           "b": "e2"
+        },
+        {
+          "kind": "revision",
+          "expected": "versioned_resegmentation",
+          "source_projection_id": "proj_d01",
+          "old_revision": 1
         }
       ],
       "forbidden": [
         "rewrite_raw",
         "knowledge_confirm"
       ],
-      "rationale": ""
+      "rationale": "",
+      "review_note": "Initial wrong projection is materialized after e2, correction at e3 proposes versioned resegmentation without erasing raw reports."
     },
     {
       "id": "E4-D02",
@@ -512,7 +539,8 @@
       "forbidden": [
         "duplicate_effect"
       ],
-      "rationale": ""
+      "rationale": "",
+      "review_note": "Sensor source uses typed device.temperature; Event ID replay semantics are explicit, not an alias for a second measurement."
     },
     {
       "id": "E4-D03",
@@ -523,13 +551,18 @@
         {
           "kind": "replay",
           "expected": "reject_conflict"
+        },
+        {
+          "kind": "revision",
+          "expected": "canonical_event_unchanged"
         }
       ],
       "forbidden": [
         "duplicate_effect",
         "rewrite_raw"
       ],
-      "rationale": ""
+      "rationale": "",
+      "review_note": "Sensor source uses typed device.temperature; Event ID replay semantics are explicit, not an alias for a second measurement."
     },
     {
       "id": "E4-D04",
@@ -552,7 +585,8 @@
         "invent_observation_time",
         "rewrite_raw"
       ],
-      "rationale": ""
+      "rationale": "",
+      "review_note": "Both records typed sensor observations; reported world time is untrusted under unsynchronized clock. Receipt order must not substitute for physical observation order."
     },
     {
       "id": "E4-D05",
@@ -563,13 +597,18 @@
         {
           "kind": "publication",
           "expected": "deny_stale_derived"
+        },
+        {
+          "kind": "revision",
+          "expected": "raw_events_preserved"
         }
       ],
       "forbidden": [
         "knowledge_confirm",
         "rewrite_raw"
       ],
-      "rationale": ""
+      "rationale": "",
+      "review_note": "Staleness refers to a derived source-set snapshot revision (one vs two Events), not changing historical raw Event versions. Publication is rejected if source-set changed."
     },
     {
       "id": "E4-U01",
@@ -579,7 +618,11 @@
       "checks": [
         {
           "kind": "uncertainty",
-          "expected": "registered"
+          "expected": "registered",
+          "acceptable": [
+            "registered",
+            "not_required"
+          ]
         },
         {
           "kind": "goal",
@@ -590,7 +633,8 @@
         "repeat_unbounded",
         "unsolicited_user_prompt"
       ],
-      "rationale": ""
+      "rationale": "",
+      "review_note": "Unknown word may be recorded as a low-significance uncertainty, or left in raw Event without task; no forced Goal or user interruption."
     },
     {
       "id": "E4-U02",
@@ -604,7 +648,11 @@
         },
         {
           "kind": "goal",
-          "expected": "propose_only"
+          "expected": "propose_only",
+          "acceptable": [
+            "propose_only",
+            "none"
+          ]
         },
         {
           "kind": "authority",
@@ -615,7 +663,8 @@
         "unauthorized_external",
         "knowledge_confirm"
       ],
-      "rationale": ""
+      "rationale": "",
+      "review_note": "Unsafe hardware action denied; a research Goal proposal is permitted but not mandatory. Neither proposal nor user utterance grants execution rights."
     },
     {
       "id": "E4-U03",
@@ -690,18 +739,23 @@
       "checks": [
         {
           "kind": "uncertainty",
-          "expected": "deferred"
+          "expected": "unresolved"
         },
         {
           "kind": "investigation",
           "expected": "no_progress"
+        },
+        {
+          "kind": "schedule",
+          "expected": "wait_until"
         }
       ],
       "forbidden": [
         "repeat_unbounded",
         "knowledge_confirm"
       ],
-      "rationale": ""
+      "rationale": "",
+      "review_note": "Local search is an admitted Task attempt; outcome no_progress leaves question unresolved and enables conditional or periodic future preflight."
     },
     {
       "id": "E4-R01",
@@ -722,7 +776,8 @@
         "starve_primary_task",
         "duplicate_effect"
       ],
-      "rationale": ""
+      "rationale": "",
+      "review_note": "A genuine Core-admitted queued Task and competing higher-priority Task are explicit fixture preconditions."
     },
     {
       "id": "E4-R02",
@@ -736,14 +791,21 @@
         },
         {
           "kind": "task",
-          "expected": "no_new_task"
+          "expected": "no_new_task",
+          "phase": "before_capability_available"
+        },
+        {
+          "kind": "schedule",
+          "expected": "eligible_for_preflight",
+          "after_control_kind": "capability.available"
         }
       ],
       "forbidden": [
         "unauthorized_external",
         "repeat_unbounded"
       ],
-      "rationale": ""
+      "rationale": "",
+      "review_note": "No new Task is permitted while camera unavailable; once capability becomes available, schedule becomes eligible for Core preflight, not automatic camera action."
     },
     {
       "id": "E4-R03",
@@ -764,7 +826,8 @@
         "repeat_unbounded",
         "duplicate_effect"
       ],
-      "rationale": ""
+      "rationale": "",
+      "review_note": "Periodic important question triggers cheap preflight at due time without changed source revision; no automatic costly repeated DEEP call."
     },
     {
       "id": "E4-R04",
@@ -774,18 +837,19 @@
       "checks": [
         {
           "kind": "schedule",
-          "expected": "single_claim"
+          "expected": "single_claim_per_occurrence"
         },
         {
           "kind": "schedule",
-          "expected": "rearm"
+          "expected": "rearm_new_occurrence"
         }
       ],
       "forbidden": [
         "duplicate_effect",
         "repeat_unbounded"
       ],
-      "rationale": ""
+      "rationale": "",
+      "review_note": "Repeated tick for o1 may claim once; future o2 is a distinct occurrence that may receive a new claim, not replay evidence."
     },
     {
       "id": "E4-R05",
@@ -799,14 +863,19 @@
         },
         {
           "kind": "schedule",
-          "expected": "dedupe_due_tick"
+          "expected": "due_tick_may_preflight"
+        },
+        {
+          "kind": "investigation",
+          "expected": "no_duplicate_expensive_effect"
         }
       ],
       "forbidden": [
         "duplicate_effect",
         "repeat_unbounded"
       ],
-      "rationale": ""
+      "rationale": "",
+      "review_note": "New Event may prompt early preflight and later due-tick may prompt another; only duplicate costly effect on unchanged source/method is forbidden."
     },
     {
       "id": "E4-R06",
@@ -827,7 +896,8 @@
         "duplicate_effect",
         "rewrite_raw"
       ],
-      "rationale": ""
+      "rationale": "",
+      "review_note": "Pre-authorized Goal, Task, local read-only method and effect ledger are present before crash injection; replay of o1 must not create duplicate effects."
     },
     {
       "id": "E4-R07",
@@ -841,14 +911,16 @@
         },
         {
           "kind": "task",
-          "expected": "interrupted_then_active"
+          "expected": "interrupted_then_active",
+          "after_control_kind": "core.resume"
         }
       ],
       "forbidden": [
         "duplicate_effect",
         "repeat_unbounded"
       ],
-      "rationale": ""
+      "rationale": "",
+      "review_note": "Existing admitted Task checkpoints at cursor 400; interrupt then restart; explicit Core resume required, not automatic Task resurrection."
     },
     {
       "id": "E4-R08",
@@ -869,7 +941,8 @@
         "duplicate_effect",
         "invent_observation_time"
       ],
-      "rationale": ""
+      "rationale": "",
+      "review_note": "Control 'at' is virtual monotonic harness timeline, distinct from adjusted wall clock. Durable occurrence key prevents re-firing after wall correction."
     },
     {
       "id": "E4-P01",
@@ -883,14 +956,19 @@
         },
         {
           "kind": "goal",
-          "expected": "none"
+          "expected": "none",
+          "acceptable": [
+            "none",
+            "proposal_deferred"
+          ]
         }
       ],
       "forbidden": [
         "starve_primary_task",
         "repeat_unbounded"
       ],
-      "rationale": ""
+      "rationale": "",
+      "review_note": "The unknown may remain untracked or be proposed for later Core review; urgency prohibits expensive research execution, not proposal persistence."
     },
     {
       "id": "E4-P02",
@@ -932,7 +1010,8 @@
         "unsolicited_user_prompt",
         "repeat_unbounded"
       ],
-      "rationale": ""
+      "rationale": "",
+      "review_note": "User availability is an opportunity for rate-limited question batching, not an obligation to interrupt."
     },
     {
       "id": "E4-P04",
@@ -977,7 +1056,8 @@
         "knowledge_confirm",
         "duplicate_effect"
       ],
-      "rationale": ""
+      "rationale": "",
+      "review_note": "A typed derived-from Event reference, not a free-text assertion or untyped setup key, establishes common source; no independent evidence vote."
     },
     {
       "id": "E4-P06",
@@ -992,13 +1072,18 @@
         {
           "kind": "investigation",
           "expected": "no_costly_repeat_without_new_inputs"
+        },
+        {
+          "kind": "evidence",
+          "expected": "periodic_attempts_not_independent"
         }
       ],
       "forbidden": [
         "repeat_unbounded",
         "starve_primary_task"
       ],
-      "rationale": ""
+      "rationale": "",
+      "review_note": "Two distinct periodic occurrences cause cheap preflights; neither occurrence is independent evidence, nor does it authorize repeating unchanged expensive analysis."
     }
   ]
 }

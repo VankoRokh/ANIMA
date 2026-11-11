@@ -37,7 +37,7 @@ The generated `Event.timestamp` is a deterministic simulation of **receipt time*
 
 `episode_pair`: `same` means belonging to one limited episode; `distinct` requires separate episodes; `insufficient` means no safe identity inference.
 
-`story_pair`: `linked_distinct_episodes` asserts an organizational connection with **no episode merge**; `candidate_only` flags a worthwhile hypothesis, `independent` forbids a story edge under stated ground truth and `insufficient` requires no unsupported link.
+`story_pair`: `same_case_reported` means source-reported common case (not physical causality); `not_same_case` means case-scoped distinction; `insufficient` means no defensible required same-case relation; `candidate_only` is a non-authoritative possible link. `same_topic` is a separate broader grouping; legacy `linked_distinct_episodes`/`independent` labels must not be conflated with case identity. When present, `acceptable` lists alternative **safe** results scored independently of the algorithm.
 
 `alias` requires exact source/context-scoped disposition: `known_reuse`, `confirmed_in_scope`, `unresolved`, `rejected`, `candidate_only` or `scope_limited`. User confirmation resolves *speaker intent in that scope*, not all world Claims.
 
@@ -51,6 +51,18 @@ The generated `Event.timestamp` is a deterministic simulation of **receipt time*
 The E4-A/B review applied **explicit episode scope** and **typed Story semantics** to the *proposed* gold. Story labels for reviewed cases now include `same_case_reported` (source-reported grouping), `not_same_case` (case-specific distinction) and `insufficient` (no required link); these are **not** claims of verified physical causation. `same_topic` is a separate optional relation, not a same-case Story. `E4-B02` accepts `candidate_only` **or** abstaining with `insufficient`; `acceptable` lists are evaluation constraints, not an instruction to the algorithm.
 
 For E4-A04, an explicit Event provenance reference in the derived record replaces string-matching `reading_id` as the independence guard. A source reference is a test precondition with a distinct authority contract; it must not make derived content an independent witness. The new E4-A/B gold remains **unfrozen and owner-adjudication pending**, and no implementation was trained or scored against it.
+
+### C/D and U/R/P adjudication corrections (2026-11-12)
+
+All 42 root cases now include the audit-driven **proposed** fixture corrections. This is an editorial/contract repair, **not** a demonstration of E4 runtime conformance and **not** an owner-frozen gold.
+
+- C/D: prior user-clarification Event for cached PSU alias; actual two supply Entity IDs; explicitly versioned dependent derived links before correction; typed sensor records with untrusted observed-time domains; derived snapshot source-revision mismatch at publication.
+- U/R/P: Core-admitted Goal/Task preconditions where a runnable task is asserted; time/condition eligibility stays separate from Task enum; periodic `preflight` is not mandatory DEEP rerun or user interruption; a repeated occurrence is idempotent but a later occurrence is distinct. User refusal and uncertain identity remain acceptable outcomes.
+- Gold `acceptable` is used only to permit multiple **bounded safe outputs**, not to mark an unsupported merge as correct. A generic `Goal` proposal never grants permission to execute a tool. Synthetic fixture IDs and `setup` are requirements for **future** E4 harness adapters, not existing production API claims.
+- `references: [{kind:"event", id:...}]` is a source provenance pointer; **only an independently validated producer/source contract can assert the trust of that pointer**. Harness-provided `provenance_authority` is test setup, not a runtime guarantee.
+- Time control `at` is a virtual harness control time. Raw `Event.timestamp` is receipt-time and cannot establish real-world ordering across unsynchronized clocks.
+
+Open before freezing: executable reference harness semantics for `setup`/controls, owner adjudication of scoped/alternative gold, exact resource budgets, clock jump/restart recovery, and independent negative variants/holdout. Do not automatically convert this draft into a confirmed benchmark.
 
 ## Evaluation tracks and gates
 

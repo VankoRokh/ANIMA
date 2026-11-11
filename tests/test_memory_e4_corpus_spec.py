@@ -127,3 +127,53 @@ def test_e4_ab_gold_does_not_infer_story_from_entity_alone():
     assert raw["e2"]["type"] == "derived.projection"
     assert {"kind": "event", "id": raw["e1"]["id"]} in raw["e2"]["references"]
     assert expected("E4-A04", "evidence") == ["same_origin_not_independent"]
+
+
+def test_e4_cd_gold_has_source_grounded_aliases_and_versions():
+    inputs = {c["id"]: c for c in _load("memory_e4_inputs_v0.json")["cases"]}
+    gold = {c["id"]: c for c in _load("memory_e4_gold_v0.json")["cases"]}
+    c03 = inputs["E4-C03"]
+    assert c03["events"][0]["key"] == "e0"
+    assert c03["setup"]["known_aliases"][0]["source_event_id"] == c03["events"][0]["raw"]["id"]
+    assert c03["setup"]["known_aliases"][0]["version"] == 1
+    assert any(x["expected"] == "same_case_reported" for x in gold["E4-C01"]["checks"])
+    c05 = inputs["E4-C05"]
+    ids = {c["id"] for c in c05["setup"]["derived_links"]}
+    assert {"link_c05_affected", "link_c05_unaffected"} == ids
+    revision = [x for x in gold["E4-C05"]["checks"]
+                if x["expected"] == "recheck_dependent_links"][0]
+    assert revision["affected_link_ids"] == ["link_c05_affected"]
+    assert revision["unchanged_link_ids"] == ["link_c05_unaffected"]
+    distinct = inputs["E4-C06"]["setup"]["distinct_registered_power_supplies"]
+    assert len(set(distinct)) == 2
+    assert all(event["raw"]["type"] == "device.temperature"
+               for event in inputs["E4-D04"]["events"])
+    assert not inputs["E4-D04"]["setup"]["clock_mapping_available"]
+    d05 = inputs["E4-D05"]
+    cmd = d05["controls"][0]
+    assert cmd["based_on_source_snapshot_rev"] < cmd["current_source_snapshot_rev"]
+    assert cmd["based_on_source_event_ids"] == [d05["events"][0]["raw"]["id"]]
+    assert cmd["current_source_event_ids"] == [e["raw"]["id"] for e in d05["events"]]
+
+
+def test_e4_urp_preconditions_separate_admission_from_due_time():
+    inputs = {c["id"]: c for c in _load("memory_e4_inputs_v0.json")["cases"]}
+    gold = {c["id"]: c for c in _load("memory_e4_gold_v0.json")["cases"]}
+    for case_id in ("E4-U06", "E4-R01", "E4-R06", "E4-R07"):
+        state = inputs[case_id]["setup"]["core_state"]
+        assert state["admitted_by"] == "Core"
+        assert state["goal_id"].startswith("goal_")
+        assert state["task_id"].startswith("task_")
+    assert inputs["E4-U06"]["setup"]["attempt"]["task_id"] == inputs["E4-U06"]["setup"]["core_state"]["task_id"]
+    assert any(check["expected"] == "eligible_for_preflight"
+               for check in gold["E4-R02"]["checks"])
+    assert len([ctl for ctl in inputs["E4-R04"]["controls"]
+                if ctl.get("occurrence_key") == "o1"]) == 2
+    assert len([ctl for ctl in inputs["E4-R04"]["controls"]
+                if ctl.get("occurrence_key") == "o2"]) == 1
+    assert any(ctl["kind"] == "core.resume" for ctl in inputs["E4-R07"]["controls"])
+    p05 = inputs["E4-P05"]["events"]
+    assert p05[1]["raw"]["type"] == "derived.summary"
+    assert {"kind": "event", "id": p05[0]["raw"]["id"]} in p05[1]["raw"]["references"]
+    assert any(q["expected"] == "periodic_attempts_not_independent"
+               for q in gold["E4-P06"]["checks"])

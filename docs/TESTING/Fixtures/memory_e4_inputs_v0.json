@@ -14,7 +14,9 @@
     "project": "ent_00000000-0000-4000-8000-000000000007",
     "camera": "ent_00000000-0000-4000-8000-000000000008",
     "pump": "ent_00000000-0000-4000-8000-000000000009",
-    "notebook": "ent_00000000-0000-4000-8000-000000000010"
+    "notebook": "ent_00000000-0000-4000-8000-000000000010",
+    "notebook_psu": "ent_00000000-0000-4000-8000-000000000011",
+    "pi_psu_secondary": "ent_00000000-0000-4000-8000-000000000012"
   },
   "cases": [
     {
@@ -649,7 +651,10 @@
     {
       "id": "E4-C01",
       "track": "C",
-      "setup": {},
+      "setup": {
+        "alias_scope": "speaker_intent_pi5",
+        "case_context": "reported replacement of same referenced power adapter"
+      },
       "events": [
         {
           "key": "e1",
@@ -709,7 +714,10 @@
     {
       "id": "E4-C02",
       "track": "C",
-      "setup": {},
+      "setup": {
+        "context_known": false,
+        "goal_admitted": false
+      },
       "events": [
         {
           "key": "e1",
@@ -738,11 +746,40 @@
             "entity_key": "psu",
             "scope": "user_pi5",
             "status": "verified_speaker_intent",
-            "source_ref": "fixture_precondition"
+            "source_event_id": "ev_00000000-0000-4000-8000-000000059001",
+            "source_event_key": "e0",
+            "version": 1,
+            "effective_after_event_key": "e0"
           }
-        ]
+        ],
+        "provider": "user",
+        "assert_cache_hit_on_event_key": "e1",
+        "expensive_method_budget": 0
       },
       "events": [
+        {
+          "key": "e0",
+          "raw": {
+            "id": "ev_00000000-0000-4000-8000-000000059001",
+            "type": "conversation.user",
+            "timestamp": "2026-11-01T11:55:00+00:00",
+            "source": "user",
+            "session_id": "session_e4_c03_s1",
+            "payload": {
+              "text": "Когда я говорю PSU в контексте моего Raspberry Pi 5, я имею в виду его блок питания."
+            },
+            "references": [
+              {
+                "kind": "entity",
+                "id": "ent_00000000-0000-4000-8000-000000000001"
+              },
+              {
+                "kind": "entity",
+                "id": "ent_00000000-0000-4000-8000-000000000004"
+              }
+            ]
+          }
+        },
         {
           "key": "e1",
           "raw": {
@@ -768,7 +805,13 @@
     {
       "id": "E4-C04",
       "track": "C",
-      "setup": {},
+      "setup": {
+        "distinct_registered_entity_ids": [
+          "ent_00000000-0000-4000-8000-000000000005",
+          "ent_00000000-0000-4000-8000-000000000004"
+        ],
+        "alias_scope": "this_pair_only"
+      },
       "events": [
         {
           "key": "e1",
@@ -815,13 +858,63 @@
       "id": "E4-C05",
       "track": "C",
       "setup": {
+        "projection_materialization": {
+          "after_event_key": "e1",
+          "revision": 1
+        },
         "prior_candidate": {
+          "id": "cand_c05_power",
           "surface": "адаптер",
           "target": "psu",
-          "status": "unverified"
-        }
+          "status": "unverified",
+          "source_event_id": "ev_00000000-0000-4000-8000-000000050034",
+          "version": 1
+        },
+        "derived_links": [
+          {
+            "id": "link_c05_affected",
+            "version": 1,
+            "source_event_ids": [
+              "ev_00000000-0000-4000-8000-000000050034"
+            ],
+            "dependency_ids": [
+              "cand_c05_power"
+            ],
+            "review_status": "unverified"
+          },
+          {
+            "id": "link_c05_unaffected",
+            "version": 1,
+            "source_event_ids": [
+              "ev_00000000-0000-4000-8000-000000059002"
+            ],
+            "dependency_ids": [
+              "entity:ent_00000000-0000-4000-8000-000000000010"
+            ],
+            "review_status": "unverified"
+          }
+        ]
       },
       "events": [
+        {
+          "key": "e0",
+          "raw": {
+            "id": "ev_00000000-0000-4000-8000-000000059002",
+            "type": "conversation.user",
+            "timestamp": "2026-11-01T11:59:00+00:00",
+            "source": "user",
+            "session_id": "session_e4_c05_s1",
+            "payload": {
+              "text": "Ноутбук проверен, это отдельная тема, не относящаяся к адаптеру."
+            },
+            "references": [
+              {
+                "kind": "entity",
+                "id": "ent_00000000-0000-4000-8000-000000000010"
+              }
+            ]
+          }
+        },
         {
           "key": "e1",
           "raw": {
@@ -861,7 +954,13 @@
     {
       "id": "E4-C06",
       "track": "C",
-      "setup": {},
+      "setup": {
+        "distinct_registered_power_supplies": [
+          "ent_00000000-0000-4000-8000-000000000011",
+          "ent_00000000-0000-4000-8000-000000000012"
+        ],
+        "same_surface_form": "PSU"
+      },
       "events": [
         {
           "key": "e1",
@@ -878,6 +977,10 @@
               {
                 "kind": "entity",
                 "id": "ent_00000000-0000-4000-8000-000000000010"
+              },
+              {
+                "kind": "entity",
+                "id": "ent_00000000-0000-4000-8000-000000000011"
               }
             ]
           }
@@ -897,6 +1000,10 @@
               {
                 "kind": "entity",
                 "id": "ent_00000000-0000-4000-8000-000000000001"
+              },
+              {
+                "kind": "entity",
+                "id": "ent_00000000-0000-4000-8000-000000000012"
               }
             ]
           }
@@ -909,11 +1016,21 @@
       "track": "D",
       "setup": {
         "prior_projection": {
+          "id": "proj_d01",
+          "revision": 1,
+          "materialize_after_event_key": "e2",
+          "source_event_ids": [
+            "ev_00000000-0000-4000-8000-000000050038",
+            "ev_00000000-0000-4000-8000-000000050039"
+          ],
           "episode_group": [
             "e1",
             "e2"
           ],
-          "version": 1
+          "dependency_ids": [
+            "source:ev_00000000-0000-4000-8000-000000050038",
+            "source:ev_00000000-0000-4000-8000-000000050039"
+          ]
         }
       },
       "events": [
@@ -980,7 +1097,10 @@
     {
       "id": "E4-D02",
       "track": "D",
-      "setup": {},
+      "setup": {
+        "canonical_payload_policy": "immutable_by_event_id",
+        "delivery_semantics": "duplicate_same_event_id"
+      },
       "events": [
         {
           "key": "e1",
@@ -991,7 +1111,10 @@
             "source": "sensor.pi5",
             "session_id": "session_e4_d02_s1",
             "payload": {
-              "text": "sensor=Pi5 temp=66C id=m28"
+              "text": "sensor=Pi5 temp=66C reading_id=m28",
+              "reading_id": "m28",
+              "value_celsius": 66,
+              "clock_domain": "sensor.pi5.unsynced"
             },
             "references": [
               {
@@ -1013,7 +1136,10 @@
     {
       "id": "E4-D03",
       "track": "D",
-      "setup": {},
+      "setup": {
+        "canonical_payload_policy": "immutable_by_event_id",
+        "delivery_semantics": "conflicting_payload_same_event_id"
+      },
       "events": [
         {
           "key": "e1",
@@ -1024,7 +1150,10 @@
             "source": "sensor.pi5",
             "session_id": "session_e4_d03_s1",
             "payload": {
-              "text": "sensor=Pi5 temp=66C id=m28"
+              "text": "sensor=Pi5 temp=66C reading_id=m28",
+              "reading_id": "m28",
+              "value_celsius": 66,
+              "clock_domain": "sensor.pi5.unsynced"
             },
             "references": [
               {
@@ -1040,14 +1169,24 @@
           "at": "2026-11-01T12:02:00+00:00",
           "kind": "deliver_conflict",
           "event_key": "e1",
-          "replacement_text": "sensor=Pi5 temp=99C id=m28"
+          "replacement_text": "sensor=Pi5 temp=99C id=m28",
+          "replacement_payload": {
+            "text": "sensor=Pi5 temp=99C reading_id=m28",
+            "reading_id": "m28",
+            "value_celsius": 99,
+            "clock_domain": "sensor.pi5.unsynced"
+          }
         }
       ]
     },
     {
       "id": "E4-D04",
       "track": "D",
-      "setup": {},
+      "setup": {
+        "receipt_timestamp_field": "raw.timestamp",
+        "observation_clock_domain": "sensor.pi5.unsynced",
+        "clock_mapping_available": false
+      },
       "events": [
         {
           "key": "e1",
@@ -1058,7 +1197,11 @@
             "source": "sensor.pi5",
             "session_id": "session_e4_d04_s1",
             "payload": {
-              "text": "Pi5 температура сегодня 60C."
+              "text": "Pi5 температура сегодня 60C.",
+              "clock_domain": "sensor.pi5.unsynced",
+              "clock_synchronized": false,
+              "observed_at_trusted": null,
+              "reported_measurement": "60C"
             },
             "references": [
               {
@@ -1077,7 +1220,11 @@
             "source": "sensor.pi5",
             "session_id": "session_e4_d04_s2",
             "payload": {
-              "text": "Доставлено только сейчас: измерено вчера утром, часы датчика не проверены."
+              "text": "Доставлено только сейчас: измерено вчера утром, часы датчика не проверены.",
+              "clock_domain": "sensor.pi5.unsynced",
+              "clock_synchronized": false,
+              "observed_at_trusted": null,
+              "reported_observed_at": "2026-10-31T09:00:00+00:00"
             },
             "references": [
               {
@@ -1093,7 +1240,26 @@
     {
       "id": "E4-D05",
       "track": "D",
-      "setup": {},
+      "setup": {
+        "derived_projection_before_publication": {
+          "id": "derived_d05",
+          "materialize_after_event_key": "e1",
+          "based_on_source_event_ids": [
+            "ev_00000000-0000-4000-8000-000000050045"
+          ],
+          "source_snapshot_revision": 1,
+          "derived_revision": 1
+        },
+        "current_source_set": {
+          "after_event_key": "e2",
+          "event_ids": [
+            "ev_00000000-0000-4000-8000-000000050045",
+            "ev_00000000-0000-4000-8000-000000050046"
+          ],
+          "source_snapshot_revision": 2
+        },
+        "source_events_are_immutable": true
+      },
       "events": [
         {
           "key": "e1",
@@ -1138,15 +1304,27 @@
         {
           "at": "2026-11-01T12:03:00+00:00",
           "kind": "sleep.publish_derived",
-          "based_on_version": 1,
-          "source_current_version": 2
+          "derived_id": "derived_d05",
+          "based_on_source_event_ids": [
+            "ev_00000000-0000-4000-8000-000000050045"
+          ],
+          "current_source_event_ids": [
+            "ev_00000000-0000-4000-8000-000000050045",
+            "ev_00000000-0000-4000-8000-000000050046"
+          ],
+          "based_on_source_snapshot_rev": 1,
+          "current_source_snapshot_rev": 2
         }
       ]
     },
     {
       "id": "E4-U01",
       "track": "U",
-      "setup": {},
+      "setup": {
+        "core_goal_admission": "not_admitted",
+        "question_significance": "low",
+        "impact_on_current_goal": "none"
+      },
       "events": [
         {
           "key": "e1",
@@ -1170,7 +1348,11 @@
       "track": "U",
       "setup": {
         "risk_class": "hardware_power_uncertain",
-        "permission": "not_granted"
+        "permission": "not_granted",
+        "action_candidate": "hardware.power.connect",
+        "required_identity": "psu_compatible_with_pi5",
+        "authority_owner": "Core",
+        "core_goal_admission": "not_executed"
       },
       "events": [
         {
@@ -1344,7 +1526,38 @@
     {
       "id": "E4-U06",
       "track": "U",
-      "setup": {},
+      "setup": {
+        "core_state": {
+          "goal_id": "goal_66666666-0000-4000-8000-666666666666",
+          "goal_status": "active",
+          "task_id": "task_66666666-0000-4000-8000-666666666666",
+          "task_status": "active",
+          "admitted_by": "Core",
+          "authorized_method": "local_search"
+        },
+        "uncertainty": {
+          "id": "uncertainty_u06",
+          "status": "unresolved",
+          "source_revision": 1
+        },
+        "attempt": {
+          "id": "attempt_u06_1",
+          "method": "local_search",
+          "method_version": "local-v1",
+          "source_revision": 1,
+          "task_id": "task_66666666-0000-4000-8000-666666666666",
+          "authorized": true
+        },
+        "next_activation": {
+          "policy": "mixed",
+          "wait_until": "2026-11-01T18:00:00+00:00",
+          "wake_on": [
+            "new_evidence",
+            "method_change",
+            "priority_change"
+          ]
+        }
+      },
       "events": [
         {
           "key": "e1",
@@ -1372,7 +1585,10 @@
           "kind": "method.result",
           "method": "local_search",
           "result": "insufficient_evidence",
-          "source_version": 1
+          "source_version": 1,
+          "attempt_id": "attempt_u06_1",
+          "method_version": "local-v1",
+          "task_id": "task_66666666-0000-4000-8000-666666666666"
         }
       ]
     },
@@ -1380,8 +1596,23 @@
       "id": "E4-R01",
       "track": "R",
       "setup": {
-        "higher_priority_task": "existing_goal",
-        "resources": "busy"
+        "core_state": {
+          "goal_id": "goal_11111111-0000-4000-8000-111111111111",
+          "goal_status": "active",
+          "task_id": "task_11111111-0000-4000-8000-111111111111",
+          "task_status": "queued",
+          "admitted_by": "Core",
+          "authorized_method": "local_log_search",
+          "goal_priority": 1
+        },
+        "higher_priority_work": {
+          "goal_id": "goal_12121212-0000-4000-8000-121212121212",
+          "task_id": "task_12121212-0000-4000-8000-121212121212",
+          "task_status": "active",
+          "goal_priority": 3
+        },
+        "resources": "busy",
+        "scheduling_policy": "foreground_first"
       },
       "events": [
         {
@@ -1409,7 +1640,21 @@
     {
       "id": "E4-R02",
       "track": "R",
-      "setup": {},
+      "setup": {
+        "core_state": {
+          "goal_id": "goal_13131313-0000-4000-8000-131313131313",
+          "goal_status": "blocked",
+          "task_id": null,
+          "admitted_by": "Core"
+        },
+        "activation": {
+          "policy": "wait_for",
+          "predicate": "capability.camera.available",
+          "capability_authority": "Core",
+          "initially_available": false
+        },
+        "user_permission_before_unlock": "not_granted"
+      },
       "events": [
         {
           "key": "e1",
@@ -1450,7 +1695,21 @@
       "setup": {
         "next_eligible_at": "2026-11-01T14:00:00+00:00",
         "priority": "important",
-        "budget": "small"
+        "budget": "small",
+        "periodic_policy": {
+          "interval_seconds": 7200,
+          "preflight_only": true,
+          "clock_domain": "wall_utc"
+        },
+        "method_history": [
+          {
+            "id": "old_deep_attempt",
+            "method": "DEEP",
+            "source_revision": 1,
+            "outcome": "insufficient_evidence"
+          }
+        ],
+        "source_revision_at_due": 1
       },
       "events": [
         {
@@ -1485,7 +1744,13 @@
       "id": "E4-R04",
       "track": "R",
       "setup": {
-        "next_eligible_at": "2026-11-01T12:30:00+00:00"
+        "next_eligible_at": "2026-11-01T12:30:00+00:00",
+        "periodic_policy": {
+          "interval_seconds": 1800,
+          "preflight_only": true,
+          "clock_domain": "wall_utc"
+        },
+        "durable_occurrence_log": []
       },
       "events": [
         {
@@ -1518,6 +1783,11 @@
           "at": "2026-11-01T12:30:00+00:00",
           "kind": "time.tick",
           "occurrence_key": "o1"
+        },
+        {
+          "at": "2026-11-01T13:00:00+00:00",
+          "kind": "time.tick",
+          "occurrence_key": "o2"
         }
       ]
     },
@@ -1525,7 +1795,19 @@
       "id": "E4-R05",
       "track": "R",
       "setup": {
-        "next_eligible_at": "2026-11-01T13:30:00+00:00"
+        "next_eligible_at": "2026-11-01T13:30:00+00:00",
+        "activation_policy": "mixed",
+        "core_state": {
+          "goal_id": "goal_14141414-0000-4000-8000-141414141414",
+          "goal_status": "active",
+          "admitted_by": "Core"
+        },
+        "preflight_policy": {
+          "source_revision_e1": 1,
+          "source_revision_e2": 2,
+          "preflight_recheck_on_due_allowed": true,
+          "expensive_effect_dedupe_by": "source_revision+method"
+        }
       },
       "events": [
         {
@@ -1578,7 +1860,32 @@
     {
       "id": "E4-R06",
       "track": "R",
-      "setup": {},
+      "setup": {
+        "core_state": {
+          "goal_id": "goal_15151515-0000-4000-8000-151515151515",
+          "goal_status": "active",
+          "task_id": "task_15151515-0000-4000-8000-151515151515",
+          "task_status": "active",
+          "admitted_by": "Core"
+        },
+        "method_authority": {
+          "method": "local.readonly_config_check",
+          "permission": "granted",
+          "scope": "pi5-local-only",
+          "external_effects": false
+        },
+        "occurrence": {
+          "key": "o1",
+          "source_event_id": "ev_00000000-0000-4000-8000-000000050063",
+          "status": "pending",
+          "durable_claim_required": true
+        },
+        "effect_ledger": {
+          "effect_key": "r06_local_check_o1",
+          "initial_effects": 0,
+          "reconcile_on_restart": true
+        }
+      },
       "events": [
         {
           "key": "e1",
@@ -1625,7 +1932,30 @@
     {
       "id": "E4-R07",
       "track": "R",
-      "setup": {},
+      "setup": {
+        "core_state": {
+          "goal_id": "goal_16161616-0000-4000-8000-161616161616",
+          "goal_status": "active",
+          "task_id": "task_16161616-0000-4000-8000-161616161616",
+          "task_status": "active",
+          "admitted_by": "Core"
+        },
+        "method_authority": {
+          "method": "local.readonly_log_scan",
+          "permission": "granted",
+          "external_effects": false
+        },
+        "durable_checkpoint": {
+          "task_id": "task_16161616-0000-4000-8000-161616161616",
+          "cursor": 0,
+          "limit": 1000,
+          "version": 1
+        },
+        "resume_policy": {
+          "after_restart": "explicit_core_reactivation",
+          "checkpoint_must_be_monotonic": true
+        }
+      },
       "events": [
         {
           "key": "e1",
@@ -1660,13 +1990,31 @@
         {
           "at": "2026-11-01T12:30:00+00:00",
           "kind": "runtime.restart"
+        },
+        {
+          "at": "2026-11-01T12:31:00+00:00",
+          "kind": "core.resume",
+          "task_id": "task_16161616-0000-4000-8000-161616161616",
+          "permission": "granted"
         }
       ]
     },
     {
       "id": "E4-R08",
       "track": "R",
-      "setup": {},
+      "setup": {
+        "clock_domains": {
+          "control_at": "harness_virtual_utc",
+          "wall_clock": "adjustable_wall_utc",
+          "occurrence_identity": "durable_idempotency_key"
+        },
+        "schedule": {
+          "interval_seconds": 7200,
+          "occurrence_key": "o1",
+          "persisted_next_eligible_at": "2026-11-01T14:00:00+00:00"
+        },
+        "duplicate_wall_clock_tick_behavior": "replay_same_occurrence_key"
+      },
       "events": [
         {
           "key": "e1",
@@ -1706,7 +2054,14 @@
       "track": "P",
       "setup": {
         "cpu_budget": "low",
-        "other_goal": "urgent"
+        "other_goal": "urgent",
+        "foreground": {
+          "core_admitted": true,
+          "status": "active",
+          "priority": 3
+        },
+        "research_priority": 0,
+        "expensive_execution_budget": 0
       },
       "events": [
         {
@@ -1756,7 +2111,9 @@
       "track": "P",
       "setup": {
         "user_status": "busy",
-        "question_budget": 0
+        "question_budget": 0,
+        "availability_is_permission_to_consider_not_must_ask": true,
+        "question_preference": "user_may_decline"
       },
       "events": [
         {
@@ -1839,7 +2196,9 @@
       "id": "E4-P05",
       "track": "P",
       "setup": {
-        "common_origin": "e1"
+        "provenance_authority": "harness_verified_source_reference",
+        "projection_relation": "derived_from_event",
+        "source_event_id": "ev_00000000-0000-4000-8000-000000050071"
       },
       "events": [
         {
@@ -1865,7 +2224,7 @@
           "key": "e2",
           "raw": {
             "id": "ev_00000000-0000-4000-8000-000000050072",
-            "type": "conversation.user",
+            "type": "derived.summary",
             "timestamp": "2026-11-01T12:02:00+00:00",
             "source": "derived.summary",
             "session_id": "session_e4_p05_s1",
@@ -1876,6 +2235,10 @@
               {
                 "kind": "entity",
                 "id": "ent_00000000-0000-4000-8000-000000000001"
+              },
+              {
+                "kind": "event",
+                "id": "ev_00000000-0000-4000-8000-000000050071"
               }
             ]
           }
@@ -1889,7 +2252,20 @@
       "setup": {
         "priority": "important",
         "next_eligible_at": "2026-11-01T13:00:00+00:00",
-        "last_method_result": "insufficient_evidence"
+        "periodic_policy": {
+          "interval_seconds": 3600,
+          "preflight_only": true
+        },
+        "last_method_result": "insufficient_evidence",
+        "method_history": [
+          {
+            "id": "p06_old",
+            "method": "DEEP",
+            "source_revision": 1,
+            "outcome": "insufficient_evidence"
+          }
+        ],
+        "source_revision_at_due": 1
       },
       "events": [
         {

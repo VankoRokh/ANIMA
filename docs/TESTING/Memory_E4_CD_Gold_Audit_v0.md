@@ -1,9 +1,15 @@
 # ANIMA — E4-C/D Independent Gold Audit v0
 
-**Status:** REVIEWED / CORRECTIONS PROPOSED; **no changes to E4-C/D input or gold yet**.  
+**Status:** initial independent audit retained; **audit corrections now applied to proposed C/D fixtures**, not frozen and not yet E4 runtime-verified.  
 **Reviewed base:** `eb2193e70ca60aead01cbc2e61e12375d77ae3e9` (existing C/D cases unchanged by A/B corrections).  
 **Scope:** 11 root cases: six C and five D.  
 **Reference:** [E4 corpus](Memory_E4_Conformance_Corpus_v0_Draft.md), [Architecture](../ROADMAP/Memory_E4_Architecture_Contract_Draft.md), [Stage 7 boundary](../ROADMAP/Stage_7_Semantic_Boundary_v0.md).
+
+## Correction disposition (2026-11-12)
+
+Revisions: C01 no forced distinct Episodes; C03 source-backed alias reuse; C04 scoped negative alias; C05 explicit affected/unaffected dependent links; C06 distinct physical supply IDs; D01 versioned pre-correction projection; D02/D03 typed sensor payload/replay; D04 unsynchronized sensor clock; D05 stale derived snapshot publication. No raw source mutation or Knowledge admission.
+
+**Below is the historical original audit**, preserved for traceability. Labels `BLOCK/REVIEW` refer to the *prior fixture revision*; they are not a claim that the revised fixtures have passed independent semantic acceptance.
 
 ## Findings
 

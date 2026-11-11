@@ -1,9 +1,15 @@
 # ANIMA — E4-U/R/P Independent Gold Audit v0
 
-**Status:** REVIEWED / CORRECTIONS PROPOSED; **no changes to E4-U/R/P input or gold yet**.  
+**Status:** initial independent audit retained; **audit corrections now applied to proposed U/R/P fixtures**, not frozen and not yet E4 runtime-verified.  
 **Reviewed base:** `eb2193e70ca60aead01cbc2e61e12375d77ae3e9` (U/R/P input/gold unchanged by A/B corrections).  
 **Scope:** 20 root cases: six U, eight R, six P.  
 **Reference:** [E4 corpus](Memory_E4_Conformance_Corpus_v0_Draft.md), [Architecture](../ROADMAP/Memory_E4_Architecture_Contract_Draft.md).
+
+## Correction disposition (2026-11-12)
+
+Revisions: U01 low-significance unknown may remain informational; U02 research Goal proposal optional, unsafe power action barred; U06 admitted local investigation attempt and future wake; R01/R06/R07 explicit Core-authorized Task, claim and checkpoint; R02 unlock permits **preflight**, not automatic Task; R04 new occurrence o2 after deduping o1; R05 due tick may preflight again without duplicate effect; R08 wall/control clock domains; P01 optional deferred proposal; P05 explicit derived Event source reference; P06 periodic attempts are not fresh evidence.
+
+**Below is the historical original audit**, preserved for traceability. Labels `BLOCK/REVIEW` refer to the *prior fixture revision*; they are not a claim that the revised fixtures have passed independent semantic acceptance.
 
 ## U — uncertainties, goals, investigation
 
