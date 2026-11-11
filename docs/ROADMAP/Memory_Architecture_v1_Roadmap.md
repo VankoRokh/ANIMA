@@ -54,6 +54,8 @@
 
 **Production implementation brief:** [Event Retrieval v1 — contract & recovery gates](Memory_Event_Retrieval_v1_Brief.md). Корректность проверяется отдельно от C3-производительности; API opt-in для Core, без изменения маршрута FAST/DEEP.
 
+**Фактический результат шага 2:** [Event Retrieval v1 — результаты](Memory_Event_Retrieval_v1_Results.md): функциональная проверка **PASS** на Python 3.12/3.13/3.14 (1506 тестов в каждой матрице), C3 PC-базовые измерения на 10³/10⁴? Уточнение: **10⁴ и 10⁵ Events** получены. Это не закрывает аппаратный Pi gate и не меняет официальные Stage статусы.
+
 Индекс производный; authoritative первичный Event не переписывается. Для JSONL locator учитывает идентичность журнала и смещение, для typed Core — точечный lookup по PK/ID. Ключ индекса и checkpoint обработанного префикса должны фиксироваться согласованно, с повторяемым догоном после прерывания. Несовпадение source hash/ID → `incomplete/error`, а не молчаливое доверие индексу. Read API различает `no_match`, `partial`, `source_unavailable`, `ambiguous`, `budget_exhausted`. Политика Event types и разрешённых полей согласуется до пилота.
 
 ### Шаг 3 — ограничения группировки
