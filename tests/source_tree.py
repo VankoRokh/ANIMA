@@ -16,7 +16,7 @@ _ROOT_SUFFIXES = {
     "anima": {".py"}, "tests": {".py"}, "scripts": {".py", ".sh"},
     "config": {".json"}, ".vscode": {".json"}, "docs": {".md", ".json"},
 }
-# Only these laboratory source files are linked from docs/ROADMAP/Research.md.
+# Only these laboratory source files are linked from project documentation.
 # Documentation fixtures must carry the targets, not arbitrary labs or artifacts.
 _EXP009_DOC_SOURCES = frozenset({
     Path("labs/exp009/c2_observe.py"),
@@ -24,6 +24,7 @@ _EXP009_DOC_SOURCES = frozenset({
     Path("labs/exp009/c2_memory_forensics.py"),
     Path("labs/exp009/graph_memory_probe.py"),
     Path("labs/exp009/c2_graph_compare.py"),
+    Path("labs/exp009/c2_retrieval_abcd.py"),
 })
 
 # These are never source subdirectories, even when a filename looks like source.
