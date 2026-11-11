@@ -29,6 +29,20 @@ def test_abcd_reuses_one_snapshot_and_preserves_production_sources(tmp_path):
     assert final["memories_unchanged"] is True
     assert final["snapshot_hash"] == header["snapshot_hash"]
 
+    snapshot = next(
+        item["snapshot"] for item in records if item["type"] == "snapshot"
+    )
+    assert all(
+        event["event_type"] == "conversation.user"
+        and event["source"] == "user"
+        and event["timestamp"]
+        for event in snapshot["events"]
+    )
+    assert all(
+        memory["created_at"] and memory["updated_at"]
+        for memory in snapshot["memories"]
+    )
+
     cases = [row for row in records if row["type"] == "comparison"]
     assert {row["snapshot_hash"] for row in cases} == {header["snapshot_hash"]}
     assert len([row for row in records
