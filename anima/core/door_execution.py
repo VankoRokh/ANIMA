@@ -69,7 +69,7 @@ class CoreDoorExecution:
 
     def __init__(
         self, *, decisions: CoreGoalDecision, internal_state: InternalStateRuntime,
-        world: VirtualDoorWorld, execution_store: ExecutionStore,
+        world: DoorWorldPort, execution_store: ExecutionStore,
         registry: ToolRegistry, executor: SandboxExecutor,
         after_effect_hook=None, before_execute_hook=None,
     ):
