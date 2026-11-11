@@ -22,7 +22,7 @@ class GraphMemoryProbe:
     def __init__(self, database_file):
         self.database_file = Path(database_file)
         self.database_file.parent.mkdir(parents=True, exist_ok=True)
-        with self._connect() as connection:
+        with closing(self._connect()) as connection, connection:
             connection.executescript(
                 """
                 CREATE TABLE IF NOT EXISTS nodes (
