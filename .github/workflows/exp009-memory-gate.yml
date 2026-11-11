@@ -36,6 +36,7 @@ jobs:
             tests/test_event_processing.py \
             tests/test_event_retrieval.py \
             tests/test_event_retrieval_c3.py \
+            tests/test_memory_shadow_encoding.py \
             tests/test_exp009_retrieval_abcd.py \
             tests/test_documentation.py \
             tests/test_source_tree.py
@@ -71,5 +72,19 @@ jobs:
         with:
           name: event-retrieval-c3-pc-py314
           path: c3-results/event_retrieval_c3_*.json
+          if-no-files-found: error
+          retention-days: 14
+      - name: Compare Memory Encoding shadow E1
+        if: matrix.python-version == '3.14'
+        run: |
+          mkdir -p encoding-results
+          python -m labs.exp009.memory_encoding_shadow \
+            --report-dir encoding-results
+      - name: Publish E1 raw episode boundary decisions
+        if: matrix.python-version == '3.14'
+        uses: actions/upload-artifact@v4
+        with:
+          name: memory-encoding-shadow-e1-py314
+          path: encoding-results/memory_encoding_shadow.json
           if-no-files-found: error
           retention-days: 14
