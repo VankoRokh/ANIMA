@@ -65,6 +65,7 @@ def test_only_documented_exp009_sources_are_copied(tmp_path):
         "c2_retrieval_abcd.py",
         "event_retrieval_c3.py",
         "memory_encoding_shadow.py",
+        "memory_encoding_e2.py",
     )
     for name in documented:
         write(root, f"labs/exp009/{name}", f"# {name}\n")
