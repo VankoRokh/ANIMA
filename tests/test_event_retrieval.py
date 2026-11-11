@@ -11,6 +11,8 @@ from anima.core.event_bus import Event
 from anima.memory.event_log import EventLog
 from anima.memory.event_retrieval import EventRetrieval
 from anima.memory.memory_store import MemoryStore
+from anima.memory.link_store import LinkStore
+from anima.memory.provenance import ProvenanceResolver
 
 
 STAMP = "2026-11-11T12:00:00+00:00"
@@ -288,3 +290,33 @@ def test_missing_memory_source_is_error_not_fabricated_evidence(tmp_path):
     )
     with pytest.raises(ValueError, match="Missing indexed source Event"):
         index.events_for_memory(memory["id"])
+
+
+def test_opt_in_provenance_uses_point_lookup_without_full_log_scan(
+    tmp_path, monkeypatch,
+):
+    log, store, index = stack(tmp_path)
+    raw = event(0, "historical temperature 82")
+    log.write(raw)
+    memory = store.create_memory(
+        memory_type="episodic", domain="project",
+        content="compressed historical thermal event",
+        source_event_id=raw.event_id, created_at=STAMP,
+        status="closed",
+    )
+    index_to_end(index)
+    resolver = ProvenanceResolver(
+        store, LinkStore(store), log, event_retrieval=index,
+    )
+
+    def forbidden_full_scan():
+        raise AssertionError("Full EventLog scan is forbidden on indexed path")
+
+    monkeypatch.setattr(log, "load_events", forbidden_full_scan)
+    proof = resolver.memory(memory["id"])
+    assert [row["id"] for row in proof["events"]] == [raw.event_id]
+    assert proof["events"][0]["payload"]["text"] == "historical temperature 82"
+
+    log.log_file.write_text("", encoding="utf-8")
+    with pytest.raises(ValueError, match="rebuild"):
+        resolver.memory(memory["id"])
