@@ -346,10 +346,19 @@ def main():
                     fast = item["context"]["FAST"]["selection_stats"]
                     deep = item["context"]["DEEP"]["selection_stats"]
                     print(
-                        f"  {item['query_id']} k={item['top_k']} "
-                        f"ids={ids} recall={item['fixture_source_recall']} "
+                        f"  {item['query_id']} query={item['query_text']!r} "
+                        f"k={item['top_k']} ids={ids} "
+                        f"recall={item['fixture_source_recall']} "
                         f"FAST={fast['items_used']} DEEP={deep['items_used']}"
                     )
+                    for rank, selected in enumerate(
+                        item["retrieval"]["results"][:3], start=1
+                    ):
+                        print(
+                            f"    [{rank}] score={selected['score']} "
+                            f"text={selected['record']['content'][:120]!r} "
+                            f"reasons={selected['reasons']}"
+                        )
 
 
 if __name__ == "__main__":
