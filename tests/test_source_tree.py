@@ -53,6 +53,32 @@ def test_source_only_tree_excludes_local_artifacts_and_keeps_pending_source(tmp_
     assert all(not (destination / name).exists() for name in artifacts)
 
 
+def test_only_documented_exp009_sources_are_copied(tmp_path):
+    root = tmp_path / "source"
+    write(root, "README.md", "source")
+    documented = (
+        "c2_observe.py",
+        "c2_memory_observe.py",
+        "c2_memory_forensics.py",
+        "graph_memory_probe.py",
+        "c2_graph_compare.py",
+    )
+    for name in documented:
+        write(root, f"labs/exp009/{name}", f"# {name}\n")
+    write(root, "labs/exp009/unreferenced.py", "# not in documentation")
+    write(root, "labs/other/fixture.py", "# not in documentation")
+    write(root, "labs/exp009/secret.json", '{"token": "not a source"}')
+
+    copied = set(copy_source_tree(root, tmp_path / "copy"))
+    for name in documented:
+        path = Path("labs/exp009") / name
+        assert path in copied
+        assert (tmp_path / "copy" / path).is_file()
+    assert Path("labs/exp009/unreferenced.py") not in copied
+    assert Path("labs/other/fixture.py") not in copied
+    assert Path("labs/exp009/secret.json") not in copied
+
+
 def test_external_directory_symlink_is_never_walked(tmp_path):
     root = tmp_path / "source"
     write(root, "anima/valid.py", "# valid\n")
