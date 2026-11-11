@@ -190,18 +190,18 @@ class PairedIndex:
             return []
         with closing(self._connect()) as connection:
             if method == "A":
-                kind_filter, extra = "AND kind='memory'", ()
+                kind_filter = "AND kind='memory'"
             elif method == "B":
-                kind_filter, extra = "AND kind='event'", ()
+                kind_filter = "AND kind='event'"
             else:
-                kind_filter, extra = "", ()
+                kind_filter = ""
             return [
                 {"id": row["node_id"], "score": row["rank"]}
                 for row in connection.execute(
                     "SELECT node_id, bm25(node_fts) AS rank "
                     "FROM node_fts WHERE node_fts MATCH ? " + kind_filter
                     + " ORDER BY rank, node_id LIMIT ?",
-                    (match, *extra, MAX_SEEDS),
+                    (match, MAX_SEEDS),
                 )
             ]
 
@@ -253,18 +253,13 @@ class PairedIndex:
                 "kind": node["kind"], "via": via,
             }
             blob = canonical(rendered)
-            # Charge array brackets and comma separators as actually rendered.
-            cost = len(blob) + (1 if entries else 2)
             if len(selected) >= max_items:
                 exhausted = True
                 break
-            if sum(map(len, entries)) + (len(entries) - 1 if entries else 0) + (
-                    2 if entries else 0) + cost > max_chars:
-                # Recompute from exact proposed JSON array (independent of
-                # formatting assumptions); continue to smaller candidates.
-                if len("[" + ",".join([*entries, blob]) + "]") > max_chars:
-                    exhausted = True
-                    continue
+            # Charge the exact serialized context including [] and commas.
+            if len("[" + ",".join([*entries, blob]) + "]") > max_chars:
+                exhausted = True
+                continue
             selected.append({**rendered, "score": score})
             entries.append(blob)
         rendered_context = "[" + ",".join(entries) + "]"
