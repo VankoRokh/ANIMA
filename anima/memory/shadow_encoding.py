@@ -116,13 +116,18 @@ class ShadowEpisodeEncoder:
         if prior is not None:
             if prior["raw_event"] != original:
                 raise ValueError("Conflicting replay for Event ID " + event.event_id)
+            episode_id = prior["episode_id"]
+            sources = (
+                []
+                if episode_id is None
+                else list(next(
+                    e["source_event_ids"] for e in self._episodes
+                    if e["episode_id"] == episode_id
+                ))
+            )
             return {
                 "event_id": event.event_id, "action": "replay",
-                "episode_id": prior["episode_id"],
-                "source_event_ids": list(
-                    next(e["source_event_ids"] for e in self._episodes
-                         if e["episode_id"] == prior["episode_id"])
-                ),
+                "episode_id": episode_id, "source_event_ids": sources,
                 "reasons": ["already_seen:verified"],
                 "score": prior["score"],
             }
