@@ -77,8 +77,9 @@ def run_e3(root, *, report_path=None):
     if book.observe(false_bridge) != after_false:
         raise AssertionError("Duplicate delivery changed candidate review")
     no_entity = bridge(5, "Copper calibration decision new hardware supply", entity=None)
-    if book.observe(no_entity) != book.snapshot():
-        raise AssertionError("Weak trigger changed state")
+    after_no_entity = book.observe(no_entity)
+    if after_no_entity["candidates"] != after_false["candidates"]:
+        raise AssertionError("Unverified Entity-free trigger changed candidates")
     unrelated_session = bridge(
         6, "Copper calibration decision new hardware supply", session=S2,
     )
