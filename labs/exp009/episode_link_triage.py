@@ -12,6 +12,7 @@ from anima.core.event_bus import Event
 from anima.memory.shadow_encoding import _tokens
 
 MAX_CANDIDATES = 256
+MAX_TRIGGER_EVENTS = 256
 MAX_BRIDGES = 8
 REVIEW_TOKEN_OVERLAP = 2
 
@@ -198,6 +199,8 @@ class EpisodeLinkTriage:
                 raise ValueError("Conflicting replay of source Event")
             return self.snapshot()
 
+        if len(self.bridges) >= MAX_TRIGGER_EVENTS:
+            raise ValueError("Review trigger capacity reached")
         # Entity refs must be checked prior to any in-memory mutation.
         _entity_set(raw, self.known_entities)
         eligible_keys = [
