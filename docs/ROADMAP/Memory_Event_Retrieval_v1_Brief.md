@@ -30,6 +30,8 @@
 5. **Ресурсы:** ограничение одной JSONL строки — 1 МБ; передача больших payload (видео, raw аудио) не является задачей v1. Буферизация индекса обрабатывается ограниченным `max_events/max_bytes`; C3 измерит цену на 10³/10⁴/10⁵ Events и на Raspberry Pi.
 6. **Отложено намеренно:** автоматический sync при каждом Runtime event (не добавлять непроверенный второй writer), объединённый ContextBuilder, semantic embeddings и multi-hop reasoning. Их подключение является отдельным integration gate. Нынешний сервис предоставляет read API, не заменяет FAST/DEEP retrieval.
 
+**Проверенный результат:** [Event Retrieval v1 — регрессия и C3 10k/100k](Memory_Event_Retrieval_v1_Results.md), CI на Python 3.12/3.13/3.14. Отчёт отделяет функциональную проверку от отсутствующих Pi/power-loss доказательств.
+
 ## Gate v1
 
 - Сохранение, поиск ID/текста, typed filter и ссылки на Memory работают без доступа к LLM.
