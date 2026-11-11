@@ -149,9 +149,22 @@ class PairedIndex:
                     kind TEXT NOT NULL CHECK(kind IN ('event', 'memory')),
                     content TEXT NOT NULL
                 );
+                CREATE TABLE IF NOT EXISTS index_meta (
+                    key TEXT PRIMARY KEY,
+                    value TEXT NOT NULL
+                );
                 CREATE VIRTUAL TABLE IF NOT EXISTS node_fts
                     USING fts5(node_id UNINDEXED, kind UNINDEXED, content);
             """)
+            previous_hash = connection.execute(
+                "SELECT value FROM index_meta WHERE key='snapshot_hash'"
+            ).fetchone()
+            if previous_hash and previous_hash["value"] != self.snapshot_hash:
+                raise ValueError("Cannot mix different frozen snapshots in one index")
+            connection.execute(
+                "INSERT OR IGNORE INTO index_meta VALUES ('snapshot_hash', ?)",
+                (self.snapshot_hash,),
+            )
             for node_id in sorted(self.nodes):
                 node = self.nodes[node_id]
                 existing = connection.execute(
@@ -181,8 +194,15 @@ class PairedIndex:
         return con
 
     def lookup_event(self, event_id):
-        node = self.nodes.get(event_id)
-        return node if node and node["kind"] == "event" else None
+        with closing(self._connect()) as connection:
+            row = connection.execute(
+                "SELECT node_id, kind, content FROM nodes "
+                "WHERE node_id=? AND kind='event'", (event_id,),
+            ).fetchone()
+        return None if row is None else {
+            "id": row["node_id"], "kind": row["kind"],
+            "content": row["content"],
+        }
 
     def _seeds(self, query, method):
         match = lexical_query(query)
