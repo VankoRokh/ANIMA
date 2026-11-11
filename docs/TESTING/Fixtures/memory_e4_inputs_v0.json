@@ -1,0 +1,1885 @@
+{
+  "schema": "anima.memory_e4.inputs/0.1",
+  "status": "DRAFT_NOT_FROZEN",
+  "dataset_kind": "synthetic_owner_review_pending",
+  "base_time": "2026-11-01T12:00:00+00:00",
+  "isolation": "each_case_independent",
+  "entities": {
+    "pi": "ent_00000000-0000-4000-8000-000000000001",
+    "pi2": "ent_00000000-0000-4000-8000-000000000002",
+    "router": "ent_00000000-0000-4000-8000-000000000003",
+    "psu": "ent_00000000-0000-4000-8000-000000000004",
+    "wifi": "ent_00000000-0000-4000-8000-000000000005",
+    "fan": "ent_00000000-0000-4000-8000-000000000006",
+    "project": "ent_00000000-0000-4000-8000-000000000007",
+    "camera": "ent_00000000-0000-4000-8000-000000000008",
+    "pump": "ent_00000000-0000-4000-8000-000000000009",
+    "notebook": "ent_00000000-0000-4000-8000-000000000010"
+  },
+  "cases": [
+    {
+      "id": "E4-A01",
+      "track": "A",
+      "setup": {},
+      "events": [
+        {
+          "key": "e1",
+          "raw": {
+            "id": "ev_00000000-0000-4000-8000-000000050001",
+            "type": "conversation.user",
+            "timestamp": "2026-11-01T12:00:00+00:00",
+            "source": "user",
+            "session_id": "session_e4_a01_s1",
+            "payload": {
+              "text": "У Pi5 сейчас температура 82 градуса."
+            },
+            "references": [
+              {
+                "kind": "entity",
+                "id": "ent_00000000-0000-4000-8000-000000000001"
+              }
+            ]
+          }
+        },
+        {
+          "key": "e2",
+          "raw": {
+            "id": "ev_00000000-0000-4000-8000-000000050002",
+            "type": "conversation.user",
+            "timestamp": "2026-11-01T12:04:00+00:00",
+            "source": "user",
+            "session_id": "session_e4_a01_s1",
+            "payload": {
+              "text": "Pi5 нагрелся до 91, вентилятор не вращается."
+            },
+            "references": [
+              {
+                "kind": "entity",
+                "id": "ent_00000000-0000-4000-8000-000000000001"
+              }
+            ]
+          }
+        }
+      ],
+      "controls": []
+    },
+    {
+      "id": "E4-A02",
+      "track": "A",
+      "setup": {},
+      "events": [
+        {
+          "key": "e1",
+          "raw": {
+            "id": "ev_00000000-0000-4000-8000-000000050003",
+            "type": "conversation.user",
+            "timestamp": "2026-11-01T12:00:00+00:00",
+            "source": "user",
+            "session_id": "session_e4_a02_s1",
+            "payload": {
+              "text": "Температура 82 градуса, перегрев."
+            },
+            "references": [
+              {
+                "kind": "entity",
+                "id": "ent_00000000-0000-4000-8000-000000000001"
+              }
+            ]
+          }
+        },
+        {
+          "key": "e2",
+          "raw": {
+            "id": "ev_00000000-0000-4000-8000-000000050004",
+            "type": "conversation.user",
+            "timestamp": "2026-11-01T12:02:00+00:00",
+            "source": "user",
+            "session_id": "session_e4_a02_s1",
+            "payload": {
+              "text": "Температура 82 градуса, перегрев."
+            },
+            "references": [
+              {
+                "kind": "entity",
+                "id": "ent_00000000-0000-4000-8000-000000000002"
+              }
+            ]
+          }
+        }
+      ],
+      "controls": []
+    },
+    {
+      "id": "E4-A03",
+      "track": "A",
+      "setup": {},
+      "events": [
+        {
+          "key": "e1",
+          "raw": {
+            "id": "ev_00000000-0000-4000-8000-000000050005",
+            "type": "conversation.user",
+            "timestamp": "2026-11-01T12:00:00+00:00",
+            "source": "user",
+            "session_id": "session_e4_a03_s1",
+            "payload": {
+              "text": "У маршрутизатора пропало соединение."
+            },
+            "references": [
+              {
+                "kind": "entity",
+                "id": "ent_00000000-0000-4000-8000-000000000003"
+              }
+            ]
+          }
+        },
+        {
+          "key": "e2",
+          "raw": {
+            "id": "ev_00000000-0000-4000-8000-000000050006",
+            "type": "conversation.user",
+            "timestamp": "2026-11-01T12:01:00+00:00",
+            "source": "user",
+            "session_id": "session_e4_a03_s1",
+            "payload": {
+              "text": "Pi5 шумит из-за системы охлаждения."
+            },
+            "references": [
+              {
+                "kind": "entity",
+                "id": "ent_00000000-0000-4000-8000-000000000001"
+              }
+            ]
+          }
+        },
+        {
+          "key": "e3",
+          "raw": {
+            "id": "ev_00000000-0000-4000-8000-000000050007",
+            "type": "conversation.user",
+            "timestamp": "2026-11-01T12:03:00+00:00",
+            "source": "user",
+            "session_id": "session_e4_a03_s1",
+            "payload": {
+              "text": "Соединение маршрутизатора восстановилось."
+            },
+            "references": [
+              {
+                "kind": "entity",
+                "id": "ent_00000000-0000-4000-8000-000000000003"
+              }
+            ]
+          }
+        }
+      ],
+      "controls": []
+    },
+    {
+      "id": "E4-A04",
+      "track": "A",
+      "setup": {},
+      "events": [
+        {
+          "key": "e1",
+          "raw": {
+            "id": "ev_00000000-0000-4000-8000-000000050008",
+            "type": "device.temperature",
+            "timestamp": "2026-11-01T12:00:00+00:00",
+            "source": "sensor.pi5",
+            "session_id": "session_e4_a04_s1",
+            "payload": {
+              "text": "sensor=Pi5 temperature=82C reading_id=m17"
+            },
+            "references": [
+              {
+                "kind": "entity",
+                "id": "ent_00000000-0000-4000-8000-000000000001"
+              }
+            ]
+          }
+        },
+        {
+          "key": "e2",
+          "raw": {
+            "id": "ev_00000000-0000-4000-8000-000000050009",
+            "type": "conversation.user",
+            "timestamp": "2026-11-01T12:01:00+00:00",
+            "source": "projection.ui",
+            "session_id": "session_e4_a04_s1",
+            "payload": {
+              "text": "В интерфейсе отражён reading_id=m17: 82 °C"
+            },
+            "references": [
+              {
+                "kind": "entity",
+                "id": "ent_00000000-0000-4000-8000-000000000001"
+              }
+            ]
+          }
+        }
+      ],
+      "controls": []
+    },
+    {
+      "id": "E4-A05",
+      "track": "A",
+      "setup": {},
+      "events": [
+        {
+          "key": "e1",
+          "raw": {
+            "id": "ev_00000000-0000-4000-8000-000000050010",
+            "type": "conversation.user",
+            "timestamp": "2026-11-01T12:00:00+00:00",
+            "source": "user",
+            "session_id": "session_e4_a05_s1",
+            "payload": {
+              "text": "Сегодня Pi5 выключился от перегрева, случай №41."
+            },
+            "references": [
+              {
+                "kind": "entity",
+                "id": "ent_00000000-0000-4000-8000-000000000001"
+              }
+            ]
+          }
+        },
+        {
+          "key": "e2",
+          "raw": {
+            "id": "ev_00000000-0000-4000-8000-000000050011",
+            "type": "conversation.user",
+            "timestamp": "2026-11-22T12:00:00+00:00",
+            "source": "user",
+            "session_id": "session_e4_a05_s2",
+            "payload": {
+              "text": "Новая независимая поломка Pi5, случай №52."
+            },
+            "references": [
+              {
+                "kind": "entity",
+                "id": "ent_00000000-0000-4000-8000-000000000001"
+              }
+            ]
+          }
+        }
+      ],
+      "controls": []
+    },
+    {
+      "id": "E4-B01",
+      "track": "B",
+      "setup": {},
+      "events": [
+        {
+          "key": "e1",
+          "raw": {
+            "id": "ev_00000000-0000-4000-8000-000000050012",
+            "type": "conversation.user",
+            "timestamp": "2026-11-01T12:00:00+00:00",
+            "source": "user",
+            "session_id": "session_e4_b01_s1",
+            "payload": {
+              "text": "Случай R18: Pi5 перегрелся."
+            },
+            "references": [
+              {
+                "kind": "entity",
+                "id": "ent_00000000-0000-4000-8000-000000000001"
+              }
+            ]
+          }
+        },
+        {
+          "key": "e2",
+          "raw": {
+            "id": "ev_00000000-0000-4000-8000-000000050013",
+            "type": "conversation.user",
+            "timestamp": "2026-11-02T12:00:00+00:00",
+            "source": "user",
+            "session_id": "session_e4_b01_s2",
+            "payload": {
+              "text": "Случай R18: проверено охлаждение, обнаружена проблема."
+            },
+            "references": [
+              {
+                "kind": "entity",
+                "id": "ent_00000000-0000-4000-8000-000000000001"
+              }
+            ]
+          }
+        },
+        {
+          "key": "e3",
+          "raw": {
+            "id": "ev_00000000-0000-4000-8000-000000050014",
+            "type": "conversation.user",
+            "timestamp": "2026-11-04T12:00:00+00:00",
+            "source": "user",
+            "session_id": "session_e4_b01_s3",
+            "payload": {
+              "text": "Случай R18: установлен новый вентилятор."
+            },
+            "references": [
+              {
+                "kind": "entity",
+                "id": "ent_00000000-0000-4000-8000-000000000001"
+              },
+              {
+                "kind": "entity",
+                "id": "ent_00000000-0000-4000-8000-000000000006"
+              }
+            ]
+          }
+        },
+        {
+          "key": "e4",
+          "raw": {
+            "id": "ev_00000000-0000-4000-8000-000000050015",
+            "type": "conversation.user",
+            "timestamp": "2026-11-05T12:00:00+00:00",
+            "source": "user",
+            "session_id": "session_e4_b01_s4",
+            "payload": {
+              "text": "Случай R18: контрольный замер после ремонта."
+            },
+            "references": [
+              {
+                "kind": "entity",
+                "id": "ent_00000000-0000-4000-8000-000000000001"
+              }
+            ]
+          }
+        }
+      ],
+      "controls": []
+    },
+    {
+      "id": "E4-B02",
+      "track": "B",
+      "setup": {},
+      "events": [
+        {
+          "key": "e1",
+          "raw": {
+            "id": "ev_00000000-0000-4000-8000-000000050016",
+            "type": "conversation.user",
+            "timestamp": "2026-11-01T12:00:00+00:00",
+            "source": "user",
+            "session_id": "session_e4_b02_s1",
+            "payload": {
+              "text": "Pi5 перегрелся при сборке системы."
+            },
+            "references": [
+              {
+                "kind": "entity",
+                "id": "ent_00000000-0000-4000-8000-000000000001"
+              }
+            ]
+          }
+        },
+        {
+          "key": "e2",
+          "raw": {
+            "id": "ev_00000000-0000-4000-8000-000000050017",
+            "type": "conversation.user",
+            "timestamp": "2026-11-08T12:00:00+00:00",
+            "source": "user",
+            "session_id": "session_e4_b02_s2",
+            "payload": {
+              "text": "Через неделю Pi5 снова нагрелся."
+            },
+            "references": [
+              {
+                "kind": "entity",
+                "id": "ent_00000000-0000-4000-8000-000000000001"
+              }
+            ]
+          }
+        }
+      ],
+      "controls": []
+    },
+    {
+      "id": "E4-B03",
+      "track": "B",
+      "setup": {},
+      "events": [
+        {
+          "key": "e1",
+          "raw": {
+            "id": "ev_00000000-0000-4000-8000-000000050018",
+            "type": "conversation.user",
+            "timestamp": "2026-11-01T12:00:00+00:00",
+            "source": "user",
+            "session_id": "session_e4_b03_s1",
+            "payload": {
+              "text": "Открыл тикет T77 по сбою охлаждения Pi5."
+            },
+            "references": [
+              {
+                "kind": "entity",
+                "id": "ent_00000000-0000-4000-8000-000000000001"
+              }
+            ]
+          }
+        },
+        {
+          "key": "e2",
+          "raw": {
+            "id": "ev_00000000-0000-4000-8000-000000050019",
+            "type": "conversation.user",
+            "timestamp": "2026-11-02T13:00:00+00:00",
+            "source": "user",
+            "session_id": "session_e4_b03_s2",
+            "payload": {
+              "text": "Продолжаю тикет T77: результаты диагностики."
+            },
+            "references": [
+              {
+                "kind": "entity",
+                "id": "ent_00000000-0000-4000-8000-000000000001"
+              }
+            ]
+          }
+        }
+      ],
+      "controls": []
+    },
+    {
+      "id": "E4-B04",
+      "track": "B",
+      "setup": {},
+      "events": [
+        {
+          "key": "e1",
+          "raw": {
+            "id": "ev_00000000-0000-4000-8000-000000050020",
+            "type": "conversation.user",
+            "timestamp": "2026-11-01T12:00:00+00:00",
+            "source": "user",
+            "session_id": "session_e4_b04_s1",
+            "payload": {
+              "text": "Не работает вентилятор охлаждения."
+            },
+            "references": [
+              {
+                "kind": "entity",
+                "id": "ent_00000000-0000-4000-8000-000000000006"
+              }
+            ]
+          }
+        },
+        {
+          "key": "e2",
+          "raw": {
+            "id": "ev_00000000-0000-4000-8000-000000050021",
+            "type": "conversation.user",
+            "timestamp": "2026-11-01T12:05:00+00:00",
+            "source": "user",
+            "session_id": "session_e4_b04_s1",
+            "payload": {
+              "text": "Отказал блок питания."
+            },
+            "references": [
+              {
+                "kind": "entity",
+                "id": "ent_00000000-0000-4000-8000-000000000004"
+              }
+            ]
+          }
+        },
+        {
+          "key": "e3",
+          "raw": {
+            "id": "ev_00000000-0000-4000-8000-000000050022",
+            "type": "conversation.user",
+            "timestamp": "2026-11-01T12:08:00+00:00",
+            "source": "user",
+            "session_id": "session_e4_b04_s1",
+            "payload": {
+              "text": "Оба отказа относятся к одному аварийному событию A9."
+            },
+            "references": [
+              {
+                "kind": "entity",
+                "id": "ent_00000000-0000-4000-8000-000000000006"
+              },
+              {
+                "kind": "entity",
+                "id": "ent_00000000-0000-4000-8000-000000000004"
+              }
+            ]
+          }
+        }
+      ],
+      "controls": []
+    },
+    {
+      "id": "E4-B05",
+      "track": "B",
+      "setup": {},
+      "events": [
+        {
+          "key": "e1",
+          "raw": {
+            "id": "ev_00000000-0000-4000-8000-000000050023",
+            "type": "conversation.user",
+            "timestamp": "2026-11-01T12:00:00+00:00",
+            "source": "user",
+            "session_id": "session_e4_b05_s1",
+            "payload": {
+              "text": "Заменили адаптер Pi5."
+            },
+            "references": [
+              {
+                "kind": "entity",
+                "id": "ent_00000000-0000-4000-8000-000000000004"
+              }
+            ]
+          }
+        },
+        {
+          "key": "e2",
+          "raw": {
+            "id": "ev_00000000-0000-4000-8000-000000050024",
+            "type": "conversation.user",
+            "timestamp": "2026-11-03T12:00:00+00:00",
+            "source": "user",
+            "session_id": "session_e4_b05_s2",
+            "payload": {
+              "text": "Вчера всё исправили."
+            },
+            "references": []
+          }
+        }
+      ],
+      "controls": []
+    },
+    {
+      "id": "E4-B06",
+      "track": "B",
+      "setup": {},
+      "events": [
+        {
+          "key": "e1",
+          "raw": {
+            "id": "ev_00000000-0000-4000-8000-000000050025",
+            "type": "conversation.user",
+            "timestamp": "2026-11-01T12:00:00+00:00",
+            "source": "user",
+            "session_id": "session_e4_b06_s1",
+            "payload": {
+              "text": "Отчёт группы B: наблюдение в 11:00; часы не синхронизированы."
+            },
+            "references": [
+              {
+                "kind": "entity",
+                "id": "ent_00000000-0000-4000-8000-000000000001"
+              }
+            ]
+          }
+        },
+        {
+          "key": "e2",
+          "raw": {
+            "id": "ev_00000000-0000-4000-8000-000000050026",
+            "type": "conversation.user",
+            "timestamp": "2026-11-01T12:10:00+00:00",
+            "source": "operator.remote",
+            "session_id": "session_e4_b06_s1",
+            "payload": {
+              "text": "Отчёт группы A: наблюдение в 10:00; другой источник времени."
+            },
+            "references": [
+              {
+                "kind": "entity",
+                "id": "ent_00000000-0000-4000-8000-000000000001"
+              }
+            ]
+          }
+        }
+      ],
+      "controls": []
+    },
+    {
+      "id": "E4-C01",
+      "track": "C",
+      "setup": {},
+      "events": [
+        {
+          "key": "e1",
+          "raw": {
+            "id": "ev_00000000-0000-4000-8000-000000050027",
+            "type": "conversation.user",
+            "timestamp": "2026-11-01T12:00:00+00:00",
+            "source": "user",
+            "session_id": "session_e4_c01_s1",
+            "payload": {
+              "text": "Блок питания моего Pi5 перестал работать."
+            },
+            "references": [
+              {
+                "kind": "entity",
+                "id": "ent_00000000-0000-4000-8000-000000000004"
+              }
+            ]
+          }
+        },
+        {
+          "key": "e2",
+          "raw": {
+            "id": "ev_00000000-0000-4000-8000-000000050028",
+            "type": "conversation.user",
+            "timestamp": "2026-11-01T12:03:00+00:00",
+            "source": "user",
+            "session_id": "session_e4_c01_s1",
+            "payload": {
+              "text": "Заменил адаптер, устройство запустилось."
+            },
+            "references": []
+          }
+        },
+        {
+          "key": "e3",
+          "raw": {
+            "id": "ev_00000000-0000-4000-8000-000000050029",
+            "type": "conversation.user",
+            "timestamp": "2026-11-01T12:05:00+00:00",
+            "source": "user",
+            "session_id": "session_e4_c01_s1",
+            "payload": {
+              "text": "Под адаптером я имел в виду тот же блок питания Pi5."
+            },
+            "references": [
+              {
+                "kind": "entity",
+                "id": "ent_00000000-0000-4000-8000-000000000004"
+              }
+            ]
+          }
+        }
+      ],
+      "controls": []
+    },
+    {
+      "id": "E4-C02",
+      "track": "C",
+      "setup": {},
+      "events": [
+        {
+          "key": "e1",
+          "raw": {
+            "id": "ev_00000000-0000-4000-8000-000000050030",
+            "type": "conversation.user",
+            "timestamp": "2026-11-01T12:00:00+00:00",
+            "source": "user",
+            "session_id": "session_e4_c02_s1",
+            "payload": {
+              "text": "Адаптер сломался."
+            },
+            "references": []
+          }
+        }
+      ],
+      "controls": []
+    },
+    {
+      "id": "E4-C03",
+      "track": "C",
+      "setup": {
+        "known_aliases": [
+          {
+            "surface": "PSU",
+            "entity_key": "psu",
+            "scope": "user_pi5",
+            "status": "verified_speaker_intent",
+            "source_ref": "fixture_precondition"
+          }
+        ]
+      },
+      "events": [
+        {
+          "key": "e1",
+          "raw": {
+            "id": "ev_00000000-0000-4000-8000-000000050031",
+            "type": "conversation.user",
+            "timestamp": "2026-11-01T12:00:00+00:00",
+            "source": "user",
+            "session_id": "session_e4_c03_s1",
+            "payload": {
+              "text": "Снова подключил PSU к Raspberry Pi."
+            },
+            "references": [
+              {
+                "kind": "entity",
+                "id": "ent_00000000-0000-4000-8000-000000000001"
+              }
+            ]
+          }
+        }
+      ],
+      "controls": []
+    },
+    {
+      "id": "E4-C04",
+      "track": "C",
+      "setup": {},
+      "events": [
+        {
+          "key": "e1",
+          "raw": {
+            "id": "ev_00000000-0000-4000-8000-000000050032",
+            "type": "conversation.user",
+            "timestamp": "2026-11-01T12:00:00+00:00",
+            "source": "user",
+            "session_id": "session_e4_c04_s1",
+            "payload": {
+              "text": "USB Wi-Fi адаптер в ноутбуке отсоединился."
+            },
+            "references": [
+              {
+                "kind": "entity",
+                "id": "ent_00000000-0000-4000-8000-000000000005"
+              }
+            ]
+          }
+        },
+        {
+          "key": "e2",
+          "raw": {
+            "id": "ev_00000000-0000-4000-8000-000000050033",
+            "type": "conversation.user",
+            "timestamp": "2026-11-01T12:02:00+00:00",
+            "source": "user",
+            "session_id": "session_e4_c04_s1",
+            "payload": {
+              "text": "Адаптер питания Pi5 подключён к розетке."
+            },
+            "references": [
+              {
+                "kind": "entity",
+                "id": "ent_00000000-0000-4000-8000-000000000004"
+              }
+            ]
+          }
+        }
+      ],
+      "controls": []
+    },
+    {
+      "id": "E4-C05",
+      "track": "C",
+      "setup": {
+        "prior_candidate": {
+          "surface": "адаптер",
+          "target": "psu",
+          "status": "unverified"
+        }
+      },
+      "events": [
+        {
+          "key": "e1",
+          "raw": {
+            "id": "ev_00000000-0000-4000-8000-000000050034",
+            "type": "conversation.user",
+            "timestamp": "2026-11-01T12:00:00+00:00",
+            "source": "user",
+            "session_id": "session_e4_c05_s1",
+            "payload": {
+              "text": "Мне кажется, адаптер — это блок питания."
+            },
+            "references": []
+          }
+        },
+        {
+          "key": "e2",
+          "raw": {
+            "id": "ev_00000000-0000-4000-8000-000000050035",
+            "type": "conversation.user",
+            "timestamp": "2026-11-01T12:02:00+00:00",
+            "source": "user",
+            "session_id": "session_e4_c05_s1",
+            "payload": {
+              "text": "Поправка: здесь адаптер USB сетевой, не блок питания."
+            },
+            "references": [
+              {
+                "kind": "entity",
+                "id": "ent_00000000-0000-4000-8000-000000000005"
+              }
+            ]
+          }
+        }
+      ],
+      "controls": []
+    },
+    {
+      "id": "E4-C06",
+      "track": "C",
+      "setup": {},
+      "events": [
+        {
+          "key": "e1",
+          "raw": {
+            "id": "ev_00000000-0000-4000-8000-000000050036",
+            "type": "conversation.user",
+            "timestamp": "2026-11-01T12:00:00+00:00",
+            "source": "user",
+            "session_id": "session_e4_c06_s1",
+            "payload": {
+              "text": "PSU ноутбука заменили."
+            },
+            "references": [
+              {
+                "kind": "entity",
+                "id": "ent_00000000-0000-4000-8000-000000000010"
+              }
+            ]
+          }
+        },
+        {
+          "key": "e2",
+          "raw": {
+            "id": "ev_00000000-0000-4000-8000-000000050037",
+            "type": "conversation.user",
+            "timestamp": "2026-11-01T12:03:00+00:00",
+            "source": "user",
+            "session_id": "session_e4_c06_s1",
+            "payload": {
+              "text": "PSU Raspberry Pi проверили."
+            },
+            "references": [
+              {
+                "kind": "entity",
+                "id": "ent_00000000-0000-4000-8000-000000000001"
+              }
+            ]
+          }
+        }
+      ],
+      "controls": []
+    },
+    {
+      "id": "E4-D01",
+      "track": "D",
+      "setup": {
+        "prior_projection": {
+          "episode_group": [
+            "e1",
+            "e2"
+          ],
+          "version": 1
+        }
+      },
+      "events": [
+        {
+          "key": "e1",
+          "raw": {
+            "id": "ev_00000000-0000-4000-8000-000000050038",
+            "type": "conversation.user",
+            "timestamp": "2026-11-01T12:00:00+00:00",
+            "source": "user",
+            "session_id": "session_e4_d01_s1",
+            "payload": {
+              "text": "Pi5 перегрелся в тесте A."
+            },
+            "references": [
+              {
+                "kind": "entity",
+                "id": "ent_00000000-0000-4000-8000-000000000001"
+              }
+            ]
+          }
+        },
+        {
+          "key": "e2",
+          "raw": {
+            "id": "ev_00000000-0000-4000-8000-000000050039",
+            "type": "conversation.user",
+            "timestamp": "2026-11-01T12:02:00+00:00",
+            "source": "user",
+            "session_id": "session_e4_d01_s1",
+            "payload": {
+              "text": "Pi5 перегрелся в тесте B."
+            },
+            "references": [
+              {
+                "kind": "entity",
+                "id": "ent_00000000-0000-4000-8000-000000000001"
+              }
+            ]
+          }
+        },
+        {
+          "key": "e3",
+          "raw": {
+            "id": "ev_00000000-0000-4000-8000-000000050040",
+            "type": "conversation.user",
+            "timestamp": "2026-11-01T12:04:00+00:00",
+            "source": "user",
+            "session_id": "session_e4_d01_s1",
+            "payload": {
+              "text": "Это были два независимых испытания; их нельзя объединять."
+            },
+            "references": [
+              {
+                "kind": "entity",
+                "id": "ent_00000000-0000-4000-8000-000000000001"
+              }
+            ]
+          }
+        }
+      ],
+      "controls": []
+    },
+    {
+      "id": "E4-D02",
+      "track": "D",
+      "setup": {},
+      "events": [
+        {
+          "key": "e1",
+          "raw": {
+            "id": "ev_00000000-0000-4000-8000-000000050041",
+            "type": "device.temperature",
+            "timestamp": "2026-11-01T12:00:00+00:00",
+            "source": "sensor.pi5",
+            "session_id": "session_e4_d02_s1",
+            "payload": {
+              "text": "sensor=Pi5 temp=66C id=m28"
+            },
+            "references": [
+              {
+                "kind": "entity",
+                "id": "ent_00000000-0000-4000-8000-000000000001"
+              }
+            ]
+          }
+        }
+      ],
+      "controls": [
+        {
+          "at": "2026-11-01T12:02:00+00:00",
+          "kind": "deliver_duplicate",
+          "event_key": "e1"
+        }
+      ]
+    },
+    {
+      "id": "E4-D03",
+      "track": "D",
+      "setup": {},
+      "events": [
+        {
+          "key": "e1",
+          "raw": {
+            "id": "ev_00000000-0000-4000-8000-000000050042",
+            "type": "device.temperature",
+            "timestamp": "2026-11-01T12:00:00+00:00",
+            "source": "sensor.pi5",
+            "session_id": "session_e4_d03_s1",
+            "payload": {
+              "text": "sensor=Pi5 temp=66C id=m28"
+            },
+            "references": [
+              {
+                "kind": "entity",
+                "id": "ent_00000000-0000-4000-8000-000000000001"
+              }
+            ]
+          }
+        }
+      ],
+      "controls": [
+        {
+          "at": "2026-11-01T12:02:00+00:00",
+          "kind": "deliver_conflict",
+          "event_key": "e1",
+          "replacement_text": "sensor=Pi5 temp=99C id=m28"
+        }
+      ]
+    },
+    {
+      "id": "E4-D04",
+      "track": "D",
+      "setup": {},
+      "events": [
+        {
+          "key": "e1",
+          "raw": {
+            "id": "ev_00000000-0000-4000-8000-000000050043",
+            "type": "device.temperature",
+            "timestamp": "2026-11-01T12:00:00+00:00",
+            "source": "sensor.pi5",
+            "session_id": "session_e4_d04_s1",
+            "payload": {
+              "text": "Pi5 температура сегодня 60C."
+            },
+            "references": [
+              {
+                "kind": "entity",
+                "id": "ent_00000000-0000-4000-8000-000000000001"
+              }
+            ]
+          }
+        },
+        {
+          "key": "e2",
+          "raw": {
+            "id": "ev_00000000-0000-4000-8000-000000050044",
+            "type": "device.temperature",
+            "timestamp": "2026-11-02T12:00:00+00:00",
+            "source": "sensor.pi5",
+            "session_id": "session_e4_d04_s2",
+            "payload": {
+              "text": "Доставлено только сейчас: измерено вчера утром, часы датчика не проверены."
+            },
+            "references": [
+              {
+                "kind": "entity",
+                "id": "ent_00000000-0000-4000-8000-000000000001"
+              }
+            ]
+          }
+        }
+      ],
+      "controls": []
+    },
+    {
+      "id": "E4-D05",
+      "track": "D",
+      "setup": {},
+      "events": [
+        {
+          "key": "e1",
+          "raw": {
+            "id": "ev_00000000-0000-4000-8000-000000050045",
+            "type": "conversation.user",
+            "timestamp": "2026-11-01T12:00:00+00:00",
+            "source": "user",
+            "session_id": "session_e4_d05_s1",
+            "payload": {
+              "text": "Результат диагностики версии 1."
+            },
+            "references": [
+              {
+                "kind": "entity",
+                "id": "ent_00000000-0000-4000-8000-000000000001"
+              }
+            ]
+          }
+        },
+        {
+          "key": "e2",
+          "raw": {
+            "id": "ev_00000000-0000-4000-8000-000000050046",
+            "type": "conversation.user",
+            "timestamp": "2026-11-01T12:02:00+00:00",
+            "source": "user",
+            "session_id": "session_e4_d05_s1",
+            "payload": {
+              "text": "Уточнение диагностики, версия 2."
+            },
+            "references": [
+              {
+                "kind": "entity",
+                "id": "ent_00000000-0000-4000-8000-000000000001"
+              }
+            ]
+          }
+        }
+      ],
+      "controls": [
+        {
+          "at": "2026-11-01T12:03:00+00:00",
+          "kind": "sleep.publish_derived",
+          "based_on_version": 1,
+          "source_current_version": 2
+        }
+      ]
+    },
+    {
+      "id": "E4-U01",
+      "track": "U",
+      "setup": {},
+      "events": [
+        {
+          "key": "e1",
+          "raw": {
+            "id": "ev_00000000-0000-4000-8000-000000050047",
+            "type": "conversation.user",
+            "timestamp": "2026-11-01T12:00:00+00:00",
+            "source": "user",
+            "session_id": "session_e4_u01_s1",
+            "payload": {
+              "text": "Устройство называется «клёпик»; пока не важно."
+            },
+            "references": []
+          }
+        }
+      ],
+      "controls": []
+    },
+    {
+      "id": "E4-U02",
+      "track": "U",
+      "setup": {
+        "risk_class": "hardware_power_uncertain",
+        "permission": "not_granted"
+      },
+      "events": [
+        {
+          "key": "e1",
+          "raw": {
+            "id": "ev_00000000-0000-4000-8000-000000050048",
+            "type": "conversation.user",
+            "timestamp": "2026-11-01T12:00:00+00:00",
+            "source": "user",
+            "session_id": "session_e4_u02_s1",
+            "payload": {
+              "text": "Нужно подключить питание, но неизвестно, какой из двух адаптеров подходит."
+            },
+            "references": [
+              {
+                "kind": "entity",
+                "id": "ent_00000000-0000-4000-8000-000000000001"
+              },
+              {
+                "kind": "entity",
+                "id": "ent_00000000-0000-4000-8000-000000000004"
+              }
+            ]
+          }
+        }
+      ],
+      "controls": []
+    },
+    {
+      "id": "E4-U03",
+      "track": "U",
+      "setup": {},
+      "events": [
+        {
+          "key": "e1",
+          "raw": {
+            "id": "ev_00000000-0000-4000-8000-000000050049",
+            "type": "conversation.user",
+            "timestamp": "2026-11-01T12:00:00+00:00",
+            "source": "user",
+            "session_id": "session_e4_u03_s1",
+            "payload": {
+              "text": "Что за адаптер у Pi5?"
+            },
+            "references": [
+              {
+                "kind": "entity",
+                "id": "ent_00000000-0000-4000-8000-000000000001"
+              }
+            ]
+          }
+        },
+        {
+          "key": "e2",
+          "raw": {
+            "id": "ev_00000000-0000-4000-8000-000000050050",
+            "type": "conversation.user",
+            "timestamp": "2026-11-01T12:01:00+00:00",
+            "source": "user",
+            "session_id": "session_e4_u03_s1",
+            "payload": {
+              "text": "Всё ещё неизвестна модель адаптера Pi5."
+            },
+            "references": [
+              {
+                "kind": "entity",
+                "id": "ent_00000000-0000-4000-8000-000000000001"
+              }
+            ]
+          }
+        },
+        {
+          "key": "e3",
+          "raw": {
+            "id": "ev_00000000-0000-4000-8000-000000050051",
+            "type": "conversation.user",
+            "timestamp": "2026-11-01T12:02:00+00:00",
+            "source": "user",
+            "session_id": "session_e4_u03_s1",
+            "payload": {
+              "text": "Не знаю модель этого адаптера Pi5."
+            },
+            "references": [
+              {
+                "kind": "entity",
+                "id": "ent_00000000-0000-4000-8000-000000000001"
+              }
+            ]
+          }
+        }
+      ],
+      "controls": []
+    },
+    {
+      "id": "E4-U04",
+      "track": "U",
+      "setup": {},
+      "events": [
+        {
+          "key": "e1",
+          "raw": {
+            "id": "ev_00000000-0000-4000-8000-000000050052",
+            "type": "conversation.user",
+            "timestamp": "2026-11-01T12:00:00+00:00",
+            "source": "user",
+            "session_id": "session_e4_u04_s1",
+            "payload": {
+              "text": "Неясно, какую плату я имел в виду."
+            },
+            "references": []
+          }
+        },
+        {
+          "key": "e2",
+          "raw": {
+            "id": "ev_00000000-0000-4000-8000-000000050053",
+            "type": "conversation.user",
+            "timestamp": "2026-11-01T12:08:00+00:00",
+            "source": "user",
+            "session_id": "session_e4_u04_s1",
+            "payload": {
+              "text": "Я не хочу сейчас отвечать на вопросы об этом."
+            },
+            "references": []
+          }
+        }
+      ],
+      "controls": []
+    },
+    {
+      "id": "E4-U05",
+      "track": "U",
+      "setup": {},
+      "events": [
+        {
+          "key": "e1",
+          "raw": {
+            "id": "ev_00000000-0000-4000-8000-000000050054",
+            "type": "conversation.user",
+            "timestamp": "2026-11-01T12:00:00+00:00",
+            "source": "user",
+            "session_id": "session_e4_u05_s1",
+            "payload": {
+              "text": "Я поменял «чёрную коробочку» на Pi5."
+            },
+            "references": []
+          }
+        },
+        {
+          "key": "e2",
+          "raw": {
+            "id": "ev_00000000-0000-4000-8000-000000050055",
+            "type": "conversation.user",
+            "timestamp": "2026-11-01T12:04:00+00:00",
+            "source": "user",
+            "session_id": "session_e4_u05_s1",
+            "payload": {
+              "text": "Под «чёрной коробочкой» я имел в виду блок питания."
+            },
+            "references": [
+              {
+                "kind": "entity",
+                "id": "ent_00000000-0000-4000-8000-000000000004"
+              }
+            ]
+          }
+        }
+      ],
+      "controls": []
+    },
+    {
+      "id": "E4-U06",
+      "track": "U",
+      "setup": {},
+      "events": [
+        {
+          "key": "e1",
+          "raw": {
+            "id": "ev_00000000-0000-4000-8000-000000050056",
+            "type": "conversation.user",
+            "timestamp": "2026-11-01T12:00:00+00:00",
+            "source": "user",
+            "session_id": "session_e4_u06_s1",
+            "payload": {
+              "text": "Причина временных отключений остаётся неизвестной."
+            },
+            "references": [
+              {
+                "kind": "entity",
+                "id": "ent_00000000-0000-4000-8000-000000000001"
+              }
+            ]
+          }
+        }
+      ],
+      "controls": [
+        {
+          "at": "2026-11-01T12:03:00+00:00",
+          "kind": "method.result",
+          "method": "local_search",
+          "result": "insufficient_evidence",
+          "source_version": 1
+        }
+      ]
+    },
+    {
+      "id": "E4-R01",
+      "track": "R",
+      "setup": {
+        "higher_priority_task": "existing_goal",
+        "resources": "busy"
+      },
+      "events": [
+        {
+          "key": "e1",
+          "raw": {
+            "id": "ev_00000000-0000-4000-8000-000000050057",
+            "type": "conversation.user",
+            "timestamp": "2026-11-01T12:00:00+00:00",
+            "source": "user",
+            "session_id": "session_e4_r01_s1",
+            "payload": {
+              "text": "Нужно выяснить, почему теряется Wi-Fi."
+            },
+            "references": [
+              {
+                "kind": "entity",
+                "id": "ent_00000000-0000-4000-8000-000000000003"
+              }
+            ]
+          }
+        }
+      ],
+      "controls": []
+    },
+    {
+      "id": "E4-R02",
+      "track": "R",
+      "setup": {},
+      "events": [
+        {
+          "key": "e1",
+          "raw": {
+            "id": "ev_00000000-0000-4000-8000-000000050058",
+            "type": "conversation.user",
+            "timestamp": "2026-11-01T12:00:00+00:00",
+            "source": "user",
+            "session_id": "session_e4_r02_s1",
+            "payload": {
+              "text": "Для исследования нужна камера, но она недоступна."
+            },
+            "references": [
+              {
+                "kind": "entity",
+                "id": "ent_00000000-0000-4000-8000-000000000008"
+              }
+            ]
+          }
+        }
+      ],
+      "controls": [
+        {
+          "at": "2026-11-01T12:05:00+00:00",
+          "kind": "time.tick"
+        },
+        {
+          "at": "2026-11-01T13:00:00+00:00",
+          "kind": "capability.available",
+          "capability": "camera",
+          "permission": "granted"
+        }
+      ]
+    },
+    {
+      "id": "E4-R03",
+      "track": "R",
+      "setup": {
+        "next_eligible_at": "2026-11-01T14:00:00+00:00",
+        "priority": "important",
+        "budget": "small"
+      },
+      "events": [
+        {
+          "key": "e1",
+          "raw": {
+            "id": "ev_00000000-0000-4000-8000-000000050059",
+            "type": "conversation.user",
+            "timestamp": "2026-11-01T12:00:00+00:00",
+            "source": "user",
+            "session_id": "session_e4_r03_s1",
+            "payload": {
+              "text": "Важно регулярно проверять причину нестабильности Pi5."
+            },
+            "references": [
+              {
+                "kind": "entity",
+                "id": "ent_00000000-0000-4000-8000-000000000001"
+              }
+            ]
+          }
+        }
+      ],
+      "controls": [
+        {
+          "at": "2026-11-01T14:00:00+00:00",
+          "kind": "time.tick",
+          "occurrence_key": "review1"
+        }
+      ]
+    },
+    {
+      "id": "E4-R04",
+      "track": "R",
+      "setup": {
+        "next_eligible_at": "2026-11-01T12:30:00+00:00"
+      },
+      "events": [
+        {
+          "key": "e1",
+          "raw": {
+            "id": "ev_00000000-0000-4000-8000-000000050060",
+            "type": "conversation.user",
+            "timestamp": "2026-11-01T12:00:00+00:00",
+            "source": "user",
+            "session_id": "session_e4_r04_s1",
+            "payload": {
+              "text": "Периодическая проверка журнала ошибок."
+            },
+            "references": [
+              {
+                "kind": "entity",
+                "id": "ent_00000000-0000-4000-8000-000000000001"
+              }
+            ]
+          }
+        }
+      ],
+      "controls": [
+        {
+          "at": "2026-11-01T12:30:00+00:00",
+          "kind": "time.tick",
+          "occurrence_key": "o1"
+        },
+        {
+          "at": "2026-11-01T12:30:00+00:00",
+          "kind": "time.tick",
+          "occurrence_key": "o1"
+        }
+      ]
+    },
+    {
+      "id": "E4-R05",
+      "track": "R",
+      "setup": {
+        "next_eligible_at": "2026-11-01T13:30:00+00:00"
+      },
+      "events": [
+        {
+          "key": "e1",
+          "raw": {
+            "id": "ev_00000000-0000-4000-8000-000000050061",
+            "type": "conversation.user",
+            "timestamp": "2026-11-01T12:00:00+00:00",
+            "source": "user",
+            "session_id": "session_e4_r05_s1",
+            "payload": {
+              "text": "Исследуем редкий сбой Pi5."
+            },
+            "references": [
+              {
+                "kind": "entity",
+                "id": "ent_00000000-0000-4000-8000-000000000001"
+              }
+            ]
+          }
+        },
+        {
+          "key": "e2",
+          "raw": {
+            "id": "ev_00000000-0000-4000-8000-000000050062",
+            "type": "conversation.user",
+            "timestamp": "2026-11-01T12:20:00+00:00",
+            "source": "user",
+            "session_id": "session_e4_r05_s2",
+            "payload": {
+              "text": "Появился новый журнал сбоя Pi5."
+            },
+            "references": [
+              {
+                "kind": "entity",
+                "id": "ent_00000000-0000-4000-8000-000000000001"
+              }
+            ]
+          }
+        }
+      ],
+      "controls": [
+        {
+          "at": "2026-11-01T13:30:00+00:00",
+          "kind": "time.tick",
+          "occurrence_key": "o_due"
+        }
+      ]
+    },
+    {
+      "id": "E4-R06",
+      "track": "R",
+      "setup": {},
+      "events": [
+        {
+          "key": "e1",
+          "raw": {
+            "id": "ev_00000000-0000-4000-8000-000000050063",
+            "type": "conversation.user",
+            "timestamp": "2026-11-01T12:00:00+00:00",
+            "source": "user",
+            "session_id": "session_e4_r06_s1",
+            "payload": {
+              "text": "Запустить безопасную локальную проверку конфигурации."
+            },
+            "references": [
+              {
+                "kind": "entity",
+                "id": "ent_00000000-0000-4000-8000-000000000001"
+              }
+            ]
+          }
+        }
+      ],
+      "controls": [
+        {
+          "at": "2026-11-01T12:02:00+00:00",
+          "kind": "execution.claim",
+          "occurrence_key": "o1"
+        },
+        {
+          "at": "2026-11-01T12:02:00+00:00",
+          "kind": "execution.crash",
+          "point": "after_claim_before_effect"
+        },
+        {
+          "at": "2026-11-01T12:03:00+00:00",
+          "kind": "runtime.restart"
+        },
+        {
+          "at": "2026-11-01T12:04:00+00:00",
+          "kind": "time.tick",
+          "occurrence_key": "o1"
+        }
+      ]
+    },
+    {
+      "id": "E4-R07",
+      "track": "R",
+      "setup": {},
+      "events": [
+        {
+          "key": "e1",
+          "raw": {
+            "id": "ev_00000000-0000-4000-8000-000000050064",
+            "type": "conversation.user",
+            "timestamp": "2026-11-01T12:00:00+00:00",
+            "source": "user",
+            "session_id": "session_e4_r07_s1",
+            "payload": {
+              "text": "Запланировано изучение 1000 записей журнала Pi5."
+            },
+            "references": [
+              {
+                "kind": "entity",
+                "id": "ent_00000000-0000-4000-8000-000000000001"
+              }
+            ]
+          }
+        }
+      ],
+      "controls": [
+        {
+          "at": "2026-11-01T12:05:00+00:00",
+          "kind": "task.checkpoint",
+          "cursor": 400
+        },
+        {
+          "at": "2026-11-01T12:06:00+00:00",
+          "kind": "execution.interrupt"
+        },
+        {
+          "at": "2026-11-01T12:30:00+00:00",
+          "kind": "runtime.restart"
+        }
+      ]
+    },
+    {
+      "id": "E4-R08",
+      "track": "R",
+      "setup": {},
+      "events": [
+        {
+          "key": "e1",
+          "raw": {
+            "id": "ev_00000000-0000-4000-8000-000000050065",
+            "type": "conversation.user",
+            "timestamp": "2026-11-01T12:00:00+00:00",
+            "source": "user",
+            "session_id": "session_e4_r08_s1",
+            "payload": {
+              "text": "Исследование запускается каждые 2 часа."
+            },
+            "references": []
+          }
+        }
+      ],
+      "controls": [
+        {
+          "at": "2026-11-01T14:00:00+00:00",
+          "kind": "time.tick",
+          "occurrence_key": "o1"
+        },
+        {
+          "at": "2026-11-01T14:00:00+00:00",
+          "kind": "clock.adjust",
+          "wall_time_delta_seconds": -3600
+        },
+        {
+          "at": "2026-11-01T14:01:00+00:00",
+          "kind": "time.tick",
+          "occurrence_key": "o1"
+        }
+      ]
+    },
+    {
+      "id": "E4-P01",
+      "track": "P",
+      "setup": {
+        "cpu_budget": "low",
+        "other_goal": "urgent"
+      },
+      "events": [
+        {
+          "key": "e1",
+          "raw": {
+            "id": "ev_00000000-0000-4000-8000-000000050066",
+            "type": "conversation.user",
+            "timestamp": "2026-11-01T12:00:00+00:00",
+            "source": "user",
+            "session_id": "session_e4_p01_s1",
+            "payload": {
+              "text": "Новый неизвестный термин встречается во время выполнения срочной задачи."
+            },
+            "references": []
+          }
+        }
+      ],
+      "controls": []
+    },
+    {
+      "id": "E4-P02",
+      "track": "P",
+      "setup": {
+        "network": "available",
+        "authorization": "denied"
+      },
+      "events": [
+        {
+          "key": "e1",
+          "raw": {
+            "id": "ev_00000000-0000-4000-8000-000000050067",
+            "type": "conversation.user",
+            "timestamp": "2026-11-01T12:00:00+00:00",
+            "source": "user",
+            "session_id": "session_e4_p02_s1",
+            "payload": {
+              "text": "Для уточнения нужен внешний сервис, но разрешение не получено."
+            },
+            "references": []
+          }
+        }
+      ],
+      "controls": []
+    },
+    {
+      "id": "E4-P03",
+      "track": "P",
+      "setup": {
+        "user_status": "busy",
+        "question_budget": 0
+      },
+      "events": [
+        {
+          "key": "e1",
+          "raw": {
+            "id": "ev_00000000-0000-4000-8000-000000050068",
+            "type": "conversation.user",
+            "timestamp": "2026-11-01T12:00:00+00:00",
+            "source": "user",
+            "session_id": "session_e4_p03_s1",
+            "payload": {
+              "text": "Неизвестная модель Pi5 адаптера."
+            },
+            "references": [
+              {
+                "kind": "entity",
+                "id": "ent_00000000-0000-4000-8000-000000000001"
+              }
+            ]
+          }
+        },
+        {
+          "key": "e2",
+          "raw": {
+            "id": "ev_00000000-0000-4000-8000-000000050069",
+            "type": "conversation.user",
+            "timestamp": "2026-11-01T12:01:00+00:00",
+            "source": "user",
+            "session_id": "session_e4_p03_s1",
+            "payload": {
+              "text": "Неизвестный серийный номер блока питания Pi5."
+            },
+            "references": [
+              {
+                "kind": "entity",
+                "id": "ent_00000000-0000-4000-8000-000000000001"
+              }
+            ]
+          }
+        }
+      ],
+      "controls": [
+        {
+          "at": "2026-11-01T16:00:00+00:00",
+          "kind": "user.available",
+          "question_budget": 1
+        }
+      ]
+    },
+    {
+      "id": "E4-P04",
+      "track": "P",
+      "setup": {},
+      "events": [
+        {
+          "key": "e1",
+          "raw": {
+            "id": "ev_00000000-0000-4000-8000-000000050070",
+            "type": "conversation.user",
+            "timestamp": "2026-11-01T12:00:00+00:00",
+            "source": "user",
+            "session_id": "session_e4_p04_s1",
+            "payload": {
+              "text": "Возможно, адаптер означает USB-устройство."
+            },
+            "references": []
+          }
+        }
+      ],
+      "controls": [
+        {
+          "at": "2026-11-01T12:02:00+00:00",
+          "kind": "model.proposal",
+          "model_role": "DEEP",
+          "proposal": "adapter refers to WiFi device"
+        }
+      ]
+    },
+    {
+      "id": "E4-P05",
+      "track": "P",
+      "setup": {
+        "common_origin": "e1"
+      },
+      "events": [
+        {
+          "key": "e1",
+          "raw": {
+            "id": "ev_00000000-0000-4000-8000-000000050071",
+            "type": "conversation.user",
+            "timestamp": "2026-11-01T12:00:00+00:00",
+            "source": "user",
+            "session_id": "session_e4_p05_s1",
+            "payload": {
+              "text": "Оригинальное сообщение о температуре Pi5 82C."
+            },
+            "references": [
+              {
+                "kind": "entity",
+                "id": "ent_00000000-0000-4000-8000-000000000001"
+              }
+            ]
+          }
+        },
+        {
+          "key": "e2",
+          "raw": {
+            "id": "ev_00000000-0000-4000-8000-000000050072",
+            "type": "conversation.user",
+            "timestamp": "2026-11-01T12:02:00+00:00",
+            "source": "derived.summary",
+            "session_id": "session_e4_p05_s1",
+            "payload": {
+              "text": "Сводка того же сообщения: Pi5 82C."
+            },
+            "references": [
+              {
+                "kind": "entity",
+                "id": "ent_00000000-0000-4000-8000-000000000001"
+              }
+            ]
+          }
+        }
+      ],
+      "controls": []
+    },
+    {
+      "id": "E4-P06",
+      "track": "P",
+      "setup": {
+        "priority": "important",
+        "next_eligible_at": "2026-11-01T13:00:00+00:00",
+        "last_method_result": "insufficient_evidence"
+      },
+      "events": [
+        {
+          "key": "e1",
+          "raw": {
+            "id": "ev_00000000-0000-4000-8000-000000050073",
+            "type": "conversation.user",
+            "timestamp": "2026-11-01T12:00:00+00:00",
+            "source": "user",
+            "session_id": "session_e4_p06_s1",
+            "payload": {
+              "text": "Причина периодического сбоя ещё не установлена."
+            },
+            "references": [
+              {
+                "kind": "entity",
+                "id": "ent_00000000-0000-4000-8000-000000000001"
+              }
+            ]
+          }
+        }
+      ],
+      "controls": [
+        {
+          "at": "2026-11-01T13:00:00+00:00",
+          "kind": "time.tick",
+          "occurrence_key": "periodic1"
+        },
+        {
+          "at": "2026-11-01T14:00:00+00:00",
+          "kind": "time.tick",
+          "occurrence_key": "periodic2"
+        }
+      ]
+    }
+  ]
+}

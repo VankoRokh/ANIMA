@@ -1,0 +1,954 @@
+{
+  "schema": "anima.memory_e4.gold/0.1",
+  "status": "PROPOSED_NOT_OWNER_ACCEPTED",
+  "source_hash": "not_frozen",
+  "cases": [
+    {
+      "id": "E4-A01",
+      "track": "A",
+      "title": "Один перегрев в пределах одного сеанса",
+      "oracle_type": "safe_system_behavior_not_unobservable_world_truth",
+      "checks": [
+        {
+          "kind": "episode_pair",
+          "expected": "same",
+          "a": "e1",
+          "b": "e2"
+        }
+      ],
+      "forbidden": [
+        "rewrite_raw",
+        "knowledge_confirm"
+      ],
+      "rationale": ""
+    },
+    {
+      "id": "E4-A02",
+      "track": "A",
+      "title": "Похожие измерения разных физических устройств",
+      "oracle_type": "safe_system_behavior_not_unobservable_world_truth",
+      "checks": [
+        {
+          "kind": "episode_pair",
+          "expected": "distinct",
+          "a": "e1",
+          "b": "e2"
+        },
+        {
+          "kind": "story_pair",
+          "expected": "independent",
+          "a": "e1",
+          "b": "e2"
+        }
+      ],
+      "forbidden": [
+        "auto_merge",
+        "assume_alias_globally"
+      ],
+      "rationale": ""
+    },
+    {
+      "id": "E4-A03",
+      "track": "A",
+      "title": "Перемежение двух тем",
+      "oracle_type": "safe_system_behavior_not_unobservable_world_truth",
+      "checks": [
+        {
+          "kind": "episode_pair",
+          "expected": "same",
+          "a": "e1",
+          "b": "e3"
+        },
+        {
+          "kind": "episode_pair",
+          "expected": "distinct",
+          "a": "e1",
+          "b": "e2"
+        }
+      ],
+      "forbidden": [
+        "auto_merge",
+        "rewrite_raw"
+      ],
+      "rationale": ""
+    },
+    {
+      "id": "E4-A04",
+      "track": "A",
+      "title": "Две проекции одного сенсорного замера",
+      "oracle_type": "safe_system_behavior_not_unobservable_world_truth",
+      "checks": [
+        {
+          "kind": "episode_pair",
+          "expected": "insufficient",
+          "a": "e1",
+          "b": "e2"
+        },
+        {
+          "kind": "evidence",
+          "expected": "no_duplicate_evidence"
+        }
+      ],
+      "forbidden": [
+        "duplicate_effect",
+        "knowledge_confirm"
+      ],
+      "rationale": "Matching reading_id from a projection does not make independent witnesses."
+    },
+    {
+      "id": "E4-A05",
+      "track": "A",
+      "title": "Повторная поломка спустя недели",
+      "oracle_type": "safe_system_behavior_not_unobservable_world_truth",
+      "checks": [
+        {
+          "kind": "episode_pair",
+          "expected": "distinct",
+          "a": "e1",
+          "b": "e2"
+        },
+        {
+          "kind": "story_pair",
+          "expected": "independent",
+          "a": "e1",
+          "b": "e2"
+        }
+      ],
+      "forbidden": [
+        "auto_merge"
+      ],
+      "rationale": ""
+    },
+    {
+      "id": "E4-B01",
+      "track": "B",
+      "title": "История диагностики и ремонта через четыре дня",
+      "oracle_type": "safe_system_behavior_not_unobservable_world_truth",
+      "checks": [
+        {
+          "kind": "episode_pair",
+          "expected": "distinct",
+          "a": "e1",
+          "b": "e2"
+        },
+        {
+          "kind": "story_pair",
+          "expected": "linked_distinct_episodes",
+          "a": "e1",
+          "b": "e2"
+        },
+        {
+          "kind": "story_pair",
+          "expected": "linked_distinct_episodes",
+          "a": "e2",
+          "b": "e3"
+        },
+        {
+          "kind": "story_pair",
+          "expected": "linked_distinct_episodes",
+          "a": "e3",
+          "b": "e4"
+        }
+      ],
+      "forbidden": [
+        "auto_merge",
+        "knowledge_confirm"
+      ],
+      "rationale": ""
+    },
+    {
+      "id": "E4-B02",
+      "track": "B",
+      "title": "Один прибор, неоднозначная повторная история",
+      "oracle_type": "safe_system_behavior_not_unobservable_world_truth",
+      "checks": [
+        {
+          "kind": "episode_pair",
+          "expected": "distinct",
+          "a": "e1",
+          "b": "e2"
+        },
+        {
+          "kind": "story_pair",
+          "expected": "candidate_only",
+          "a": "e1",
+          "b": "e2"
+        }
+      ],
+      "forbidden": [
+        "auto_story_confirm"
+      ],
+      "rationale": ""
+    },
+    {
+      "id": "E4-B03",
+      "track": "B",
+      "title": "Явное продолжение кейса после новой сессии",
+      "oracle_type": "safe_system_behavior_not_unobservable_world_truth",
+      "checks": [
+        {
+          "kind": "episode_pair",
+          "expected": "distinct",
+          "a": "e1",
+          "b": "e2"
+        },
+        {
+          "kind": "story_pair",
+          "expected": "linked_distinct_episodes",
+          "a": "e1",
+          "b": "e2"
+        }
+      ],
+      "forbidden": [
+        "auto_merge"
+      ],
+      "rationale": ""
+    },
+    {
+      "id": "E4-B04",
+      "track": "B",
+      "title": "Два устройства в общей аварии",
+      "oracle_type": "safe_system_behavior_not_unobservable_world_truth",
+      "checks": [
+        {
+          "kind": "episode_pair",
+          "expected": "distinct",
+          "a": "e1",
+          "b": "e2"
+        },
+        {
+          "kind": "story_pair",
+          "expected": "linked_distinct_episodes",
+          "a": "e1",
+          "b": "e2"
+        }
+      ],
+      "forbidden": [
+        "auto_merge",
+        "knowledge_confirm"
+      ],
+      "rationale": "The user reports shared context, which supports organization, not verified physical causality."
+    },
+    {
+      "id": "E4-B05",
+      "track": "B",
+      "title": "Неясная анафора о прошлом ремонте",
+      "oracle_type": "safe_system_behavior_not_unobservable_world_truth",
+      "checks": [
+        {
+          "kind": "story_pair",
+          "expected": "insufficient",
+          "a": "e1",
+          "b": "e2"
+        },
+        {
+          "kind": "uncertainty",
+          "expected": "registered"
+        }
+      ],
+      "forbidden": [
+        "auto_story_confirm",
+        "knowledge_confirm"
+      ],
+      "rationale": ""
+    },
+    {
+      "id": "E4-B06",
+      "track": "B",
+      "title": "Не смешивать порядок получения и время события",
+      "oracle_type": "safe_system_behavior_not_unobservable_world_truth",
+      "checks": [
+        {
+          "kind": "temporal",
+          "expected": "unknown_world_order",
+          "a": "e1",
+          "b": "e2"
+        },
+        {
+          "kind": "story_pair",
+          "expected": "candidate_only",
+          "a": "e1",
+          "b": "e2"
+        }
+      ],
+      "forbidden": [
+        "invent_observation_time",
+        "knowledge_confirm"
+      ],
+      "rationale": ""
+    },
+    {
+      "id": "E4-C01",
+      "track": "C",
+      "title": "Локально подтверждённая пользователем идентичность БП",
+      "oracle_type": "safe_system_behavior_not_unobservable_world_truth",
+      "checks": [
+        {
+          "kind": "alias",
+          "expected": "confirmed_in_scope",
+          "from": "адаптер",
+          "to": "psu",
+          "scope": "speaker_intent_pi5"
+        },
+        {
+          "kind": "story_pair",
+          "expected": "linked_distinct_episodes",
+          "a": "e1",
+          "b": "e2"
+        }
+      ],
+      "forbidden": [
+        "promote_user_intent_to_world_fact",
+        "assume_alias_globally"
+      ],
+      "rationale": ""
+    },
+    {
+      "id": "E4-C02",
+      "track": "C",
+      "title": "Неоднозначное слово адаптер без контекста",
+      "oracle_type": "safe_system_behavior_not_unobservable_world_truth",
+      "checks": [
+        {
+          "kind": "alias",
+          "expected": "unresolved",
+          "from": "адаптер",
+          "scope": "unknown"
+        },
+        {
+          "kind": "uncertainty",
+          "expected": "registered"
+        }
+      ],
+      "forbidden": [
+        "assume_alias_globally",
+        "knowledge_confirm"
+      ],
+      "rationale": ""
+    },
+    {
+      "id": "E4-C03",
+      "track": "C",
+      "title": "Повтор известного контекстного алиаса без DEEP",
+      "oracle_type": "safe_system_behavior_not_unobservable_world_truth",
+      "checks": [
+        {
+          "kind": "alias",
+          "expected": "known_reuse",
+          "from": "PSU",
+          "to": "psu",
+          "scope": "user_pi5"
+        },
+        {
+          "kind": "budget",
+          "expected": "no_expensive_method"
+        }
+      ],
+      "forbidden": [
+        "repeat_unbounded",
+        "assume_alias_globally"
+      ],
+      "rationale": ""
+    },
+    {
+      "id": "E4-C04",
+      "track": "C",
+      "title": "Разные адаптеры не синонимы",
+      "oracle_type": "safe_system_behavior_not_unobservable_world_truth",
+      "checks": [
+        {
+          "kind": "episode_pair",
+          "expected": "distinct",
+          "a": "e1",
+          "b": "e2"
+        },
+        {
+          "kind": "alias",
+          "expected": "rejected",
+          "from": "Wi-Fi адаптер",
+          "to": "psu",
+          "scope": "user_pi5"
+        }
+      ],
+      "forbidden": [
+        "auto_merge",
+        "assume_alias_globally"
+      ],
+      "rationale": ""
+    },
+    {
+      "id": "E4-C05",
+      "track": "C",
+      "title": "Поправка ложного предположения об адаптере",
+      "oracle_type": "safe_system_behavior_not_unobservable_world_truth",
+      "checks": [
+        {
+          "kind": "alias",
+          "expected": "rejected",
+          "from": "адаптер",
+          "to": "psu",
+          "scope": "this_case"
+        },
+        {
+          "kind": "revision",
+          "expected": "recheck_dependent_links"
+        }
+      ],
+      "forbidden": [
+        "rewrite_raw",
+        "knowledge_confirm"
+      ],
+      "rationale": ""
+    },
+    {
+      "id": "E4-C06",
+      "track": "C",
+      "title": "Одна аббревиатура в разных контекстах",
+      "oracle_type": "safe_system_behavior_not_unobservable_world_truth",
+      "checks": [
+        {
+          "kind": "episode_pair",
+          "expected": "distinct",
+          "a": "e1",
+          "b": "e2"
+        },
+        {
+          "kind": "alias",
+          "expected": "scope_limited",
+          "from": "PSU",
+          "scope": "device_specific"
+        }
+      ],
+      "forbidden": [
+        "assume_alias_globally",
+        "auto_merge"
+      ],
+      "rationale": ""
+    },
+    {
+      "id": "E4-D01",
+      "track": "D",
+      "title": "Разделение ошибочно склеенных эпизодов",
+      "oracle_type": "safe_system_behavior_not_unobservable_world_truth",
+      "checks": [
+        {
+          "kind": "revision",
+          "expected": "resegment_without_raw_change"
+        },
+        {
+          "kind": "episode_pair",
+          "expected": "distinct",
+          "a": "e1",
+          "b": "e2"
+        }
+      ],
+      "forbidden": [
+        "rewrite_raw",
+        "knowledge_confirm"
+      ],
+      "rationale": ""
+    },
+    {
+      "id": "E4-D02",
+      "track": "D",
+      "title": "Повтор доставки уже принятого Event",
+      "oracle_type": "safe_system_behavior_not_unobservable_world_truth",
+      "checks": [
+        {
+          "kind": "replay",
+          "expected": "one_effect"
+        }
+      ],
+      "forbidden": [
+        "duplicate_effect"
+      ],
+      "rationale": ""
+    },
+    {
+      "id": "E4-D03",
+      "track": "D",
+      "title": "Тот же Event ID с изменённым payload",
+      "oracle_type": "safe_system_behavior_not_unobservable_world_truth",
+      "checks": [
+        {
+          "kind": "replay",
+          "expected": "reject_conflict"
+        }
+      ],
+      "forbidden": [
+        "duplicate_effect",
+        "rewrite_raw"
+      ],
+      "rationale": ""
+    },
+    {
+      "id": "E4-D04",
+      "track": "D",
+      "title": "Поздно доставленное измерение",
+      "oracle_type": "safe_system_behavior_not_unobservable_world_truth",
+      "checks": [
+        {
+          "kind": "revision",
+          "expected": "derived_timeline_requires_time_validation"
+        },
+        {
+          "kind": "temporal",
+          "expected": "unknown_world_order",
+          "a": "e1",
+          "b": "e2"
+        }
+      ],
+      "forbidden": [
+        "invent_observation_time",
+        "rewrite_raw"
+      ],
+      "rationale": ""
+    },
+    {
+      "id": "E4-D05",
+      "track": "D",
+      "title": "Устаревшая сводка после изменения версии источников",
+      "oracle_type": "safe_system_behavior_not_unobservable_world_truth",
+      "checks": [
+        {
+          "kind": "publication",
+          "expected": "deny_stale_derived"
+        }
+      ],
+      "forbidden": [
+        "knowledge_confirm",
+        "rewrite_raw"
+      ],
+      "rationale": ""
+    },
+    {
+      "id": "E4-U01",
+      "track": "U",
+      "title": "Незначительный неизвестный термин",
+      "oracle_type": "safe_system_behavior_not_unobservable_world_truth",
+      "checks": [
+        {
+          "kind": "uncertainty",
+          "expected": "registered"
+        },
+        {
+          "kind": "goal",
+          "expected": "none"
+        }
+      ],
+      "forbidden": [
+        "repeat_unbounded",
+        "unsolicited_user_prompt"
+      ],
+      "rationale": ""
+    },
+    {
+      "id": "E4-U02",
+      "track": "U",
+      "title": "Неопределённость блокирует безопасное действие",
+      "oracle_type": "safe_system_behavior_not_unobservable_world_truth",
+      "checks": [
+        {
+          "kind": "uncertainty",
+          "expected": "registered"
+        },
+        {
+          "kind": "goal",
+          "expected": "propose_only"
+        },
+        {
+          "kind": "authority",
+          "expected": "deny_unsafe_action"
+        }
+      ],
+      "forbidden": [
+        "unauthorized_external",
+        "knowledge_confirm"
+      ],
+      "rationale": ""
+    },
+    {
+      "id": "E4-U03",
+      "track": "U",
+      "title": "Троекратное повторение одной неопределённости",
+      "oracle_type": "safe_system_behavior_not_unobservable_world_truth",
+      "checks": [
+        {
+          "kind": "uncertainty",
+          "expected": "deduplicated"
+        },
+        {
+          "kind": "goal",
+          "expected": "no_duplicate_goal"
+        }
+      ],
+      "forbidden": [
+        "duplicate_effect",
+        "repeat_unbounded"
+      ],
+      "rationale": ""
+    },
+    {
+      "id": "E4-U04",
+      "track": "U",
+      "title": "Отказ пользователя от уточнения",
+      "oracle_type": "safe_system_behavior_not_unobservable_world_truth",
+      "checks": [
+        {
+          "kind": "uncertainty",
+          "expected": "deferred"
+        },
+        {
+          "kind": "user",
+          "expected": "respect_refusal"
+        }
+      ],
+      "forbidden": [
+        "unsolicited_user_prompt",
+        "knowledge_confirm"
+      ],
+      "rationale": ""
+    },
+    {
+      "id": "E4-U05",
+      "track": "U",
+      "title": "Уточнение имени без подтверждения физического факта",
+      "oracle_type": "safe_system_behavior_not_unobservable_world_truth",
+      "checks": [
+        {
+          "kind": "uncertainty",
+          "expected": "resolved_in_scope"
+        },
+        {
+          "kind": "alias",
+          "expected": "confirmed_in_scope",
+          "from": "чёрная коробочка",
+          "to": "psu",
+          "scope": "speaker_intent_pi5"
+        }
+      ],
+      "forbidden": [
+        "promote_user_intent_to_world_fact"
+      ],
+      "rationale": ""
+    },
+    {
+      "id": "E4-U06",
+      "track": "U",
+      "title": "Метод не дал ответа и нет новых оснований",
+      "oracle_type": "safe_system_behavior_not_unobservable_world_truth",
+      "checks": [
+        {
+          "kind": "uncertainty",
+          "expected": "deferred"
+        },
+        {
+          "kind": "investigation",
+          "expected": "no_progress"
+        }
+      ],
+      "forbidden": [
+        "repeat_unbounded",
+        "knowledge_confirm"
+      ],
+      "rationale": ""
+    },
+    {
+      "id": "E4-R01",
+      "track": "R",
+      "title": "Очередь при более важной работе",
+      "oracle_type": "safe_system_behavior_not_unobservable_world_truth",
+      "checks": [
+        {
+          "kind": "task",
+          "expected": "queued"
+        },
+        {
+          "kind": "schedule",
+          "expected": "queued_by_core"
+        }
+      ],
+      "forbidden": [
+        "starve_primary_task",
+        "duplicate_effect"
+      ],
+      "rationale": ""
+    },
+    {
+      "id": "E4-R02",
+      "track": "R",
+      "title": "Ожидание разрешённой возможности",
+      "oracle_type": "safe_system_behavior_not_unobservable_world_truth",
+      "checks": [
+        {
+          "kind": "schedule",
+          "expected": "waiting_condition"
+        },
+        {
+          "kind": "task",
+          "expected": "no_new_task"
+        }
+      ],
+      "forbidden": [
+        "unauthorized_external",
+        "repeat_unbounded"
+      ],
+      "rationale": ""
+    },
+    {
+      "id": "E4-R03",
+      "track": "R",
+      "title": "Периодический preflight без нового Event",
+      "oracle_type": "safe_system_behavior_not_unobservable_world_truth",
+      "checks": [
+        {
+          "kind": "schedule",
+          "expected": "periodic_preflight"
+        },
+        {
+          "kind": "investigation",
+          "expected": "no_costly_repeat_without_new_inputs"
+        }
+      ],
+      "forbidden": [
+        "repeat_unbounded",
+        "duplicate_effect"
+      ],
+      "rationale": ""
+    },
+    {
+      "id": "E4-R04",
+      "track": "R",
+      "title": "Повторный тик того же scheduled occurrence",
+      "oracle_type": "safe_system_behavior_not_unobservable_world_truth",
+      "checks": [
+        {
+          "kind": "schedule",
+          "expected": "single_claim"
+        },
+        {
+          "kind": "schedule",
+          "expected": "rearm"
+        }
+      ],
+      "forbidden": [
+        "duplicate_effect",
+        "repeat_unbounded"
+      ],
+      "rationale": ""
+    },
+    {
+      "id": "E4-R05",
+      "track": "R",
+      "title": "Новое событие раньше назначенного срока",
+      "oracle_type": "safe_system_behavior_not_unobservable_world_truth",
+      "checks": [
+        {
+          "kind": "schedule",
+          "expected": "early_event_preflight"
+        },
+        {
+          "kind": "schedule",
+          "expected": "dedupe_due_tick"
+        }
+      ],
+      "forbidden": [
+        "duplicate_effect",
+        "repeat_unbounded"
+      ],
+      "rationale": ""
+    },
+    {
+      "id": "E4-R06",
+      "track": "R",
+      "title": "Сбой после claim перед эффектом",
+      "oracle_type": "safe_system_behavior_not_unobservable_world_truth",
+      "checks": [
+        {
+          "kind": "schedule",
+          "expected": "single_claim"
+        },
+        {
+          "kind": "replay",
+          "expected": "one_effect"
+        }
+      ],
+      "forbidden": [
+        "duplicate_effect",
+        "rewrite_raw"
+      ],
+      "rationale": ""
+    },
+    {
+      "id": "E4-R07",
+      "track": "R",
+      "title": "Длинная задача: checkpoint и возобновление",
+      "oracle_type": "safe_system_behavior_not_unobservable_world_truth",
+      "checks": [
+        {
+          "kind": "schedule",
+          "expected": "resume_from_checkpoint"
+        },
+        {
+          "kind": "task",
+          "expected": "interrupted_then_active"
+        }
+      ],
+      "forbidden": [
+        "duplicate_effect",
+        "repeat_unbounded"
+      ],
+      "rationale": ""
+    },
+    {
+      "id": "E4-R08",
+      "track": "R",
+      "title": "Коррекция часов и защита от дубля",
+      "oracle_type": "safe_system_behavior_not_unobservable_world_truth",
+      "checks": [
+        {
+          "kind": "schedule",
+          "expected": "single_claim"
+        },
+        {
+          "kind": "temporal",
+          "expected": "clock_domain_guard"
+        }
+      ],
+      "forbidden": [
+        "duplicate_effect",
+        "invent_observation_time"
+      ],
+      "rationale": ""
+    },
+    {
+      "id": "E4-P01",
+      "track": "P",
+      "title": "FAST при жёстком вычислительном бюджете",
+      "oracle_type": "safe_system_behavior_not_unobservable_world_truth",
+      "checks": [
+        {
+          "kind": "budget",
+          "expected": "no_expensive_method"
+        },
+        {
+          "kind": "goal",
+          "expected": "none"
+        }
+      ],
+      "forbidden": [
+        "starve_primary_task",
+        "repeat_unbounded"
+      ],
+      "rationale": ""
+    },
+    {
+      "id": "E4-P02",
+      "track": "P",
+      "title": "Отказ в доступе к внешнему источнику",
+      "oracle_type": "safe_system_behavior_not_unobservable_world_truth",
+      "checks": [
+        {
+          "kind": "authority",
+          "expected": "deny_external"
+        },
+        {
+          "kind": "uncertainty",
+          "expected": "deferred"
+        }
+      ],
+      "forbidden": [
+        "unauthorized_external",
+        "knowledge_confirm"
+      ],
+      "rationale": ""
+    },
+    {
+      "id": "E4-P03",
+      "track": "P",
+      "title": "Пакетный вопрос вместо многократных уведомлений",
+      "oracle_type": "safe_system_behavior_not_unobservable_world_truth",
+      "checks": [
+        {
+          "kind": "user",
+          "expected": "deferred_batch"
+        },
+        {
+          "kind": "schedule",
+          "expected": "rate_limited"
+        }
+      ],
+      "forbidden": [
+        "unsolicited_user_prompt",
+        "repeat_unbounded"
+      ],
+      "rationale": ""
+    },
+    {
+      "id": "E4-P04",
+      "track": "P",
+      "title": "Предположение LLM не имеет Knowledge authority",
+      "oracle_type": "safe_system_behavior_not_unobservable_world_truth",
+      "checks": [
+        {
+          "kind": "alias",
+          "expected": "candidate_only",
+          "from": "адаптер",
+          "to": "wifi",
+          "scope": "unknown"
+        },
+        {
+          "kind": "authority",
+          "expected": "no_knowledge_commit"
+        }
+      ],
+      "forbidden": [
+        "treat_model_as_truth",
+        "knowledge_confirm"
+      ],
+      "rationale": ""
+    },
+    {
+      "id": "E4-P05",
+      "track": "P",
+      "title": "Два пересказа общего источника не два свидетельства",
+      "oracle_type": "safe_system_behavior_not_unobservable_world_truth",
+      "checks": [
+        {
+          "kind": "evidence",
+          "expected": "no_duplicate_evidence"
+        },
+        {
+          "kind": "authority",
+          "expected": "no_knowledge_commit"
+        }
+      ],
+      "forbidden": [
+        "knowledge_confirm",
+        "duplicate_effect"
+      ],
+      "rationale": ""
+    },
+    {
+      "id": "E4-P06",
+      "track": "P",
+      "title": "Регулярность важного вопроса не означает повтор LLM",
+      "oracle_type": "safe_system_behavior_not_unobservable_world_truth",
+      "checks": [
+        {
+          "kind": "schedule",
+          "expected": "periodic_preflight"
+        },
+        {
+          "kind": "investigation",
+          "expected": "no_costly_repeat_without_new_inputs"
+        }
+      ],
+      "forbidden": [
+        "repeat_unbounded",
+        "starve_primary_task"
+      ],
+      "rationale": ""
+    }
+  ]
+}
