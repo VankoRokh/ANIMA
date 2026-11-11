@@ -1,6 +1,6 @@
 # ANIMA — Memory Architecture v1.0 / v1.1 Roadmap
 
-**Статус:** согласованная дорожная карта; шаг 0 VERIFIED и шаг 1 EXP-009 lab PASS на SHA `5d679e0a7ca9866270d6f13c02175cf7fa46dec0`; production Event Retrieval (шаг 2) ещё не реализован.  
+**Статус:** шаги 0–1 VERIFIED; Event Retrieval v1 (шаг 2) прошёл функциональную приёмку и PC-C3, но Pi/power-loss gate открыт; шаг 3 Memory Encoding — E1 shadow lab PASS, production integration OPEN.  
 **Дата решения:** 2026-11-11.  
 **Рабочая ветка:** `experiment/core-memory-information-baseline`.  
 **Отправной исследованный snapshot:** `cab955f82931feb16e5a7c2bf801e17aa736fd8f`.  
@@ -61,6 +61,8 @@
 ### Шаг 3 — ограничения группировки
 
 **Исследование E1 (shadow):** [Memory Encoding — raw Event association](Memory_Encoding_Shadow_E1_Brief.md). Сравниваем Legacy 64/512 и независимый shadow на одинаковых raw Events; production Memory не меняем до оценки границ эпизодов.
+
+**Подтверждённые E1 результаты:** [Memory Encoding E1 — raw decisions and analysis](Memory_Encoding_E1_Results.md), CI `43094616959`: 20 событий, Legacy 10 ошибочных объединённых пар против 0 у shadow на этом корпусе. Отдельный probe компрессии пока не имеет подтверждённой CI-приёмки.
 
 Проверять не только качество текста summary, но и **границы эпизода**: перегрев в один сеанс против другого дня, отдельные независимые измерения, повтор доставки, похожие фразы о разных объектах, изменение формата/пунктуации, переразметка уже сжатого эпизода. Эксперимент не имеет права разрушительно перезаписывать действующие Memory до отдельного решения о миграции.
 
