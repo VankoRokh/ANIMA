@@ -9,12 +9,12 @@ FINAL_STATUSES = {"done", "skipped"}
 
 
 class EventProcessingCoordinator:
-    """Replay-safe Memory coordinator for a single writer per processor key.
+    """SQLite-serialized processing for one shared event-processing key.
 
-    Concurrent instances are not supported: the ledger preflight and claim are
-    not atomic, and a racing failure may overwrite a completed status.
-    Do not add a background writer before introducing a transactional claim,
-    terminal-status guards, and negative interleaving tests.
+    Concurrent coordinators sharing a SQLite database serialize read/claim,
+    Memory effects and commit using BEGIN IMMEDIATE. Terminal status cannot
+    be overwritten by a late failure. This does not cover concurrent
+    writers to the separate raw EventLog.
     """
 
     def __init__(
@@ -108,77 +108,77 @@ class EventProcessingCoordinator:
             raise ValueError("EventProcessingCoordinator requires an Event")
         self._require_raw_event(event)
 
-        previous = self.get(event.event_id)
-        if previous is not None and previous["status"] in FINAL_STATUSES:
-            return self._replay_result(event, previous["status"])
-
-        attempt = 1 if previous is None else previous["attempts"] + 1
-        started_at = self._now()
-
+        # Claim, inspect status, apply Memory effects and finalize under one
+        # SQLite write lock. Competing coordinator instances serialize here.
+        attempt = None
+        started_at = None
+        replay_status = None
+        result = None
         try:
-            with self.memory_store.transaction() as connection:
-                connection.execute(
+            with self.memory_store.transaction(immediate=True) as connection:
+                previous = connection.execute(
                     """
-                    INSERT INTO event_processing(
-                        event_id, processor, processor_version, status,
-                        attempts, started_at, finished_at, last_error
-                    ) VALUES (?, ?, ?, 'processing', ?, ?, NULL, NULL)
-                    ON CONFLICT(event_id, processor, processor_version)
-                    DO UPDATE SET
-                        status = 'processing',
-                        attempts = excluded.attempts,
-                        started_at = excluded.started_at,
-                        finished_at = NULL,
-                        last_error = NULL
-                    """,
-                    (
-                        event.event_id,
-                        self.processor_name,
-                        self.processor_version,
-                        attempt,
-                        started_at,
-                    ),
-                )
-
-                result = self.memory_processor.process_event(
-                    event,
-                    connection=connection,
-                    trace_result=False,
-                )
-
-                if self.fault_hook is not None:
-                    self.fault_hook(event, result, connection)
-
-                final_status = (
-                    "skipped" if result["action"] == "skip" else "done"
-                )
-                connection.execute(
-                    """
-                    UPDATE event_processing
-                    SET status = ?, finished_at = ?, last_error = NULL
+                    SELECT status, attempts FROM event_processing
                     WHERE event_id = ? AND processor = ? AND processor_version = ?
                     """,
-                    (
-                        final_status,
-                        self._now(),
-                        event.event_id,
-                        self.processor_name,
-                        self.processor_version,
-                    ),
-                )
+                    (event.event_id, self.processor_name, self.processor_version),
+                ).fetchone()
+                if previous is not None and previous["status"] in FINAL_STATUSES:
+                    replay_status = previous["status"]
+                else:
+                    attempt = 1 if previous is None else previous["attempts"] + 1
+                    started_at = self._now()
+                    connection.execute(
+                        """
+                        INSERT INTO event_processing(
+                            event_id, processor, processor_version, status,
+                            attempts, started_at, finished_at, last_error
+                        ) VALUES (?, ?, ?, 'processing', ?, ?, NULL, NULL)
+                        ON CONFLICT(event_id, processor, processor_version)
+                        DO UPDATE SET
+                            status = 'processing',
+                            attempts = excluded.attempts,
+                            started_at = excluded.started_at,
+                            finished_at = NULL,
+                            last_error = NULL
+                        """,
+                        (
+                            event.event_id, self.processor_name,
+                            self.processor_version, attempt, started_at,
+                        ),
+                    )
+
+                    result = self.memory_processor.process_event(
+                        event, connection=connection, trace_result=False,
+                    )
+                    if self.fault_hook is not None:
+                        self.fault_hook(event, result, connection)
+                    final_status = (
+                        "skipped" if result["action"] == "skip" else "done"
+                    )
+                    connection.execute(
+                        """
+                        UPDATE event_processing
+                        SET status = ?, finished_at = ?, last_error = NULL
+                        WHERE event_id = ? AND processor = ? AND processor_version = ?
+                        """,
+                        (
+                            final_status, self._now(), event.event_id,
+                            self.processor_name, self.processor_version,
+                        ),
+                    )
         except Exception as error:
-            self._record_failure(
-                event.event_id,
-                attempt,
-                started_at,
-                error,
-            )
+            # Lock acquisition failure did not start a processing attempt.
+            if attempt is not None:
+                self._record_failure(event.event_id, attempt, started_at, error)
             self._trace(
                 "event_processing: failed "
                 f"event={event.event_id} attempt={attempt} error={error}"
             )
             raise
 
+        if replay_status is not None:
+            return self._replay_result(event, replay_status)
         self.memory_processor._trace_result(result)
         return result
 
@@ -250,7 +250,7 @@ class EventProcessingCoordinator:
         adopted = 0
         now = self._now()
 
-        with self.memory_store.transaction() as connection:
+        with self.memory_store.transaction(immediate=True) as connection:
             existing = {
                 row["event_id"]
                 for row in connection.execute(
@@ -307,7 +307,7 @@ class EventProcessingCoordinator:
         return adopted
 
     def _record_failure(self, event_id, attempt, started_at, error):
-        with self.memory_store.transaction() as connection:
+        with self.memory_store.transaction(immediate=True) as connection:
             connection.execute(
                 """
                 INSERT INTO event_processing(
@@ -321,6 +321,8 @@ class EventProcessingCoordinator:
                     started_at = excluded.started_at,
                     finished_at = excluded.finished_at,
                     last_error = excluded.last_error
+                WHERE event_processing.status NOT IN ('done', 'skipped')
+                  AND event_processing.attempts <= excluded.attempts
                 """,
                 (
                     event_id,
