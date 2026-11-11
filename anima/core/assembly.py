@@ -30,6 +30,7 @@ from anima.internal_state.store import InternalStateStore
 from anima.memory.composer import RuleBasedComposer
 from anima.memory.episodic import EpisodicMemory
 from anima.memory.event_log import EventLog
+from anima.memory.event_retrieval import EventRetrieval
 from anima.memory.event_processing import EventProcessingCoordinator
 from anima.memory.link_store import LinkStore
 from anima.memory.memory_store import MemoryStore
@@ -61,6 +62,7 @@ class CoreAssembly:
     core_decision: CoreGoalDecision | None
     core_execution: CoreDoorExecution | None
     core_autonomy: CoreAutonomy | None
+    event_retrieval: EventRetrieval | None
 
 
 def build_core(
@@ -73,6 +75,7 @@ def build_core(
     world_port: DoorWorldPort | None = None,
     world_handlers: Mapping[tuple[str, str], object] | None = None,
     auto_core: bool = False,
+    enable_event_retrieval: bool = False,
 ) -> CoreAssembly:
     """Build the current, proven runtime stack once for CLI and headless use.
 
@@ -96,6 +99,8 @@ def build_core(
         raise ValueError("world_handlers require explicit world_port")
     if type(auto_core) is not bool:
         raise TypeError("auto_core must be boolean")
+    if type(enable_event_retrieval) is not bool:
+        raise TypeError("enable_event_retrieval must be boolean")
     if auto_core and virtual_door_root is None and world_port is None:
         raise ValueError("Autonomous Core requires explicitly registered virtual world")
     root = (get_data_dir() if data_dir is None else Path(data_dir)).expanduser().resolve()
@@ -104,6 +109,10 @@ def build_core(
     event_bus = EventBus()
     event_log = EventLog(root / "events.jsonl")
     memory_store = MemoryStore(root / "memory.db")
+    event_retrieval = (
+        EventRetrieval(event_log, root / "event_index.db", memory_store=memory_store)
+        if enable_event_retrieval else None
+    )
     link_store = LinkStore(memory_store)
     memory = EpisodicMemory(memory_store)
     trace = DiagnosticTrace()
@@ -206,6 +215,7 @@ def build_core(
         core_decision=core_decision,
         core_execution=core_execution,
         core_autonomy=core_autonomy,
+        event_retrieval=event_retrieval,
     )
 
 
