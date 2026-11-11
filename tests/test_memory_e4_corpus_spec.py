@@ -51,7 +51,22 @@ def test_e4_raw_events_validate_and_gold_references_exist():
             Event.validate_record(raw)
             assert raw["id"] not in global_ids
             global_ids.add(raw["id"])
-            assert all(ref["id"] in registry for ref in raw["references"])
+            for reference in raw["references"]:
+                if reference["kind"] == "entity":
+                    assert reference["id"] in registry
+                elif reference["kind"] == "event":
+                    # Explicit provenance can point to an earlier raw Event in
+                    # this isolated case, but not to an unrelated Entity or
+                    # a fabricated Event ID.
+                    prior_event_ids = {
+                        earlier["raw"]["id"]
+                        for earlier in case["events"]
+                        if earlier["key"] in case_keys
+                        and earlier["raw"]["id"] != raw["id"]
+                    }
+                    assert reference["id"] in prior_event_ids
+                else:
+                    raise AssertionError("Unknown E4 raw reference kind")
             timestamps.append(datetime.fromisoformat(raw["timestamp"]))
         assert case_keys
         assert timestamps == sorted(timestamps)
@@ -65,7 +80,12 @@ def test_e4_raw_events_validate_and_gold_references_exist():
         assert oracle["checks"] and oracle["forbidden"]
         for check in oracle["checks"]:
             assert check["kind"] in ALLOWED_CHECKS and check["expected"]
-            for end in ("a", "b"):
+            if "acceptable" in check:
+                allowed = check["acceptable"]
+                assert isinstance(allowed, list) and check["expected"] in allowed
+                assert len(allowed) == len(set(allowed))
+                assert all(isinstance(value, str) and value for value in allowed)
+            for end in ("a", "b", "after_event_key"):
                 if end in check:
                     assert check[end] in case_keys
         assert set(oracle["forbidden"]) <= set(ALLOWED_FORBIDDEN)
@@ -87,3 +107,23 @@ def test_e4_unknown_and_persistent_periodic_review_are_explicit():
         c["id"] == "E4-P04" and "treat_model_as_truth" in c["forbidden"]
         for c in gold
     )
+
+
+def test_e4_ab_gold_does_not_infer_story_from_entity_alone():
+    inputs = {case["id"]: case for case in _load("memory_e4_inputs_v0.json")["cases"]}
+    gold = {case["id"]: case for case in _load("memory_e4_gold_v0.json")["cases"]}
+
+    def expected(case_id, kind):
+        return [check["expected"] for check in gold[case_id]["checks"]
+                if check["kind"] == kind]
+
+    assert expected("E4-A02", "story_pair") == ["insufficient"]
+    assert expected("E4-B06", "story_pair") == ["insufficient"]
+    assert expected("E4-A05", "story_pair") == ["not_same_case"]
+    assert expected("E4-B03", "story_pair") == ["same_case_reported"]
+    assert inputs["E4-B04"]["setup"]["episode_scope"] == "device_process"
+
+    raw = {row["key"]: row["raw"] for row in inputs["E4-A04"]["events"]}
+    assert raw["e2"]["type"] == "derived.projection"
+    assert {"kind": "event", "id": raw["e1"]["id"]} in raw["e2"]["references"]
+    assert expected("E4-A04", "evidence") == ["same_origin_not_independent"]
