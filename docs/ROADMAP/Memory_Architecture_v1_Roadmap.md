@@ -52,6 +52,8 @@
 
 ### Шаг 2 — контракт индекса
 
+**Production implementation brief:** [Event Retrieval v1 — contract & recovery gates](Memory_Event_Retrieval_v1_Brief.md). Корректность проверяется отдельно от C3-производительности; API opt-in для Core, без изменения маршрута FAST/DEEP.
+
 Индекс производный; authoritative первичный Event не переписывается. Для JSONL locator учитывает идентичность журнала и смещение, для typed Core — точечный lookup по PK/ID. Ключ индекса и checkpoint обработанного префикса должны фиксироваться согласованно, с повторяемым догоном после прерывания. Несовпадение source hash/ID → `incomplete/error`, а не молчаливое доверие индексу. Read API различает `no_match`, `partial`, `source_unavailable`, `ambiguous`, `budget_exhausted`. Политика Event types и разрешённых полей согласуется до пилота.
 
 ### Шаг 3 — ограничения группировки
