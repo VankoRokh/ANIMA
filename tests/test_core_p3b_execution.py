@@ -19,6 +19,15 @@ from anima.execution.contracts import ActionSpec
 EXPECTED = {"type": "symbol", "value": "closed"}
 
 
+def test_core_door_world_annotation_is_importable_on_supported_python():
+    from typing import get_type_hints
+
+    from anima.core.door_execution import CoreDoorExecution
+    from anima.core.door_world import DoorWorldPort
+
+    assert get_type_hints(CoreDoorExecution.__init__)["world"] is DoorWorldPort
+
+
 def _actions(*, tool=DOOR_TOOL):
     key = (
         DOOR_SUBJECT, DOOR_PREDICATE,
