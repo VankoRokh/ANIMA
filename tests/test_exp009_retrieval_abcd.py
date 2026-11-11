@@ -57,7 +57,18 @@ def test_abcd_raw_event_reachable_without_compacted_memory_marker(tmp_path):
     assert case_b["recall_at_k"] == 1.0
     for method in METHODS:
         assert _comparison(records, "no_match", method)["no_match_pass"]
-        assert _comparison(records, "negative_unseen", method)["no_match_pass"]
+    # The adversarial negative intentionally shares "telemetry" with real
+    # Events: lexical matches here are measured false positives, NOT a
+    # successful no-match. Do not suppress them or rewrite the gold.
+    adversarial = [
+        _comparison(records, "negative_unseen", method)
+        for method in METHODS
+    ]
+    assert any(item["no_match_pass"] is False for item in adversarial)
+    assert all(
+        item["false_positive_count"] == len(item["selected"])
+        for item in adversarial
+    )
 
 
 def test_abcd_packing_and_per_query_gold_are_identical(tmp_path):
