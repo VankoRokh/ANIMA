@@ -1,10 +1,15 @@
 class ProvenanceResolver:
     """Resolve Stage 1 provenance from SQLite links back to raw Events."""
 
-    def __init__(self, memory_store, link_store, event_log):
+    def __init__(self, memory_store, link_store, event_log, *,
+                 event_retrieval=None):
+        # Explicit opt-in: default legacy behavior and trust boundaries remain.
+        if event_retrieval is not None and event_retrieval.event_log is not event_log:
+            raise ValueError("Provenance index must share the primary EventLog")
         self.memory_store = memory_store
         self.link_store = link_store
         self.event_log = event_log
+        self.event_retrieval = event_retrieval
 
     def memory(self, memory_id):
         memory = self.memory_store.get_memory(memory_id)
@@ -113,12 +118,17 @@ class ProvenanceResolver:
         }
 
     def _event_index(self):
+        # Indexed provenance resolves only required IDs and never scans JSONL.
+        if self.event_retrieval is not None:
+            return None
         return {
             event["id"]: event
             for event in self.event_log.load_events()
         }
 
     def _events_for_memory(self, memory_id, event_index):
+        if self.event_retrieval is not None:
+            return self.event_retrieval.events_for_memory(memory_id)
         event_ids = self.memory_store.source_events(memory_id)
         events = []
 
