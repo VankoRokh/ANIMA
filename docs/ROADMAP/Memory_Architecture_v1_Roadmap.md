@@ -94,4 +94,4 @@ Derived summary не заменяет первичное свидетельст�
 
 Для каждого шага: **brief → frozen baseline → isolated/shadow implementation → positive/negative tests → comparison report → решение о внедрении → обновление архитектуры/ADR при изменении контрактов**. Результаты испытаний сохранять в [`docs/TESTING/Results`](../TESTING/Results/README.md); исследовательские гипотезы — в [`Research.md`](Research.md). Не менять `docs/project.json`, Stage status, Core authority и production routing «ради зелёного теста».
 
-**Первое исполняемое задание после принятия roadmap:** шаг 0 — короткий baseline/remediation brief с точными файлами и тестами, затем контролируемый шаг 1 EXP-009. Отдельное разрешение требуется на кодовые изменения и любую миграцию существующих хранилищ.
+**Первое исполняемое задание:** [Stage 0 — Baseline & Remediation Brief](Memory_Stage0_Baseline_Remediation_Brief.md). Его исправления и испытания выполняются до перехода к контролируемому EXP-009. Миграция хранилищ и расширение режима записи требуют отдельного решения.
