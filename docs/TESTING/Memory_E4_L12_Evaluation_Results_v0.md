@@ -1,9 +1,9 @@
 # ANIMA — E4 L1.2 Measured Outcomes v0
 
 **Status: EXPERIMENTAL RESEARCH PASS / PRODUCTION MEMORY ADMISSION STILL BLOCKED.**  
-**Evaluated code snapshot:** `2d717826e087ce631519b20c148d521170b1bb0a`.  
-**CI:** [GitHub Actions #43185914842](https://github.com/VankoRokh/ANIMA/actions/runs/43185914842), SUCCESS on Python 3.12/3.13/3.14.  
-**Technical tests:** 1590 full-regression PASS per Python environment; 98 profile tests PASS.  
+**Evaluated code snapshot:** `040b579fb31e925cfc3f85587b3280c37b4e9b1e`.  
+**CI:** [GitHub Actions #43186836427](https://github.com/VankoRokh/ANIMA/actions/runs/43186836427), SUCCESS on Python 3.12/3.13/3.14.  
+**Technical tests:** 1591 full-regression PASS per Python environment; 98 profile tests PASS.  
 **Artifacts:** `e4-l12-scoped-lab-evaluation-py314` (raw + separate post-hoc evaluations for frozen positive/negative and open challenge; old→new deltas).  
 **Sources:** [L1.2 contract](Memory_E4_L12_Contract_v0.md), [adapter and evaluators](Memory_E4_L12_Lab_v0.md), [L1.1 failure research](Memory_E4_L11_Challenge_Results_v0.md).
 
@@ -28,6 +28,19 @@
 | **E4-X11** | A colleague's unrelated trial correction revised earlier A/B grouping | `rejected_unbound`, zero Episode revisions | Same Entity/nearby text does not establish that the correction targets the prior projection |
 
 A separately added non-frozen test uses `ticket T77` reported by the same user in **two unrelated sessions with no stable namespace**. L1.2 now abstains; a session-local identifier is not global continuity. This test is **not part of the 16-check challenge gold**.
+
+## Intermediate namespace regression and its correction
+
+A stricter inter-session identifier rule was evaluated as snapshot `2d717826e087ce631519b20c148d521170b1bb0a`. The *actual raw differential archive*, independently inspected after that CI run, exposed two **PASS→FAIL regressions** on existing frozen cases:
+
+| Case | Intermediate behavior | Source evidence | Final behavior |
+| --- | --- | --- | --- |
+| **E4-A05:check:2** | `not_same_case_reported` → `insufficient` | User explicitly says «Новая независимая поломка Pi5, случай №52», distinct from earlier №41 | `not_same_case_reported` |
+| **E4-N02:check:2** | `not_same_case_reported` → `insufficient` | User explicitly says «новый независимый случай №52», distinct from earlier №41 | `not_same_case_reported` |
+
+This is **not** a reason to merge identical unverified ticket numbers across different sessions. Instead L1.2 now distinguishes an *explicit user-reported new independent case* (with two source Event references, distinct typed IDs, and no world-truth upgrade) from an **unverified repeated number** (remains `insufficient`).
+
+The last snapshot `040b579f...` restores frozen scores to **41 PASS / 0 FAIL / 81 NOT_SUPPORTED**, preserves **16 PASS / 0 FAIL** on the separate 15-case development challenge, and adds a focused negative unit test for user-reported independence. The final raw `positive_delta.json` and `negative_delta.json` each contain **zero changed statuses and zero regressions** relative to L1.1. This intermediate failure was discovered by inspecting the artifact, not inferred from a green `pytest`.
 
 ## Safety boundaries and missed capabilities
 
