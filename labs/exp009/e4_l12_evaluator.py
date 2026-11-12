@@ -25,6 +25,10 @@ IDENTIFIER = re.compile(
     r"\s*(?:№\s*|#\s*)?(?P<token>[A-Za-zА-Я]?\d{1,6})\b", re.I
 )
 PROJECT = re.compile(r"\b(?:проект|проекте|project)\s+([A-Za-zА-Яа-я0-9_-]+)", re.I)
+EXPLICIT_INDEPENDENT = re.compile(
+    r"\b(?:нов(?:ая|ый|ое|ые)|друг(?:ая|ой|ое|ие))"
+    r"\s+(?:независим\w*|отдельн\w*)\b", re.I
+)
 
 
 def _canonical(surface):
@@ -85,6 +89,16 @@ def _validate(observed, source):
         if pair.get("typed_identifiers") != expected:
             raise ValueError("Forged or mismatched typed identifier provenance")
         left, right = expected["left"], expected["right"]
+        if pair.get("reason_codes") == ["user_explicit_new_independent_case"]:
+            later_text = b["payload"].get("text", "")
+            if (not left or not right or left["kind"] != right["kind"]
+                    or left["token"] == right["token"]
+                    or a["source"] != b["source"] or b["source"] != "user"
+                    or pair["status"] != "not_same_case_reported"
+                    or pair.get("source_event_ids") != [a["id"], b["id"]]
+                    or not isinstance(later_text, str)
+                    or not EXPLICIT_INDEPENDENT.search(later_text)):
+                raise ValueError("Unverified explicit-independent case report")
         if left and right:
             if ((left["kind"] != right["kind"]
                  or left["source"] != "user" or right["source"] != "user")

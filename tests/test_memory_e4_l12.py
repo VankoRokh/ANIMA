@@ -73,6 +73,15 @@ def test_repeated_ticket_token_in_unverified_new_session_abstains():
     assert row["source_event_ids"] == []
 
 
+def test_cross_session_explicit_new_independent_case_is_not_same_report():
+    for suite, case_id in (("positive", "E4-A05"), ("negative", "E4-N02")):
+        row = _disposition(l12(suite=suite, case_id=case_id)["cases"][0])
+        assert row["status"] == "not_same_case_reported"
+        assert row["reason_codes"] == ["user_explicit_new_independent_case"]
+        assert len(row["source_event_ids"]) == 2
+        assert row["authority"] == "source_report_not_world_fact"
+
+
 def test_conflicting_aliases_keep_both_sources_without_last_write_wins():
     x06 = challenge(case_id="E4-X06")["cases"][0]
     assert len(x06["alias_records"]) == 2

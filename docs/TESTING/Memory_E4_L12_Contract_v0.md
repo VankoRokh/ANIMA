@@ -14,7 +14,7 @@
 
 ## Typed Story rule
 
-Recognize the limited explicit lexicon `тикет/ticket` → `ticket`; `случай/case` → `case`; `авария/инцидент/событие` → `incident`. Parse the marker from **source text**, not from gold. Comparisons require matching kind and source-scoped namespace. Without a declared stable namespace, the fallback is **speaker-and-session-local**: reusing a number across separate sessions cannot establish identity by itself. Cross-kind same-token also returns `insufficient`. Preserve independently source-backed joint-incident reports when neither earlier Event supplies a marker. Any extension of this lexicon needs its own negative probes.
+Recognize the limited explicit lexicon `тикет/ticket` → `ticket`; `случай/case` → `case`; `авария/инцидент/событие` → `incident`. Parse the marker from **source text**, not from gold. Comparisons require matching kind and source-scoped namespace. Without a declared stable namespace, the fallback is **speaker-and-session-local**: reusing a number across separate sessions cannot establish identity by itself. Cross-kind same-token also returns `insufficient`. **Explicitly reported independence:** the source user's later statement that a case is *new and independent* (with a different typed identifier) can support a scoped `not_same_case_reported` even across sessions, with both source Events. This represents the user's report, not verified independent physical causation. Preserve independently source-backed joint-incident reports when neither earlier Event supplies a marker. Any extension of this lexicon needs its own negative probes.
 
 ## Alias policy
 

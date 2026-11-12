@@ -28,6 +28,10 @@ CASE_MARKER = re.compile(
 )
 PROJECT = re.compile(r"\b(?:проект|проекте|project)\s+(?P<name>[A-Za-zА-Яа-я0-9_-]+)\b", re.I)
 DEICTIC = re.compile(r"^\s*(?:это|эти|они)\s+были\b", re.I)
+EXPLICIT_INDEPENDENT = re.compile(
+    r"\b(?:нов(?:ая|ый|ое|ые)|друг(?:ая|ой|ое|ие))"
+    r"\s+(?:независим\w*|отдельн\w*)\b", re.I
+)
 TRIAL_PAIR = re.compile(
     r"\b(?:испытани(?:я|й)|тест(?:ы|а|ов)|эксперимент(?:ы|а|ов))"
     r"\s+(?P<a>[A-ZА-Я0-9]{1,3})\s+и\s+(?P<b>[A-ZА-Я0-9]{1,3})\b",
@@ -124,6 +128,17 @@ def typed_story_assessments(case, legacy):
                               status == "same_case_reported" else
                               "different_typed_reported_identifiers"],
                 source_event_ids=[a["source_event_id"], b["source_event_id"]],
+                authority="source_report_not_world_fact",
+            )
+            row.pop("namespace_evidence", None)
+        elif (a["kind"] == b["kind"] and a["token"] != b["token"]
+              and EXPLICIT_INDEPENDENT.search(text_of(right))):
+            # This is the user's statement that the case is independently
+            # new; it does not establish independent physical causation.
+            row.update(
+                status="not_same_case_reported",
+                reason_codes=["user_explicit_new_independent_case"],
+                source_event_ids=[left["id"], right["id"]],
                 authority="source_report_not_world_fact",
             )
             row.pop("namespace_evidence", None)
