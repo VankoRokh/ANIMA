@@ -24,7 +24,7 @@ def test_e4_negatives_are_isolated_valid_events_and_gold_is_separate():
     assert inp["schema"] == "anima.memory_e4.negative_inputs/0.1"
     assert gold["schema"] == "anima.memory_e4.negative_gold/0.1"
     assert "NOT_HOLDOUT" in inp["status"]
-    assert gold["status"] == "PROPOSED_NOT_OWNER_ACCEPTED"
+    assert gold["status"] == "FROZEN_PROVISIONAL_DEV_GOLD_V0"
     assert len(inp["cases"]) == len(gold["cases"]) == 15
     assert {x["id"] for x in inp["cases"]} == {x["id"] for x in gold["cases"]}
     for track, count in TRACKS.items():
@@ -77,8 +77,8 @@ def _git_blob_sha1(data):
 
 
 def test_e4_candidate_manifest_pins_exact_json_files():
-    m = _load("memory_e4_freeze_candidate_manifest_v0.json")
-    assert m["status"] == "CANDIDATE_OWNER_REVIEW_PENDING"
+    m = _load("memory_e4_frozen_manifest_v0.json")
+    assert m["status"] == "FROZEN_DESIGN_BASELINE_V0"
     assert m["owner_approved"] is False
     assert m["production_conformance"] is False
     assert m["blind_holdout"] == "NOT_CREATED"

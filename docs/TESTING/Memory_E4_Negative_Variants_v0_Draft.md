@@ -1,6 +1,6 @@
 # ANIMA — E4 Negative Variants v0 (development suite)
 
-**Status: DRAFT; visible 15-case development negative suite, NOT blinded holdout.**  
+**Status: FROZEN DESIGN FIXTURE; provisional visible development-negative gold, NOT blinded holdout.**  
 **Inputs:** [JSON](Fixtures/memory_e4_negative_inputs_v0.json) · **Proposed gold:** [JSON](Fixtures/memory_e4_negative_gold_v0.json) · **Adjudication:** [Gold review](Memory_E4_Gold_Adjudication_v0.md).
 
 These independently reset synthetic tests probe adversarial contrasts to positive roots. The `setup` objects are **simulation preconditions**; `controls` are not existing Core APIs. Input events are valid typed Event records; gold is never passed into the encoder.

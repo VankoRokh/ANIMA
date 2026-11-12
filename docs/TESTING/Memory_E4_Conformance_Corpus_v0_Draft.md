@@ -1,6 +1,6 @@
 # ANIMA — Memory E4 Conformance Corpus v0 (design draft)
 
-**Status:** **DRAFT — owner review required**, not a frozen benchmark or implementation acceptance.  
+**Status:** **FROZEN DESIGN BASELINE** — exact input and proposed gold bytes locked; semantic gold still provisional, E4 execution not verified.  
 **Repository branch:** `experiment/core-memory-information-baseline`.  
 **Date:** 2026-11-12.  
 **Architecture:** [Memory E4 Architecture Contract (draft)](../ROADMAP/Memory_E4_Architecture_Contract_Draft.md).  
@@ -50,7 +50,7 @@ The generated `Event.timestamp` is a deterministic simulation of **receipt time*
 
 The E4-A/B review applied **explicit episode scope** and **typed Story semantics** to the *proposed* gold. Story labels for reviewed cases now include `same_case_reported` (source-reported grouping), `not_same_case` (case-specific distinction) and `insufficient` (no required link); these are **not** claims of verified physical causation. `same_topic` is a separate optional relation, not a same-case Story. `E4-B02` accepts `candidate_only` **or** abstaining with `insufficient`; `acceptable` lists are evaluation constraints, not an instruction to the algorithm.
 
-For E4-A04, an explicit Event provenance reference in the derived record replaces string-matching `reading_id` as the independence guard. A source reference is a test precondition with a distinct authority contract; it must not make derived content an independent witness. The new E4-A/B gold remains **unfrozen and owner-adjudication pending**, and no implementation was trained or scored against it.
+For E4-A04, an explicit Event provenance reference in the derived record replaces string-matching `reading_id` as the independence guard. A source reference is a test precondition with a distinct authority contract; it must not make derived content an independent witness. The original E4-A/B review gold was **unfrozen and owner-adjudication pending**, and no implementation was trained or scored against it.
 
 ### C/D and U/R/P adjudication corrections (2026-11-12)
 
@@ -62,7 +62,7 @@ All 42 root cases now include the audit-driven **proposed** fixture corrections.
 - `references: [{kind:"event", id:...}]` is a source provenance pointer; **only an independently validated producer/source contract can assert the trust of that pointer**. Harness-provided `provenance_authority` is test setup, not a runtime guarantee.
 - Time control `at` is a virtual harness control time. Raw `Event.timestamp` is receipt-time and cannot establish real-world ordering across unsynchronized clocks.
 
-Open before freezing: executable reference harness semantics for `setup`/controls, owner adjudication of scoped/alternative gold, exact resource budgets, clock jump/restart recovery, and independent negative variants/holdout. Do not automatically convert this draft into a confirmed benchmark.
+Open before semantic E4 conformance: executable reference harness semantics for `setup`/controls, owner adjudication of scoped/alternative gold, exact resource budgets, clock jump/restart recovery, and independent negative variants/holdout. Do not automatically convert this draft into a confirmed benchmark.
 
 ## Evaluation tracks and gates
 
@@ -86,9 +86,17 @@ Freeze these **before** comparing candidate algorithms, not after studying failu
 - **Not done:** owner adjudication of every gold root, independent semantic annotation, executable E4 Core adapters, reference schedules/clock model, measured throughput, Raspberry Pi experiments, crash injection, actual Stage 7 model behavior, hidden holdout.
 - **Production:** untouched. E1/E2/E3 status and Core Goal/Task permissions do not change.
 
+## Frozen design baseline / read-only observation
+
+- [E4 v0 Freeze Record](Memory_E4_v0_Freeze_Record.md)
+- [E4 v0 Runner Contract — L0 Shadow only](Memory_E4_Runner_Contract_v0.md)
+- [Frozen content-addressed manifest](Fixtures/memory_e4_frozen_manifest_v0.json)
+
+The `v0` event and oracle JSON files are pinned by exact blob hash. Alternative labels remain bounded and gold remains provisional. L0 observations **cannot** satisfy Story, Goal/Task, SLEEP or recovery checks; unsupported actions are reported, never simulated.
+
 ## Pre-freeze technical candidate and development negatives
 
-The [four bounded gold alternatives](Memory_E4_Gold_Adjudication_v0.md), [visible 15-case adversarial suite](Memory_E4_Negative_Variants_v0_Draft.md) and [content-addressed candidate manifest](Fixtures/memory_e4_freeze_candidate_manifest_v0.json) are now available for review. **All remain candidates, not owner-frozen conformance or blinded holdout.** These do not alter production Core/Memory.
+The [four bounded gold alternatives](Memory_E4_Gold_Adjudication_v0.md), [visible 15-case adversarial suite](Memory_E4_Negative_Variants_v0_Draft.md) and [superseded predecessor candidate manifest](Fixtures/memory_e4_freeze_candidate_manifest_v0.json) remain accessible. The current [frozen design manifest](Fixtures/memory_e4_frozen_manifest_v0.json) fixes source bytes, not conformance or independent gold validation.
 
 ## Owner-review questions before freeze
 
@@ -98,4 +106,4 @@ The [four bounded gold alternatives](Memory_E4_Gold_Adjudication_v0.md), [visibl
 4. Does user confirmation of a nickname resolve only the intended referent, not physical truth? (proposed yes)
 5. May an important unanswered question retain a periodic **cheap** check even without new evidence, while expensive repeated analysis remains gated? (proposed yes)
 
-The corpus should be frozen only **after** owner-reviewed corrections. Do not infer acceptance from a green syntax/CI check.
+The exact fixture bytes are now locked under the [freeze record](Memory_E4_v0_Freeze_Record.md). This is a reproducibility freeze, not independent gold adjudication or E4 conformance. Do not infer semantic success from green CI.

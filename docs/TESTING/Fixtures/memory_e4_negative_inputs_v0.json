@@ -1,6 +1,6 @@
 {
   "schema": "anima.memory_e4.negative_inputs/0.1",
-  "status": "PROPOSED_DEV_NEGATIVES_NOT_HOLDOUT",
+  "status": "FROZEN_DEV_NEGATIVES_NOT_HOLDOUT",
   "isolation": "fresh_state_per_case",
   "entities": {
     "pi": "ent_00000000-0000-4000-8000-000000000001",

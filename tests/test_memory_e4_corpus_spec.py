@@ -22,8 +22,8 @@ def test_e4_design_has_separate_inputs_and_proposed_gold():
     gold = _load("memory_e4_gold_v0.json")
     assert inputs["schema"] == "anima.memory_e4.inputs/0.1"
     assert gold["schema"] == "anima.memory_e4.gold/0.1"
-    assert inputs["status"] == "DRAFT_NOT_FROZEN"
-    assert gold["status"] == "PROPOSED_NOT_OWNER_ACCEPTED"
+    assert inputs["status"] == "FROZEN_DESIGN_INPUTS_V0"
+    assert gold["status"] == "FROZEN_PROVISIONAL_GOLD_V0"
     assert inputs["isolation"] == "each_case_independent"
     assert len(inputs["cases"]) == len(gold["cases"]) == 42
     assert {c["id"] for c in inputs["cases"]} == {c["id"] for c in gold["cases"]}

@@ -1,6 +1,6 @@
 # ANIMA — E4 Gold Adjudication v0
 
-**Status: TECHNICAL CANDIDATE / OWNER REVIEW OPEN.** No claim of independent owner approval or production E4 conformance.
+**Status: FOUR ALTERNATIVES TECHNICALLY ADJUDICATED / DESIGN FIXTURE FROZEN / INDEPENDENT GOLD REVIEW OPEN.** No claim of independently confirmed owner-by-label approval or production E4 conformance.
 
 **Review basis:** positive corpus from `94abd222465770f3b336148a2861468009eb7283`, [A/B audit](Memory_E4_AB_Gold_Audit_v0.md), [C/D audit](Memory_E4_CD_Gold_Audit_v0.md), [U/R/P audit](Memory_E4_URP_Gold_Audit_v0.md), [architecture](../ROADMAP/Memory_E4_Architecture_Contract_Draft.md).
 
@@ -26,9 +26,9 @@
 
 ## Gates still OPEN
 
-1. **Owner gold acceptance:** the four bounded outcomes above have a technical rationale; the user has not separately reviewed and accepted this complete table as frozen gold.
+1. **Independent gold acceptance:** the four bounded outcomes have technical rationale and are held constant for experiments; the owner has authorized proceeding but has not independently adjudicated every oracle label.
 2. **Reference evaluator:** source/clock/control semantics and trace-level negative checking are not implemented as E4 runner.
 3. **Blind holdout:** **not present**. The linked negative suite is visible to development and not a generalization test.
 4. **Physical resilience/latency:** Raspberry Pi, crash injection and real memory throughput have not been measured for E4.
 
-[Freeze candidate fingerprint](Fixtures/memory_e4_freeze_candidate_manifest_v0.json) locks JSON bytes for reproducibility using Git blob SHA-1. It is a fingerprint, **not a signature and not status FROZEN**.
+[Frozen baseline fingerprint](Fixtures/memory_e4_frozen_manifest_v0.json) locks JSON bytes for reproducibility using Git blob SHA-1. It is a checksum, **not a signature or semantic verification**.

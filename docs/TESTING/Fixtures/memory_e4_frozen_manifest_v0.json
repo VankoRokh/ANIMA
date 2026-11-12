@@ -1,0 +1,36 @@
+{
+  "schema": "anima.memory_e4.frozen_manifest/0.1",
+  "status": "FROZEN_DESIGN_BASELINE_V0",
+  "owner_approved": false,
+  "owner_authorized_continuation": true,
+  "oracle_status": "FROZEN_PROVISIONAL_NOT_INDEPENDENTLY_ADJUDICATED",
+  "production_conformance": false,
+  "blind_holdout": "NOT_CREATED",
+  "source_before_freeze_commit": "906229bcc2c3d12103c686028360c791100dc703",
+  "freeze_scope": "EXACT_JSON_BYTES_ONLY",
+  "root_cases": 42,
+  "negative_dev_cases": 15,
+  "root_events": 75,
+  "negative_dev_events": 25,
+  "root_gold_checks": 94,
+  "negative_dev_gold_checks": 28,
+  "hash_format": "Git blob SHA-1 with byte count; content fingerprint not security signature",
+  "pinned_files": {
+    "docs/TESTING/Fixtures/memory_e4_inputs_v0.json": {
+      "git_blob_sha1": "40b8fc967454b89265fe1b2ab6485aa1579b8c60",
+      "bytes": 69053
+    },
+    "docs/TESTING/Fixtures/memory_e4_gold_v0.json": {
+      "git_blob_sha1": "c86ffbc33dad612641eff5d8823c5b33f61f55ec",
+      "bytes": 33184
+    },
+    "docs/TESTING/Fixtures/memory_e4_negative_inputs_v0.json": {
+      "git_blob_sha1": "2dddc27aa14c1418c7662b925517d2a582308533",
+      "bytes": 23051
+    },
+    "docs/TESTING/Fixtures/memory_e4_negative_gold_v0.json": {
+      "git_blob_sha1": "8ae5554fa82e41eabe5d87bb803cd47bf8a776cc",
+      "bytes": 8932
+    }
+  }
+}

@@ -1,6 +1,6 @@
 {
   "schema": "anima.memory_e4.negative_gold/0.1",
-  "status": "PROPOSED_NOT_OWNER_ACCEPTED",
+  "status": "FROZEN_PROVISIONAL_DEV_GOLD_V0",
   "cases": [
     {
       "id": "E4-N01",

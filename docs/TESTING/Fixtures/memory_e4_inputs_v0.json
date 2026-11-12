@@ -1,6 +1,6 @@
 {
   "schema": "anima.memory_e4.inputs/0.1",
-  "status": "DRAFT_NOT_FROZEN",
+  "status": "FROZEN_DESIGN_INPUTS_V0",
   "dataset_kind": "synthetic_owner_review_pending",
   "base_time": "2026-11-01T12:00:00+00:00",
   "isolation": "each_case_independent",
