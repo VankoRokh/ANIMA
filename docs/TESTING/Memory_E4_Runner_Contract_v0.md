@@ -25,6 +25,8 @@ Use `python -m labs.exp009.e4_l0_observation --case E4-A03 --output /tmp/e4-a03.
 
 Use `--level L1` for the [conservative association lab](Memory_E4_L1_Conservative_Lab_v0.md). Default `--level L0` behavior is unchanged.
 
+Use `--level L1.1` for the [bounded, reversible E4 L1.1 laboratory](Memory_E4_L11_Lab_v0.md), whose [pre-implementation failure research and negative counterexamples](Memory_E4_L11_Failure_Research_v0.md) remain visible. These are not production Memory features.
+
 For every case the runner:
 
 1. Confirms frozen input SHA-1 and exact file length against the immutable [manifest](Fixtures/memory_e4_frozen_manifest_v0.json).
