@@ -38,6 +38,10 @@ python -m labs.exp009.e4_evaluator --suite negative --trace e4-results/e4_l1_neg
 
 Other gold dimensions (UncertaintyRegistry, long-running Goal/Task, scheduler, sleep publication, recovery, actual effects, real-world temporal resolution) are \`NOT_SUPPORTED\` until an independent, instrumented interface exists. No full E4 score is computed.
 
+## Measured snapshot
+
+[Independent E4 L1 Evaluation Results v0](Memory_E4_L1_Evaluation_Results_v0.md) records the 57-case assessment: **35 PASS, 4 FAIL, 83 NOT_SUPPORTED** among 122 gold checks, plus all 99 forbidden obligations unsupported. This is a limited L0/L1 diagnostic, not E4 conformance.
+
 ## Integrity safeguards
 
 Reject invalid manifest hashes, unknown/duplicate cases, wrong Event sequence or assignment, fabricated Story evidence IDs, aliases without source-backed Entity references, made-up source Event pointers, missing synthetic control declarations or L1 claiming semantic conformance. A missing Story pair is \`NOT_OBSERVED\` rather than a PASS for \`insufficient\`.
