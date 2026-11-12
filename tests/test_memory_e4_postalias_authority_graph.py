@@ -6,7 +6,7 @@ security gap is NOT a production acceptance test.
 from collections import defaultdict
 from random import Random
 
-from tests.test_memory_e4_alias_lifecycle_lab import _setup, _revocation
+from tests.test_memory_e4_alias_lifecycle_lab import (_setup, _revocation, _definition, _event)
 
 
 def _logical_closure(edges, alias_id):
@@ -141,3 +141,84 @@ def test_exactly_128_affected_nodes_are_admitted_atomically(tmp_path):
     assert len(set(result["affected_nodes"])) == 128
     assert j.count("invalidations") == 128
     assert j.node("story_u")["head_state"] == "current"
+
+
+def test_twelve_competing_source_definitions_revoke_incremental_closure(tmp_path):
+    """Many conflicting Event claims, multiple revocations and mixed DAG paths.
+
+    This tests structural scoping, not truth or actual source independence.
+    """
+    from labs.exp009.e4_alias_lifecycle_lab import AliasLifecycleLab
+
+    j = AliasLifecycleLab(tmp_path / "multi_conflict_lab.db")
+    definitions = {}
+    aliases = [f"conflict_{i:02d}" for i in range(12)]
+    for i, alias_id in enumerate(aliases):
+        definition = _definition(
+            100 + i, alias_id, f"psu:alternative:{i:02d}",
+            surface="адаптер", session=f"report_{i:02d}")
+        j.append_event(definition)
+        j.define(alias_id=alias_id,
+                 definition_event_id=definition["id"],
+                 operation_key=f"define_{alias_id}")
+        definitions[alias_id] = definition
+    observation = _event(1000, "Синтетическое наблюдение общего устройства.")
+    j.append_event(observation)
+
+    rng = Random(99173)
+    graph = {}
+    created = []
+    for i in range(90):
+        node = f"mixed_{i:03d}"
+        primary = aliases[i % 12]
+        alias_deps = [primary]
+        if i % 7 == 0:
+            secondary = aliases[(i + 5) % 12]
+            if secondary != primary:
+                alias_deps.append(secondary)
+        n_parents = rng.randrange(min(3, len(created)) + 1)
+        parent_deps = rng.sample(created, k=n_parents)
+        j.create_node(
+            node_id=node,
+            kind="Story" if i % 3 else "Episode",
+            source_event_ids=[observation["id"]],
+            alias_dependencies=[(name, 1) for name in alias_deps],
+            node_dependencies=[(name, 1) for name in parent_deps],
+            operation_key=f"seed_{node}",
+        )
+        graph[node] = ([("alias", name) for name in alias_deps] +
+                       [("node", name) for name in parent_deps])
+        created.append(node)
+
+    already_stale = set()
+    revoked_aliases = set()
+    for revocation_number, alias_id in enumerate((aliases[0], aliases[5], aliases[9])):
+        revocation = _revocation(
+            2000 + revocation_number, alias_id,
+            definitions[alias_id], session="revisit_s2",
+            timestamp="2026-11-14T12:00:00+00:00")
+        j.append_event(revocation)
+        result = j.revoke(
+            alias_id=alias_id, revocation_event_id=revocation["id"],
+            expected_head=1, operation_key=f"revoke_{alias_id}")
+
+        revoked_aliases.add(alias_id)
+        expected_now = set().union(*(
+            _logical_closure(graph, name) for name in revoked_aliases
+        ))
+        newly_stale = expected_now - already_stale
+        assert set(result["affected_nodes"]) == newly_stale
+        assert result["invalidation_count"] == len(newly_stale)
+        assert set(j.invalidations(f"revoke_{alias_id}")) == newly_stale
+        for node in graph:
+            assert j.node(node)["head_state"] == (
+                "stale" if node in expected_now else "current"
+            )
+        already_stale = expected_now
+
+    assert 12 < len(already_stale) < 90
+    assert j.count("raw_events") == 16
+    for alias_id in aliases:
+        state = "revoked" if alias_id in revoked_aliases else "active"
+        assert j.alias(alias_id)["head_state"] == state
+        assert j.alias(alias_id, 1)["record"]["state"] == "active"
