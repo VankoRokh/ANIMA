@@ -27,7 +27,7 @@ TRACE_SCHEMA = "anima.e4.shadow_observation_l0/0.1"
 
 
 def _blob_sha(data):
-    header = b"blob " + str(len(data)).encode("ascii") + b"\\0"
+    header = b"blob " + str(len(data)).encode("ascii") + b"\0"
     return hashlib.sha1(header + data).hexdigest()
 
 
