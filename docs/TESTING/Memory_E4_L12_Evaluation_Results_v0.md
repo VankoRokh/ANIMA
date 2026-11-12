@@ -42,6 +42,8 @@ This is **not** a reason to merge identical unverified ticket numbers across dif
 
 The last snapshot `040b579f...` restores frozen scores to **41 PASS / 0 FAIL / 81 NOT_SUPPORTED**, preserves **16 PASS / 0 FAIL** on the separate 15-case development challenge, and adds a focused negative unit test for user-reported independence. The final raw `positive_delta.json` and `negative_delta.json` each contain **zero changed statuses and zero regressions** relative to L1.1. This intermediate failure was discovered by inspecting the artifact, not inferred from a green `pytest`.
 
+**Follow-up hardening:** [L1.2 explicit source binding results](Memory_E4_L12_Source_Binding_Results_v0.md). Cross-session ambient-anchor false reuse is blocked; typed source-pointer receipt requires a pinned caller-supplied snapshot. The frozen E4 v0 score remains 41 PASS/0 FAIL/81 NOT_SUPPORTED and 99 forbidden obligations remain uninstrumented.
+
 ## Safety boundaries and missed capabilities
 
 - `CorrectionTarget` from a bounded deictic utterance («Это были…») remains a **lab-only heuristic**, explicitly carrying `production_admission=false`. A unique local antecedent does not prove actual-world target identity or allow durable Memory rewriting.

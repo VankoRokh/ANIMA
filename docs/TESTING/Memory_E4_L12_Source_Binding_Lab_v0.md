@@ -5,6 +5,8 @@
 **Implementation:** [source-pointer candidate assessor](../../labs/exp009/e4_l12_target_proof.py), [open raw probe](../../labs/exp009/e4_l12_source_probe.py).  
 **Adversarial negative tests:** [source-pointer and cross-session alias tests](../../tests/test_memory_e4_l12_source_binding.py).
 
+**Measured outcome:** [Source Binding Hardening Results v0](Memory_E4_L12_Source_Binding_Results_v0.md): 1606 regression PASS on Python 3.12/3.13/3.14; exact typed Event pointers produce *source-only candidate*, unverified cross-session alias targeting abstains. Not production proof.
+
 ## Why this layer exists
 
 An ordinary `references: [{kind: event, id: ...}]` is source-supplied attribution. It can show that a user utterance explicitly refers to source Events, **but cannot verify that the user statement is true, that the projection is authoritative, or that Core has admitted a derived revision**. The laboratory separately verifies:
