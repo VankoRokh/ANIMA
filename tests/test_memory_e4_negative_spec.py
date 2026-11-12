@@ -82,7 +82,7 @@ def test_e4_candidate_manifest_pins_exact_json_files():
     assert m["owner_approved"] is False
     assert m["production_conformance"] is False
     assert m["blind_holdout"] == "NOT_CREATED"
-    assert m["positive_root_cases"] == 42
+    assert m["root_cases"] == 42
     assert m["negative_dev_cases"] == 15
     expected = {
         "docs/TESTING/Fixtures/memory_e4_inputs_v0.json",
