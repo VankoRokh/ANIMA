@@ -94,6 +94,20 @@ jobs:
           path: e4-l11-results/*.json
           if-no-files-found: error
           retention-days: 14
+      - name: Measure visible E4 L1.1 generalization challenge
+        if: matrix.python-version == '3.14'
+        run: |
+          mkdir -p e4-l11-challenge
+          python -m labs.exp009.e4_l11_challenge_runner --output e4-l11-challenge/raw.json
+          python -m labs.exp009.e4_l11_challenge_evaluator --trace e4-l11-challenge/raw.json --output e4-l11-challenge/assessment.json --print-summary
+      - name: Publish visible E4 L1.1 challenge results
+        if: matrix.python-version == '3.14'
+        uses: actions/upload-artifact@v4
+        with:
+          name: e4-l11-visible-novel-challenges-py314
+          path: e4-l11-challenge/*.json
+          if-no-files-found: error
+          retention-days: 14
       - name: Event Retrieval C3 PC baseline (10k and 100k Events)
         if: github.event_name == 'workflow_dispatch' && matrix.python-version == '3.14'
         run: |

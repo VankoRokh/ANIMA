@@ -36,6 +36,8 @@ _EXP009_DOC_SOURCES = frozenset({
     Path("labs/exp009/e4_l11_association.py"),
     Path("labs/exp009/e4_l11_evaluator.py"),
     Path("labs/exp009/e4_l11_compare.py"),
+    Path("labs/exp009/e4_l11_challenge_runner.py"),
+    Path("labs/exp009/e4_l11_challenge_evaluator.py"),
 })
 
 # These are never source subdirectories, even when a filename looks like source.
