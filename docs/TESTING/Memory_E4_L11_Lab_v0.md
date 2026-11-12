@@ -22,4 +22,6 @@ python -m labs.exp009.e4_l11_evaluator --suite positive --trace e4-l11-results/p
 
 For head-to-head comparison, also run legacy L1 and independent evaluator from [E4 Evaluator v0](Memory_E4_Independent_Evaluator_v0.md) and then `python -m labs.exp009.e4_l11_compare --old OLD.json --new NEW.json --output DIFF.json`.
 
-**Measured outcome:** [E4 L1.1 independent evaluation results v0](Memory_E4_L11_Evaluation_Results_v0.md) — 41 PASS, 0 FAIL and 81 NOT_SUPPORTED among 122 frozen checks; zero visible regressions, but no full E4 conformance.\n\n**Scoring interpretation:** a PASS for a derived Episode view is a **lab-only proxy**; it does not satisfy durable E4 revision, crash-safe SLEEP, or Goal/Task execution. 99 forbidden obligations are NOT_SUPPORTED absent independent effects instrumentation. The negative suite is visible development data; no blind holdout.
+**Measured outcome:** [E4 L1.1 independent evaluation results v0](Memory_E4_L11_Evaluation_Results_v0.md) — 41 PASS, 0 FAIL and 81 NOT_SUPPORTED among 122 frozen checks; zero visible regressions, but no full E4 conformance.
+
+**Scoring interpretation:** a PASS for a derived Episode view is a **lab-only proxy**; it does not satisfy durable E4 revision, crash-safe SLEEP, or Goal/Task execution. 99 forbidden obligations are NOT_SUPPORTED absent independent effects instrumentation. The negative suite is visible development data; no blind holdout.
