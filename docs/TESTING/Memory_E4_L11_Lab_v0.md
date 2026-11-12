@@ -24,7 +24,9 @@ For head-to-head comparison, also run legacy L1 and independent evaluator from [
 
 **New open development challenge:** [15 novel E4 L1.1 adversarial scenarios](Memory_E4_L11_Challenge_v0.md), declared before their evaluation and separate from frozen E4 v0. They are *not* blinded or independent in authorship.
 
-**Pre-L2 review:** [critical architecture assessment and L2 admission gates](Memory_E4_PreL2_Architecture_Review_v0.md).\n\n**Pre-L2 research:** [new adversarial results](Memory_E4_L11_Challenge_Results_v0.md) and [isolated durable revision journal laboratory](Memory_E4_Derived_Journal_Lab_v0.md). Their outcomes do not imply production Memory migrations or Core action authority.
+**Pre-L2 review:** [critical architecture assessment and L2 admission gates](Memory_E4_PreL2_Architecture_Review_v0.md).
+
+**Pre-L2 research:** [new adversarial results](Memory_E4_L11_Challenge_Results_v0.md) and [isolated durable revision journal laboratory](Memory_E4_Derived_Journal_Lab_v0.md). Their outcomes do not imply production Memory migrations or Core action authority.
 
 **Measured outcome:** [E4 L1.1 independent evaluation results v0](Memory_E4_L11_Evaluation_Results_v0.md) — 41 PASS, 0 FAIL and 81 NOT_SUPPORTED among 122 frozen checks; zero visible regressions, but no full E4 conformance.
 
