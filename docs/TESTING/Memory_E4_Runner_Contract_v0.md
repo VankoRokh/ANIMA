@@ -13,7 +13,7 @@ Separate source replay, actual adapter behavior, independent scoring, and future
 | Layer | Input | Output | Status and restrictions |
 | --- | --- | --- | --- |
 | **L0** | Frozen Event input + Entity registry; per-case isolated temporary MemoryStore | Existing `ShadowEpisodeEncoder` raw decisions, source IDs, reasons, episodes; unsupported-control list | **Implemented** read-only baseline. Validates and observes, **does not grade** E4 and does not execute control events or simulate user/Goal/SLEEP. |
-| **L1** | Same frozen Events, explicit Episode/Story/Entity decision adapter | Typed per-event association proposals, provenance refs and abstentions | **Not implemented**. Never publish Knowledge and never treat candidate as verified. |
+| **L1 (partial)** | Same frozen Events + L0 Shadow decisions | Explicit reported-case links, scoped speaker-intent alias proposals, typed source pointers | **Implemented experimental read-only slice**. No E4 Episode resegmentation or general semantic resolver. |
 | **L2** | Explicit `setup`, admitted Goal/Task/authority, virtual clock and control stream | Decision trace and side-effect ledger for uncertainty, queuing, due/condition review | **Not implemented**. Must not synthesize passing Task outcomes. |
 | **L3** | Crash/restart/checkpoints, persistency and source version changes | Durable recovery ledger, exact event+operation identities, recovery outcomes | **Not implemented**. Require injection around before/after effect and publication. |
 | **EVAL** | Closed raw trace + frozen gold | Per-check results with `PASS`/`FAIL`/`NOT_SUPPORTED`/`NOT_OBSERVED` and explanations | **Not implemented**. `NOT_SUPPORTED` never counts as PASS. |
@@ -21,6 +21,8 @@ Separate source replay, actual adapter behavior, independent scoring, and future
 ## Deterministic L0 behavior
 
 Use `python -m labs.exp009.e4_l0_observation --case E4-A03 --output /tmp/e4-a03.json` from repo root. Choose `--suite positive|negative`, or run all cases without `--case`. Output file must not already exist. Output contains no gold labels.
+
+Use `--level L1` for the [conservative association lab](Memory_E4_L1_Conservative_Lab_v0.md). Default `--level L0` behavior is unchanged.
 
 For every case the runner:
 
