@@ -72,7 +72,19 @@ def enhance_stories(case, legacy):
     for row in items:
         left, right = rows[row["left_event_key"]], rows[row["right_event_key"]]
         la, lb = _case_marker(left), _case_marker(right)
-        if not (la and lb and left["source"] == right["source"] == "user"):
+        if left["source"] != "user" or right["source"] != "user":
+            # A relay can repeat the same ticket string without establishing
+            # its namespace, identity or independence. Preserve the reports,
+            # but do not let legacy pairing promote them into case membership.
+            if row["status"] in ("same_case_reported", "not_same_case_reported"):
+                row.update(
+                    status="insufficient",
+                    reason_codes=["untrusted_relay_case_identity_unverified"],
+                    source_event_ids=[],
+                    authority="source_report_not_world_fact",
+                )
+            continue
+        if not (la and lb):
             continue
         na, nb = _namespace(left, setup), _namespace(right, setup)
         if na == nb:
