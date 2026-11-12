@@ -129,7 +129,10 @@ def _validate(observed, source):
                 and (a["session_id"] == raw["session_id"]
                      or bool(set(a["anchor_entity_ids"]) & {
                          r["id"] for r in raw["references"] if r["kind"] == "entity"
-                     })))
+                     })
+                     or a["target_entity_id"] in {
+                         r["id"] for r in raw["references"] if r["kind"] == "entity"
+                     }))
         ]
         if "definition_not_reuse" in mention.get("reason_codes_l12", []):
             # The utterance defines the label rather than reusing it.
@@ -153,15 +156,22 @@ def _validate(observed, source):
             if not chosen:
                 raise ValueError("Alias reuse without source-backed target")
             anchors = {x["id"] for x in raw["references"] if x["kind"] == "entity"}
-            matched = [a for a in records if (
-                a["target_entity_id"] in anchors
-                or set(a["anchor_entity_ids"]) & anchors
-            )] if anchors else []
+            eligible = [
+                a for a in records
+                if a["session_id"] == raw["session_id"]
+                or a["target_entity_id"] in anchors
+            ]
+            matched = [
+                a for a in eligible
+                if (a["target_entity_id"] in anchors
+                    or (a["session_id"] == raw["session_id"]
+                        and bool(set(a["anchor_entity_ids"]) & anchors)))
+            ] if anchors else []
             if matched:
-                records = matched
-            elif anchors and any(a["anchor_entity_ids"] for a in records):
-                records = []
-            if len({a["target_entity_id"] for a in records}) != 1:
+                eligible = matched
+            elif anchors and any(a["anchor_entity_ids"] for a in eligible):
+                eligible = []
+            if len({a["target_entity_id"] for a in eligible}) != 1:
                 raise ValueError("Unresolved alias conflict was incorrectly promoted")
         elif mention["status"] == "insufficient":
             if "target_entity_id" in mention or "source_event_id" in mention:

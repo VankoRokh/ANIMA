@@ -141,6 +141,19 @@ jobs:
           path: e4-l12-results/*.json
           if-no-files-found: error
           retention-days: 14
+      - name: Emit E4 L1.2 explicit source-pointer and alias-scope probe
+        if: matrix.python-version == '3.14'
+        run: |
+          mkdir -p e4-l12-source-results
+          python -m labs.exp009.e4_l12_source_probe --output e4-l12-source-results/source_binding.json
+      - name: Publish E4 L1.2 source-binding raw probe
+        if: matrix.python-version == '3.14'
+        uses: actions/upload-artifact@v4
+        with:
+          name: e4-l12-source-binding-probe-py314
+          path: e4-l12-source-results/*.json
+          if-no-files-found: error
+          retention-days: 14
       - name: Event Retrieval C3 PC baseline (10k and 100k Events)
         if: github.event_name == 'workflow_dispatch' && matrix.python-version == '3.14'
         run: |

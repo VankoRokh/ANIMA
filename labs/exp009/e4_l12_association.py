@@ -200,23 +200,37 @@ def conflict_aware_aliases(case, legacy_records, legacy_mentions):
             if (d["surface"] == surface and d["speaker"] == raw["source"]
                 and index[d["source_event_id"]] < index[raw["id"]]
                 and (d["session_id"] == raw["session_id"]
-                     or bool(entity_ids(raw) & set(d["anchor_entity_ids"]))))
+                     or bool(entity_ids(raw) & set(d["anchor_entity_ids"]))
+                     or d["target_entity_id"] in entity_ids(raw))))
         ]
         item["candidate_source_event_ids"] = [d["source_event_id"] for d in candidates]
         anchors = entity_ids(raw)
-        matched = [
+        # Across sessions, a shared ambient device (e.g. Pi5) is a retrieval
+        # *candidate*, not proof that the old alias still names its PSU.
+        # Only the target Entity explicitly referenced in the new Event can
+        # bind a previous-session alias definition.
+        eligible = [
             d for d in candidates
+            if d["session_id"] == raw["session_id"]
+            or d["target_entity_id"] in anchors
+        ]
+        matched = [
+            d for d in eligible
             if (d["target_entity_id"] in anchors
-                or bool(anchors & set(d["anchor_entity_ids"])))
+                or (d["session_id"] == raw["session_id"]
+                    and bool(anchors & set(d["anchor_entity_ids"]))))
         ] if anchors else []
         if matched:
-            # Explicitly named current Entity/source anchor constrains scope.
             candidates = matched
             reason = "source_entity_anchor_filters_competing_aliases"
-        elif anchors and any(d["anchor_entity_ids"] for d in candidates):
+        elif not eligible and candidates:
+            candidates = []
+            reason = "cross_session_context_not_target_bound"
+        elif anchors and any(d["anchor_entity_ids"] for d in eligible):
             candidates = []
             reason = "current_anchor_disagrees_with_known_alias_context"
         else:
+            candidates = eligible
             reason = "unique_source_backed_candidate" if candidates else "no_eligible_definition"
         targets = {d["target_entity_id"] for d in candidates}
         if len(targets) == 1:
