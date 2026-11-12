@@ -1,0 +1,21 @@
+{
+  "schema": "anima.e4.l11_challenge_manifest/0.1",
+  "status": "PREDECLARED_VISIBLE_DEVELOPMENT_NOT_HOLDOUT",
+  "source_commit": "f3b9382bb89d82b53141d2f8a74529dce7ccd1fe",
+  "owner_independent_review": false,
+  "root_e4_v0_untouched": true,
+  "case_count": 15,
+  "check_count": 16,
+  "source_event_count": 36,
+  "pinned_files": {
+    "docs/TESTING/Fixtures/memory_e4_l11_challenge_inputs_v0.json": {
+      "git_blob_sha1": "8cd0995956061a120280daf00dda74b330b2fad7",
+      "bytes": 27977
+    },
+    "docs/TESTING/Fixtures/memory_e4_l11_challenge_gold_v0.json": {
+      "git_blob_sha1": "f0ba95f6e185fd48c9fce99ef8834e894056101c",
+      "bytes": 4538
+    }
+  },
+  "notes": "Exactly specified before running L1.1 on these cases. Evaluator is separate from adapter, but both authored in same project; never call blinded/independent holdout."
+}
