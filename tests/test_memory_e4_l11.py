@@ -122,6 +122,17 @@ def test_namespaces_need_verified_disjoint_precondition(tmp_path):
     assert relay["story_pair_assessments"][0]["status"] == "insufficient"
 
 
+def test_untrusted_relay_duplicate_ticket_id_stays_insufficient():
+    # Separate *messages* from one unknown relay do not establish that the
+    # ticket namespace, source independence or case identity is reliable.
+    case, reg = _case("negative", "E4-N05")
+    case["events"][0]["raw"]["source"] = "unknown.relay"
+    case["events"][1]["raw"]["source"] = "unknown.relay"
+    result = l11_case(case, entity_registry=reg)
+    assert result["story_pair_assessments"][0]["status"] == "insufficient"
+    assert result["story_pair_assessments"][0]["source_event_ids"] == []
+
+
 def test_evaluator_rejects_forged_revision_or_alias_normalization(tmp_path):
     path = _raw(tmp_path / "revision", case_id="E4-D01")
     data = json.loads(path.read_text(encoding="utf-8"))
