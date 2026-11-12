@@ -32,6 +32,10 @@ python -m labs.exp009.e4_l12_source_probe --output /tmp/e4-l12-source-probe.json
 
 The new probes are **developer-authored synthetic variations** and not an independent unseen holdout. Frozen E4 v0 and the 15-case open challenge stay byte-identical; independent existing gold scorers are rerun on both datasets to detect regressions.
 
+## New isolated E4 lifecycle research
+
+[Versioned alias revocation and selective invalidation contract](Memory_E4_L12_Alias_Lifecycle_Contract_v0.md) and [isolated SQLite lifecycle implementation and test plan](Memory_E4_L12_Alias_Lifecycle_Lab_v0.md). This is separate from L1.2 source-target resolution and not connected to production Memory or its read-only evaluator.
+
 ## Required next gates
 
 - Separate Core-owned authority for candidate admission and verified projection snapshot identity.
