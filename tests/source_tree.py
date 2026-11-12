@@ -40,6 +40,10 @@ _EXP009_DOC_SOURCES = frozenset({
     Path("labs/exp009/e4_l11_challenge_evaluator.py"),
     Path("labs/exp009/e4_revision_journal_lab.py"),
     Path("labs/exp009/e4_revision_journal_probe.py"),
+    Path("labs/exp009/e4_l12_association.py"),
+    Path("labs/exp009/e4_l12_evaluator.py"),
+    Path("labs/exp009/e4_l12_challenge_runner.py"),
+    Path("labs/exp009/e4_l12_challenge_evaluator.py"),
 })
 
 # These are never source subdirectories, even when a filename looks like source.

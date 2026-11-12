@@ -121,6 +121,26 @@ jobs:
           path: e4-journal-results/*.json
           if-no-files-found: error
           retention-days: 14
+      - name: Evaluate L1.2 on frozen E4 v0 and predeclared open challenge
+        if: matrix.python-version == '3.14'
+        run: |
+          mkdir -p e4-l12-results
+          python -m labs.exp009.e4_l12_association --suite positive --output e4-l12-results/positive_raw.json
+          python -m labs.exp009.e4_l12_association --suite negative --output e4-l12-results/negative_raw.json
+          python -m labs.exp009.e4_l12_evaluator --suite positive --trace e4-l12-results/positive_raw.json --output e4-l12-results/positive_evaluation.json --print-summary
+          python -m labs.exp009.e4_l12_evaluator --suite negative --trace e4-l12-results/negative_raw.json --output e4-l12-results/negative_evaluation.json --print-summary
+          python -m labs.exp009.e4_l11_compare --old e4-l11-results/e4_l11_positive_evaluation.json --new e4-l12-results/positive_evaluation.json --output e4-l12-results/positive_delta.json
+          python -m labs.exp009.e4_l11_compare --old e4-l11-results/e4_l11_negative_evaluation.json --new e4-l12-results/negative_evaluation.json --output e4-l12-results/negative_delta.json
+          python -m labs.exp009.e4_l12_challenge_runner --output e4-l12-results/challenge_raw.json
+          python -m labs.exp009.e4_l12_challenge_evaluator --trace e4-l12-results/challenge_raw.json --output e4-l12-results/challenge_evaluation.json --print-summary
+      - name: Publish raw L1.2 traces, separate evaluations and paired deltas
+        if: matrix.python-version == '3.14'
+        uses: actions/upload-artifact@v4
+        with:
+          name: e4-l12-scoped-lab-evaluation-py314
+          path: e4-l12-results/*.json
+          if-no-files-found: error
+          retention-days: 14
       - name: Event Retrieval C3 PC baseline (10k and 100k Events)
         if: github.event_name == 'workflow_dispatch' && matrix.python-version == '3.14'
         run: |

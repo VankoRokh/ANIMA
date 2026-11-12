@@ -24,6 +24,8 @@ For head-to-head comparison, also run legacy L1 and independent evaluator from [
 
 **New open development challenge:** [15 novel E4 L1.1 adversarial scenarios](Memory_E4_L11_Challenge_v0.md), declared before their evaluation and separate from frozen E4 v0. They are *not* blinded or independent in authorship.
 
+**L1.2 conservative research:** [typed identifier, conflict-aware alias and CorrectionTarget contract](Memory_E4_L12_Contract_v0.md) and [L1.2 laboratory report](Memory_E4_L12_Lab_v0.md). Separate from L1/L1.1 and from production Memory.
+
 **Pre-L2 review:** [critical architecture assessment and L2 admission gates](Memory_E4_PreL2_Architecture_Review_v0.md).
 
 **Pre-L2 research:** [new adversarial results](Memory_E4_L11_Challenge_Results_v0.md) and [isolated durable revision journal laboratory](Memory_E4_Derived_Journal_Lab_v0.md). Their outcomes do not imply production Memory migrations or Core action authority.
