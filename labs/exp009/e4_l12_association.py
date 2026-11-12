@@ -201,7 +201,7 @@ def conflict_aware_aliases(case, legacy_records, legacy_mentions):
                 and index[d["source_event_id"]] < index[raw["id"]]
                 and (d["session_id"] == raw["session_id"]
                      or bool(entity_ids(raw) & set(d["anchor_entity_ids"]))
-                     or d["target_entity_id"] in entity_ids(raw))))
+                     or d["target_entity_id"] in entity_ids(raw)))
         ]
         item["candidate_source_event_ids"] = [d["source_event_id"] for d in candidates]
         anchors = entity_ids(raw)
