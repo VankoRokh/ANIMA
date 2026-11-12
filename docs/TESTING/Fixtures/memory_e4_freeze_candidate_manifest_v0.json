@@ -1,0 +1,30 @@
+{
+  "schema": "anima.memory_e4.freeze_candidate_manifest/0.1",
+  "status": "CANDIDATE_OWNER_REVIEW_PENDING",
+  "owner_approved": false,
+  "production_conformance": false,
+  "positive_root_cases": 42,
+  "negative_dev_cases": 15,
+  "source_commit_sha": "94abd222465770f3b336148a2861468009eb7283",
+  "hash_format": "git_blob_sha1; reproducible fingerprint, not signature",
+  "pinned_files": {
+    "docs/TESTING/Fixtures/memory_e4_inputs_v0.json": {
+      "git_blob_sha1": "739731f1b45e79b8b6a19ce59bef9a8eb13a5da2",
+      "bytes": 69046
+    },
+    "docs/TESTING/Fixtures/memory_e4_gold_v0.json": {
+      "git_blob_sha1": "b1772be6df66850b2f3dfed43f4bffb3fff21246",
+      "bytes": 33185
+    },
+    "docs/TESTING/Fixtures/memory_e4_negative_inputs_v0.json": {
+      "git_blob_sha1": "82591e74a8b5d42db8c98ffbff4e1e205209a473",
+      "bytes": 23053
+    },
+    "docs/TESTING/Fixtures/memory_e4_negative_gold_v0.json": {
+      "git_blob_sha1": "27ab1a3f6dcc2e8bf9df3ec8d15fed376f8b225d",
+      "bytes": 8929
+    }
+  },
+  "semantic_review": "TECHNICAL_PROVISIONAL",
+  "blind_holdout": "NOT_CREATED"
+}

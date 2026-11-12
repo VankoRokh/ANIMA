@@ -86,6 +86,10 @@ Freeze these **before** comparing candidate algorithms, not after studying failu
 - **Not done:** owner adjudication of every gold root, independent semantic annotation, executable E4 Core adapters, reference schedules/clock model, measured throughput, Raspberry Pi experiments, crash injection, actual Stage 7 model behavior, hidden holdout.
 - **Production:** untouched. E1/E2/E3 status and Core Goal/Task permissions do not change.
 
+## Pre-freeze technical candidate and development negatives
+
+The [four bounded gold alternatives](Memory_E4_Gold_Adjudication_v0.md), [visible 15-case adversarial suite](Memory_E4_Negative_Variants_v0_Draft.md) and [content-addressed candidate manifest](Fixtures/memory_e4_freeze_candidate_manifest_v0.json) are now available for review. **All remain candidates, not owner-frozen conformance or blinded holdout.** These do not alter production Core/Memory.
+
 ## Owner-review questions before freeze
 
 1. Is `Story` an organizational relation with strict separate-episode provenance as described?
