@@ -30,4 +30,6 @@ python -m labs.exp009.e4_l12_challenge_evaluator \
   --output e4-l12-results/challenge_eval.json --print-summary
 ```
 
+**Measured results:** [L1.2 paired outcomes and remaining production gates](Memory_E4_L12_Evaluation_Results_v0.md): 41/122 frozen gold checks PASS (81 unsupported), 16/16 visible development challenge PASS, 99 forbidden obligations remain uninstrumented. These are not production E4 acceptance.
+
 **Evaluation interpretation:** L1.2 is not allowed to publish Memory, Knowledge or any external effects. Its bound `CorrectionTarget` may support a temporary research view, but deictic reference is a heuristic, not independently authenticated Event targeting. A green CI means deterministic laboratory checks and integrity gates; visible developer-authored gold cannot certify broad generalization. The remaining 99 forbidden E4 obligations are outside this evaluation.
