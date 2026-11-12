@@ -61,6 +61,18 @@ def test_story_identifier_kind_and_reported_scope():
     assert _disposition(challenge(case_id="E4-X03")["cases"][0])["status"] == "insufficient"
 
 
+def test_repeated_ticket_token_in_unverified_new_session_abstains():
+    case, registry = _case("E4-X05")
+    case["events"][0]["raw"]["payload"]["text"] = "Тикет T77 относится к первому устройству."
+    case["events"][1]["raw"]["payload"]["text"] = "Тикет T77 относится ко второму устройству."
+    case["events"][1]["raw"]["session_id"] = "another_unverified_session"
+    result = l12_case(dict(case, track=case["topic"]), entity_registry=registry)
+    row = _disposition(result)
+    assert row["status"] == "insufficient"
+    assert row["reason_codes"] == ["namespace_not_proven_equivalent"]
+    assert row["source_event_ids"] == []
+
+
 def test_conflicting_aliases_keep_both_sources_without_last_write_wins():
     x06 = challenge(case_id="E4-X06")["cases"][0]
     assert len(x06["alias_records"]) == 2

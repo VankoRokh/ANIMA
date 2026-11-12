@@ -76,7 +76,8 @@ def typed_identifier(event, setup):
     elif kind == "case" and setup.get("case_id_namespace"):
         scope = {"kind": "declared_speaker_scope", "name": str(setup["case_id_namespace"])}
     else:
-        scope = {"kind": "speaker_session_local", "name": event["source"]}
+        scope = {"kind": "speaker_session_local", "name": event["source"],
+                 "session_id": event["session_id"]}
     return {
         "kind": kind,
         "token": match.group("token").upper(),

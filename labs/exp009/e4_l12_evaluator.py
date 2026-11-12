@@ -56,7 +56,8 @@ def _identifier_from_event(raw, setup):
     elif kind == "case" and setup.get("case_id_namespace"):
         ns = {"kind": "declared_speaker_scope", "name": str(setup["case_id_namespace"])}
     else:
-        ns = {"kind": "speaker_session_local", "name": raw["source"]}
+        ns = {"kind": "speaker_session_local", "name": raw["source"],
+              "session_id": raw["session_id"]}
     return {
         "kind": kind, "token": found["token"].upper(), "namespace": ns,
         "source": raw["source"], "source_event_id": raw["id"],
