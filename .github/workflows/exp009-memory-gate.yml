@@ -60,6 +60,22 @@ jobs:
           path: exp009-results/retrieval_abcd.jsonl
           if-no-files-found: error
           retention-days: 14
+      - name: Generate E4 L1 raw traces and independent diagnostic reports
+        if: matrix.python-version == '3.14'
+        run: |
+          mkdir -p e4-results
+          python -m labs.exp009.e4_l0_observation --level L1 --suite positive --output e4-results/e4_l1_positive_raw.json
+          python -m labs.exp009.e4_l0_observation --level L1 --suite negative --output e4-results/e4_l1_negative_raw.json
+          python -m labs.exp009.e4_evaluator --suite positive --trace e4-results/e4_l1_positive_raw.json --output e4-results/e4_positive_evaluation.json --print-summary
+          python -m labs.exp009.e4_evaluator --suite negative --trace e4-results/e4_l1_negative_raw.json --output e4-results/e4_negative_evaluation.json --print-summary
+      - name: Publish E4 L1 raw traces and independent diagnostic reports
+        if: matrix.python-version == '3.14'
+        uses: actions/upload-artifact@v4
+        with:
+          name: e4-l1-independent-diagnostic-py314
+          path: e4-results/*.json
+          if-no-files-found: error
+          retention-days: 14
       - name: Event Retrieval C3 PC baseline (10k and 100k Events)
         if: github.event_name == 'workflow_dispatch' && matrix.python-version == '3.14'
         run: |

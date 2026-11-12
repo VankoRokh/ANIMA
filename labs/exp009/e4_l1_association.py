@@ -216,7 +216,14 @@ def run_case(case, *, entity_registry):
         "alias_records": records, "alias_mentions": mentions,
         "source_origin_links": origin_links(case),
         "memory_store_unchanged": l0["memory_store_unchanged"],
-        "ignored_setup_keys": l0["ignored_setup_keys"],
+        "setup_usage": {
+            "read_keys": sorted(set(case["setup"]) & {
+                "ticket_namespace", "case_id_namespace",
+            }),
+            "unhandled_keys": sorted(set(case["setup"]) - {
+                "ticket_namespace", "case_id_namespace",
+            }),
+        },
         "unsupported_controls": l0["unsupported_controls"],
         "unsupported_capabilities": [
             "Episode_resegmentation", "GeneralEntityResolution",

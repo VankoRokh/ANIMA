@@ -16,7 +16,7 @@ Separate source replay, actual adapter behavior, independent scoring, and future
 | **L1 (partial)** | Same frozen Events + L0 Shadow decisions | Explicit reported-case links, scoped speaker-intent alias proposals, typed source pointers | **Implemented experimental read-only slice**. No E4 Episode resegmentation or general semantic resolver. |
 | **L2** | Explicit `setup`, admitted Goal/Task/authority, virtual clock and control stream | Decision trace and side-effect ledger for uncertainty, queuing, due/condition review | **Not implemented**. Must not synthesize passing Task outcomes. |
 | **L3** | Crash/restart/checkpoints, persistency and source version changes | Durable recovery ledger, exact event+operation identities, recovery outcomes | **Not implemented**. Require injection around before/after effect and publication. |
-| **EVAL** | Closed raw trace + frozen gold | Per-check results with `PASS`/`FAIL`/`NOT_SUPPORTED`/`NOT_OBSERVED` and explanations | **Not implemented**. `NOT_SUPPORTED` never counts as PASS. |
+| **EVAL** | Closed L1 raw trace and frozen provisional gold | Per-check results, integrity gates, trace fingerprint, coverage and failure reasons | **Implemented limited independent post-hoc diagnostic**; not full E4 conformance. |
 
 ## Deterministic L0 behavior
 
@@ -64,5 +64,5 @@ Separate `NOT_SUPPORTED` (system cannot execute contract), `NOT_OBSERVED` (trace
 
 1. Specify a **read-only adapter protocol** for Story/Episode/Entity outputs with explicit support matrix; no production migrations.
 2. Define harness control semantics / tie-breaking / virtual clock and source authorization, then write tests that would FAIL if the runner silently simulates a currently unsupported Core capability.
-3. Build external scorer that loads only frozen gold and sealed raw trace, records per-case decisions and a separate coverage denominator.
+3. **Completed for L1 (limited diagnostic):** [independent E4 Evaluator v0](Memory_E4_Independent_Evaluator_v0.md) opens gold after reading closed L1 traces, with separate coverage and observed-pass denominators; broader E4 scoring remains open.
 4. Run original 42 + visible 15 development negatives with equal budgets; do not call this a blinded holdout or claim E4 PASS from CI alone.
