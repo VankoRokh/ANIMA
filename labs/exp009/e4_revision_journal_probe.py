@@ -20,7 +20,7 @@ def run_probe():
         journal_path = Path(folder) / "isolated_lab.db"
         journal = DerivedRevisionJournal(journal_path)
         before = {e["id"]: hashlib.sha256(json.dumps(
-            e, sort_keys=True, ensure_ascii=False
+            e, sort_keys=True, ensure_ascii=False, separators=(",", ":")
         ).encode("utf-8")).hexdigest() for e in (e1, e2, e3)}
         journal.append_event("stream", e1)
         journal.append_event("stream", e2)
@@ -67,9 +67,11 @@ def run_probe():
             reopened.publication_guard("proj_d01_lab", expected_revision=2)
         except RevisionConflict:
             blocked = True
-        after = {e["id"]: hashlib.sha256(json.dumps(
-            e, sort_keys=True, ensure_ascii=False
-        ).encode("utf-8")).hexdigest() for e in (e1, e2, e3)}
+        # Unlike comparing the input dictionaries to themselves, this checks
+        # the actual digests recorded in the persisted revision. read_revision
+        # separately rehashes SQLite raw rows and dependency edges.
+        stored = {event_id: head["record"]["source_digests"][event_id]
+                  for event_id in before}
         return {
             "schema": "anima.e4.derived_journal_recovery_lab/0.1",
             "status": "SIMULATED_TRANSACTION_RECOVERY_ONLY",
@@ -83,7 +85,7 @@ def run_probe():
             "versions_preserved": reopened.versions("proj_d01_lab"),
             "historical_version1_assignment": old["record"]["assignments"][e2["id"]],
             "current_version2_assignment": head["record"]["assignments"][e2["id"]],
-            "source_event_digests_preserved": before == after,
+            "source_event_digests_preserved": before == stored,
             "stale_after_late_event": not stale["eligible_for_lab_preflight"],
             "preflight_denied_on_stale": blocked,
             "staleness_scope": "ENTIRE_SOURCE_STREAM_CONSERVATIVE",

@@ -31,7 +31,7 @@ foreign Event / relay correction -> rejected
 direct SQLite byte tamper -> detected by stored source/derived digest
 ```
 
-These are **Python-injected exceptions** around transactions, NOT real process kill, lost disk writes, unplugged power, SSD endurance, filesystem errors, cross-database atomicity, concurrent MemoryStore migration or Raspberry Pi validation. The whole-stream dependency epoch is deliberately coarse and may invalidate more derived records than necessary. No measured C3 throughput/latency or retention policy for the growing revision history exists.
+These tests also expose a deliberate **known semantic admission gap**: the journal accepts a same-user later Event even when its text refers to someone else's tests (X11); correct source scope must be enforced by a separate decision/evidence gate. The raw recovery demo now verifies persisted dependency hashes rather than merely comparing the same in-memory Event dictionaries.\n\nThese are **Python-injected exceptions** around transactions, NOT real process kill, lost disk writes, unplugged power, SSD endurance, filesystem errors, cross-database atomicity, concurrent MemoryStore migration or Raspberry Pi validation. The whole-stream dependency epoch is deliberately coarse and may invalidate more derived records than necessary. No measured C3 throughput/latency or retention policy for the growing revision history exists.
 
 ## Reproduce
 

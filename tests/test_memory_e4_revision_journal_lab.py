@@ -220,3 +220,35 @@ def test_empty_or_untrusted_implicit_assignment_not_accepted(tmp_path):
             assignments={e1["id"]: "shadow_group_old",
                          e2["id"]: "shadow_group_old"}
         ))
+
+def test_lab_journal_does_not_verify_semantic_target_scope(tmp_path):
+    """A reliable storage commit can still persist a semantically wrong split.
+
+    This is a *known gap* exposed by the independently scored X11 challenge:
+    storage must never be treated as the Core's evidence admission policy.
+    """
+    from labs.exp009.e4_l11_challenge_runner import load_challenge
+    challenge, _ = load_challenge()
+    case = next(x for x in challenge["cases"] if x["id"] == "E4-X11")
+    e1, e2, irrelevant_correction = [x["raw"] for x in case["events"]]
+    j = DerivedRevisionJournal(tmp_path / "lab_no_semantic_authority.db")
+    for raw in (e1, e2):
+        j.append_event("stream", raw)
+    j.record_revision(
+        projection_id="proj_challenge", stream_id="stream",
+        expected_head=0, expected_source_version=2,
+        source_event_ids=[e1["id"], e2["id"]],
+        assignments={e1["id"]: "same", e2["id"]: "same"},
+        operation_key="seed",
+    )
+    j.append_event("stream", irrelevant_correction)
+    stored = j.record_revision(
+        projection_id="proj_challenge", stream_id="stream",
+        expected_head=1, expected_source_version=3,
+        source_event_ids=[e1["id"], e2["id"], irrelevant_correction["id"]],
+        assignments={e1["id"]: "same", e2["id"]: "split"},
+        correction_event_id=irrelevant_correction["id"],
+        operation_key="accepted_without_semantic_scope_validation",
+    )
+    assert stored["status"] == "committed"
+    assert j.read_revision("proj_challenge")["record"]["authority"] == "LAB_DERIVED_ONLY"
