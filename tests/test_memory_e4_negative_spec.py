@@ -72,7 +72,7 @@ def test_e4_negatives_are_isolated_valid_events_and_gold_is_separate():
 
 
 def _git_blob_sha1(data):
-    prefix = b"blob " + str(len(data)).encode("ascii") + b"\\0"
+    prefix = b"blob " + str(len(data)).encode("ascii") + b"\0"
     return hashlib.sha1(prefix + data).hexdigest()
 
 
