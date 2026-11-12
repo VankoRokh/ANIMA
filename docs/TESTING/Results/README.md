@@ -60,5 +60,5 @@
 | [TV-0051 — Stage 6 Cognitive Integration Core Final Acceptance](TV-0051.md) | 2026-11-02 | [6](../../ROADMAP/README.md#stage-6) | Passed | [123374b](https://github.com/VankoRokh/ANIMA/commit/123374b7eabf03fe1f65e9101626c2b26412dc08) |
 | [TV-0052 — Stage 7 Semantic Boundary Deterministic Baseline Validation](TV-0052.md) | 2026-11-03 | [7](../../ROADMAP/README.md#stage-7) | Passed | [ccb0fe7](https://github.com/VankoRokh/ANIMA/commit/ccb0fe72fb6686042bf5853489eda1e28e96981d) |
 | [TV-0053 — Stage 7 Residual Model-Facing Protocol Evaluation](TV-0053.md) | 2026-11-03 | [7](../../ROADMAP/README.md#stage-7) | Inconclusive | [6ad680b](https://github.com/VankoRokh/ANIMA/commit/6ad680b955158c53deb2b22420fdf0c9c0fb1bca) |
-| [TV-0054 — Raspberry Pi 5 and PC Core v0.1 Endurance and Profiling T6-T9.2](TV-0054.md) | 2026-11-12 | [9](../../ROADMAP/README.md#stage-9) | Inconclusive | [6ffdc2e](https://github.com/VankoRokh/ANIMA/commit/6ffdc2e49b115968cb5309ea591fa27f1eace6f3) |
+| [TV-0054 — Raspberry Pi 5 and PC Core v0.1 Endurance and EventLog Scaling T6-T9.3](TV-0054.md) | 2026-11-12 | [9](../../ROADMAP/README.md#stage-9) | Inconclusive | [6ffdc2e](https://github.com/VankoRokh/ANIMA/commit/6ffdc2e49b115968cb5309ea591fa27f1eace6f3) |
 <!-- AUTO:results:END -->
