@@ -76,6 +76,24 @@ jobs:
           path: e4-results/*.json
           if-no-files-found: error
           retention-days: 14
+      - name: Generate E4 L1.1 raw and independent differential reports
+        if: matrix.python-version == '3.14'
+        run: |
+          mkdir -p e4-l11-results
+          python -m labs.exp009.e4_l0_observation --level L1.1 --suite positive --output e4-l11-results/e4_l11_positive_raw.json
+          python -m labs.exp009.e4_l0_observation --level L1.1 --suite negative --output e4-l11-results/e4_l11_negative_raw.json
+          python -m labs.exp009.e4_l11_evaluator --suite positive --trace e4-l11-results/e4_l11_positive_raw.json --output e4-l11-results/e4_l11_positive_evaluation.json --print-summary
+          python -m labs.exp009.e4_l11_evaluator --suite negative --trace e4-l11-results/e4_l11_negative_raw.json --output e4-l11-results/e4_l11_negative_evaluation.json --print-summary
+          python -m labs.exp009.e4_l11_compare --old e4-results/e4_positive_evaluation.json --new e4-l11-results/e4_l11_positive_evaluation.json --output e4-l11-results/e4_positive_delta.json
+          python -m labs.exp009.e4_l11_compare --old e4-results/e4_negative_evaluation.json --new e4-l11-results/e4_l11_negative_evaluation.json --output e4-l11-results/e4_negative_delta.json
+      - name: Publish E4 L1.1 raw, evaluation and differential
+        if: matrix.python-version == '3.14'
+        uses: actions/upload-artifact@v4
+        with:
+          name: e4-l11-lab-differential-py314
+          path: e4-l11-results/*.json
+          if-no-files-found: error
+          retention-days: 14
       - name: Event Retrieval C3 PC baseline (10k and 100k Events)
         if: github.event_name == 'workflow_dispatch' && matrix.python-version == '3.14'
         run: |

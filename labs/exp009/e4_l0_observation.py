@@ -128,12 +128,15 @@ def run_suite(*, suite="positive", case_id=None):
 
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--level", choices=("L0", "L1"), default="L0")
+    parser.add_argument("--level", choices=("L0", "L1", "L1.1"), default="L0")
     parser.add_argument("--suite", choices=tuple(INPUT_FILES), default="positive")
     parser.add_argument("--case", dest="case_id")
     parser.add_argument("--output", type=Path)
     args = parser.parse_args(argv)
-    if args.level == "L1":
+    if args.level == "L1.1":
+        from labs.exp009.e4_l11_association import run_suite as l11_suite
+        report = l11_suite(suite=args.suite, case_id=args.case_id)
+    elif args.level == "L1":
         from labs.exp009.e4_l1_association import run_suite as l1_suite
         report = l1_suite(suite=args.suite, case_id=args.case_id)
     else:
