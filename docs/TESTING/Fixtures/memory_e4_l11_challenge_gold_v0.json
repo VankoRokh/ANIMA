@@ -1,0 +1,196 @@
+{
+  "schema": "anima.e4.l11_challenge_gold/0.1",
+  "status": "PROPOSED_DEVELOPMENT_GOLD_NOT_BLIND",
+  "cases": [
+    {
+      "id": "E4-X01",
+      "checks": [
+        {
+          "kind": "story_pair",
+          "expected": "insufficient",
+          "a": "e1",
+          "b": "e2"
+        }
+      ],
+      "note": "Matching marker alone does not prove these namespace types are equivalent.",
+      "oracle_authority": "human_proposed_in_scope_not_world_truth"
+    },
+    {
+      "id": "E4-X02",
+      "checks": [
+        {
+          "kind": "story_pair",
+          "expected": "insufficient",
+          "a": "e1",
+          "b": "e2"
+        }
+      ],
+      "note": "",
+      "oracle_authority": "human_proposed_in_scope_not_world_truth"
+    },
+    {
+      "id": "E4-X03",
+      "checks": [
+        {
+          "kind": "story_pair",
+          "expected": "insufficient",
+          "a": "e1",
+          "b": "e2"
+        }
+      ],
+      "note": "",
+      "oracle_authority": "human_proposed_in_scope_not_world_truth"
+    },
+    {
+      "id": "E4-X04",
+      "checks": [
+        {
+          "kind": "story_pair",
+          "expected": "not_same_case_reported",
+          "a": "e1",
+          "b": "e2"
+        }
+      ],
+      "note": "",
+      "oracle_authority": "human_proposed_in_scope_not_world_truth"
+    },
+    {
+      "id": "E4-X05",
+      "checks": [
+        {
+          "kind": "story_pair",
+          "expected": "same_case_reported",
+          "a": "e1",
+          "b": "e2"
+        }
+      ],
+      "note": "",
+      "oracle_authority": "human_proposed_in_scope_not_world_truth"
+    },
+    {
+      "id": "E4-X06",
+      "checks": [
+        {
+          "kind": "alias_mention",
+          "expected": "insufficient",
+          "event": "e3",
+          "surface": "адаптер"
+        }
+      ],
+      "note": "Last-write-wins same-session alias reuse is unsafe without a target anchor.",
+      "oracle_authority": "human_proposed_in_scope_not_world_truth"
+    },
+    {
+      "id": "E4-X07",
+      "checks": [
+        {
+          "kind": "alias_mention",
+          "expected": "scoped_alias_reuse",
+          "event": "e3",
+          "surface": "адаптер",
+          "target": "pi_psu_secondary"
+        }
+      ],
+      "note": "",
+      "oracle_authority": "human_proposed_in_scope_not_world_truth"
+    },
+    {
+      "id": "E4-X08",
+      "checks": [
+        {
+          "kind": "alias_records_count",
+          "expected": 0
+        }
+      ],
+      "note": "",
+      "oracle_authority": "human_proposed_in_scope_not_world_truth"
+    },
+    {
+      "id": "E4-X09",
+      "checks": [
+        {
+          "kind": "alias_canonical",
+          "expected": "зеленая коробка",
+          "event": "e2",
+          "target": "psu"
+        }
+      ],
+      "note": "",
+      "oracle_authority": "human_proposed_in_scope_not_world_truth"
+    },
+    {
+      "id": "E4-X10",
+      "checks": [
+        {
+          "kind": "alias_canonical",
+          "expected": "новая маленькая коробочка",
+          "event": "e2",
+          "target": "psu"
+        }
+      ],
+      "note": "",
+      "oracle_authority": "human_proposed_in_scope_not_world_truth"
+    },
+    {
+      "id": "E4-X11",
+      "checks": [
+        {
+          "kind": "revision_count",
+          "expected": 0
+        }
+      ],
+      "note": "Same user and device do not prove correction refers to A vs B.",
+      "oracle_authority": "human_proposed_in_scope_not_world_truth"
+    },
+    {
+      "id": "E4-X12",
+      "checks": [
+        {
+          "kind": "revision_count",
+          "expected": 1
+        },
+        {
+          "kind": "episode_pair",
+          "expected": "distinct",
+          "a": "e1",
+          "b": "e2"
+        }
+      ],
+      "note": "",
+      "oracle_authority": "human_proposed_in_scope_not_world_truth"
+    },
+    {
+      "id": "E4-X13",
+      "checks": [
+        {
+          "kind": "revision_count",
+          "expected": 0
+        }
+      ],
+      "note": "",
+      "oracle_authority": "human_proposed_in_scope_not_world_truth"
+    },
+    {
+      "id": "E4-X14",
+      "checks": [
+        {
+          "kind": "revision_count",
+          "expected": 0
+        }
+      ],
+      "note": "",
+      "oracle_authority": "human_proposed_in_scope_not_world_truth"
+    },
+    {
+      "id": "E4-X15",
+      "checks": [
+        {
+          "kind": "revision_count",
+          "expected": 0
+        }
+      ],
+      "note": "",
+      "oracle_authority": "human_proposed_in_scope_not_world_truth"
+    }
+  ]
+}

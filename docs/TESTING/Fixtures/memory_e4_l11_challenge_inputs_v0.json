@@ -1,0 +1,906 @@
+{
+  "schema": "anima.e4.l11_challenge_inputs/0.1",
+  "status": "OPEN_DEVELOPMENT_ADVERSARIAL_NOT_HOLDOUT",
+  "description": "New cases authored after L1.1, not part of frozen E4 v0, kept separate for honest failure discovery.",
+  "entities": {
+    "pi": "ent_00000000-0000-4000-8000-000000000001",
+    "pi2": "ent_00000000-0000-4000-8000-000000000002",
+    "router": "ent_00000000-0000-4000-8000-000000000003",
+    "psu": "ent_00000000-0000-4000-8000-000000000004",
+    "wifi": "ent_00000000-0000-4000-8000-000000000005",
+    "fan": "ent_00000000-0000-4000-8000-000000000006",
+    "project": "ent_00000000-0000-4000-8000-000000000007",
+    "camera": "ent_00000000-0000-4000-8000-000000000008",
+    "pump": "ent_00000000-0000-4000-8000-000000000009",
+    "notebook": "ent_00000000-0000-4000-8000-000000000010",
+    "notebook_psu": "ent_00000000-0000-4000-8000-000000000011",
+    "pi_psu_secondary": "ent_00000000-0000-4000-8000-000000000012"
+  },
+  "cases": [
+    {
+      "id": "E4-X01",
+      "topic": "case",
+      "description": "Ticket and incident use same local marker but different identifier families",
+      "events": [
+        {
+          "key": "e1",
+          "raw": {
+            "id": "ev_00000000-0000-4000-8000-000000071001",
+            "type": "conversation.user",
+            "timestamp": "2026-11-08T10:00:00+00:00",
+            "source": "user",
+            "session_id": "challenge_e4-x01_s1",
+            "payload": {
+              "text": "Тикет T77 относится к Pi5."
+            },
+            "references": [
+              {
+                "kind": "entity",
+                "id": "ent_00000000-0000-4000-8000-000000000001"
+              }
+            ]
+          }
+        },
+        {
+          "key": "e2",
+          "raw": {
+            "id": "ev_00000000-0000-4000-8000-000000071002",
+            "type": "conversation.user",
+            "timestamp": "2026-11-08T10:05:00+00:00",
+            "source": "user",
+            "session_id": "challenge_e4-x01_s1",
+            "payload": {
+              "text": "Случай T77 касается Pi5."
+            },
+            "references": [
+              {
+                "kind": "entity",
+                "id": "ent_00000000-0000-4000-8000-000000000001"
+              }
+            ]
+          }
+        }
+      ],
+      "setup": {},
+      "controls": []
+    },
+    {
+      "id": "E4-X02",
+      "topic": "case",
+      "description": "Two projects with repeated ticket number, no verified separate namespaces",
+      "events": [
+        {
+          "key": "e1",
+          "raw": {
+            "id": "ev_00000000-0000-4000-8000-000000071003",
+            "type": "conversation.user",
+            "timestamp": "2026-11-08T10:00:00+00:00",
+            "source": "user",
+            "session_id": "challenge_e4-x02_s1",
+            "payload": {
+              "text": "Проект Alpha: тикет T77 по Pi5."
+            },
+            "references": [
+              {
+                "kind": "entity",
+                "id": "ent_00000000-0000-4000-8000-000000000001"
+              }
+            ]
+          }
+        },
+        {
+          "key": "e2",
+          "raw": {
+            "id": "ev_00000000-0000-4000-8000-000000071004",
+            "type": "conversation.user",
+            "timestamp": "2026-11-09T11:00:00+00:00",
+            "source": "user",
+            "session_id": "challenge_e4-x02_s2",
+            "payload": {
+              "text": "Проект Beta: тикет T77 по маршрутизатору."
+            },
+            "references": [
+              {
+                "kind": "entity",
+                "id": "ent_00000000-0000-4000-8000-000000000003"
+              }
+            ]
+          }
+        }
+      ],
+      "setup": {},
+      "controls": []
+    },
+    {
+      "id": "E4-X03",
+      "topic": "source",
+      "description": "Duplicate ticket report from an unknown relay",
+      "events": [
+        {
+          "key": "e1",
+          "raw": {
+            "id": "ev_00000000-0000-4000-8000-000000071005",
+            "type": "conversation.user",
+            "timestamp": "2026-11-08T10:00:00+00:00",
+            "source": "unknown.relay",
+            "session_id": "challenge_e4-x03_s1",
+            "payload": {
+              "text": "Тикет T77 открыт."
+            },
+            "references": [
+              {
+                "kind": "entity",
+                "id": "ent_00000000-0000-4000-8000-000000000001"
+              }
+            ]
+          }
+        },
+        {
+          "key": "e2",
+          "raw": {
+            "id": "ev_00000000-0000-4000-8000-000000071006",
+            "type": "conversation.user",
+            "timestamp": "2026-11-08T10:05:00+00:00",
+            "source": "unknown.relay",
+            "session_id": "challenge_e4-x03_s1",
+            "payload": {
+              "text": "Тикет T77 всё ещё открыт."
+            },
+            "references": [
+              {
+                "kind": "entity",
+                "id": "ent_00000000-0000-4000-8000-000000000001"
+              }
+            ]
+          }
+        }
+      ],
+      "setup": {},
+      "controls": []
+    },
+    {
+      "id": "E4-X04",
+      "topic": "case",
+      "description": "Known disjoint ticket namespaces allow scoped distinction",
+      "events": [
+        {
+          "key": "e1",
+          "raw": {
+            "id": "ev_00000000-0000-4000-8000-000000071007",
+            "type": "conversation.user",
+            "timestamp": "2026-11-08T10:00:00+00:00",
+            "source": "user",
+            "session_id": "challenge_e4-x04_s1",
+            "payload": {
+              "text": "Проект Gamma: тикет T55."
+            },
+            "references": [
+              {
+                "kind": "entity",
+                "id": "ent_00000000-0000-4000-8000-000000000001"
+              }
+            ]
+          }
+        },
+        {
+          "key": "e2",
+          "raw": {
+            "id": "ev_00000000-0000-4000-8000-000000071008",
+            "type": "conversation.user",
+            "timestamp": "2026-11-09T10:00:00+00:00",
+            "source": "user",
+            "session_id": "challenge_e4-x04_s2",
+            "payload": {
+              "text": "Проект Delta: тикет T55."
+            },
+            "references": [
+              {
+                "kind": "entity",
+                "id": "ent_00000000-0000-4000-8000-000000000003"
+              }
+            ]
+          }
+        }
+      ],
+      "setup": {
+        "distinct_ticket_namespaces": [
+          "Gamma",
+          "Delta"
+        ]
+      },
+      "controls": []
+    },
+    {
+      "id": "E4-X05",
+      "topic": "case",
+      "description": "Same user reports one incident across two devices",
+      "events": [
+        {
+          "key": "e1",
+          "raw": {
+            "id": "ev_00000000-0000-4000-8000-000000071009",
+            "type": "conversation.user",
+            "timestamp": "2026-11-08T10:00:00+00:00",
+            "source": "user",
+            "session_id": "challenge_e4-x05_s1",
+            "payload": {
+              "text": "Pi5-A отключился в аварии A17."
+            },
+            "references": [
+              {
+                "kind": "entity",
+                "id": "ent_00000000-0000-4000-8000-000000000001"
+              }
+            ]
+          }
+        },
+        {
+          "key": "e2",
+          "raw": {
+            "id": "ev_00000000-0000-4000-8000-000000071010",
+            "type": "conversation.user",
+            "timestamp": "2026-11-08T10:01:00+00:00",
+            "source": "user",
+            "session_id": "challenge_e4-x05_s1",
+            "payload": {
+              "text": "Pi5-B отключился в аварии A17."
+            },
+            "references": [
+              {
+                "kind": "entity",
+                "id": "ent_00000000-0000-4000-8000-000000000002"
+              }
+            ]
+          }
+        }
+      ],
+      "setup": {},
+      "controls": []
+    },
+    {
+      "id": "E4-X06",
+      "topic": "alias",
+      "description": "Two definitions conflict; unanchored mention must abstain",
+      "events": [
+        {
+          "key": "e1",
+          "raw": {
+            "id": "ev_00000000-0000-4000-8000-000000071011",
+            "type": "conversation.user",
+            "timestamp": "2026-11-08T10:00:00+00:00",
+            "source": "user",
+            "session_id": "challenge_e4-x06_s1",
+            "payload": {
+              "text": "Под «адаптер» я имел в виду блок питания ноутбука."
+            },
+            "references": [
+              {
+                "kind": "entity",
+                "id": "ent_00000000-0000-4000-8000-000000000010"
+              },
+              {
+                "kind": "entity",
+                "id": "ent_00000000-0000-4000-8000-000000000011"
+              }
+            ]
+          }
+        },
+        {
+          "key": "e2",
+          "raw": {
+            "id": "ev_00000000-0000-4000-8000-000000071012",
+            "type": "conversation.user",
+            "timestamp": "2026-11-08T10:03:00+00:00",
+            "source": "user",
+            "session_id": "challenge_e4-x06_s1",
+            "payload": {
+              "text": "Под «адаптер» я имел в виду блок питания Pi5."
+            },
+            "references": [
+              {
+                "kind": "entity",
+                "id": "ent_00000000-0000-4000-8000-000000000001"
+              },
+              {
+                "kind": "entity",
+                "id": "ent_00000000-0000-4000-8000-000000000012"
+              }
+            ]
+          }
+        },
+        {
+          "key": "e3",
+          "raw": {
+            "id": "ev_00000000-0000-4000-8000-000000071013",
+            "type": "conversation.user",
+            "timestamp": "2026-11-08T10:07:00+00:00",
+            "source": "user",
+            "session_id": "challenge_e4-x06_s1",
+            "payload": {
+              "text": "адаптер не включается."
+            },
+            "references": []
+          }
+        }
+      ],
+      "setup": {},
+      "controls": []
+    },
+    {
+      "id": "E4-X07",
+      "topic": "alias",
+      "description": "Explicit anchor permits scoped reuse despite two definitions",
+      "events": [
+        {
+          "key": "e1",
+          "raw": {
+            "id": "ev_00000000-0000-4000-8000-000000071014",
+            "type": "conversation.user",
+            "timestamp": "2026-11-08T10:00:00+00:00",
+            "source": "user",
+            "session_id": "challenge_e4-x07_s1",
+            "payload": {
+              "text": "Под «адаптер» я имел в виду блок питания ноутбука."
+            },
+            "references": [
+              {
+                "kind": "entity",
+                "id": "ent_00000000-0000-4000-8000-000000000010"
+              },
+              {
+                "kind": "entity",
+                "id": "ent_00000000-0000-4000-8000-000000000011"
+              }
+            ]
+          }
+        },
+        {
+          "key": "e2",
+          "raw": {
+            "id": "ev_00000000-0000-4000-8000-000000071015",
+            "type": "conversation.user",
+            "timestamp": "2026-11-08T10:03:00+00:00",
+            "source": "user",
+            "session_id": "challenge_e4-x07_s1",
+            "payload": {
+              "text": "Под «адаптер» я имел в виду блок питания Pi5."
+            },
+            "references": [
+              {
+                "kind": "entity",
+                "id": "ent_00000000-0000-4000-8000-000000000001"
+              },
+              {
+                "kind": "entity",
+                "id": "ent_00000000-0000-4000-8000-000000000012"
+              }
+            ]
+          }
+        },
+        {
+          "key": "e3",
+          "raw": {
+            "id": "ev_00000000-0000-4000-8000-000000071016",
+            "type": "conversation.user",
+            "timestamp": "2026-11-08T10:07:00+00:00",
+            "source": "user",
+            "session_id": "challenge_e4-x07_s1",
+            "payload": {
+              "text": "адаптер Pi5 не включается."
+            },
+            "references": [
+              {
+                "kind": "entity",
+                "id": "ent_00000000-0000-4000-8000-000000000001"
+              },
+              {
+                "kind": "entity",
+                "id": "ent_00000000-0000-4000-8000-000000000012"
+              }
+            ]
+          }
+        }
+      ],
+      "setup": {},
+      "controls": []
+    },
+    {
+      "id": "E4-X08",
+      "topic": "source",
+      "description": "External relay cannot establish a user alias",
+      "events": [
+        {
+          "key": "e1",
+          "raw": {
+            "id": "ev_00000000-0000-4000-8000-000000071017",
+            "type": "conversation.user",
+            "timestamp": "2026-11-08T10:00:00+00:00",
+            "source": "unknown.relay",
+            "session_id": "challenge_e4-x08_s1",
+            "payload": {
+              "text": "Под «адаптер» я имел в виду блок питания."
+            },
+            "references": [
+              {
+                "kind": "entity",
+                "id": "ent_00000000-0000-4000-8000-000000000004"
+              }
+            ]
+          }
+        }
+      ],
+      "setup": {},
+      "controls": []
+    },
+    {
+      "id": "E4-X09",
+      "topic": "morphology",
+      "description": "Instrumental case feminine noun with adjective",
+      "events": [
+        {
+          "key": "e1",
+          "raw": {
+            "id": "ev_00000000-0000-4000-8000-000000071018",
+            "type": "conversation.user",
+            "timestamp": "2026-11-08T10:00:00+00:00",
+            "source": "user",
+            "session_id": "challenge_e4-x09_s1",
+            "payload": {
+              "text": "Я поставил зелёную коробку рядом с Pi5."
+            },
+            "references": []
+          }
+        },
+        {
+          "key": "e2",
+          "raw": {
+            "id": "ev_00000000-0000-4000-8000-000000071019",
+            "type": "conversation.user",
+            "timestamp": "2026-11-08T10:02:00+00:00",
+            "source": "user",
+            "session_id": "challenge_e4-x09_s1",
+            "payload": {
+              "text": "Под «зелёной коробкой» я имел в виду блок питания."
+            },
+            "references": [
+              {
+                "kind": "entity",
+                "id": "ent_00000000-0000-4000-8000-000000000004"
+              }
+            ]
+          }
+        }
+      ],
+      "setup": {},
+      "controls": []
+    },
+    {
+      "id": "E4-X10",
+      "topic": "morphology",
+      "description": "Three-word Russian phrase normalization is not generally supported",
+      "events": [
+        {
+          "key": "e1",
+          "raw": {
+            "id": "ev_00000000-0000-4000-8000-000000071020",
+            "type": "conversation.user",
+            "timestamp": "2026-11-08T10:00:00+00:00",
+            "source": "user",
+            "session_id": "challenge_e4-x10_s1",
+            "payload": {
+              "text": "На столе новая маленькая коробочка."
+            },
+            "references": []
+          }
+        },
+        {
+          "key": "e2",
+          "raw": {
+            "id": "ev_00000000-0000-4000-8000-000000071021",
+            "type": "conversation.user",
+            "timestamp": "2026-11-08T10:02:00+00:00",
+            "source": "user",
+            "session_id": "challenge_e4-x10_s1",
+            "payload": {
+              "text": "Под «новой маленькой коробочкой» я имел в виду блок питания."
+            },
+            "references": [
+              {
+                "kind": "entity",
+                "id": "ent_00000000-0000-4000-8000-000000000004"
+              }
+            ]
+          }
+        }
+      ],
+      "setup": {},
+      "controls": []
+    },
+    {
+      "id": "E4-X11",
+      "topic": "revision",
+      "description": "Unrelated correction should not split earlier two tests",
+      "events": [
+        {
+          "key": "e1",
+          "raw": {
+            "id": "ev_00000000-0000-4000-8000-000000071022",
+            "type": "conversation.user",
+            "timestamp": "2026-11-08T10:00:00+00:00",
+            "source": "user",
+            "session_id": "challenge_e4-x11_s1",
+            "payload": {
+              "text": "Pi5 перегрелся в тесте A."
+            },
+            "references": [
+              {
+                "kind": "entity",
+                "id": "ent_00000000-0000-4000-8000-000000000001"
+              }
+            ]
+          }
+        },
+        {
+          "key": "e2",
+          "raw": {
+            "id": "ev_00000000-0000-4000-8000-000000071023",
+            "type": "conversation.user",
+            "timestamp": "2026-11-08T10:02:00+00:00",
+            "source": "user",
+            "session_id": "challenge_e4-x11_s1",
+            "payload": {
+              "text": "Pi5 перегрелся в тесте B."
+            },
+            "references": [
+              {
+                "kind": "entity",
+                "id": "ent_00000000-0000-4000-8000-000000000001"
+              }
+            ]
+          }
+        },
+        {
+          "key": "e3",
+          "raw": {
+            "id": "ev_00000000-0000-4000-8000-000000071024",
+            "type": "conversation.user",
+            "timestamp": "2026-11-08T10:04:00+00:00",
+            "source": "user",
+            "session_id": "challenge_e4-x11_s1",
+            "payload": {
+              "text": "На Pi5 коллега проводил два независимых испытания; их нельзя объединять."
+            },
+            "references": [
+              {
+                "kind": "entity",
+                "id": "ent_00000000-0000-4000-8000-000000000001"
+              }
+            ]
+          }
+        }
+      ],
+      "setup": {
+        "prior_projection": {
+          "id": "challenge_previous_group",
+          "revision": 1,
+          "materialize_after_event_key": "e2",
+          "source_event_ids": [
+            "ev_00000000-0000-4000-8000-000000071022",
+            "ev_00000000-0000-4000-8000-000000071023"
+          ],
+          "episode_group": [
+            "e1",
+            "e2"
+          ]
+        }
+      },
+      "controls": []
+    },
+    {
+      "id": "E4-X12",
+      "topic": "revision",
+      "description": "Explicitly referenced trial separation can suggest a revision",
+      "events": [
+        {
+          "key": "e1",
+          "raw": {
+            "id": "ev_00000000-0000-4000-8000-000000071025",
+            "type": "conversation.user",
+            "timestamp": "2026-11-08T10:00:00+00:00",
+            "source": "user",
+            "session_id": "challenge_e4-x12_s1",
+            "payload": {
+              "text": "Pi5 перегрелся в тесте A."
+            },
+            "references": [
+              {
+                "kind": "entity",
+                "id": "ent_00000000-0000-4000-8000-000000000001"
+              }
+            ]
+          }
+        },
+        {
+          "key": "e2",
+          "raw": {
+            "id": "ev_00000000-0000-4000-8000-000000071026",
+            "type": "conversation.user",
+            "timestamp": "2026-11-08T10:02:00+00:00",
+            "source": "user",
+            "session_id": "challenge_e4-x12_s1",
+            "payload": {
+              "text": "Pi5 перегрелся в тесте B."
+            },
+            "references": [
+              {
+                "kind": "entity",
+                "id": "ent_00000000-0000-4000-8000-000000000001"
+              }
+            ]
+          }
+        },
+        {
+          "key": "e3",
+          "raw": {
+            "id": "ev_00000000-0000-4000-8000-000000071027",
+            "type": "conversation.user",
+            "timestamp": "2026-11-08T10:04:00+00:00",
+            "source": "user",
+            "session_id": "challenge_e4-x12_s1",
+            "payload": {
+              "text": "Это были два независимых испытания A и B; их нельзя объединять."
+            },
+            "references": [
+              {
+                "kind": "entity",
+                "id": "ent_00000000-0000-4000-8000-000000000001"
+              }
+            ]
+          }
+        }
+      ],
+      "setup": {
+        "prior_projection": {
+          "id": "challenge_previous_group",
+          "revision": 1,
+          "materialize_after_event_key": "e2",
+          "source_event_ids": [
+            "ev_00000000-0000-4000-8000-000000071025",
+            "ev_00000000-0000-4000-8000-000000071026"
+          ],
+          "episode_group": [
+            "e1",
+            "e2"
+          ]
+        }
+      },
+      "controls": []
+    },
+    {
+      "id": "E4-X13",
+      "topic": "revision",
+      "description": "Untrusted reporter cannot trigger user revision",
+      "events": [
+        {
+          "key": "e1",
+          "raw": {
+            "id": "ev_00000000-0000-4000-8000-000000071028",
+            "type": "conversation.user",
+            "timestamp": "2026-11-08T10:00:00+00:00",
+            "source": "user",
+            "session_id": "challenge_e4-x13_s1",
+            "payload": {
+              "text": "Pi5 перегрелся в тесте A."
+            },
+            "references": [
+              {
+                "kind": "entity",
+                "id": "ent_00000000-0000-4000-8000-000000000001"
+              }
+            ]
+          }
+        },
+        {
+          "key": "e2",
+          "raw": {
+            "id": "ev_00000000-0000-4000-8000-000000071029",
+            "type": "conversation.user",
+            "timestamp": "2026-11-08T10:02:00+00:00",
+            "source": "user",
+            "session_id": "challenge_e4-x13_s1",
+            "payload": {
+              "text": "Pi5 перегрелся в тесте B."
+            },
+            "references": [
+              {
+                "kind": "entity",
+                "id": "ent_00000000-0000-4000-8000-000000000001"
+              }
+            ]
+          }
+        },
+        {
+          "key": "e3",
+          "raw": {
+            "id": "ev_00000000-0000-4000-8000-000000071030",
+            "type": "conversation.user",
+            "timestamp": "2026-11-08T10:04:00+00:00",
+            "source": "unknown.relay",
+            "session_id": "challenge_e4-x13_s1",
+            "payload": {
+              "text": "Это были два независимых испытания A и B; их нельзя объединять."
+            },
+            "references": [
+              {
+                "kind": "entity",
+                "id": "ent_00000000-0000-4000-8000-000000000001"
+              }
+            ]
+          }
+        }
+      ],
+      "setup": {
+        "prior_projection": {
+          "id": "challenge_previous_group",
+          "revision": 1,
+          "materialize_after_event_key": "e2",
+          "source_event_ids": [
+            "ev_00000000-0000-4000-8000-000000071028",
+            "ev_00000000-0000-4000-8000-000000071029"
+          ],
+          "episode_group": [
+            "e1",
+            "e2"
+          ]
+        }
+      },
+      "controls": []
+    },
+    {
+      "id": "E4-X14",
+      "topic": "revision",
+      "description": "No prior version means no versioned revision",
+      "events": [
+        {
+          "key": "e1",
+          "raw": {
+            "id": "ev_00000000-0000-4000-8000-000000071031",
+            "type": "conversation.user",
+            "timestamp": "2026-11-08T10:00:00+00:00",
+            "source": "user",
+            "session_id": "challenge_e4-x14_s1",
+            "payload": {
+              "text": "Pi5 перегрелся в тесте A."
+            },
+            "references": [
+              {
+                "kind": "entity",
+                "id": "ent_00000000-0000-4000-8000-000000000001"
+              }
+            ]
+          }
+        },
+        {
+          "key": "e2",
+          "raw": {
+            "id": "ev_00000000-0000-4000-8000-000000071032",
+            "type": "conversation.user",
+            "timestamp": "2026-11-08T10:02:00+00:00",
+            "source": "user",
+            "session_id": "challenge_e4-x14_s1",
+            "payload": {
+              "text": "Pi5 перегрелся в тесте B."
+            },
+            "references": [
+              {
+                "kind": "entity",
+                "id": "ent_00000000-0000-4000-8000-000000000001"
+              }
+            ]
+          }
+        },
+        {
+          "key": "e3",
+          "raw": {
+            "id": "ev_00000000-0000-4000-8000-000000071033",
+            "type": "conversation.user",
+            "timestamp": "2026-11-08T10:04:00+00:00",
+            "source": "user",
+            "session_id": "challenge_e4-x14_s1",
+            "payload": {
+              "text": "Это были два независимых испытания A и B; их нельзя объединять."
+            },
+            "references": [
+              {
+                "kind": "entity",
+                "id": "ent_00000000-0000-4000-8000-000000000001"
+              }
+            ]
+          }
+        }
+      ],
+      "setup": {},
+      "controls": []
+    },
+    {
+      "id": "E4-X15",
+      "topic": "revision",
+      "description": "Same trial label in both messages does not warrant a split",
+      "events": [
+        {
+          "key": "e1",
+          "raw": {
+            "id": "ev_00000000-0000-4000-8000-000000071034",
+            "type": "conversation.user",
+            "timestamp": "2026-11-08T10:00:00+00:00",
+            "source": "user",
+            "session_id": "challenge_e4-x15_s1",
+            "payload": {
+              "text": "Pi5 перегрелся в тесте A."
+            },
+            "references": [
+              {
+                "kind": "entity",
+                "id": "ent_00000000-0000-4000-8000-000000000001"
+              }
+            ]
+          }
+        },
+        {
+          "key": "e2",
+          "raw": {
+            "id": "ev_00000000-0000-4000-8000-000000071035",
+            "type": "conversation.user",
+            "timestamp": "2026-11-08T10:02:00+00:00",
+            "source": "user",
+            "session_id": "challenge_e4-x15_s1",
+            "payload": {
+              "text": "Pi5 перегрелся в тесте A."
+            },
+            "references": [
+              {
+                "kind": "entity",
+                "id": "ent_00000000-0000-4000-8000-000000000001"
+              }
+            ]
+          }
+        },
+        {
+          "key": "e3",
+          "raw": {
+            "id": "ev_00000000-0000-4000-8000-000000071036",
+            "type": "conversation.user",
+            "timestamp": "2026-11-08T10:04:00+00:00",
+            "source": "user",
+            "session_id": "challenge_e4-x15_s1",
+            "payload": {
+              "text": "Это были два независимых испытания A и B; их нельзя объединять."
+            },
+            "references": [
+              {
+                "kind": "entity",
+                "id": "ent_00000000-0000-4000-8000-000000000001"
+              }
+            ]
+          }
+        }
+      ],
+      "setup": {
+        "prior_projection": {
+          "id": "challenge_previous_group",
+          "revision": 1,
+          "materialize_after_event_key": "e2",
+          "source_event_ids": [
+            "ev_00000000-0000-4000-8000-000000071034",
+            "ev_00000000-0000-4000-8000-000000071035"
+          ],
+          "episode_group": [
+            "e1",
+            "e2"
+          ]
+        }
+      },
+      "controls": []
+    }
+  ]
+}
