@@ -6,6 +6,8 @@
 **Raw trace:** [alias lifecycle recovery probe](../../labs/exp009/e4_alias_lifecycle_probe.py).  
 **Adversarial tests:** [source-target, crash/replay, selective impact tests](../../tests/test_memory_e4_alias_lifecycle_lab.py).
 
+**Measured results:** [Alias Lifecycle Selective Invalidation Results v0](Memory_E4_L12_Alias_Lifecycle_Results_v0.md): 1629 regression PASS on Python 3.12/3.13/3.14, two exactly affected nodes, unaffected competing Story, simulated crash/replay and source history. Not production E4 acceptance.
+
 ## Model and constraints
 
 The prototype is a **separate SQLite database**, rejecting filenames `memory.db` and `core_state.db`, with WAL/`synchronous=FULL` and explicit `BEGIN IMMEDIATE` transactions. It never opens ANIMA production Memory.

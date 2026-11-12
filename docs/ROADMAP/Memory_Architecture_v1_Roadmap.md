@@ -70,6 +70,8 @@
 
 **E4 — концептуальный контракт, production-реализация не начата:** [Event → Episode → Story и долговременные исследования неопределённостей](Memory_E4_Architecture_Contract_Draft.md). Учтены условное ожидание, очереди, длительное выполнение, самостоятельная постановка Goal/Task и периодический review важных вопросов без новых Events; планирование остаётся полномочием Core.
 
+**E4 — L1.2 versioned alias lifecycle lab:** [measured selective invalidation](../TESTING/Memory_E4_L12_Alias_Lifecycle_Results_v0.md): source-backed alias revocation and transitive dependency marking (only directly affected Story/Episode), immutable earlier revisions, idempotent replay and injected crash recovery. **1629 PASS** (Python 3.12/3.13/3.14). Storage lab only; Core source authority, SLEEP and production Memory remain **blocked**.
+
 **E4 — L1.2 source binding hardening:** [raw and measured results](../TESTING/Memory_E4_L12_Source_Binding_Results_v0.md) — 1606 PASS across Python 3.12/3.13/3.14; explicit typed Event pointers are source-only lab candidates, while ambient cross-session alias reuse abstains. The real Core admission and provenance authority are **not implemented**.
 
 **E4 — L1.2 scoped research:** [L1.2 contract](../TESTING/Memory_E4_L12_Contract_v0.md), [L1.2 evaluation](../TESTING/Memory_E4_L12_Evaluation_Results_v0.md): typed report identifiers, conflict-aware source aliases, laboratory CorrectionTarget. Old 57-case frozen result unchanged (41 PASS, 81 NOT_SUPPORTED); the 15-case visible challenge improved from 12/16 to 16/16 but is **not independent**. All 99 forbidden obligations remain unverified; no production Memory or autonomous L2 authorization.

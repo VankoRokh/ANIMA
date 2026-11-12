@@ -49,4 +49,6 @@ Git blob SHA-1 and sizes were separately rechecked against both manifests at thi
 4. **No external blind holdout.** Both this probe and earlier 15-case corpus were authored in the same development workflow. Good scores on visible cases do not demonstrate broad validity or field-ready performance.
 5. **No L2 effects.** Unknown Goal/Task authority, periodic investigation and SLEEP integration remain separate research gates.
 
-**Verdict:** hardening is a reproducible lab-level improvement; **E4 production and action-enabled L2 remain NO-GO**. The next meaningful step is to design and test **versioned alias revocation/dependency invalidation** on synthetic cross-session traces before considering durable integration.
+**Follow-up:** the isolated [versioned Alias Lifecycle experiment](Memory_E4_L12_Alias_Lifecycle_Results_v0.md) subsequently measured selective Story/Episode invalidation and simulated recovery; it remains outside production Memory.
+
+**Verdict:** source-binding hardening and the separate alias lifecycle lab are reproducible limited experiments; **E4 production and action-enabled L2 remain NO-GO**.
