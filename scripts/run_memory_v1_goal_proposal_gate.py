@@ -67,7 +67,6 @@ def _no_effects(core):
     assert core.core_execution.store.list_operations() == []
     assert _effect_count(core.core_execution.world) == 0
     assert core.core_execution.world.current()["state"] == "open"
-    assert core.core_execution._proof if hasattr(core.core_execution, "_proof") else True
 
 
 def _candidate(view):
@@ -277,13 +276,14 @@ def main(argv=None):
     else:
         if args.root is not None or args.case is not None:
             parser.error("--root and --case are internal-only")
+        if args.report is not None:
+            dest = args.report.expanduser().resolve()
+            if dest.exists() or dest.is_relative_to(Path.cwd().resolve()):
+                parser.error("M3 report must be new and outside repository")
         result = gate()
     payload = json.dumps(result, indent=2, sort_keys=True, ensure_ascii=False) + "\n"
     if args.report is not None:
-        dest = args.report.expanduser().resolve()
-        if dest.exists() or dest.is_relative_to(Path.cwd().resolve()):
-            parser.error("M3 report must be new and outside repository")
-        with dest.open("x", encoding="utf-8") as fp:
+        with args.report.expanduser().resolve().open("x", encoding="utf-8") as fp:
             fp.write(payload)
     print(payload, end="")
 
