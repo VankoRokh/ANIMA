@@ -1,6 +1,6 @@
 # ANIMA v0.1 Integrated — M2 live Godot VAL + Memory provenance + Core recovery
 
-**Status:** PREDECLARED before implementation.  
+**Status:** CI VERIFIED — real Godot 4.7.2 (hosted Linux x86_64), full Python 3.12–3.14 regression PASS. Owner's physical laptop M2 gate remains OPEN.  
 **Base commit:** `2b4463596c7422a8243fce6e71258896188e5363` (M1 laptop PASS).  
 **Execution target:** only laptop Linux x86-64 / installed Godot 4.7.2; GitHub-hosted Linux x86-64 CI also allowed. Raspberry Pi deferred by owner.
 
@@ -41,3 +41,44 @@ This gate runs live **Godot**, not fake P6 nor the M1 SQLite door. Hard `os._exi
 - Manual run on notebook after CI: `python -m labs.virtual_anima_lab.python.m2_integrated_gate --godot "$GODOT_BIN" --report /tmp/anima-m2-PC.json`. Runner must never overwrite an existing report.
 
 **Stop condition:** any false success, effect replay, foreign or lost Event/Memory sources, wrong world instance, unbounded trigger, missing proof, or client invocation requiring operator rights is a failure. Update this document only with observed test evidence, not inferred correctness. Official `docs/project.json` stays unchanged.
+
+## CI acceptance result — 2026-11-13
+
+**Tested implementation commit:** `9f58074444c38895f7f3d571bc5d31fbc98cd267` (last code/test commit, before this docs record).  
+**Primary source:** [GitHub Actions run #43423339900](https://github.com/VankoRokh/ANIMA/actions/runs/43423339900): **SUCCESS** — four green jobs.
+
+| Gate | Result | Evidence |
+| --- | --- | --- |
+| Python 3.12 targeted M0/M1/M2/P6 | **20 PASS** | CI matrix logs |
+| Python 3.12 full suite | **1667 PASS** | CI matrix logs |
+| Python 3.13 targeted / full | **20 PASS / 1667 PASS** | CI matrix logs |
+| Python 3.14 targeted / full | **20 PASS / 1667 PASS** | CI matrix logs |
+| Real Godot engine | **4.7.2 PASS** | Official `godotengine/godot-builds` release zip SHA256 `cadd3204e728a35d3f13adb7fd0d7902636b79f6b95c40c265eb73b6c35329e4` |
+| Native Godot P6 bridge GDScript | **PASS** | `BridgeP6DoorTest.gd` in same job |
+| Live M2 all cases | **M2_INTEGRATED_GODOT_PASS** | `anima-m2-live-godot-py314` JSON artifact in same run |
+
+**Case evidence** (actual separate Godot world process per case):
+- `normal`: one close_door effect, `completed/succeeded`, independent Core sensor proof in raw source-backed Event index.
+- `before`: hard exit after durable `executing` operation, before executing Godot command; **0 effects**, `active/uncertain`, **no proof**, no effect replay on Core recovery.
+- `after`: hard exit after **1** Godot close_door effect but before executor receipt; `completed/succeeded` with independent sensor proof, **no repeated effect**.
+- Each scenario: historical false user claim indexed, linked to actual Memory, preserved across restart; FAST historical snapshot excludes current question; `index_status=complete`; `knowledge_count=0`; Godot process instance remains unchanged across Core cold restart. All world effects counted externally by the test harness, not by a tool-reported success claim.
+- M2's main CLI now *checks the actual executable version* `--headless --version` and refuses binaries other than Godot 4.7.2. CI pinned SHA256 prevents an unverified engine swap.
+
+**Initial regression finding and remediation:** An earlier M2 full-suite attempt had three documentation-test failures because the index Markdown linked to a lab file intentionally omitted from restricted source-tree fixtures. The README now references the lab runner by literal code path; no Core/Memory/VAL logic was changed for this repair. Final run #43423339900 is fully green.
+
+**Meaning of PASS:** real external world, historical retrieval context and Core-owned action/recovery can coexist safely in this *bounded, operator-configured* test. Not evidence of automatic memory-conditioned goal formation or full autonomous cognition. `os._exit` is **not** `SIGKILL`, and this gate does not simulate power failure, corrupted disks, malicious loopback peers, or end-user deployment.
+
+### Laptop reproduction (owner gate OPEN)
+
+From a fresh checkout/worktree of M2 branch and repository root, with an existing local Godot 4.7.2 binary:
+
+```bash
+GODOT_BIN="$HOME/.local/opt/godot/Godot_v4.7.2-stable_linux.x86_64"
+python -m labs.virtual_anima_lab.python.m2_integrated_gate \
+  --godot "$GODOT_BIN" \
+  --report /tmp/anima-m2-PC.json
+```
+
+Runner starts and stops **three** headless Godot children itself; **do not start a separate Lab** for this gate. Each case uses a random free loopback port and disposable temporary Core/VAL data, not the user's existing ANIMA instance. Report path must be absent and outside repository; choose a new name on retry. Declare owner laptop PASS only after an observed local `M2_INTEGRATED_GODOT_PASS` report.
+
+**Next engineering decision:** identify the smallest read-only cognition→goal proposal contract so actual remembered context can influence *proposals* without granting `Memory` authority to declare sensor truth or invoke tools. This requires its own negative/admission gates; do not silently edit `anima/`, `docs/project.json`, or the existing typed Core binding rules.
