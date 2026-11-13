@@ -308,7 +308,9 @@ def verify(root, scenario):
     effect_before = _effect_count(core.core_execution.world)
     assert effect_before == manifest["expected_effects"]
     replay = core.runtime.run_core_door_goal(goal_id)
-    assert replay.outcome == "VERIFIED_SUCCESS", replay
+    assert replay.outcome == "RECOVERED_VERIFIED_SUCCESS", replay
+    assert replay.reason_code == "PERSISTED_VERIFICATION_PROOF"
+    assert replay.evidence_event_id == manifest["proof_event_id"]
     operations_after = core.core_execution.store.list_operations(goal_id=goal_id)
     assert [op["id"] for op in operations_after] == [
         op["id"] for op in operations_before
