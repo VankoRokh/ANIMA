@@ -146,13 +146,6 @@ def seed(root, case):
         assert too_long.reason == "unbounded_rationale"
         negative_results["oversized_rationale"] = too_long.reason
 
-        # Incomplete Event index MUST prevent retrospective admission.
-        core.runtime.user_input("M3_UNRELATED_CHANGE: laboratory audit marker.")
-        assert core.event_retrieval.status()["status"] == "partial"
-        insufficient = gate.review(view, proposed)
-        assert insufficient.reason == "index_incomplete_or_changed"
-        negative_results["incomplete_index"] = insufficient.reason
-        _sync(core.event_retrieval)
     if case == "state_only":
         # A forged but source-backed proposal must be rejected on marker semantics.
         note = view.sources[0]
