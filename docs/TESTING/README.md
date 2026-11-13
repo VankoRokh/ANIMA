@@ -1,5 +1,9 @@
 # Проверки и наблюдение
 
+## ANIMA v0.1 Integrated — M0 read-path acceptance
+
+[Критерии M0](Memory_v1_Integrated_Read_Path_M0_v0.md): первая сквозная проверка уже существующих Core Runtime → raw Event → Memory source links → Event Retrieval → Provenance/Context → детерминированный FAST, с **двумя отдельными Python-процессами** и обязательными отрицательными случаями. [Standalone runner](../../scripts/run_memory_v1_integrated_read_gate.py) и [регрессионные тесты](../../tests/test_memory_v1_integrated_read_gate.py). M0 не подтверждает автономный исполнительный контур, Stage 7 или работу на Pi до отдельных прогонов.
+
 ## E4 — завершающие SIGKILL/scale проверки перед интеграцией
 
 [Изолированный контракт и воспроизводимый маршрут](Memory_E4_Crash_Scale_Exit_Gate_v0.md): [реальный SIGKILL в отдельном процессе](../../tests/test_memory_e4_process_kill.py) и [измерение 100/1000/10000 синтетических узлов](../../labs/exp009/e4_scale_probe.py). Результаты относятся только к E4 laboratory journal; **не** закрывают Memory v1.0, Core Integration, Pi performance или production-авторизацию. Статус каждой новой проверки уточняется после измеренного CI/локального запуска.
