@@ -1,6 +1,6 @@
 # ANIMA v0.1 Integrated — M1 Core-owned Decision / Memory Advisory (headless)
 
-**Status:** PREDECLARED; implementation and independent CI results recorded separately below.  
+**Status:** CI VERIFIED on GitHub Linux x86-64 / Python 3.12–3.14; physical owner's laptop M1 gate OPEN; not production integration or Godot VAL.  
 **Branch:** `work/anima-v01-integrated-m1` from M0 frozen baseline `9df779d14f03ff6d0bd514ecf880547621063678`.  
 **Execution platform for today's acceptance:** notebook Linux x86-64; GitHub Linux x86-64 compatibility matrix. **Pi postponed** by explicit owner decision.
 
@@ -39,3 +39,30 @@ For each scenario: operator-unbound Goal must be deferred and cause zero effects
 ## Next gate
 
 After M1 laptop PASS: define a *reviewable read-only cognition/decision interface* if actual memory-conditioned planning is needed; forbid treating Memory as Belief. Then connect the same admitted Core behavior to the existing external Godot VAL adapter and test real recovery. Do not call M1 a full artificial personality.
+
+## Измеренные результаты CI — 2026-11-13
+
+- **Исполняемый snapshot:** `d7593c3ec4c33535cd8eaac19b2945a4a26c477f` (документация с результатами добавлена позднее). [GitHub Actions #43420302372](https://github.com/VankoRokh/ANIMA/actions/runs/43420302372) — **SUCCESS** на GitHub-hosted Linux x86-64.
+- **M0+M1 targeted:** **9/9 PASS** на Python 3.12, 3.13, 3.14.
+- **Полная регрессия:** **1662/1662 PASS** на каждой из Python 3.12, 3.13, 3.14.
+- **M1 runner:** `M1_INTEGRATED_DECISION_PASS` на каждой версии. Содержит три обязательных сценария и повторное открытие тех же хранилищ в отдельных Python-процессах.
+- **Случай A:** Memory утверждает `closed`, реальное состояние `open`; ровно **1** эффект закрытия, `VERIFIED_SUCCESS`.
+- **Случай B:** Memory утверждает `open`, реальное состояние `closed`; ровно **0** эффектов, `NO_EFFECT_REQUIRED`, Goal verified.
+- **Случай C:** сначала отказ зарегистрированного sensor `sense()`, **0** эффектов при сбое; после восстановления сенсора ровно **1** эффект и independent Goal proof.
+- **Граница:** `unbound Goal` без действия; никаких автоматических Knowledge, FAST без прав Goal/Task/Tool; отсутствие нынешнего вопроса в historical snapshot перед новым `Runtime.user_input`; replay использует `RECOVERED_VERIFIED_SUCCESS` и не повторяет эффект.
+- **Открытые проверки:** реальный ноутбук владельца (Python 3.14.4), физический `SIGKILL` на объединённом маршруте, внешняя Godot VAL, отсутствие самопривязки в полноценном production flow, реальная способность памяти влиять на планирование, Pi (отложен). Ни один из них не подразумевается CI PASS.
+
+### Зафиксированная поправка теста
+
+Первый CI-прогон #43420237814 обнаружил **ошибочное ожидание тестового runner**: при повторном вызове после crash-free restart Core возвращал корректный `RECOVERED_VERIFIED_SUCCESS`, а тест ошибочно требовал `VERIFIED_SUCCESS`. Исправлено только ожидаемое состояние теста в `d7593c3`; `anima/core/door_execution.py` **не менялся**, дубли эффектов не обнаружены. На исправленном snapshot матрица полностью зелёная.
+
+### На ноутбуке
+
+Из отдельного checkout или worktree этой M1-ветки, из корня проекта:
+
+```bash
+python --version
+python -m scripts.run_memory_v1_integrated_decision_gate --report /tmp/anima-m1-PC.json
+```
+
+Если файл отчёта уже существует, указать новое имя: скрипт не перезаписывает результаты. Он создаёт только временные синтетические данные и изолированную headless-world SQLite-фикстуру. Это **не** запуск Godot или Raspberry Pi. Заявлять M1 laptop PASS только по присланному фактическому JSON, не по GitHub CI.
