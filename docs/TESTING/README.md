@@ -1,5 +1,9 @@
 # Проверки и наблюдение
 
+## ANIMA v0.1 Integrated — M2 Memory + live Godot VAL + Core recovery
+
+[M2-контракт](Memory_v1_Integrated_External_VAL_M2_v0.md): реальная Godot 4.7.2 `p6_door` через существующий `VALDoorPort`, историческая Memory/Provenance, ограниченный FAST-context, Core Goal/Task/допущенный инструмент и независимое сенсорное подтверждение после перезапуска. `before`/`after` hard-exit перед receipt — отдельные отрицательные проверки, это не настоящие SIGKILL или сбой питания. [M2 lab runner](../../labs/virtual_anima_lab/python/m2_integrated_gate.py), [offline tests](../../tests/test_m2_external_val_memory.py). Внешний порт только `127.0.0.1`; Pi отложен. M2 **не** даёт Memory полномочий на Goal/Tool.
+
 ## ANIMA v0.1 Integrated — M1 Core-owned typed decision acceptance
 
 [Критерии M1](Memory_v1_Integrated_Decision_M1_v0.md): исторический Memory-контекст читается **до** сохранения текущего вопроса, но только как справочная информация для FAST. Исполняемый typed Goal по-прежнему создаёт и связывает исключительно тестовый оператор, а Core P3-B принимает действия лишь по зарегистрированному датчику и собственному Verification. Негативные случаи: ложный user report, недоступность сенсора и unbound Goal. Headless VirtualDoorWorld, не Godot. [M1 runner](../../scripts/run_memory_v1_integrated_decision_gate.py); [M1 tests](../../tests/test_memory_v1_integrated_decision_gate.py). CI PASS не означает завершение Stage 7, production Memory→Core planning или тесты Pi.
