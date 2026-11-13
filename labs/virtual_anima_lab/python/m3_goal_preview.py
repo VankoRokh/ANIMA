@@ -130,7 +130,8 @@ class MemoryGoalPreviewGate:
                 memory_store=memory_store, link_store=link_store,
             ),
             provenance=self.provenance,
-        )\n        self._latest_window = None  # Only this gate may issue an admissible view.
+        )
+        self._latest_window = None  # Only this gate may issue an admissible view.
 
     def capture(self, *, query, current_event_id):
         """Capture strictly source-backed memory context before current input."""
