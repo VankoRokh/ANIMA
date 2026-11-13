@@ -357,13 +357,13 @@ class M5BindingAdmission:
         if receipt.action != "APPROVE" or receipt.fingerprint != row["fingerprint"]:
             raise ValueError("M5 binding approval receipt is invalid")
         present = self._binding(row["origin_goal_id"])
+        live = self._sensor(sensor_event_id, tick)
+        if live["tick"] < saved["sensor"]["tick"]:
+            raise ValueError("M5 live sensor went backward")
         if row["status"] == "bound":
             if present is None:
                 raise ValueError("M5 bound ledger missing canonical Core binding")
             return present
-        live = self._sensor(sensor_event_id, tick)
-        if live["tick"] < saved["sensor"]["tick"]:
-            raise ValueError("M5 live sensor went backward")
         if cut == "before_bind":
             import os
             os._exit(74)
