@@ -1,6 +1,6 @@
 # ANIMA v0.1 Integrated — M2 live Godot VAL + Memory provenance + Core recovery
 
-**Status:** CI VERIFIED — real Godot 4.7.2 (hosted Linux x86_64), full Python 3.12–3.14 regression PASS. Owner's physical laptop M2 gate remains OPEN.  
+**Status:** CI VERIFIED (real Godot 4.7.2; Python 3.12–3.14 full regression PASS) + owner-reported laptop M2 PASS (Python 3.14.4, real Godot 4.7.2); Raspberry Pi deferred.  
 **Base commit:** `2b4463596c7422a8243fce6e71258896188e5363` (M1 laptop PASS).  
 **Execution target:** only laptop Linux x86-64 / installed Godot 4.7.2; GitHub-hosted Linux x86-64 CI also allowed. Raspberry Pi deferred by owner.
 
@@ -68,7 +68,7 @@ This gate runs live **Godot**, not fake P6 nor the M1 SQLite door. Hard `os._exi
 
 **Meaning of PASS:** real external world, historical retrieval context and Core-owned action/recovery can coexist safely in this *bounded, operator-configured* test. Not evidence of automatic memory-conditioned goal formation or full autonomous cognition. `os._exit` is **not** `SIGKILL`, and this gate does not simulate power failure, corrupted disks, malicious loopback peers, or end-user deployment.
 
-### Laptop reproduction (owner gate OPEN)
+### Laptop reproduction (owner gate PASS; instructions retained)
 
 From a fresh checkout/worktree of M2 branch and repository root, with an existing local Godot 4.7.2 binary:
 
@@ -82,3 +82,21 @@ python -m labs.virtual_anima_lab.python.m2_integrated_gate \
 Runner starts and stops **three** headless Godot children itself; **do not start a separate Lab** for this gate. Each case uses a random free loopback port and disposable temporary Core/VAL data, not the user's existing ANIMA instance. Report path must be absent and outside repository; choose a new name on retry. Declare owner laptop PASS only after an observed local `M2_INTEGRATED_GODOT_PASS` report.
 
 **Next engineering decision:** identify the smallest read-only cognition→goal proposal contract so actual remembered context can influence *proposals* without granting `Memory` authority to declare sensor truth or invoke tools. This requires its own negative/admission gates; do not silently edit `anima/`, `docs/project.json`, or the existing typed Core binding rules.
+
+## Local laptop result — owner report, 2026-11-13
+
+**Evidence class:** owner-supplied original JSON file `anima-m2-PC.json` from the `m2_integrated_gate` runner, inspected independently as an uploaded file; not a direct remote collection from the laptop. The report declares exact commit `f5a885aadd69305ffa85d64bdf5a92ce2225c34d`, Godot `4.7.2`, Python `3.14.4`, Linux `7.0.0-42-generic` x86-64/glibc 2.43.
+
+**Top-level outcome:** `status=M2_INTEGRATED_GODOT_PASS`. All three cases declare `M2_CASE_PASS`:
+
+| Case | World effects | Goal/operation | Independent proof indexed | Recovery outcome |
+| --- | ---: | --- | --- | --- |
+| `normal` | 1 | `completed/succeeded` | `true` | unchanged world instance, no duplicate |
+| `before` | 0 | `active/uncertain` | `false` | no fabricated success, no duplicate |
+| `after` | 1 | `completed/succeeded` | `true` | persisted effect reconciled, no duplicate |
+
+In **each** case the report confirms `historical_memory_recovered=true`, `historical_raw_event_recovered=true`, `index_status=complete`, `current_query_excluded_from_prior_context=true`, `world_instance_unchanged=true`, `no_duplicate_effect=true`, `fast_items=1`, `fast_chars=65`, `knowledge_count=0`. Source authority is declared `registered VAL sensor only`.
+
+**Negative scope:** `model_used=false`, `sigkill_tested=false`, `pi_tested=false`, `production_code_changed=false`. The tested forced exit mechanism is `os._exit`, not `SIGKILL` or power interruption; no model-driven goal proposal, live operator authentication, hardware transport, or Raspberry testing has been established.
+
+**Decision:** **M2 functional live Godot integration accepted on the owner's laptop**, aligned with GitHub CI. This is sufficient to move to the next **bounded, reviewable cognition→goal-proposal contract** experiment, provided that Memory/FAST remain non-authoritative, execution is still Core-owned, and every proposed change has separate negative admission tests. Do not mark official Stage or `docs/project.json` complete.
