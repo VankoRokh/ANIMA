@@ -1,6 +1,6 @@
 # ANIMA v0.1 Integrated — M5 separate typed-binding admission (no executor)
 
-**Status:** CI VERIFIED — M5 seven-case two-process gate and full Python 3.12–3.14 regression PASS; physical laptop M5 gate OPEN.  
+**Status:** CI VERIFIED (M5 seven-case gate and full Python 3.12–3.14 regression PASS) + owner-reported laptop M5 PASS (Python 3.14.4, Linux x86_64). Raspberry Pi deferred.  
 **Base:** M4 owner-reported laptop PASS, commit `1c691c738228c34f4b7dd880ef412328cf7c93be`, branch `work/anima-v01-integrated-m5`. Raspberry Pi deferred.
 
 ## Rationale / central hazard
@@ -57,7 +57,7 @@ M5 introduces **a different operator decision and an immutable admission ledger 
 
 This is **not** general execution authorization or autonomous action. The written P3-A binding is still a *latent capability*; a **different** future CoreAssembly with an executor and P3-C enabled could act on it. M5 does **not** provide a cross-process firewall that protects against such a future configuration. Never open the M5 lab database with executor-enabled Core until an independently reviewed M6 revalidation/admission design exists. P2 adapter names and operator `operator_ref` strings are **not** transport/human authentication. Registered sensor freshness is a logical-tick property, not proof that the physical world cannot change after observation. `os._exit` is not actual SIGKILL, device power loss, data corruption, or durable multi-process security. No LLM, Godot, Raspberry Pi, production `anima/` changes, official Stage status, or `docs/project.json` changes in M5.
 
-### Notebook acceptance — OPEN
+### Notebook acceptance — owner-reported PASS
 
 On a separate `ANIMA-M5` worktree using the owner's Python 3.14.4:
 
@@ -66,6 +66,26 @@ python -m scripts.run_memory_v1_binding_gate --report /tmp/anima-m5-PC.json
 ```
 
 The script runs **seven** isolated synthetic headless Core/VirtualDoor scenarios, each with two independent Python processes and two intentional `os._exit` cuts. No Godot process must be started. The report file must be new and external to the repository; use a different name for retries. Expected overall `status=M5_TYPED_BINDING_PASS`. **Do not call the notebook gate PASS until the owner supplies its actual report.**
+
+### Notebook result — owner-provided JSON, 2026-11-13
+
+**Source:** the original uploaded file `anima-m5-PC.json`, parsed directly. Evidence class: owner-provided local result; **not** a remote terminal attestation. The JSON declares `schema=anima.memory_v1.binding_admission_m5/0.1`, `status=M5_TYPED_BINDING_PASS`, `python=3.14.4`, `machine=x86_64`. It contains **no Git SHA**, so the local source revision cannot be established solely from this file. The CI-tested snapshot `534c7d1fe37f13bea888a3890a30abac440ff6af` is separately verified, and branch documentation snapshot `02cb7cdcb2ceee09934207068ec6a4bf168fcff4` passed GitHub Actions #43449185168.
+
+| Case | Final bound Goal count | Source / approval note |
+| --- | ---: | --- |
+| `normal` | 1 | Registered sensor + distinct M5 approval; one bound M4 Goal |
+| `before_bind` | 1 | Child-process `os._exit` before write; recovered and bound |
+| `after_bind` | 1 | Child-process `os._exit` after Core bind; replay reconciled |
+| `resume_approval` | 1 | Distinct M5 host approval after restart |
+| `rejected` | 0 | Rejection leaves existing M4 Goal unbound |
+| `source_modified` | 0 | Changed M4 source rejected; `m4_source_checked=false` is expected **denial**, not successful source verification |
+| `world_changed` | 0 | New sensor reading prevents binding |
+
+Each case reports `status=M5_CASE_PASS`, `phase=verify`, `goal_count=1`, `goal_start_transitions=1`, `task_count=0`, `effect_count=0`, `knowledge_count=0`, `registered_sensor_checked=true`, `no_executor_installed=true`, `auto_core_enabled=false`. Top level: `bound_goals=4`, `tasks_created=0`, `tools_executed=0`, `executor_installed=false`.
+
+**Nonclaims from laptop report:** `operator_authenticated=false`, `llm_used=false`, `godot_tested=false`, `pi_tested=false`, `true_sigkill_tested=false`, `production_code_changed=false`. Only the `before_bind` and `after_bind` records indicate deliberate `os._exit` cut testing. This gate does **not** establish executor security, live Godot authorization, real operator identity, SIGKILL/power loss recovery, or natural-language goal formation.
+
+**Decision:** **M5 accepted for owner-reported functional laptop gate**, consistent with all-green CI. The **latent binding** must remain isolated from executor-enabled Core; M6 must independently design and test an enforceable admission/revalidation boundary before any action-capable Core may consume it. No Stage completion and no production `anima/` change.
 
 **Next dependency:** M6 should separately design the safe transition from latent binding to execution-capable Core, including how *every* pending bound Goal is rechecked under fresh registered observation and explicit execution authorization before enabling Tool/P3-C. The desired experimental scope is a real Godot VAL with existing independent Proof and replay guard; production operator authentication remains a separate unsolved problem.
 
