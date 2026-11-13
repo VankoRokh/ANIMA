@@ -255,7 +255,9 @@ class M5BindingAdmission:
         if (m4["goal_id"] != saved["goal_id"]
                 or m4["fingerprint"] != saved["m4_fingerprint"]):
             raise ValueError("M5 source M4 proposal fingerprint changed")
-        if self._trusted_registry() != saved["system"]:
+        # JSON persistence converts PropertyRule tuple fields to arrays;
+        # compare the exact canonical JSON form, not Python tuple-vs-list.
+        if _canon(self._trusted_registry()) != _canon(saved["system"]):
             raise ValueError("M5 trusted action or registered property changed")
         before = saved["sensor"]
         old = self.core.core_events.ingress.get_event(before["event_id"])
