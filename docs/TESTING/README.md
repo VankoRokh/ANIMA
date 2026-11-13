@@ -1,5 +1,9 @@
 # Проверки и наблюдение
 
+## ANIMA v0.1 Integrated — M5 separate typed binding admission without executor
+
+[M5-контракт](Memory_v1_Integrated_Binding_Admission_M5_v0.md): подтверждённый M4 Goal может получить **отдельную** типизированную привязку P3-A, только после новой явной host-decision по неизменяемому ActionSpec, registered P2 sensor Belief и exact-source fingerprint. В лабораторном Core **нет исполнительного модуля и P3-C**, поэтому binding не может вызвать Tool. Путь `labs/virtual_anima_lab/python/m5_binding_admission.py`, runner `scripts/run_memory_v1_binding_gate.py`; [отрицательные тесты](../../tests/test_memory_v1_binding_gate.py). Binding в сохранённом Core work DB **может стать исполнимым** при последующей другой сборке: M5 не даёт права переносить данные в конфигурацию с executor без нового допуска. `operator_ref` не аутентифицирует пользователя. Production `anima/` не меняется; Pi и Godot отложены.
+
 ## ANIMA v0.1 Integrated — M4 explicit approval and unbound Core Goal
 
 [M4-контракт](Memory_v1_Integrated_Approval_M4_v0.md): только после source-backed `REVIEW_REQUIRED` и отдельного явного operator-test-host решения по неизменяемому fingerprint допускается создание ровно одной **непривязанной** Goal через существующий GoalStore. Журнал подтверждений изолирован от Core, резервирует Goal ID и start-transition ID для безопасного replay при обрыве между подтверждением и созданием. Лабораторный путь `labs/virtual_anima_lab/python/m4_approval_bridge.py`; runner `scripts/run_memory_v1_approval_gate.py`; [отрицательные тесты](../../tests/test_memory_v1_approval_gate.py). Host `operator_ref` **не подтверждает реальную личность**. Нет Task, Tool, Belief, Knowledge и автоматического Goal binding. No production `anima/` code or Stage 6 validator changes.
