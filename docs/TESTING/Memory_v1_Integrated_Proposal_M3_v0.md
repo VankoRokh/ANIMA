@@ -1,6 +1,6 @@
 # ANIMA v0.1 Integrated — M3 memory-sourced Goal suggestion preview
 
-**Status:** CI VERIFIED — full Python 3.12/3.13/3.14 regression and two-process M3 preview PASS; owner's notebook M3 gate OPEN. **Branch:** `work/anima-v01-integrated-m3` from M2 laptop PASS at `fbe34df8400fed7bfc6c23394f517a46e9a5ee7f`. No Raspberry Pi work in this phase.
+**Status:** CI VERIFIED — full Python 3.12/3.13/3.14 regression and two-process M3 preview PASS; owner-reported laptop M3 PASS on Python 3.14.4; Raspberry Pi deferred. **Branch:** `work/anima-v01-integrated-m3` from M2 laptop PASS at `fbe34df8400fed7bfc6c23394f517a46e9a5ee7f`. No Raspberry Pi work in this phase.
 
 ## Purpose
 
@@ -56,7 +56,7 @@ The reviewer outputs only `REVIEW_REQUIRED`, `CONFLICT_REVIEW`, or `REJECTED`; e
 
 **Initial test remediations:** the first M3 CI runs detected (1) a literal newline escape introduced by a test-side edit; (2) a partial-index negative test that modified the persisted history later compared after restart; and (3) artifact output located inside the repository despite the runner's external-report guard. All were addressed in **test/lab/CI code** without changing `anima/` or weakening source/authority validation. Last complete matrix #43427875816 is green.
 
-### Notebook acceptance — pending
+### Notebook acceptance — owner-reported PASS
 
 From the root of a separate M3 worktree with Python 3.14.4:
 
@@ -65,6 +65,19 @@ python -m scripts.run_memory_v1_goal_proposal_gate --report /tmp/anima-m3-PC.jso
 ```
 
 The runner uses three temporary isolated synthetic headless worlds with a configured but inactive Core action boundary. It does not require running Godot. The report file must not exist before this call. **Only a real owner-provided JSON** with `M3_GOAL_PREVIEW_PASS` can close M3 on that physical laptop. Raspberry Pi remains deferred.
+
+### Owner's notebook report — 2026-11-13
+
+**Evidence:** original file `anima-m3-PC.json` supplied by the owner, independently parsed after upload. This is a **reported local-run result**, not a remote terminal capture by the reviewer. The JSON has **no `commit` field**, so exact local Git SHA cannot be independently confirmed from this artifact alone; it does show schema `anima.memory_v1.goal_suggestion_m3/0.1` and the expected M3 result structure.
+
+- **Environment:** Linux x86_64, Python `3.14.4`; `status=M3_GOAL_PREVIEW_PASS`. All three child-process verification phases report `M3_CASE_PASS`.
+- **`request`:** `REVIEW_REQUIRED` with reason `historical_report_only_not_authorization`; one historical Memory ID and linked raw Event ID. Reported ten negative outcomes: fake Event/Memory, foreign template, fabricated Goal, operator-role claim, excess priority, tool escalation, oversized rationale, self-citation and wrong query.
+- **`state_only`:** `REJECTED` / `no_proposal`; forged draft based only on a state report rejected as `source_does_not_request_target`.
+- **`conflict`:** `CONFLICT_REVIEW` / `visible_revocation_requires_independent_review`; two historical raw Event IDs. No authorization conveyed by the conflict outcome.
+- **For all cases:** `source_backed=true`, `review_is_approval=false`, `current_event_self_cited=false`, `current_event_persisted=false`, **0 Goal**, **0 Task**, **0 Action**, **0 Knowledge**.
+- **Not tested by this local report:** `llm_used=false` in all cases; `godot_tested=false`, `pi_tested=false`, `production_code_changed=false`. M3 reports no natural-language understanding, independent operator approval or live-Godot action.
+
+**Decision:** M3 review-only functional acceptance on the owner's laptop **PASS**. The boundary is deliberately non-authorizing and uses deterministic synthetic markers. M4, if undertaken, requires an independently specified and audited proposal→operator-approval→Core Goal transition. No official Stage completion is inferred.
 
 **Next design question:** whether a later M4 should provide an explicit, auditable system/owner approval workflow that can convert a reviewed suggestion to a new Core Goal *without* weakening typed Goal binding, Proof and source-authority rules. M3 itself deliberately stops at review.
 
