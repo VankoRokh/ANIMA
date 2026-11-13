@@ -1,6 +1,6 @@
 # ANIMA v0.1 Integrated — M5 separate typed-binding admission (no executor)
 
-**Status:** PREDECLARED before implementation and CI.  
+**Status:** CI VERIFIED — M5 seven-case two-process gate and full Python 3.12–3.14 regression PASS; physical laptop M5 gate OPEN.  
 **Base:** M4 owner-reported laptop PASS, commit `1c691c738228c34f4b7dd880ef412328cf7c93be`, branch `work/anima-v01-integrated-m5`. Raspberry Pi deferred.
 
 ## Rationale / central hazard
@@ -32,6 +32,40 @@ M5 introduces **a different operator decision and an immutable admission ledger 
 
 **Explicit nonclaims:** Host-provided `operator_ref` does not authenticate a human. `os._exit` is not real SIGKILL/power loss. Trusted sensor adapter is simulated headless SQLite world, not an authenticated external process. An independently started action-capable Core with the same persistence is **out of scope** and must be prevented by deployment rules until separately designed authorization controls exist. Do not mark Stage completion or change `docs/project.json`.
 
-## Observed results
+## Observed results — GitHub CI 2026-11-13
 
-Pending.
+**Executable snapshot:** `534c7d1fe37f13bea888a3890a30abac440ff6af`.  
+**Primary run:** [GitHub Actions #43448293220](https://github.com/VankoRokh/ANIMA/actions/runs/43448293220) — **SUCCESS** all three Linux x86_64 jobs, including syntax/docs.
+
+| Gate | Python 3.12 | Python 3.13 | Python 3.14 |
+| --- | ---: | ---: | ---: |
+| Targeted M0–M5 + P6 | **70 PASS** | **70 PASS** | **70 PASS** |
+| Standalone seven-case runner | `M5_TYPED_BINDING_PASS` | `M5_TYPED_BINDING_PASS` | `M5_TYPED_BINDING_PASS` |
+| Full repository regression | **1717 PASS** | **1717 PASS** | **1717 PASS** |
+| Docs / syntax | PASS | PASS | PASS |
+
+**Acceptance corpus in observed runner:** `normal` and `before_bind`, `after_bind`, `resume_approval` each result in one real typed P3-A Core binding of the existing canonical M4 Goal. `rejected`, `source_modified`, and `world_changed` preserve the Goal in its **unbound** state. No scenario creates a new Goal beyond the single preexisting M4 Goal. Every case reports **0 Tasks, 0 Effects, 0 Knowledge**. The restricted `CoreAssembly` has `core_execution=None`, `core_autonomy=None`, and a direct Core run call must fail without a configured executor. Real `CoreIngress` evaluates the door sensor's registered producer, value, tick, evidence event and P2 freshness. Core action registry/criterion are system-owned, never provided by the memory draft.
+
+**Replay and negative tests:** record a second M5-specific operator decision; refuse unapproved/rejected receipts, conflicting replays, unregistered sensor ID, closed instead of open world, changed source after M5 approval, mismatched trusted ActionSpec, same origin re-stage with a new sensor, conflicting existing Core binding, and the *same stage sensor event replayed as an allegedly new observation*. A fresh event with **strictly larger sensor tick** is required on apply. `before_bind` hard-exits after durable admission and before `CoreGoalDecision.bind`; `after_bind` hard-exits after binding and before receipt, recovering the exact existing binding rather than creating a different one.
+
+**Observed CI issues and corrections (no production code changed):**
+1. Initial M5 setup exposed a partial Event Retrieval index after `Runtime.sleep()`. Lab runner now explicitly syncs before opening M4. M4's existing strict source-complete check remains enforced.
+2. Stage snapshot serializes `PropertyRule` tuples as JSON arrays. Comparing Python tuple to parsed list produced false mismatch; system-owned registry is now compared through the *same canonical JSON* on both sides.
+3. Review identified a time-of-check concern: simply replaying the first admissible sensor Event with its original tick must not count as a new observation. Added a strictly increasing sensor-tick gate and negative test before final green matrix.
+
+### Scope limitations
+
+This is **not** general execution authorization or autonomous action. The written P3-A binding is still a *latent capability*; a **different** future CoreAssembly with an executor and P3-C enabled could act on it. M5 does **not** provide a cross-process firewall that protects against such a future configuration. Never open the M5 lab database with executor-enabled Core until an independently reviewed M6 revalidation/admission design exists. P2 adapter names and operator `operator_ref` strings are **not** transport/human authentication. Registered sensor freshness is a logical-tick property, not proof that the physical world cannot change after observation. `os._exit` is not actual SIGKILL, device power loss, data corruption, or durable multi-process security. No LLM, Godot, Raspberry Pi, production `anima/` changes, official Stage status, or `docs/project.json` changes in M5.
+
+### Notebook acceptance — OPEN
+
+On a separate `ANIMA-M5` worktree using the owner's Python 3.14.4:
+
+```bash
+python -m scripts.run_memory_v1_binding_gate --report /tmp/anima-m5-PC.json
+```
+
+The script runs **seven** isolated synthetic headless Core/VirtualDoor scenarios, each with two independent Python processes and two intentional `os._exit` cuts. No Godot process must be started. The report file must be new and external to the repository; use a different name for retries. Expected overall `status=M5_TYPED_BINDING_PASS`. **Do not call the notebook gate PASS until the owner supplies its actual report.**
+
+**Next dependency:** M6 should separately design the safe transition from latent binding to execution-capable Core, including how *every* pending bound Goal is rechecked under fresh registered observation and explicit execution authorization before enabling Tool/P3-C. The desired experimental scope is a real Godot VAL with existing independent Proof and replay guard; production operator authentication remains a separate unsolved problem.
+
