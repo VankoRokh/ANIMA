@@ -3,6 +3,8 @@
 The online CI stage separately executes actual Godot 4.7.2 P6 bridge.
 """
 import json
+import subprocess
+import sys
 
 import pytest
 
@@ -61,3 +63,17 @@ def test_m2_seed_rejects_unknown_mode_without_data_touch(tmp_path):
     with pytest.raises(ValueError, match="Unsupported"):
         seed("unknown", tmp_path / "missing", 49998)
     assert not (tmp_path / "missing").exists()
+
+def test_m2_rejects_non_godot_executable_before_world_creation(tmp_path):
+    report = tmp_path / "must-not-exist.json"
+    run = subprocess.run(
+        [
+            sys.executable, "-m",
+            "labs.virtual_anima_lab.python.m2_integrated_gate",
+            "--godot", sys.executable, "--report", str(report),
+        ],
+        capture_output=True, text=True, timeout=30,
+    )
+    assert run.returncode != 0
+    assert "requires exact Godot 4.7.2" in run.stderr
+    assert not report.exists()
