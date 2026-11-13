@@ -130,7 +130,7 @@ class MemoryGoalPreviewGate:
                 memory_store=memory_store, link_store=link_store,
             ),
             provenance=self.provenance,
-        )
+        )\n        self._latest_window = None  # Only this gate may issue an admissible view.
 
     def capture(self, *, query, current_event_id):
         """Capture strictly source-backed memory context before current input."""
@@ -171,7 +171,7 @@ class MemoryGoalPreviewGate:
                     seen.add(key)
                 if len(sources) > MAX_VISIBLE_SOURCES:
                     raise ValueError("M3 visible source budget exceeded")
-        return PreviewWindow(
+        view = PreviewWindow(
             current_event_id=current_event_id, query=query,
             selected=tuple(selected), sources=tuple(sources),
             items_used=context["selection_stats"]["items_used"],
@@ -179,6 +179,8 @@ class MemoryGoalPreviewGate:
             truncated=bool(context["truncated"]
                            or context["selection_stats"]["omitted_budget"]),
         )
+        self._latest_window = view
+        return view
 
     @staticmethod
     def _reject(reason):
@@ -187,6 +189,8 @@ class MemoryGoalPreviewGate:
     def review(self, view, draft):
         if not isinstance(view, PreviewWindow):
             raise TypeError("M3 requires its immutable PreviewWindow")
+        if view is not self._latest_window:
+            return self._reject("unissued_or_stale_preview_window")
         if view.truncated:
             return self._reject("bounded_context_incomplete")
         if draft is None:
