@@ -113,6 +113,18 @@ def test_m5_no_binding_without_second_operator_approval(tmp_path):
     _assert_safe(core, tmp_path, goal_id=m4row["goal_id"], bound=False)
 
 
+def test_m5_replayed_stage_sensor_cannot_authorize_binding(tmp_path):
+    core, gate, m4row, ticket, _ = _fixture(tmp_path)
+    gate.decide(_receipt(ticket, "same-sensor"))
+    first = json.loads(ticket["snapshot_json"])["sensor"]
+    with pytest.raises(ValueError, match="NEW registered sensor tick"):
+        gate.apply(
+            ticket["ticket_id"],
+            sensor_event_id=first["event_id"], tick=first["tick"],
+        )
+    _assert_safe(core, tmp_path, goal_id=m4row["goal_id"], bound=False)
+
+
 def test_m5_changed_receipt_and_fingerprint_are_denied(tmp_path):
     core, gate, m4row, ticket, _ = _fixture(tmp_path)
     authorized = _receipt(ticket, "unit")
