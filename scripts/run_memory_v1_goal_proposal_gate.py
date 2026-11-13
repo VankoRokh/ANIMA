@@ -7,6 +7,7 @@ import argparse
 import json
 from pathlib import Path
 import platform
+import sqlite3
 import subprocess
 import sys
 import tempfile
@@ -67,6 +68,8 @@ def _no_effects(core):
     assert core.core_execution.store.list_operations() == []
     assert _effect_count(core.core_execution.world) == 0
     assert core.core_execution.world.current()["state"] == "open"
+    with sqlite3.connect(core.memory_store.database_file) as db:
+        assert db.execute("SELECT COUNT(*) FROM knowledge").fetchone()[0] == 0
 
 
 def _candidate(view):
