@@ -156,9 +156,7 @@ def seed(root, case):
     _assert_safe(core, root, goal_id=m4row["goal_id"], bound=False)
     if case == "source_modified":
         core.memory_store.update_memory(
-            json.loads(m5.ticket(row["ticket_id"])["snapshot_json"])[
-                "m4_ticket_id"
-            ] if False else m4row["goal_id"][:0] or draft_memory_id(core, m4row),
+            json.loads(m4row["draft_json"])["memory_id"],
             content="M5_CHANGED_MEMORY_AFTER_BINDING_APPROVAL",
         )
         core.runtime.sleep()
@@ -180,12 +178,6 @@ def seed(root, case):
     _assert_safe(core, root, goal_id=saved["goal_id"], bound=True)
     core.runtime.sleep()
     return {"phase": "seed", "status": "M5_SEED_PASS", "case": case}
-
-
-def draft_memory_id(core, m4row):
-    """Source id is chosen from the exact durable M4 approved proposal."""
-    import json as _j
-    return _j.loads(m4row["draft_json"])["memory_id"]
 
 
 def verify(root, case):
