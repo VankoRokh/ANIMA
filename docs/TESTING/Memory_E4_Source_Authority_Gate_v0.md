@@ -1,6 +1,6 @@
 # ANIMA E4 — Isolated Source Authority Gate v0
 
-**Status:** PREDECLARED TEST CONTRACT / NOT PRODUCTION ADMISSION. Baseline `e422c5255cefa56b8519c660fe6f797371736d31`, research branch `experiment/core-memory-information-baseline`. The previous [post-alias negative result](Memory_E4_PostAlias_Authority_Graph_Gate_v0.md) is a real blocker: user-controlled `source="user"` was sufficient to revoke.
+**Status:** MEASURED ISOLATED SOURCE-BINDING LAB PASS / **REAL AUTHENTICATION & PRODUCTION REMAIN NO-GO**. Baseline `e422c5255cefa56b8519c660fe6f797371736d31`, research branch `experiment/core-memory-information-baseline`. The previous [post-alias negative result](Memory_E4_PostAlias_Authority_Graph_Gate_v0.md) is a real blocker: user-controlled `source="user"` was sufficient to revoke.
 
 ## Question
 
@@ -40,3 +40,17 @@ Can an isolated laboratory enforce an **independently admitted principal** on bo
 The trusted test adapter token is a **lab fixture**; possession is not proof of a specific human or cryptographic transport authentication. Python object privacy and process-local secrets are not a security perimeter if arbitrary code can run inside the trusted process. The adapter is assumed to authenticate the upstream caller *before* invoking the lab; that assumption remains untested. Direct SQLite edits, stolen test tokens, file-system compromise, replay across separately cloned DBs, multi-DB transactions and real process kill are excluded.
 
 **Verdict policy:** A green test is **LAB AUTHORITY BINDING PASS** only, not identity verification, Core authority, production memory admission or L2 GO. An unbound or foreign principal changing any alias head is an unconditional FAIL.
+
+## Measured results — 2026-11-13
+
+- **Implementation snapshot:** `382ef0f370340a3526d11ea456ff13aa1f7c4849`; **CI:** [#43413204085](https://github.com/VankoRokh/ANIMA/actions/runs/43413204085) — SUCCESS on Python 3.12, 3.13 and 3.14.
+- **Targeted regression:** 98 PASS on each interpreter. **Full regression:** **1648 PASS** on each interpreter. This includes the **14 parameter-expanded new tests** in `tests/test_memory_e4_source_authority_gate.py`; they are not part of the separate 98-test targeted set.
+- **Spoofing:** a syntactically valid unadmitted `source="user"` revocation was rejected as `UNADMITTED_REVOCATION`, without modifying any alias or node heads; denial audit survived reopen.
+- **Foreign principal:** a revocation event admitted to Bob or Mallory could not revoke an Alice-owned alias; exact event reference and identical `source="user"` did not confer authority.
+- **Owner path:** admitted Alice defined `a` and revoked in a later session; exactly `story_s` and `episode_e` became stale, `story_u` and competing alias `b` stayed current. The allowed decision persisted the admitted principal, original/causing Event IDs, expected head, policy revision and revocation hash.
+- **Integrity / durability simulation:** invalid adapter token/unknown adapter, Event ID rebinding, same ID with altered bytes, unadmitted definition, policy mismatch, and corrupted admission digest were rejected. Simulated `before_commit` rolled back both the allowed decision and all mutations; simulated `after_commit` survived reopen and idempotent replay without a duplicate decision. Overflow >128 descendants rolled back the *entire* allowed operation.
+- **No source of live identity:** the test adapter registry and tokens are fixtures. The submitted `Event` never supplies trusted identity, but this lab does **not** authenticate actual humans, transport channels or arbitrary code with access to the process.
+- **No integration:** no `anima/` code, production Event/Memory DB, Core authority, Goal/Task, SLEEP or L2 is modified. Base `AliasLifecycleLab` remains intentionally unguarded and is not safe for production. The permitted path uses only the separate guarded class.
+- **Unmeasured:** real `SIGKILL` between writes and commit, actual power loss, cross-database transactions, scalability/p95/RSS, concurrent adapters, authenticated transport or external independent holdout. Passing the suite is not a semantic generalization or production authorization result.
+
+**Verdict:** the source-authority *binding invariant* holds under a deliberately synthetic trusted-adapter assumption and this observed test matrix. **Production authorization remains blocked** until the upstream trusted boundary is real, bypass paths removed, and crash + availability/scale gates pass. With >128 descendants, the current atomic rollback prevents partial corruption **but can indefinitely block a needed revocation**; propose a durable pending-invalidation state with read-time safety before raising the resource limit.
