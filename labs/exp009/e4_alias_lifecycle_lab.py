@@ -197,6 +197,17 @@ class AliasLifecycleLab:
             return _receipt("Event", status="appended",
                             event_id=raw["id"], seq=next_seq)
 
+    def _authorize_definition_tx(self, db, alias_id, definition_event_id,
+                                 definition_digest, operation_key):
+        """Historical unguarded LAB ONLY; guarded subclass overrides this hook."""
+        return None
+
+    def _authorize_revocation_tx(self, db, alias_id, definition_event_id,
+                                 revocation_event_id, revocation_digest,
+                                 expected_head, operation_key):
+        """Historical unguarded LAB ONLY; guarded subclass overrides this hook."""
+        return None
+
     def define(self, *, alias_id, definition_event_id, operation_key,
                expected_head=0, cut=None):
         self._key(alias_id, "alias_id")
@@ -227,6 +238,8 @@ class AliasLifecycleLab:
                         or not any(r == {"kind": "entity", "id": target}
                                    for r in raw["references"])):
                     raise LifecycleConflict("Alias definition target not source-bound")
+                self._authorize_definition_tx(
+                    db, alias_id, definition_event_id, digest, operation_key)
                 record = dict(alias_id=alias_id, revision=1, state="active",
                               source_event_id=definition_event_id,
                               source_sha256=digest, surface=surface,
@@ -357,6 +370,9 @@ class AliasLifecycleLab:
                         datetime.fromisoformat(revoke_raw["timestamp"]) <=
                         datetime.fromisoformat(original["timestamp"])):
                     raise LifecycleConflict("Revocation source/identity not bound")
+                self._authorize_revocation_tx(
+                    db, alias_id, head["definition_event_id"], revocation_event_id,
+                    revoke_digest, expected_head, operation_key)
                 record = dict(alias_id=alias_id, revision=expected_head + 1,
                               previous_revision=expected_head, state="revoked",
                               definition_event_id=head["definition_event_id"],
