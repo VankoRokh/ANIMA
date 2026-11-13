@@ -1,5 +1,9 @@
 # Проверки и наблюдение
 
+## ANIMA v0.1 Integrated — M3 review-only Goal proposal from historical Memory
+
+[M3-контракт](Memory_v1_Integrated_Proposal_M3_v0.md): проверяемое по первичным Events историческое воспоминание может стать **только предложением для рассмотрения**, но не Goal/Task/Tool. Экспериментальная реализация изолирована в `labs/virtual_anima_lab/python/m3_goal_preview.py`, исполняемый gate `scripts/run_memory_v1_goal_proposal_gate.py`, [отрицательные тесты](../../tests/test_memory_v1_goal_proposal_gate.py). Frozen Stage 6 `ProposalValidator` не расширен; противоречивые свидетельства блокируют автоматический переход, неподтверждённые идентификаторы и ложные полномочия отклоняются. Никакого LLM/автономной постановки целей или нового Stage.
+
 ## ANIMA v0.1 Integrated — M2 Memory + live Godot VAL + Core recovery
 
 [M2-контракт](Memory_v1_Integrated_External_VAL_M2_v0.md): реальная Godot 4.7.2 `p6_door` через существующий `VALDoorPort`, историческая Memory/Provenance, ограниченный FAST-context, Core Goal/Task/допущенный инструмент и независимое сенсорное подтверждение после перезапуска. `before`/`after` hard-exit перед receipt — отдельные отрицательные проверки, это не настоящие SIGKILL или сбой питания. M2 lab runner: `labs/virtual_anima_lab/python/m2_integrated_gate.py`, [offline tests](../../tests/test_m2_external_val_memory.py). Внешний порт только `127.0.0.1`; Pi отложен. M2 **не** даёт Memory полномочий на Goal/Tool.
