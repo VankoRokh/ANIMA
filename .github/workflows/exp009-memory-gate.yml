@@ -167,6 +167,20 @@ jobs:
           path: e4-alias-lifecycle-results/*.json
           if-no-files-found: error
           retention-days: 14
+      - name: E4 isolated selective-invalidation scale baseline (PC 100/1k/10k)
+        if: matrix.python-version == '3.14'
+        run: |
+          mkdir -p e4-scale-results
+          python -m labs.exp009.e4_scale_probe --sizes 100 1000 10000 --repeat 3 --output e4-scale-results/scale.json
+          python -c 'import json; d=json.load(open("e4-scale-results/scale.json")); [print("E4_SCALE_PASS", x["size"], "affected", x["samples"][0]["affected"], "median_revoke_s", x["median_revoke_s"], "peak_rss_kib", max(y["peak_rss_kib_linux_process"] for y in x["samples"])) for x in d["runs"]]'
+      - name: Publish isolated E4 scale benchmark
+        if: matrix.python-version == '3.14'
+        uses: actions/upload-artifact@v4
+        with:
+          name: e4-selective-invalidation-scale-py314
+          path: e4-scale-results/*.json
+          if-no-files-found: error
+          retention-days: 14
       - name: Event Retrieval C3 PC baseline (10k and 100k Events)
         if: github.event_name == 'workflow_dispatch' && matrix.python-version == '3.14'
         run: |
