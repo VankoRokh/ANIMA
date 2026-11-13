@@ -1,6 +1,6 @@
 # ANIMA v0.1 Integrated — M4 reviewed proposal → explicit operator decision → unbound Core Goal
 
-**Status:** CI VERIFIED — Python 3.12–3.14 full regression, six-case two-process M4 acceptance PASS; owner's laptop M4 OPEN.  
+**Status:** CI VERIFIED (Python 3.12–3.14; full regression and six-case gate PASS) + owner-reported laptop M4 PASS (Linux x86_64; Python 3.14.4). Raspberry Pi deferred.  
 **Branch:** `work/anima-v01-integrated-m4`, starting from M3 owner-accepted `1856d00b5daed8a21feb54a30c21d36e9e7cb572`. Raspberry Pi deferred.
 
 ## Purpose
@@ -58,7 +58,7 @@ All cases assert **0 Tasks, 0 Tool effects, 0 Knowledge**, and unbound Goals rem
 
 **Exactly what this does not prove:** `os._exit` ≠ `SIGKILL` or power loss; operator `test.operator.m4` is a trusted **lab-host input convention**, **not** an authenticated human identity or security boundary against hostile local code. No LLM, live Godot, network agent, Raspberry Pi, automatic Goal approval, Task binding or action. `anima/`, official Stage statuses, and `docs/project.json` were not changed.
 
-### Notebook acceptance — OPEN
+### Notebook acceptance — PASS (owner-provided original JSON)
 
 From an isolated `ANIMA-M4` worktree, using local Python 3.14.4:
 
@@ -67,6 +67,27 @@ python -m scripts.run_memory_v1_approval_gate --report /tmp/anima-m4-PC.json
 ```
 
 Runner opens six separate disposable synthetic Core worlds, forces two intentional `os._exit` interruptions in child workers, and reads Core/Goal/Memory in fresh independent Python processes; **no Godot binary needed**. It refuses to overwrite existing reports, or place the report inside the repository. The expected top-level result is `M4_APPROVED_GOAL_PASS`. Physical laptop PASS must be asserted from the owner's actual JSON, not from CI alone.
+
+### M4 laptop result — 2026-11-13
+
+**Evidence class:** the original uploaded file `anima-m4-PC.json` was read and independently parsed. This is an owner-provided local-run JSON, **not** an external authenticated terminal attestation. It reports `schema=anima.memory_v1.approval_m4/0.1`, `status=M4_APPROVED_GOAL_PASS`, `python=3.14.4`, `machine=x86_64`; six separate case records are in `phase=verify` and each has `status=M4_CASE_PASS`.
+
+**Important source limitation:** the report has **no Git commit/SHA field**, so the exact local source tree cannot be proven from this JSON alone. CI on branch commit `72992d7aa242c2e0a55593ee15c86d0cc6ce2687` was separately successful; do not silently equate that CI snapshot with the unversioned local report.
+
+| Case | Recovered Goals | Goal start transitions | Result |
+| --- | ---: | ---: | --- |
+| `normal` | 1 | 1 | explicit approval → one unbound active Goal |
+| `before_goal` | 1 | 1 | replay after stored decision / pre-Goal cut |
+| `after_goal` | 1 | 1 | reconcile existing Goal after pre-ledger cut |
+| `approval_resume` | 1 | 1 | approval only in resumed phase |
+| `rejected` | 0 | 0 | declined, no Goal materialization |
+| `source_modified` | 0 | 0 | altered post-approval evidence rejected |
+
+**Top-level counts:** `goals_total=4`, `tasks_created=0`, `tools_executed=0`. **Each case:** `task_count=0`, `effect_count=0`, `knowledge_count=0`, `raw_provenance_checked=true`, `index_status=complete`, `stage6_changed=false`. Each created Goal declares `goal_unbound=true`, and its initial transition count is exactly 1.
+
+**Explicit nonclaims:** `operator_identity_authenticated=false`, `llm_used=false`, `godot_tested=false`, `pi_tested=false`, `true_sigkill_tested=false`, `production_code_changed=false`. The runner's laboratory `os._exit` cut is **not** evidence of power-loss durability, real operator authentication, malicious actor resistance, or executable Goal binding.
+
+**Decision:** M4 **functional laptop gate accepted** (owner-reported PASS), alongside full GitHub CI matrix. This validates a replay-safe *lab-controlled unbound Goal creation bridge*, **not** production operator security. Separate independent M5 admission/binding tests are still required before approved Goals may execute. Official Stage status and `docs/project.json` unchanged.
 
 **Next architectural dependency:** M4 only creates unbound Goals. An M5 proposal for **separate, explicit typed binding/execution authorization** should be independently designed and negatively tested before any M4-produced Goal can act. Operator identity/authentication and persistent approval security remain open production concerns.
 
