@@ -1,5 +1,9 @@
 # Проверки и наблюдение
 
+## ANIMA v0.1 Integrated — M4 explicit approval and unbound Core Goal
+
+[M4-контракт](Memory_v1_Integrated_Approval_M4_v0.md): только после source-backed `REVIEW_REQUIRED` и отдельного явного operator-test-host решения по неизменяемому fingerprint допускается создание ровно одной **непривязанной** Goal через существующий GoalStore. Журнал подтверждений изолирован от Core, резервирует Goal ID и start-transition ID для безопасного replay при обрыве между подтверждением и созданием. Лабораторный путь `labs/virtual_anima_lab/python/m4_approval_bridge.py`; runner `scripts/run_memory_v1_approval_gate.py`; [отрицательные тесты](../../tests/test_memory_v1_approval_gate.py). Host `operator_ref` **не подтверждает реальную личность**. Нет Task, Tool, Belief, Knowledge и автоматического Goal binding. No production `anima/` code or Stage 6 validator changes.
+
 ## ANIMA v0.1 Integrated — M3 review-only Goal proposal from historical Memory
 
 [M3-контракт](Memory_v1_Integrated_Proposal_M3_v0.md): проверяемое по первичным Events историческое воспоминание может стать **только предложением для рассмотрения**, но не Goal/Task/Tool. Экспериментальная реализация изолирована в `labs/virtual_anima_lab/python/m3_goal_preview.py`, исполняемый gate `scripts/run_memory_v1_goal_proposal_gate.py`, [отрицательные тесты](../../tests/test_memory_v1_goal_proposal_gate.py). Frozen Stage 6 `ProposalValidator` не расширен; противоречивые свидетельства блокируют автоматический переход, неподтверждённые идентификаторы и ложные полномочия отклоняются. Никакого LLM/автономной постановки целей или нового Stage.
