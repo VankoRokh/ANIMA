@@ -32,6 +32,9 @@ MANIFEST = "m5_manifest.json"
 
 
 def _m4(core, root):
+    # Wake/sleep append raw Events; source index must be explicitly caught up.
+    # M4 still fails closed if sync encounters source identity/corruption issues.
+    assert _sync(core.event_retrieval)["status"] == "complete"
     return M4ApprovalBridge(
         database_file=root / "m4_approval.db",
         preview_gate=_gate(core), goal_store=core.internal_state.goals,
