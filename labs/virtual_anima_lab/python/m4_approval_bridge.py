@@ -33,6 +33,7 @@ DDL = """
 CREATE TABLE IF NOT EXISTS m4_approval_tickets (
     ticket_id TEXT PRIMARY KEY,
     fingerprint TEXT NOT NULL,
+    origin_key TEXT NOT NULL UNIQUE,
     draft_json TEXT NOT NULL,
     view_json TEXT NOT NULL,
     review_json TEXT NOT NULL,
@@ -148,6 +149,11 @@ class M4ApprovalBridge:
         if len(raw.encode("utf-8")) > MAX_TICKET_BYTES:
             raise ValueError("M4 preview exceeds durable ticket size")
         digest = _sha(payload)
+        origin_key = _sha({
+            "template": draft["template"], "memory_id": draft["memory_id"],
+            "source_event_id": draft["source_event_id"],
+            "current_event_id": draft["current_event_id"],
+        })
         ticket_id = "m4_" + digest
         goal_id = "goal_" + _uuid4_deterministic(ticket_id + ":goal")
         transition_id = "gt_" + _uuid4_deterministic(ticket_id + ":start")
@@ -157,17 +163,19 @@ class M4ApprovalBridge:
             try:
                 db.execute(
                     """INSERT OR IGNORE INTO m4_approval_tickets
-                    (ticket_id,fingerprint,draft_json,view_json,review_json,
+                    (ticket_id,fingerprint,origin_key,draft_json,view_json,review_json,
                      status,decision_json,goal_id,transition_id,created_at,updated_at)
-                    VALUES (?,?,?,?,?,'reviewed',NULL,?,?,?,?)""",
-                    (ticket_id, digest, _canon(draft), _canon(asdict(view)),
+                    VALUES (?,?,?,?,?,?,'reviewed',NULL,?,?,?,?)""",
+                    (ticket_id, digest, origin_key, _canon(draft), _canon(asdict(view)),
                      _canon(review.to_dict()), goal_id, transition_id, now, now),
                 )
                 row = db.execute(
-                    "SELECT * FROM m4_approval_tickets WHERE ticket_id=?",
-                    (ticket_id,),
+                    "SELECT * FROM m4_approval_tickets WHERE origin_key=?",
+                    (origin_key,),
                 ).fetchone()
-                if (row is None or row["fingerprint"] != digest
+                if (row is None or row["ticket_id"] != ticket_id
+                        or row["origin_key"] != origin_key
+                        or row["fingerprint"] != digest
                         or row["draft_json"] != _canon(draft)
                         or row["view_json"] != _canon(asdict(view))
                         or row["review_json"] != _canon(review.to_dict())):
@@ -188,6 +196,12 @@ class M4ApprovalBridge:
                 raise ValueError("Ticket payload changed")
             if row["ticket_id"] != "m4_" + row["fingerprint"]:
                 raise ValueError("Ticket identity changed")
+            if row["origin_key"] != _sha({
+                "template": draft["template"], "memory_id": draft["memory_id"],
+                "source_event_id": draft["source_event_id"],
+                "current_event_id": draft["current_event_id"],
+            }):
+                raise ValueError("Ticket source identity changed")
             if row["goal_id"] != (
                 "goal_" + _uuid4_deterministic(row["ticket_id"] + ":goal")
             ) or row["transition_id"] != (
