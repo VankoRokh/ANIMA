@@ -24,7 +24,7 @@ from anima.execution.contracts import ActionSpec
 from .core_port import VALDoorPort
 
 
-def make_core(data_dir: Path, *, port: int = 46019):
+def make_core(data_dir: Path, *, port: int = 46019, enable_event_retrieval: bool = False):
     """Composition root registers the external port as exactly one narrow source.
 
     No Godot-specific class is imported anywhere by the Core implementation.
@@ -61,6 +61,7 @@ def make_core(data_dir: Path, *, port: int = 46019):
         world_port=world,
         world_handlers=world.handlers(),
         auto_core=True,
+        enable_event_retrieval=enable_event_retrieval,
     )
 
 
