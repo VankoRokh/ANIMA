@@ -1,6 +1,6 @@
 # ANIMA v0.1 Integrated — M4 reviewed proposal → explicit operator decision → unbound Core Goal
 
-**Status:** PREDECLARED, awaiting CI and laptop acceptance.  
+**Status:** CI VERIFIED — Python 3.12–3.14 full regression, six-case two-process M4 acceptance PASS; owner's laptop M4 OPEN.  
 **Branch:** `work/anima-v01-integrated-m4`, starting from M3 owner-accepted `1856d00b5daed8a21feb54a30c21d36e9e7cb572`. Raspberry Pi deferred.
 
 ## Purpose
@@ -35,4 +35,38 @@ M4 test fixtures do not prove real `SIGKILL`, power-loss durability, multi-host 
 
 ## Evidence
 
-No claimed outcomes before running CI and notebook tests.
+### GitHub CI — 2026-11-13
+
+**Frozen executable snapshot:** `e6fa8f0234fc79ad8b205e00100bb742d4d61a2d`. [GitHub Actions #43444096905](https://github.com/VankoRokh/ANIMA/actions/runs/43444096905) — **SUCCESS** in three Linux x86-64 Python matrix jobs.
+
+| Gate | Python 3.12 | Python 3.13 | Python 3.14 |
+| --- | ---: | ---: | ---: |
+| Targeted M0/M1/M2/P6/M3/M4 | **51 PASS** | **51 PASS** | **51 PASS** |
+| Full repository regression | **1698 PASS** | **1698 PASS** | **1698 PASS** |
+| Independent two-process M4 runner | `M4_APPROVED_GOAL_PASS` | `M4_APPROVED_GOAL_PASS` | `M4_APPROVED_GOAL_PASS` |
+| Documentation/syntax | PASS | PASS | PASS |
+
+**Six isolated-case expected outcomes (observed by the M4 runner):**
+- `normal`: operator decision APPROVE, **one** canonical Goal/one start transition; replay leaves exactly one Goal; unbound Core door execution defers with `UNBOUND_GOAL`.
+- `before_goal`: persisted approval, hard `os._exit(74)` before Goal creation; second process finds no Goal and creates exactly one with reserved IDs.
+- `after_goal`: hard `os._exit(73)` after real `GoalStore.create_goal` but before approval-ledger receipt; second process finds matching Goal and reconciles ledger without creating another.
+- `approval_resume`: second process initially finds ticket only in `reviewed` state; no Goal before an explicit second-process APPROVE; then one canonical Goal.
+- `rejected`: terminal REJECT forbids later APPROVE or Goal creation.
+- `source_modified`: historical Memory changes after persisted APPROVE, so materialization fails closed with zero Goal.
+
+All cases assert **0 Tasks, 0 Tool effects, 0 Knowledge**, and unbound Goals remain active. Negative tests also check source/index integrity, unknown operator, changed receipt fingerprint, changed same-origin proposal, foreign operator-provided fields, occupied Goal ID, and frozen Stage 6 `ProposalValidator`.
+
+**Exactly what this does not prove:** `os._exit` ≠ `SIGKILL` or power loss; operator `test.operator.m4` is a trusted **lab-host input convention**, **not** an authenticated human identity or security boundary against hostile local code. No LLM, live Godot, network agent, Raspberry Pi, automatic Goal approval, Task binding or action. `anima/`, official Stage statuses, and `docs/project.json` were not changed.
+
+### Notebook acceptance — OPEN
+
+From an isolated `ANIMA-M4` worktree, using local Python 3.14.4:
+
+```bash
+python -m scripts.run_memory_v1_approval_gate --report /tmp/anima-m4-PC.json
+```
+
+Runner opens six separate disposable synthetic Core worlds, forces two intentional `os._exit` interruptions in child workers, and reads Core/Goal/Memory in fresh independent Python processes; **no Godot binary needed**. It refuses to overwrite existing reports, or place the report inside the repository. The expected top-level result is `M4_APPROVED_GOAL_PASS`. Physical laptop PASS must be asserted from the owner's actual JSON, not from CI alone.
+
+**Next architectural dependency:** M4 only creates unbound Goals. An M5 proposal for **separate, explicit typed binding/execution authorization** should be independently designed and negatively tested before any M4-produced Goal can act. Operator identity/authentication and persistent approval security remain open production concerns.
+
