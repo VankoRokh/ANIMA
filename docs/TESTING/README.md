@@ -1,5 +1,9 @@
 # Проверки и наблюдение
 
+## ANIMA v0.1 Integrated — M1 Core-owned typed decision acceptance
+
+[Критерии M1](Memory_v1_Integrated_Decision_M1_v0.md): исторический Memory-контекст читается **до** сохранения текущего вопроса, но только как справочная информация для FAST. Исполняемый typed Goal по-прежнему создаёт и связывает исключительно тестовый оператор, а Core P3-B принимает действия лишь по зарегистрированному датчику и собственному Verification. Негативные случаи: ложный user report, недоступность сенсора и unbound Goal. Headless VirtualDoorWorld, не Godot. [M1 runner](../../scripts/run_memory_v1_integrated_decision_gate.py); [M1 tests](../../tests/test_memory_v1_integrated_decision_gate.py). CI PASS не означает завершение Stage 7, production Memory→Core planning или тесты Pi.
+
 ## ANIMA v0.1 Integrated — M0 read-path acceptance
 
 [Критерии M0](Memory_v1_Integrated_Read_Path_M0_v0.md): первая сквозная проверка уже существующих Core Runtime → raw Event → Memory source links → Event Retrieval → Provenance/Context → детерминированный FAST, с **двумя отдельными Python-процессами** и обязательными отрицательными случаями. [Standalone runner](../../scripts/run_memory_v1_integrated_read_gate.py) и [регрессионные тесты](../../tests/test_memory_v1_integrated_read_gate.py). M0 не подтверждает автономный исполнительный контур, Stage 7 или работу на Pi до отдельных прогонов.
