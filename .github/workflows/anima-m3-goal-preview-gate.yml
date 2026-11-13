@@ -40,7 +40,8 @@ jobs:
         run: |
           mkdir -p integration-reports
           python -m scripts.run_memory_v1_goal_proposal_gate \
-            --report integration-reports/m3-${{ matrix.python-version }}.json
+            --report /tmp/anima-m3-ci-${{ matrix.python-version }}.json
+          cp /tmp/anima-m3-ci-${{ matrix.python-version }}.json integration-reports/m3-${{ matrix.python-version }}.json
       - name: Full ANIMA regression
         run: python -m pytest -q -p no:cacheprovider
       - name: Documentation and syntax gate
