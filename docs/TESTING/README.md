@@ -2,7 +2,7 @@
 
 ## ANIMA v0.1 Integrated — M2 Memory + live Godot VAL + Core recovery
 
-[M2-контракт](Memory_v1_Integrated_External_VAL_M2_v0.md): реальная Godot 4.7.2 `p6_door` через существующий `VALDoorPort`, историческая Memory/Provenance, ограниченный FAST-context, Core Goal/Task/допущенный инструмент и независимое сенсорное подтверждение после перезапуска. `before`/`after` hard-exit перед receipt — отдельные отрицательные проверки, это не настоящие SIGKILL или сбой питания. [M2 lab runner](../../labs/virtual_anima_lab/python/m2_integrated_gate.py), [offline tests](../../tests/test_m2_external_val_memory.py). Внешний порт только `127.0.0.1`; Pi отложен. M2 **не** даёт Memory полномочий на Goal/Tool.
+[M2-контракт](Memory_v1_Integrated_External_VAL_M2_v0.md): реальная Godot 4.7.2 `p6_door` через существующий `VALDoorPort`, историческая Memory/Provenance, ограниченный FAST-context, Core Goal/Task/допущенный инструмент и независимое сенсорное подтверждение после перезапуска. `before`/`after` hard-exit перед receipt — отдельные отрицательные проверки, это не настоящие SIGKILL или сбой питания. M2 lab runner: `labs/virtual_anima_lab/python/m2_integrated_gate.py`, [offline tests](../../tests/test_m2_external_val_memory.py). Внешний порт только `127.0.0.1`; Pi отложен. M2 **не** даёт Memory полномочий на Goal/Tool.
 
 ## ANIMA v0.1 Integrated — M1 Core-owned typed decision acceptance
 
