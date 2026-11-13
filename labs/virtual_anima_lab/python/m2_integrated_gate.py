@@ -392,6 +392,16 @@ def main(argv=None):
     godot = args.godot.expanduser().resolve()
     if not godot.is_file():
         parser.error(f"Godot executable not found: {godot}")
+    try:
+        binary_check = subprocess.run(
+            [str(godot), "--headless", "--version"], capture_output=True,
+            text=True, timeout=12, check=False,
+        )
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        parser.error(f"Godot version probe failed: {exc}")
+    detected = binary_check.stdout.strip()
+    if binary_check.returncode != 0 or not detected.startswith("4.7.2"):
+        parser.error(f"M2 requires exact Godot 4.7.2; found {detected!r}")
     if args.report is not None:
         target = args.report.expanduser().resolve()
         if target.exists() or target.is_relative_to(ROOT):
