@@ -1,6 +1,6 @@
 # ANIMA — E4 Memory v1.0 Crash/Scale Exit Gate (isolated)
 
-**Status:** PREDECLARED / NOT PRODUCTION ADMISSION.
+**Status:** MEASURED ISOLATED SIGKILL + SYNTHETIC SCALE PASS / PC+PI MEMORY GATE STILL OPEN / NOT PRODUCTION ADMISSION.
 **Baseline:** `31cd283c3af7517aa36381f89d2cef2a2ab98150` (`experiment/core-memory-information-baseline`).
 **Purpose:** close only the remaining isolated source-authority journal safety unknowns; **do not** widen the memory-graph design. Then return to the pre-existing [Memory Architecture v1 Roadmap](../ROADMAP/Memory_Architecture_v1_Roadmap.md) and the Integrated ANIMA v0.1 milestone.
 
@@ -36,3 +36,30 @@ Follow the unchanged official `docs/project.json` progression; no new Stage. Sta
 4. **Defer** L2 autonomous investigations, exotic graph engines, embeddings/rerank, Meta-memory, training/LoRA, physical sensors, complex SLEEP semantics (Memory v1.1), cluster/peripheral hardware until integrated v0.1 passes.
 
 **Stop rule:** one successful isolated experiment does not add a new side mechanism. If the measured Memory gate passes, hand off to integration acceptance; if it fails, fix only the failing invariant. Do not modify production routing or Stage statuses before end-to-end acceptance.
+
+## Measured outcome — 2026-11-13
+
+**Implementation snapshot:** `901a49b8346a672b2cb44057f96878d8fcaef420`. **CI:** [#43415469572](https://github.com/VankoRokh/ANIMA/actions/runs/43415469572), completed **SUCCESS** in Python 3.12 / 3.13 / 3.14 matrix; **98 targeted PASS** and **1653 full regression PASS** on each.
+
+**Real SIGKILL gate:** `tests/test_memory_e4_process_kill.py` runs separate child processes killed with Linux `SIGKILL` (exit code `-9`), followed by independent fresh interpreter reopen/replay. The before-COMMIT cut occurs after the alias/graph/authorization receipts have been staged but before the SQLite transaction commits, proving rollback within **one isolated DB**. The after-COMMIT cut preserves an authorized decision, exactly two invalidations and idempotent replay. No post-crash partial heads, duplicate effects or loss of original version were observed in these cases. These tests are **not** real power-loss or multi-store recovery.
+
+**Synthetic selective invalidation scale (GitHub-hosted Linux x86-64, Python 3.14, 3 independent lab databases per size):**
+
+| Nodes total | Expected/actual stale nodes | Coarse theoretical touches | Median revoke wall time | Observed process high-water RSS |
+| ---: | ---: | ---: | ---: | ---: |
+| 100 | 8 | 100 | 2.184 ms | up to 24,788 KiB |
+| 1,000 | 50 | 1,000 | 3.724 ms | up to 25,480 KiB |
+| 10,000 | 64 | 10,000 | 4.531 ms | up to 30,308 KiB |
+
+`LAB_BENCHMARK_ONLY`: these are **not** production Memory throughput, p95 estimates, or time for invalidating 10,000 descendants. The largest graph has 64 *affected* nodes and 9,936 *unaffected* nodes; the fixed policy budget remains 128. Graph construction used a single synthetic SQL transaction rather than the public node-creation API. The coarse-wide count is mathematical, not separately timed SQL. `ru_maxrss` reflects the process high-water mark, not incremental RSS of a single revoke. Three samples are insufficient for reliable tail percentiles. Raw CI artifact: `e4-selective-invalidation-scale-py314` (14-day retention).
+
+**Reproduce on Linux laptop and Pi 5 (use the same branch and fixture):**
+
+```bash
+python -m pytest -q tests/test_memory_e4_process_kill.py tests/test_memory_e4_scale_probe.py
+python -m labs.exp009.e4_scale_probe --sizes 100 1000 10000 --repeat 3 --output /tmp/anima-e4-scale-PROFILE.json
+```
+
+Use distinct profile output filenames per device; the runner refuses to overwrite an existing report. Record Python version, CPU/architecture, storage medium and thermal conditions. The GitHub-hosted benchmark is **not** a Raspberry Pi measurement. The earlier Core PC/Pi T9.5/T9.6 SIGKILL evidence cannot substitute for E4 Memory parity.
+
+**Decision:** complete the **isolated safety research** for this bounded profile, while keeping **production E4 revocation and action-enabled L2 NO-GO**. High-fanout >128 alias revocation still rolls back atomically and represents a correction-availability blocker if that feature is later enabled. Do **not** add pending-invalidation machinery now merely to unblock the *first read-only integrated ANIMA*. Next work item: implement/validate the already approved Memory v1.0 Event→Memory→Retrieval→Context→Core A–E/G integration path, then compare the same instance on PC/Pi. No additional E4 graph features are authorized by this result.
