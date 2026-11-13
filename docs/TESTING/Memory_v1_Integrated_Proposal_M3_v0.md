@@ -1,6 +1,6 @@
 # ANIMA v0.1 Integrated — M3 memory-sourced Goal suggestion preview
 
-**Status:** FROZEN CONTRACT before test implementation. **Branch:** `work/anima-v01-integrated-m3` from M2 laptop PASS at `fbe34df8400fed7bfc6c23394f517a46e9a5ee7f`. No Raspberry Pi work in this phase.
+**Status:** CI VERIFIED — full Python 3.12/3.13/3.14 regression and two-process M3 preview PASS; owner's notebook M3 gate OPEN. **Branch:** `work/anima-v01-integrated-m3` from M2 laptop PASS at `fbe34df8400fed7bfc6c23394f517a46e9a5ee7f`. No Raspberry Pi work in this phase.
 
 ## Purpose
 
@@ -44,4 +44,27 @@ The reviewer outputs only `REVIEW_REQUIRED`, `CONFLICT_REVIEW`, or `REJECTED`; e
 
 ## Evidence
 
-Results will be entered here only after observed CI and notebook tests. Passing CI alone does not mean physical laptop M3 PASS.
+### GitHub CI — 2026-11-13
+
+- **Frozen executable snapshot:** `544c284a56e77029c58f798bc66da886f0438c5b`. [GitHub Actions run #43427875816](https://github.com/VankoRokh/ANIMA/actions/runs/43427875816) — **SUCCESS** on all three Linux x86-64 Python jobs.
+- **Targeted M0/M1/M2/P6/M3:** **32/32 PASS** each on Python **3.12, 3.13 and 3.14**.
+- **Full repository regression:** **1679/1679 PASS** each on Python **3.12, 3.13 and 3.14**; documentation and syntax checks PASS.
+- **Two-process standalone acceptance:** `M3_GOAL_PREVIEW_PASS` on every Python version, with `request=REVIEW_REQUIRED`, `state_only=REJECTED`, `conflict=CONFLICT_REVIEW`.
+- Negative checks include forged memory/source IDs, self-citation, wrong current query, unsupported template, extra tool/role/priority/Goal fields, oversize rationale, stale view, Memory rewritten after capture, partially indexed or altered source, and an unbound historical state report. A selected historical report **never** gives world/goal/approval authority.
+- The runner verifies **actual** GoalStore count, TaskStore emptiness, ExecutionStore emptiness, virtual door world effect ledger and real Knowledge table count are all zero. Existing Stage 6 model `ProposalValidator` still rejects `PROPOSE_ACTION`, `PROPOSE_TASK`, `REQUEST_CONTEXT`.
+- M3 uses only synthetic marker recognition. It does not run a real LLM or live Godot, establish natural-language semantic correctness, approve a proposal, or create any Goal. Full M2 live Godot PASS remains a **separate previous gate**.
+
+**Initial test remediations:** the first M3 CI runs detected (1) a literal newline escape introduced by a test-side edit; (2) a partial-index negative test that modified the persisted history later compared after restart; and (3) artifact output located inside the repository despite the runner's external-report guard. All were addressed in **test/lab/CI code** without changing `anima/` or weakening source/authority validation. Last complete matrix #43427875816 is green.
+
+### Notebook acceptance — pending
+
+From the root of a separate M3 worktree with Python 3.14.4:
+
+```bash
+python -m scripts.run_memory_v1_goal_proposal_gate --report /tmp/anima-m3-PC.json
+```
+
+The runner uses three temporary isolated synthetic headless worlds with a configured but inactive Core action boundary. It does not require running Godot. The report file must not exist before this call. **Only a real owner-provided JSON** with `M3_GOAL_PREVIEW_PASS` can close M3 on that physical laptop. Raspberry Pi remains deferred.
+
+**Next design question:** whether a later M4 should provide an explicit, auditable system/owner approval workflow that can convert a reviewed suggestion to a new Core Goal *without* weakening typed Goal binding, Proof and source-authority rules. M3 itself deliberately stops at review.
+
