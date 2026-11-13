@@ -1,0 +1,53 @@
+name: ANIMA v0.1 Integrated M1 Gate
+
+on:
+  push:
+    branches:
+      - work/anima-v01-integrated-m1
+  workflow_dispatch:
+
+concurrency:
+  group: anima-m1-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  integrated-decision-m1:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ['3.12', '3.13', '3.14']
+    steps:
+      - name: Checkout frozen M1 branch
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Install regression dependencies
+        run: python -m pip install -r requirements-dev.txt
+      - name: M1 and M0 direct integration regression
+        run: |
+          python -m pytest -q -p no:cacheprovider \
+            tests/test_memory_v1_integrated_decision_gate.py \
+            tests/test_memory_v1_integrated_read_gate.py
+      - name: Run M1 isolated two-process acceptance runner
+        run: |
+          mkdir -p integration-reports
+          python -m scripts.run_memory_v1_integrated_decision_gate \
+            --report integration-reports/m1-${{ matrix.python-version }}.json
+      - name: Full regression
+        run: python -m pytest -q -p no:cacheprovider
+      - name: Documentation and syntax gate
+        run: bash scripts/check.sh
+      - name: Publish machine-readable M1 gate evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: integrated-m1-py${{ matrix.python-version }}
+          path: integration-reports/m1-${{ matrix.python-version }}.json
+          if-no-files-found: error
+          retention-days: 14
