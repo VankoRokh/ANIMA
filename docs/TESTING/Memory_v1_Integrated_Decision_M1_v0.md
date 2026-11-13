@@ -1,6 +1,6 @@
 # ANIMA v0.1 Integrated — M1 Core-owned Decision / Memory Advisory (headless)
 
-**Status:** CI VERIFIED on GitHub Linux x86-64 / Python 3.12–3.14; physical owner's laptop M1 gate OPEN; not production integration or Godot VAL.  
+**Status:** M1 CI VERIFIED (Python 3.12–3.14) + owner-reported laptop M1 PASS (Python 3.14.4); not production integration or Godot VAL.  
 **Branch:** `work/anima-v01-integrated-m1` from M0 frozen baseline `9df779d14f03ff6d0bd514ecf880547621063678`.  
 **Execution platform for today's acceptance:** notebook Linux x86-64; GitHub Linux x86-64 compatibility matrix. **Pi postponed** by explicit owner decision.
 
@@ -50,7 +50,7 @@ After M1 laptop PASS: define a *reviewable read-only cognition/decision interfac
 - **Случай B:** Memory утверждает `open`, реальное состояние `closed`; ровно **0** эффектов, `NO_EFFECT_REQUIRED`, Goal verified.
 - **Случай C:** сначала отказ зарегистрированного sensor `sense()`, **0** эффектов при сбое; после восстановления сенсора ровно **1** эффект и independent Goal proof.
 - **Граница:** `unbound Goal` без действия; никаких автоматических Knowledge, FAST без прав Goal/Task/Tool; отсутствие нынешнего вопроса в historical snapshot перед новым `Runtime.user_input`; replay использует `RECOVERED_VERIFIED_SUCCESS` и не повторяет эффект.
-- **Открытые проверки:** реальный ноутбук владельца (Python 3.14.4), физический `SIGKILL` на объединённом маршруте, внешняя Godot VAL, отсутствие самопривязки в полноценном production flow, реальная способность памяти влиять на планирование, Pi (отложен). Ни один из них не подразумевается CI PASS.
+- **Открытые проверки:** физический `SIGKILL` на объединённом маршруте, внешняя Godot VAL, отсутствие самопривязки в полноценном production flow, реальная способность памяти влиять на планирование, Pi (отложен). M1 laptop PASS подтверждён отдельным отчётом владельца ниже; прочие проверки не подразумеваются CI PASS.
 
 ### Зафиксированная поправка теста
 
@@ -66,3 +66,17 @@ python -m scripts.run_memory_v1_integrated_decision_gate --report /tmp/anima-m1-
 ```
 
 Если файл отчёта уже существует, указать новое имя: скрипт не перезаписывает результаты. Он создаёт только временные синтетические данные и изолированную headless-world SQLite-фикстуру. Это **не** запуск Godot или Raspberry Pi. Заявлять M1 laptop PASS только по присланному фактическому JSON, не по GitHub CI.
+
+## M1 на ноутбуке владельца — отчёт 2026-11-13
+
+**Источник:** полный JSON вывода `scripts.run_memory_v1_integrated_decision_gate`, предоставленный владельцем в разговоре; не независимый удалённый сбор данных с устройства. Запуск производился после переноса ветки M1 на ноутбук, исходный код runner соответствует уже принятому M1 сценарию. Конкретный `git rev-parse HEAD` локального запуска в переданном JSON **не указан**, поэтому нельзя приписывать отчёту идентичность позднейших docs-only коммитов.
+
+- **Итог:** `status=M1_INTEGRATED_DECISION_PASS`, `schema=anima.memory_v1.integrated_decision_m1/0.1`.
+- **Окружение:** `Python 3.14.4`, `Linux-7.0.0-42-generic-x86_64-with-glibc2.43`, `machine=x86_64`. Raspberry Pi **не тестировался**.
+- **false_closed:** исторический user report = closed, состояние мира = open. `M1_SCENARIO_PASS`, `effect_count=1`, `goal_status=completed`, `independent_sensor_proof=true`; FAST historical context = **1 Memory / 65 символов**.
+- **false_open:** исторический user report = open, состояние мира = closed. `M1_SCENARIO_PASS`, `effect_count=0`, `goal_status=completed`, `independent_sensor_proof=true`; FAST historical context = **1 Memory / 63 символа**.
+- **sensor_unavailable:** ошибочный user report = closed, исходная дверь открыта; `sensor_failure_blocked=true`, окончательное `effect_count=1` **после** восстановления сенсора; `M1_SCENARIO_PASS`, `independent_sensor_proof=true`. FAST context = **1 Memory / 65 символов**.
+- **Для всех трёх случаев:** `query_excluded_from_historical_snapshot=true`, `memory_used_as_sensor_authority=false`, `typed_goal_explicitly_operator_bound=true`, `effect_replayed=false`, `knowledge_count=0`, `core_autonomy_enabled=false`. `history_id` и `query_id` различаются.
+- **Невыполненные проверки:** `godot_val_tested=false`, `model_used=false`, `pi_tested=false`, `real_sigkill_tested=false`. Полноценная автоматическая когнитивная интеграция **ещё не доказана**.
+
+**Приёмка:** **M1 functional headless laptop gate PASS**. Для следующего интеграционного шага использовать тот же явный разрыв: Memory — подтверждаемая по источникам справочная информация, Core Belief — только от зарегистрированных наблюдений; FastCognition не может самостоятельно создавать Goal, вызывать Tool или подтверждать Knowledge. Отдельно понадобится проверить этот маршрут в настоящем Godot VAL, но этот этап не следует считать сделанным на основании M1.
