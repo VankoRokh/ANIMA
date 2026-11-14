@@ -132,6 +132,38 @@ def test_canonical_release_and_architecture_routes(repo):
     check_documentation(repo)
 
 
+
+def test_research_catalog_preserves_negative_evidence(repo):
+    index = (repo / "docs/research/README.md").read_text()
+    assert "retrieval.md" in index
+    assert "memory-encoding.md" in index
+    assert "semantics.md" in index
+    assert "virtual-world.md" in index
+    assert "future-directions.md" in index
+
+    encoding = (repo / "docs/research/memory-encoding.md").read_text()
+    assert "AUTHORITY FAIL" in encoding
+    assert "NO-GO" in encoding
+    assert "128" in encoding
+    assert "Memory_E4_Crash_Scale_Exit_Gate_v0.md" in encoding
+
+    semantics = (repo / "docs/research/semantics.md").read_text()
+    assert "Inconclusive" in semantics
+    assert "48/50" in semantics
+    assert "CR-032" in semantics
+    assert "revision-residual/0.3" in semantics
+
+    virtual = (repo / "docs/research/virtual-world.md").read_text()
+    assert "10/10" in virtual
+    assert "true_sigkill_tested=false" in virtual
+    assert "operator_authenticated=false" in virtual
+    assert "первичным CI-отчётом" in virtual or "первичном CI report" in virtual
+
+    legacy = (repo / "docs/RESEARCH/README.md").read_text()
+    assert "../research/README.md" in legacy
+    check_documentation(repo)
+
+
 def test_incomplete_report_is_rejected(repo):
     report = repo / "docs/TESTING/Results/TV-0001.md"
     report.write_text(report.read_text().replace("## Не доказано", "## Потерянный раздел"))
