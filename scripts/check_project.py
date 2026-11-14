@@ -65,6 +65,18 @@ def check_documentation(root=ROOT):
     update(root, check=True)
     docs = sorted((root / "docs").rglob("*.md"))
     require(docs, "docs is empty")
+    # A checkout may work on Linux but collide on case-insensitive filesystems.
+    # Validate paths for all files and directories, not just Markdown pages.
+    folded = {}
+    for item in sorted((root / "docs").rglob("*")):
+        rel = item.relative_to(root).as_posix()
+        normalized = rel.casefold()
+        previous = folded.get(normalized)
+        require(
+            previous is None or previous == rel,
+            f"Case-only documentation path collision: {previous} / {rel}",
+        )
+        folded[normalized] = rel
     pages = [root / "README.md", *docs]
     visible = {}
     for page in pages:
