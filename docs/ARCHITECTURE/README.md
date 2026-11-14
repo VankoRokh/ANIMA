@@ -49,6 +49,27 @@ SLEEP организует отдельные безопасные ограни�
 
 **Важное различие статусов:** Stage 6 `Complete` подтверждает ограниченный интеграционный контур того Stage. ANIMA v0.1 — **другой контракт**, для которого нужен отдельный набор испытаний. Отчёты лабораторий M0–M6-B2 и Stage 7 не делают автоматически работающими новые production-модули.
 
+## Компоненты и подтверждение
+
+Это **короткий технический индекс**: ссылка на реальный модуль плюс профильный тест, а не заявление о прохождении всех возможных нагрузок.
+
+| Подсистема | Код | Проверка |
+|---|---|---|
+| Runtime и системный цикл | [runtime.py](../../anima/runtime.py) | [test_runtime.py](../../tests/test_runtime.py) |
+| Identity / State | [state.py](../../anima/core/state.py) | [test_state.py](../../tests/test_state.py) |
+| Event / Memory / Knowledge | [knowledge.py](../../anima/memory/knowledge.py) | [test_knowledge.py](../../tests/test_knowledge.py) |
+| Retrieval | [retrieval.py](../../anima/memory/retrieval.py) | [test_retrieval.py](../../tests/test_retrieval.py) |
+| Canonical IR / Resolver | [ir.py](../../anima/ir.py) | [test_resolution.py](../../tests/test_resolution.py) |
+| FAST / DEEP routing | [routing.py](../../anima/cognition/routing.py) | [test_cognitive_routing.py](../../tests/test_cognitive_routing.py) |
+| FAST backend | [fast_llm.py](../../anima/cognition/fast_llm.py) | [test_fast_llm_backend.py](../../tests/test_fast_llm_backend.py) |
+| DEEP backend | [deep_llm.py](../../anima/cognition/deep_llm.py) | [test_deep_dispatch_integration.py](../../tests/test_deep_dispatch_integration.py) |
+| Goals / Internal State / Choice | [choice_engine.py](../../anima/internal_state/choice_engine.py) | [test_choice_engine.py](../../tests/test_choice_engine.py) |
+| Persistent Task | [store.py](../../anima/tasks/store.py) | [test_task_store.py](../../tests/test_task_store.py) |
+| Execution / Verification | [coordinator.py](../../anima/execution/coordinator.py) | [test_stage6_execution_verification.py](../../tests/test_stage6_execution_verification.py) |
+| SLEEP и Tasks | [task_lifecycle.py](../../anima/sleep/task_lifecycle.py) | [test_stage6_sleep_lifecycle.py](../../tests/test_stage6_sleep_lifecycle.py) |
+| Trace и восстановление | [unified_trace.py](../../anima/diagnostics/unified_trace.py) | [test_stage6_unified_trace_recovery.py](../../tests/test_stage6_unified_trace_recovery.py) |
+| ANIMA v0.1 — штатный запуск | [release_v01.py](../../anima/release_v01.py) | [test_release_v01.py](../../tests/test_release_v01.py) |
+
 ## Работающая конфигурация ANIMA v0.1
 
 Штатная точка входа: [`anima/release_v01.py`](../../anima/release_v01.py). Она использует существующие [`CoreAssembly`](../../anima/core/assembly.py) и [`Runtime`](../../anima/runtime.py); сохраняет Identity, State, EventLog, MemoryStore/LinkStore, Event Retrieval, Internal State и typed Core-интерфейсы. Через локальный JSONL stdin доступны несколько reports, статус, точный поиск исходных Events, ограниченный Context и завершение.
