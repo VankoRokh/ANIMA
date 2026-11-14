@@ -73,4 +73,4 @@ stdin JSONL → release_v01.serve → ReleaseSession.handle("report")
 | [Cognition](cognition.md) | Canonical IR, Resolver, FAST/DEEP, Choice и предложения | [routing.py](../../anima/cognition/routing.py), [test_cognitive_routing.py](../../tests/test_cognitive_routing.py) |
 | [SLEEP](sleep-and-recovery.md) | WorkItem, checkpoints, bounded processing и границы восстановления | [execution.py](../../anima/sleep/execution.py), [test_stage6_sleep_lifecycle.py](../../tests/test_stage6_sleep_lifecycle.py) |
 
-**Как читать:** сначала [релизный контракт](../versions/v0.1/contract.md), затем профильный маршрут выше, тематическую страницу и ссылку на проверку. Происхождение решений — в [истории](../history/stages.md), выводы лабораторий — в [исследованиях](../research/README.md).
+**Как читать:** сначала [релизный контракт](../versions/v0.1/contract.md), затем профильный маршрут выше, тематическую страницу и ссылку на проверку. Происхождение решений — в [истории](../history/stages.md), выводы лабораторий — в [исследованиях](../RESEARCH/README.md).
