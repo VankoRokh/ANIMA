@@ -346,6 +346,24 @@ class M6B2Admission:
         world = saved["world"]
         if self.port._binding() != (world["world_instance_id"], world["epoch"]):
             raise ValueError("M6-B2 world identity changed")
+        # A saved adapter binding does not prove that the current Godot process
+        # still has that identity. Recovery must verify a live hello as well.
+        with self.port._client() as client:
+            hello = client.call("hello")
+        if (self.port._identity(hello["data"]) != world["world_instance_id"]
+                or hello["epoch"] != world["epoch"]):
+            raise ValueError("M6-B2 live Godot world replaced")
+        if row["status"] == "claimed":
+            consumed = target.ingress.get_event(row["consumed_event_id"])
+            operation = target.operations.get_operation(row["operation_id"])
+            if (operation is None or operation["goal_id"] != saved["goal_id"]
+                    or consumed is None
+                    or consumed["source_ref"] != DOOR_SOURCE
+                    or consumed["producer_ref"] != P6_PRODUCER
+                    or consumed["payload"]["observed_at"]["domain"] != "lab_sample"
+                    or consumed["payload"]["observed_at"]["value"]
+                       <= saved["admission_sample"]["lab_sample"]):
+                raise ValueError("M6-B2 claimed operation/source evidence changed")
         return saved
 
     def stage(self, b1_ticket_id):
