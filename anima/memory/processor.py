@@ -16,6 +16,26 @@ UPDATE_MAX_GAP_SECONDS = 2 * 60 * 60
 RECENT_CANDIDATE_LIMIT = 20
 FTS_CANDIDATE_LIMIT = 10
 
+# A repeated metadata token must not turn session/time proximity into
+# evidence that two messages describe the same episode.
+ASSOCIATION_NOISE_TOKENS = frozenset({
+    "ref", "id", "номер", "source", "event", "record", "report",
+    "message", "operator", "сообщение", "событие", "оператор",
+    "данные", "запись", "текст", "the", "and", "for", "from",
+    "with", "this", "that", "about", "is", "are", "was", "were",
+    "on", "of", "at", "to", "in", "a", "an", "и", "или",
+    "на", "от", "это", "для", "что", "как", "по",
+})
+GENERIC_PREFIX_LABELS = frozenset({
+    "ref", "id", "number", "номер", "report", "message",
+    "status", "record", "event", "source", "topic", "note",
+    "decision", "change", "outcome", "constraint", "reason",
+    "question", "update", "label", "timestamp", "log",
+    "отчёт", "отчет", "сообщение", "запись", "тема",
+    "статус", "решение", "причина", "вопрос", "данные",
+})
+PREFIX_ANCHOR = re.compile(r"^\s*([\w-]{3,64})\s*:", re.UNICODE)
+
 
 class MemoryProcessor:
     """Deterministic selection and episodic association baseline."""
@@ -77,6 +97,7 @@ class MemoryProcessor:
         semantic_signal = (
             candidate["fts_score"] > 0
             or candidate["entity_overlap"] > 0
+            or candidate["anchor_match"]
         )
         update_allowed = (
             semantic_signal
@@ -270,6 +291,12 @@ class MemoryProcessor:
             )
             for memory in candidates
         ]
+        # A different explicit subject is negative evidence, even when two
+        # records share boilerplate, time and session. Never select the
+        # conflicting candidate over a genuine matching episode.
+        scored = [item for item in scored if not item["anchor_conflict"]]
+        if not scored:
+            return None
         scored.sort(
             key=lambda item: (
                 item["score"],
@@ -341,6 +368,30 @@ class MemoryProcessor:
             reasons.append("same_type:+1")
 
         source_events = self._source_events(memory["id"], event_index)
+        incoming_anchor = self._prefix_anchor(text)
+        source_anchors = {
+            self._prefix_anchor(record["payload"]["text"])
+            for record in source_events
+            if record.get("type") == "conversation.user"
+            and isinstance(record.get("payload"), dict)
+            and isinstance(record["payload"].get("text"), str)
+        }
+        source_anchors.discard(None)
+        # Do not extend an already mixed/legacy Memory using a single
+        # matching label: only a pure matching source group is strong.
+        anchor_conflict = bool(
+            incoming_anchor and source_anchors
+            and source_anchors != {incoming_anchor}
+        )
+        anchor_match = bool(
+            incoming_anchor and source_anchors == {incoming_anchor}
+        )
+        if anchor_conflict:
+            reasons.append("anchor_conflict:block_association")
+        elif anchor_match:
+            score += 2
+            reasons.append("anchor_match:+2")
+
         if any(
             record.get("session_id") == event.session_id
             and event.session_id is not None
@@ -379,6 +430,8 @@ class MemoryProcessor:
             "fts_score": fts_score,
             "entity_overlap": entity_overlap,
             "large_time_gap": large_time_gap,
+            "anchor_match": anchor_match,
+            "anchor_conflict": anchor_conflict,
         }
 
     def _source_events(self, memory_id, event_index):
@@ -604,14 +657,40 @@ class MemoryProcessor:
         }
 
     @classmethod
+    def _association_tokens(cls, text):
+        return {
+            token for token in cls._tokens(text)
+            if len(token) >= 3
+            and not token.isdecimal()
+            and token not in ASSOCIATION_NOISE_TOKENS
+        }
+
+    @staticmethod
+    def _prefix_anchor(text):
+        """Use a structured subject prefix only as a grouping hint, not authority.
+
+        Examples: `ambercoil: ...`, `device-17: ...`.
+        Generic labels such as `report:` and `decision:` are not subjects.
+        """
+        match = PREFIX_ANCHOR.match(text)
+        if match is None:
+            return None
+        label = match.group(1).casefold()
+        if label.isdecimal() or label in GENERIC_PREFIX_LABELS:
+            return None
+        return label
+
+    @classmethod
     def _lexical_score(cls, left, right):
-        left_tokens = cls._tokens(left)
-        right_tokens = cls._tokens(right)
+        left_tokens = cls._association_tokens(left)
+        right_tokens = cls._association_tokens(right)
         if not left_tokens or not right_tokens:
             return 0
 
         overlap = len(left_tokens & right_tokens)
-        if overlap == 0:
+        # A single shared word (or machine-generated reference marker) is
+        # insufficient evidence for association, however close in time.
+        if overlap < 2:
             return 0
 
         ratio = overlap / min(len(left_tokens), len(right_tokens))
