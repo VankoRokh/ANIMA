@@ -54,4 +54,3 @@ jobs:
       - name: Проверить изменения PR на whitespace
         if: github.event_name == 'pull_request'
         run: git diff --check HEAD^ HEAD
-
