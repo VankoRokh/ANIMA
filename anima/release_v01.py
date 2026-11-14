@@ -181,7 +181,7 @@ def _release_configuration(root: Path, sandbox_door: bool):
     else:
         with path.open("x", encoding="utf-8") as stream:
             json.dump(profile, stream, sort_keys=True)
-            stream.write("\\n")
+            stream.write("\n")
 
 
 def _make_core(root: Path, sandbox_door: bool):
