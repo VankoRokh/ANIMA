@@ -1,6 +1,6 @@
 # ANIMA Memory v1 — M6-A executable startup + pre-effect admission
 
-**Status:** FROZEN DESIGN — awaiting tests, CI and owner laptop gate.  
+**Status:** CI VERIFIED — seven-case M6-A admission/execution/recovery and complete Python 3.12–3.14 regression PASS; owner's laptop gate OPEN.  
 **Branch:** `work/anima-v01-integrated-m6`, based on owner-accepted M5 `1ec7674773ba2202035ecb9d013773a74dfadef5`.
 
 ## Architectural blocker: M5 vs P6/Godot provenance
@@ -39,3 +39,52 @@ M6-A therefore verifies the *entire* M3→M4→M5 chain through an independently
 - GitHub CI Python 3.12–3.14 targeted/full regression and `scripts/check.sh`. Owner laptop Python 3.14.4 report after CI.
 
 **Hard FAIL:** any unauthorized Tool effect, duplicate effect, fabricated Proof or Goal completion, activation of P3-C by the M6 startup path, changed frozen P2/P3-A source under an existing binding, or production `anima/` edits. CI evidence does not imply real-Godot or hardware readiness.
+
+## CI evidence — 2026-11-14
+
+**Frozen tested source SHA:** `de364f589e0e6956139e3108d972821d7b06bf26`.
+
+**GitHub Actions:** [#43590019848](https://github.com/VankoRokh/ANIMA/actions/runs/43590019848) — **SUCCESS** for all three Linux x86_64 Python jobs.
+
+| Gate | Python 3.12 | Python 3.13 | Python 3.14 |
+| --- | ---: | ---: | ---: |
+| Targeted M0–M6A + P6 | 85 PASS | 85 PASS | 85 PASS |
+| Seven isolated two-process acceptance cases | `M6_EXECUTION_ADMISSION_PASS` | `M6_EXECUTION_ADMISSION_PASS` | `M6_EXECUTION_ADMISSION_PASS` |
+| Full repository regression | **1732 PASS** | **1732 PASS** | **1732 PASS** |
+| Syntax/docs verification | PASS | PASS | PASS |
+
+**Real synthetic environment actions are measured, not inferred from model output.** The runner's seven cases report:
+
+| Case | Final Goal | World door-effect ledger | M6 permission |
+| --- | --- | ---: | --- |
+| `normal` | completed + independent P2 sensor proof | 1 | claimed once |
+| `before_effect` | active; Operation uncertain, **not retried** | 0 | approval unused |
+| `after_effect` | completed after read-only reconciliation + independent proof | 1 | claimed once |
+| `no_approval` | active, unexecuted | 0 | staged |
+| `rejected` | active, unexecuted | 0 | rejected |
+| `source_modified` | active, unexecuted | 0 | approved, but source no longer admissible |
+| `world_changed` | active, unexecuted | 0 | approved, but live sensor precondition no longer true |
+
+**Totals:** exactly **2 Tool effects** in two isolated positive cases; zero unexpected effects and no duplicate. Recovery uses the canonical P3-B uncertainty ledger, keyed read-only reconciliation and registered P2 independent verification. The third consent is immutable, its fingerprint binds one M5 Goal and frozen ActionSpec, and the actual Tool handler checks/atomically claims its single-use permission *before* attempting an effect. No P3-C is constructed in this lab pathway.
+
+**Observed remediation:** the first M6 CI exposed a repeated-use test invoking the *new admission check* after Core had appended service events and before the Event Retrieval index caught up. Admission correctly denied an incomplete index. The replay test was corrected to call existing **Core read-only operation recovery** instead of seeking a second execution admission. No source completeness requirement or Tool guard was weakened. The final matrix above includes this correction.
+
+### Owner notebook acceptance — OPEN
+
+From a separate `ANIMA-M6A` worktree on Linux x86_64 with Python 3.14.4:
+
+```bash
+python -m scripts.run_memory_v1_execution_gate --report /tmp/anima-m6a-PC.json
+```
+
+This runner constructs seven **new isolated** `TemporaryDirectory` fixture worlds, runs each case in fresh Python child processes, and deletes its own temporary data on exit. It intentionally uses `os._exit` for the two cut points, not SIGKILL. **Godot is not required and not tested.** The report location must not already exist and must be outside the repo. Expected top-level `status=M6_EXECUTION_ADMISSION_PASS`; accept physical-laptop PASS only after inspecting the original owner-provided JSON.
+
+### Mandatory caveats for M6-B
+
+- Production `anima/` never changed; the opt-in M6 harness is **not a global executor construction firewall**. A user or process calling `build_core` with an unguarded handler and the same persistence can bypass the lab-specific rule. Real enforcement requires tightening the production composition/transport boundary, not further claims from this fixture.
+- M5 registered source `adapter.virtual_door_sensor/0.1`, `lab_tick`; existing P6 Godot source `adapter.val_door_port/0.1`, `lab_sample`. Source/clock migration must be **explicitly independently approved and proven** before M5-bound Goal acts on the Godot port. Equivalent door content or Tool name alone is not enough.
+- Lab operator identifiers and P2 source refs are not authenticated; an attacker with local code/SQLite access can bypass laboratory assumptions.
+- The sensor check and Tool effect span separate transactions/DBs, not a globally atomic physical-world operation. A concurrent environment change after pre-effect observation is a real remaining TOCTOU risk.
+- No LLM, real Godot world, power-loss or true SIGKILL, Raspberry Pi, malicious local process isolation, or official Stage completion is demonstrated. No `docs/project.json` update is authorized.
+
+**Next gated stage:** M6-B first needs a frozen source-identity/clock migration contract and negative cases; only after that should it attempt genuine Godot 4.7.2 readback, effect, independent Core Proof and two-cut recovery under the same third-approval semantics.
