@@ -4,7 +4,7 @@
 
 ## Куда идти
 
-Канонические входы: [дорожная карта](roadmap.md), [история](history/README.md), [архитектура](system/README.md), [исследования](research/README.md), [контракт v0.1](versions/v0.1/contract.md) и [приёмка v0.1](versions/v0.1/acceptance.md). Старые пути `ROADMAP/`, `STAGES/` и `RELEASES/` пока сохранены для исторических ссылок.
+Канонические входы: [дорожная карта](roadmap.md), [история](history/README.md), [архитектура](system/README.md), [исследования](RESEARCH/README.md), [контракт v0.1](versions/v0.1/contract.md) и [приёмка v0.1](versions/v0.1/acceptance.md). Старые пути `ROADMAP/`, `STAGES/` и `RELEASES/` пока сохранены для исторических ссылок.
 
 | Вопрос | Раздел | Что там находится |
 | --- | --- | --- |
@@ -12,7 +12,7 @@
 | Как мы сюда пришли? | [История разработки](history/README.md), [Core](history/core-v0.1.md) и [Memory](history/memory-integration.md) | Stage D0–11, typed Core и параллельная интеграция после Stage 6 |
 | Как устроена система сегодня? | [Архитектура и исполняемые профили](system/README.md) | Runtime, Events/Authority, Memory, Goals/Execution, FAST/DEEP и SLEEP с кодом и профильными тестами |
 | Какие работы сейчас нужны? | [Дорожная карта](roadmap.md) | Только цель активного релиза и проверяемые действия до выпуска |
-| Какие идеи остались экспериментами? | [Исследования](research/README.md) | Memory E1–E4, VAL/M0–M6, альтернативы и не принятые гипотезы |
+| Какие идеи остались экспериментами? | [Исследования](RESEARCH/README.md) | Memory E1–E4, VAL/M0–M6, альтернативы и не принятые гипотезы |
 | Что подтверждено испытаниями? | [Тестирование](TESTING/README.md) и [отчёты TV](TESTING/Results/README.md) | Условия, сценарии, SHA, PASS/FAIL/Inconclusive и ограничения выводов |
 | Почему приняты именно такие решения? | [Архитектурные решения](DECISIONS/README.md) | ADR-001–010 и причины отказа от альтернатив |
 | Как запустить и перенести экземпляр? | [Эксплуатация](OPERATIONS/README.md) | Установка, запуск v0.1, резервирование, восстановление, проверки |
