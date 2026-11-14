@@ -4,7 +4,7 @@
 
 | Нужна информация | Канонический источник |
 |---|---|
-| Текущие этапы и зависимости | [`project.json`](project.json); читаемый [план](ROADMAP/README.md) |
+| Активный контракт релиза ANIMA v0.1 | [Граница релиза и приёмочные gates](RELEASES/ANIMA_v0_1_Release_Contract.md) — пока OPEN |\n| Текущие этапы и зависимости | [`project.json`](project.json); читаемый [план](ROADMAP/README.md) |
 | Что реально реализовано | [Архитектура](ARCHITECTURE/README.md) |
 | Зачем приняты решения | [ADR](DECISIONS/README.md) |
 | Как запускать, проверять и восстанавливать | [Эксплуатация](OPERATIONS/README.md) и [тестирование](TESTING/README.md) |
