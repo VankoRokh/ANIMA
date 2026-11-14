@@ -242,6 +242,25 @@ class M6B1Migration:
             saved["target"]["world_instance_id"], saved["target"]["epoch"],
         ):
             raise ValueError("M6-B1 target Godot instance/epoch changed")
+        initial = saved["target"]
+        with closing(sqlite3.connect(self.port.database_file)) as db:
+            old = db.execute(
+                """SELECT instance_id,lab_observation_id,epoch,world_tick,
+                          world_revision,payload_json FROM sample_log
+                   WHERE sample_seq=?""",
+                (initial["lab_sample"],),
+            ).fetchone()
+        if old is None:
+            raise ValueError("M6-B1 original target sample missing")
+        ident, obs_id, epoch, tick, revision, payload = old
+        if (ident != initial["world_instance_id"]
+                or obs_id != initial["godot_observation_id"]
+                or epoch != initial["epoch"]
+                or tick != initial["world_tick"]
+                or revision != initial["world_revision"]
+                or _sha(json.loads(payload)) != initial["raw_godot_sha256"]
+                or initial["adapter_occurrence_id"] != f"p6:{ident}:{obs_id}"):
+            raise ValueError("M6-B1 original raw Godot provenance changed")
         return saved
 
     def stage(self, m5_ticket_id):
