@@ -21,7 +21,7 @@ from pathlib import Path
 from anima.release_v01 import open_release
 from scripts.run_release_v01_gate import _git_snapshot, _percentile
 
-SCHEMA = "anima.v0_1.diversity_probe/0.1"
+SCHEMA = "anima.v0_1.diversity_probe/0.2"
 TOPICS = {
     "cooling": ("ambercoil", (
         "датчик температуры показал 82 градуса",
@@ -90,12 +90,14 @@ TOPICS = {
 }
 
 
-def generate_corpus(events=160, *, seed=7):
+def generate_corpus(events=160, *, seed=7, mode="plain"):
     """Воспроизводимый ряд: 8 тем, исправления, противоречия и двуязычие."""
     if type(events) is not int or not 32 <= events <= 1000:
         raise ValueError("events must be an integer between 32 and 1000")
     if type(seed) is not int or not 0 <= seed <= 1_000_000:
         raise ValueError("seed must be an integer between 0 and 1000000")
+    if mode not in {"plain", "labeled"}:
+        raise ValueError("mode must be plain or labeled")
     names = tuple(TOPICS)
     corpus = []
     for index in range(events):
@@ -103,7 +105,10 @@ def generate_corpus(events=160, *, seed=7):
         keyword, details = TOPICS[name]
         variant = (index // len(names) + seed) % len(details)
         marker = f"zzanima{index:05d}x"
-        text = f"{keyword}: {details[variant]}. Номер {index:04d}; ref {marker}."
+        if mode == "plain":
+            text = f"{keyword}: {details[variant]}. {marker}"
+        else:
+            text = f"{keyword}: {details[variant]}. Номер {index:04d}; ref {marker}."
         corpus.append({
             "number": index,
             "topic": name,
@@ -130,8 +135,8 @@ def _storage_sizes(root):
     }
 
 
-def run_probe(*, events=160, seed=7):
-    corpus = generate_corpus(events=events, seed=seed)
+def run_probe(*, events=160, seed=7, mode="plain"):
+    corpus = generate_corpus(events=events, seed=seed, mode=mode)
     snapshot = _git_snapshot()
     source_digest = sha256(
         json.dumps(corpus, ensure_ascii=False, sort_keys=True).encode("utf-8")
@@ -259,6 +264,7 @@ def run_probe(*, events=160, seed=7):
             "checkout_clean": True,
             "fixture_sha256": source_digest,
             "seed": seed,
+            "mode": mode,
             "python": platform.python_version(),
             "platform": platform.platform(),
             "machine": platform.machine(),
@@ -308,9 +314,10 @@ def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--events", type=int, default=160)
     parser.add_argument("--seed", type=int, default=7)
+    parser.add_argument("--mode", choices=("plain", "labeled"), default="plain")
     parser.add_argument("--report", type=Path)
     args = parser.parse_args(argv)
-    result = run_probe(events=args.events, seed=args.seed)
+    result = run_probe(events=args.events, seed=args.seed, mode=args.mode)
     if args.report:
         output = args.report.expanduser().resolve()
         output.parent.mkdir(parents=True, exist_ok=True)
