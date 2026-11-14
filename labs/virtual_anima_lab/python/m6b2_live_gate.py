@@ -135,13 +135,10 @@ def seed(root: Path, case: str, port: int):
 
 def _mutate(gate, case, row):
     if case == "source_modified":
-        m4 = gate.b1.m5.m4.get_ticket(
-            json.loads(gate.b1.m5.ticket(
-                json.loads(gate.b1.get(row["b1_ticket_id"])["snapshot_json"])[
-                    "m5_ticket_id"
-                ]
-            )["snapshot_json"])["m4_ticket_id"]
+        original = json.loads(
+            (gate.root / "m5_manifest.json").read_text(encoding="utf-8")
         )
+        m4 = gate.b1.m5.m4.get_ticket(original["m4_ticket_id"])
         mid = json.loads(m4["draft_json"])["memory_id"]
         gate.b1.m5.core.memory_store.update_memory(
             mid, content="M6B2_HISTORY_TAMPER_AFTER_APPROVAL",
@@ -426,7 +423,7 @@ def main(argv=None):
             recover(args.root, args.case, args.port)
         )
     else:
-        if args.root or args.port or args.case and args.phase != "main":
+        if args.root is not None or args.port is not None:
             p.error("worker arguments are internal")
         binary = args.godot.expanduser().resolve()
         if not binary.is_file():
