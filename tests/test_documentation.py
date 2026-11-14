@@ -157,7 +157,7 @@ def test_research_catalog_preserves_negative_evidence(repo):
     assert "10/10" in virtual
     assert "true_sigkill_tested=false" in virtual
     assert "operator_authenticated=false" in virtual
-    assert "первичным CI-отчётом" in virtual or "первичном CI report" in virtual
+    assert "опубликованном CI report" in virtual and "владельческого ноутбука" in virtual
 
     legacy = (repo / "docs/RESEARCH/README.md").read_text()
     assert "../research/README.md" in legacy
