@@ -179,6 +179,14 @@ def _release_configuration(root: Path, sandbox_door: bool):
         if json.loads(path.read_text(encoding="utf-8")) != profile:
             raise RuntimeError("Release capability profile mismatch; migration required")
     else:
+        # Never adopt a lab/legacy instance by silently changing its trusted
+        # source and action registries. Only the freshly created lock is allowed.
+        other = [entry for entry in root.iterdir() if entry.name != ".anima-v01.lock"]
+        if other:
+            raise RuntimeError(
+                "Unlabelled nonempty instance directory; use a fresh v0.1 path "
+                "or an explicit future migration"
+            )
         with path.open("x", encoding="utf-8") as stream:
             json.dump(profile, stream, sort_keys=True)
             stream.write("\n")
