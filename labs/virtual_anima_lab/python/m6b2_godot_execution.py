@@ -297,8 +297,25 @@ class M6B2Admission:
             raise ValueError("M6-B2 frozen execution ticket changed")
         self._history(saved, active=active)
         target = self._target()
-        if target.decision._binding(saved["goal_id"]) is None:
-            raise ValueError("M6-B2 target P3-A binding missing")
+        bound = target.decision._binding(saved["goal_id"])
+        if (bound is None or bound["mode"] != CRITERION["mode"]
+                or bound["criterion_kind"] != CRITERION["kind"]
+                or bound["subject_ref"] != DOOR_SUBJECT
+                or bound["predicate_ref"] != DOOR_PREDICATE
+                or bound["expected_json"] != _canon(CRITERION["expected"])):
+            raise ValueError("M6-B2 target P3-A binding changed")
+        with closing(sqlite3.connect(self.port.database_file)) as db:
+            stored = db.execute(
+                "SELECT payload_json,instance_id,epoch,world_revision "
+                "FROM sample_log WHERE sample_seq=?",
+                (saved["admission_sample"]["lab_sample"],),
+            ).fetchone()
+        if (stored is None or _sha(json.loads(stored[0]))
+                != saved["admission_sample"]["sample_hash"]
+                or stored[1] != saved["world"]["world_instance_id"]
+                or stored[2] != saved["world"]["epoch"]
+                or stored[3] != saved["world"]["world_revision"]):
+            raise ValueError("M6-B2 original P6 sample ledger changed")
         original = target.ingress.get_event(saved["admission_sample"]["event_id"])
         if (original is None or original["content_sha256"]
                 != saved["admission_sample"]["content_sha256"]
@@ -477,6 +494,11 @@ class M6B2Admission:
                 or action.to_dict()["arguments"] != {"subject_ref": DOOR_SUBJECT}
                 or spec.goal_id != saved["goal_id"]
                 or spec.criterion_kind != "world.property_equals"
+                or dict(spec.parameters) != {
+                    "subject_ref": DOOR_SUBJECT,
+                    "predicate_ref": DOOR_PREDICATE,
+                    "expected": {"type": "symbol", "value": "closed"},
+                }
                 or task is None or task.status != "active"
                 or task.goal_id != saved["goal_id"]):
             raise ValueError("M6-B2 operation/Task/VerificationSpec mismatch")
