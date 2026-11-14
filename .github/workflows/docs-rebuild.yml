@@ -4,7 +4,6 @@ on:
   push:
     branches:
       - work/anima-v01-documentation-rebuild
-      - work/anima-documentation-migration-v2
   pull_request:
     branches:
       - release/v0.1
@@ -39,3 +38,18 @@ jobs:
       - name: Полная регрессия на Python 3.14
         if: matrix.python-version == '3.14'
         run: python -m pytest -q
+      - name: Функциональный gate v0.1 / 128 событий (не SLO)
+        run: |
+          python -m scripts.run_release_v01_gate --events 128 \
+            --report "${{ runner.temp }}/anima-v01-docsmigration.json"
+      - name: Сохранить первичный JSON gate
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: anima-v01-docsmigration-${{ matrix.python-version }}
+          if-no-files-found: warn
+          path: ${{ runner.temp }}/anima-v01-docsmigration.json
+      - name: Проверить изменения PR на whitespace
+        if: github.event_name == 'pull_request'
+        run: git diff --check HEAD^ HEAD
+
