@@ -253,6 +253,64 @@ def test_m6b2_guard_needs_real_persisted_operation(tmp_path, fake_val):
     assert _read(gate.port)["effect_operations"] == []
 
 
+
+def test_m6b2_rejects_replaced_godot_instance(tmp_path, fake_val):
+    gate, origin = _fixture(tmp_path)
+    row = gate.stage(origin["ticket_id"])
+    gate.decide(_decision(row))
+    changed = _read(gate.port)
+    changed["instance"] = "b" * 32
+    _write(gate.port, changed)
+    with pytest.raises(ValueError, match="instance|epoch|changed"):
+        gate.assemble(row["ticket_id"])
+    assert _read(gate.port)["effect_operations"] == []
+
+
+def test_m6b2_replayed_sample_is_not_fresh(tmp_path, fake_val, monkeypatch):
+    gate, origin = _fixture(tmp_path)
+    row = gate.stage(origin["ticket_id"])
+    gate.decide(_decision(row))
+    previous = json.loads(row["snapshot_json"])["admission_sample"]["lab_sample"]
+    monkeypatch.setattr(
+        VALDoorPort, "sense", lambda _: ({"unused": "replay"}, previous),
+    )
+    with pytest.raises(ValueError, match="stale Godot sample"):
+        gate.assemble(row["ticket_id"])
+    assert _read(gate.port)["effect_operations"] == []
+
+
+@pytest.mark.skipif(
+    "fork" not in multiprocessing.get_all_start_methods(),
+    reason="simulated subprocess transport fixture requires POSIX fork",
+)
+def test_m6b2_lying_tool_receipt_never_completes_goal(
+    tmp_path, fake_val, monkeypatch,
+):
+    gate, origin = _fixture(tmp_path)
+    row = gate.stage(origin["ticket_id"])
+    gate.decide(_decision(row))
+    target = gate.assemble(row["ticket_id"])
+    # Worker reports success but does NOT change the independent fake world.
+    monkeypatch.setattr(
+        VALDoorPort, "execute",
+        lambda self, root, args, operation_id, **pins: {
+            "operation_id": operation_id, "applied": True,
+        },
+    )
+    turn = gate.execute_approved(row["ticket_id"], target)
+    assert turn.outcome == "UNVERIFIED"
+    assert len(_read(gate.port)["effect_operations"]) == 0
+    assert gate.b1.m5.core.internal_state.goals.get_goal(row["goal_id"])["status"] == "active"
+    assert gate.get(row["ticket_id"])["status"] == "claimed"
+    assert len(target.operations.list_operations()) == 1
+    # The claimed permit cannot run a second tool even when the first lies.
+    recovered = M6B2Admission.reopen(tmp_path, port_num=gate.port.port)
+    again = recovered.execute_approved(
+        row["ticket_id"], recovered.assemble(row["ticket_id"]),
+    )
+    assert again.outcome != "VERIFIED_SUCCESS"
+    assert len(_read(gate.port)["effect_operations"]) == 0
+
 def test_m6b2_rejects_changed_world_revision_pre_effect(tmp_path, fake_val):
     gate, origin = _fixture(tmp_path)
     row = gate.stage(origin["ticket_id"])
