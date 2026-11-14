@@ -26,6 +26,8 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
+from scripts.workspace_paths import models_root, llama_server_binary
+
 from anima.cognition import CognitivePipeline, FastResult
 from anima.cognition.fast_llm import FastLLMBackend, FastLLMTransportError, LlamaCppFastTransport
 from anima.core.event_bus import Event
@@ -310,8 +312,8 @@ def _sha256(path):
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--base-url", default="http://127.0.0.1:8080")
-    parser.add_argument("--server-binary", type=Path, default=Path.home()/"Projects/llama.cpp/build/bin/llama-server")
-    parser.add_argument("--model-file", type=Path, default=Path.home()/"Projects/models/qwen3-0.6b/Qwen3-0.6B-Q8_0.gguf")
+    parser.add_argument("--server-binary", type=Path, default=llama_server_binary())
+    parser.add_argument("--model-file", type=Path, default=models_root() / "qwen3-0.6b/Qwen3-0.6B-Q8_0.gguf")
     parser.add_argument("--timeout", type=float, default=30.0)
     parser.add_argument("--startup-timeout", type=float, default=60.0)
     parser.add_argument("--output", type=Path, default=ROOT/".benchmarks/stage5-projected-smoke"/

@@ -24,6 +24,8 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
+from scripts.workspace_paths import models_root, llama_server_binary
+
 from anima.cognition.deep_llm import DeepLLMProfile, build_llama_cpp_deep_backend
 from anima.cognition.proposals import CognitiveDispatcher, CognitiveProposal
 from anima.cognition.routing import CognitiveDestination, CognitiveRouter
@@ -33,11 +35,8 @@ from anima.resolution import resolve
 from anima.tasks.store import TaskStore
 
 
-DEFAULT_BINARY = Path.home() / "Projects/llama.cpp/build/bin/llama-server"
-DEFAULT_MODEL = (
-    Path.home()
-    / "Projects/models/tool-benchmark/smollm3-3b/SmolLM3-Q8_0.gguf"
-)
+DEFAULT_BINARY = llama_server_binary()
+DEFAULT_MODEL = models_root() / "tool-benchmark/smollm3-3b/SmolLM3-Q8_0.gguf"
 DEFAULT_MODEL_LABEL = "SmolLM3-3B-Q8_0"
 DEFAULT_PORT = 8082
 

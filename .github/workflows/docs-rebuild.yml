@@ -4,7 +4,6 @@ on:
   push:
     branches:
       - work/anima-v01-documentation-rebuild
-      - develop
   pull_request:
     branches:
       - release/v0.1
@@ -37,6 +36,8 @@ jobs:
         run: bash scripts/check.sh
       - name: Регрессия документации
         run: python -m pytest -q tests/test_documentation.py
+      - name: Пути рабочего пространства / без моделей
+        run: python -m pytest -q tests/test_workspace_paths.py
       - name: Релизный импорт и целевые smoke-тесты
         run: python -m pytest -q tests/test_release_v01.py tests/test_release_v01_acceptance.py
       - name: Полная регрессия на Python 3.14

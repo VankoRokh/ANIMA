@@ -74,4 +74,5 @@ bash scripts/run.sh
 Run создаёт или продолжает локальный экземпляр. Его данные резервируются
 отдельно от Git. Восстановление, внешний ANIMA_DATA_DIR и наблюдение тестов —
 в [эксплуатации](docs/operations.md), [проверках](docs/verification.md) и [правилах документации](docs/documentation.md).
+Локальные модели и llama.cpp, конфигурация путей, worktree и Obsidian — [рабочее пространство](docs/workspace.md).
 Полная навигация: [документация](docs/README.md).

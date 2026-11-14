@@ -19,6 +19,8 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
+from scripts.workspace_paths import models_root, llama_server_binary
+
 from anima.cognition.deep_llm import DeepLLMProfile, build_llama_cpp_deep_backend
 from anima.cognition.fast_llm import FastLLMBackend, LlamaCppFastTransport
 from anima.cognition.proposals import ProjectedFastProposalAdapter
@@ -140,12 +142,12 @@ def main(argv=None):
     parser.add_argument(
         "--models-root",
         type=Path,
-        default=Path.home() / "Projects/models",
+        default=models_root(),
     )
     parser.add_argument(
         "--server-binary",
         type=Path,
-        default=Path.home() / "Projects/llama.cpp/build/bin/llama-server",
+        default=llama_server_binary(),
     )
     parser.add_argument("--port", type=int, default=8083)
     parser.add_argument("--timeout", type=float, default=120.0)
