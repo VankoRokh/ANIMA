@@ -23,7 +23,7 @@
 | [ARCHITECTURE](../ARCHITECTURE/README.md) | Работающие код и контракты, независимо от номера релиза |
 | [ROADMAP](../ROADMAP/README.md) | Историческая карта Stage и текущие релизные задачи |
 | [TESTING](../TESTING/README.md) | Методики, условия и источники доказательств |
-| [RESEARCH](../research/README.md) | Непринятые гипотезы и побочные эксперименты |
+| [RESEARCH](../RESEARCH/README.md) | Непринятые гипотезы и побочные эксперименты |
 | [DECISIONS](../DECISIONS/README.md) | Архитектурные решения и основания |
 | [ARCHIVE](../ARCHIVE/README.md) | Неактуальные редакции и история |
 
