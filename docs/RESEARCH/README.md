@@ -19,7 +19,7 @@
 | EXP-009 / Event Retrieval v1 | Контролируемый A/B/C/D; выбран отдельный индекс исходных Events, встроен в базовый релизный read path | [Поиск и происхождение данных](retrieval.md) |
 | Memory Encoding E1–E4 | E1 shadow PASS; E2/E3 — отдельные лабораторные границы; E4 authority/crash/scale только в изолированной лаборатории, production **NO-GO** | [Кодирование и отзыв](memory-encoding.md) |
 | Stage 7 / Semantic Boundary | Frozen read-only `classify_relation/0.1`; deterministic baseline PASS, model residual Inconclusive | [Семантика](semantics.md) |
-| VAL / Godot, P5/P6, M0–M6-B2 | Изолированные и live проверки; M6-B2 10/10 CI, не весь Stage 8 или релиз | [Виртуальная среда и интеграции](virtual-world.md) |
+| VAL / Godot, P5/P6, M0–M6-B2 | Изолированные и live проверки; M6-B2 10/10 CI и 10/10 отдельный ноутбучный JSON; не весь Stage 8 или релиз | [Виртуальная среда и интеграции](virtual-world.md) |
 | Core P0–P6 и аудит B1–B4 | Исправления и независимые ограничения; исторический путь реализации | [История Core](../history/core-v0.1.md) |
 | Pi, FAST/DEEP/SLEEP, perception, метапамять | Отдельные пробы и будущие варианты; не навязаны Foundation | [Аппаратные и дальнейшие направления](future-directions.md) |
 
