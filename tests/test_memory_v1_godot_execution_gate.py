@@ -261,7 +261,7 @@ def test_m6b2_rejects_replaced_godot_instance(tmp_path, fake_val):
     changed = _read(gate.port)
     changed["instance"] = "b" * 32
     _write(gate.port, changed)
-    with pytest.raises(ValueError, match="instance|epoch|changed"):
+    with pytest.raises(ValueError, match="instance|epoch|changed|replaced"):
         gate.assemble(row["ticket_id"])
     assert _read(gate.port)["effect_operations"] == []
 
