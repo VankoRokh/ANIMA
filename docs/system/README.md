@@ -67,7 +67,7 @@ stdin JSONL → release_v01.serve → ReleaseSession.handle("report")
 | Слой | Что здесь объясняется | Код и профильная проверка |
 | --- | --- | --- |
 | [Runtime](runtime.md) | Композиция, Identity, State, запуск, storage и жизненный цикл | [assembly.py](../../anima/core/assembly.py), [test_runtime.py](../../tests/test_runtime.py) |
-| [Events и полномочия](events-and-authority.md) | Raw Event, typed observation, outbox, Belief, источник истины | [ingress.py](../../anima/core/ingress.py), [test_core_ingress.py](../../tests/test_core_ingress.py) |
+| [Events и полномочия](events-and-authority.md) | Raw Event, typed observation, outbox, Belief, источник истины | [ingress.py](../../anima/core/ingress.py), [test_core_audit_blockers.py](../../tests/test_core_audit_blockers.py) |
 | [Memory и Retrieval](memory-and-retrieval.md) | Первичные источники, Memory/Knowledge, два пути чтения | [event_retrieval.py](../../anima/memory/event_retrieval.py), [test_event_retrieval.py](../../tests/test_event_retrieval.py) |
 | [Goals и Execution](goals-and-execution.md) | Goal, Task, Policy, допуск, эффект, Verification, recovery | [door_execution.py](../../anima/core/door_execution.py), [test_release_v01.py](../../tests/test_release_v01.py) |
 | [Cognition](cognition.md) | Canonical IR, Resolver, FAST/DEEP, Choice и предложения | [routing.py](../../anima/cognition/routing.py), [test_cognitive_routing.py](../../tests/test_cognitive_routing.py) |
