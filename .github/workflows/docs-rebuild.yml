@@ -1,10 +1,10 @@
-name: Проверка перестроенной документации ANIMA
+name: ANIMA v0.1 — документация и регрессия R-09
 
 on:
   push:
     branches:
-      - work/anima-v01-documentation-rebuild
-      - work/anima-v01-r08-diversity
+      - develop
+      - release/v0.1
   pull_request:
     branches:
       - release/v0.1
@@ -13,14 +13,14 @@ on:
   workflow_dispatch:
 
 concurrency:
-  group: docs-v01-${{ github.head_ref || github.ref_name }}
+  group: v01-r09-${{ github.event_name }}-${{ github.head_ref || github.ref_name }}
   cancel-in-progress: true
 
 jobs:
   docs-validation:
     name: Документация / Python ${{ matrix.python-version }}
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 20
     strategy:
       fail-fast: false
       matrix:
@@ -33,6 +33,11 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
       - run: python -m pip install -r requirements-dev.txt
+      - name: Git SHA и чистое рабочее дерево
+        run: |
+          git rev-parse HEAD
+          git status --short --branch
+          test -z "$(git status --porcelain=v1 --untracked-files=all)"
       - name: Ссылки, якоря, доступность, генерация и синтаксис
         run: bash scripts/check.sh
       - name: Регрессия документации
@@ -43,13 +48,12 @@ jobs:
         run: python -m pytest -q tests/test_release_v01_diversity_probe.py
       - name: Релизный импорт и целевые smoke-тесты
         run: python -m pytest -q tests/test_release_v01.py tests/test_release_v01_acceptance.py
-      - name: Полная регрессия на Python 3.14
-        if: matrix.python-version == '3.14'
+      - name: R-09 / полный pytest на каждой версии Python
         run: python -m pytest -q
       - name: Функциональный gate v0.1 / 128 событий (не SLO)
         run: |
           python -m scripts.run_release_v01_gate --events 128 \
-            --report "${{ runner.temp }}/anima-v01-docsmigration.json"
+            --report "${{ runner.temp }}/anima-v01-release-gate.json"
       - name: R-08 / разнородные события без служебной разметки
         run: |
           python -m scripts.run_release_v01_diversity_probe --events 160 --seed 7 --mode plain \
@@ -71,9 +75,9 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: anima-v01-docsmigration-${{ matrix.python-version }}
+          name: anima-v01-release-gate-${{ matrix.python-version }}
           if-no-files-found: warn
-          path: ${{ runner.temp }}/anima-v01-docsmigration.json
+          path: ${{ runner.temp }}/anima-v01-release-gate.json
       - name: Проверить изменения PR на whitespace
         if: github.event_name == 'pull_request'
         run: git diff --check HEAD^ HEAD
