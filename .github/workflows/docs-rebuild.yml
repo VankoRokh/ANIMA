@@ -5,6 +5,7 @@ on:
     branches:
       - develop
       - release/v0.1
+      - work/anima-v01-final-acceptance
   pull_request:
     branches:
       - release/v0.1
