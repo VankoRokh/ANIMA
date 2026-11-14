@@ -73,5 +73,5 @@ bash scripts/run.sh
 
 Run создаёт или продолжает локальный экземпляр. Его данные резервируются
 отдельно от Git. Восстановление, внешний ANIMA_DATA_DIR и наблюдение тестов —
-в [Operations](docs/OPERATIONS/README.md) и [Testing](docs/TESTING/README.md).
+в [эксплуатации](docs/operations.md), [проверках](docs/verification.md) и [правилах документации](docs/documentation.md).
 Полная навигация: [документация](docs/README.md).
