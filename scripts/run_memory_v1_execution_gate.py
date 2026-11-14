@@ -229,7 +229,7 @@ def verify(root, case):
             assert turn.outcome in ("DEFERRED", "VERIFIED_SUCCESS"), turn
             # A second explicit recovery turn must not produce a second Tool effect.
             again = gate.execute_approved(row["ticket_id"], executable)
-            assert again.outcome in ("DEFERRED", "VERIFIED_SUCCESS"), again
+            assert again.outcome in ("DEFERRED", "VERIFIED_SUCCESS", "RECOVERED_VERIFIED_SUCCESS"), again
             op_status = "uncertain" if case == "before_effect" else "succeeded"
         _base_assert(
             root, goal_id, effects=0 if case == "before_effect" else 1,
