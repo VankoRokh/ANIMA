@@ -13,6 +13,16 @@ def test_diverse_corpus_is_reproducible_and_all_topics_present():
     first = generate_corpus(events=64, seed=7)
     assert first == generate_corpus(events=64, seed=7)
     assert first != generate_corpus(events=64, seed=9)
+    labeled = generate_corpus(events=64, seed=7, mode="labeled")
+    assert labeled != first
+    assert [row["marker"] for row in labeled] == [
+        row["marker"] for row in first
+    ]
+    assert [row["topic"] for row in labeled] == [
+        row["topic"] for row in first
+    ]
+    assert all("Номер " not in row["text"] for row in first)
+    assert all("Номер " in row["text"] for row in labeled)
     assert len(first) == 64
     assert set(row["topic"] for row in first) == set(TOPICS)
     assert len(set(row["marker"] for row in first)) == 64
@@ -33,8 +43,10 @@ def test_seed_is_bounded(seed):
         generate_corpus(events=32, seed=seed)
 
 
-def test_diverse_ingestion_reopen_search_and_raw_diagnostic_report():
-    result = run_probe(events=32, seed=7)
+@pytest.mark.parametrize("mode", ["plain", "labeled"])
+def test_diverse_ingestion_reopen_search_and_raw_diagnostic_report(mode):
+    result = run_probe(events=32, seed=7, mode=mode)
+    assert result["mode"] == mode
     assert result["integrity_status"] == "PASS"
     assert result["semantic_quality_status"] == "NOT_SCORED"
     assert result["performance_status"] == "MEASURED_NOT_SLO_GATED"
@@ -60,3 +72,8 @@ def test_diverse_ingestion_reopen_search_and_raw_diagnostic_report():
             and item["record"]["payload"]["text"] == row["original_text"]
             for item in row["raw_search_response"]["results"]
         )
+
+
+def test_invalid_corpus_mode_rejected():
+    with pytest.raises(ValueError, match="mode"):
+        generate_corpus(events=32, mode="unknown")
