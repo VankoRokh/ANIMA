@@ -157,7 +157,9 @@ def test_research_catalog_preserves_negative_evidence(repo):
     assert "10/10" in virtual
     assert "true_sigkill_tested=false" in virtual
     assert "operator_authenticated=false" in virtual
-    assert "опубликованном CI report" in virtual and "владельческого ноутбука" in virtual
+    assert "anima-m6b2-PC-20261114-172243.json" in virtual
+    assert "7465684725551188215a932dca6c42f98250c7d4" in virtual
+    assert "10/10" in virtual and "world_effect_total=2" in virtual
 
     legacy = (repo / "docs/RESEARCH/legacy-index.md").read_text()
     assert "## Отдельные направления" in legacy
