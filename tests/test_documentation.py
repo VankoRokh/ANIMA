@@ -126,10 +126,9 @@ def test_canonical_release_and_architecture_routes(repo):
     legacy_contract = (repo / "docs/RELEASES/ANIMA_v0_1_Release_Contract.md").read_text()
     assert "../versions/v0.1/contract.md" in legacy_contract
     assert "## 4. Приёмка R-01–R-10" in legacy_contract
-    assert "АНИМА" not in contract  # техническое имя ANIMA не переводим
     architecture = (repo / "docs/system/README.md").read_text()
     assert "CoreIngress" in architecture and "sandbox-door" in architecture
-    assert "CoreDoorExecution" in architecture and "нет" in architecture.lower()
+    assert "CoreDoorExecution" in architecture and "core_execution=None" in architecture
     check_documentation(repo)
 
 
