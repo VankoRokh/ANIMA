@@ -167,6 +167,47 @@ def test_research_catalog_preserves_negative_evidence(repo):
     check_documentation(repo)
 
 
+
+def test_operations_verification_and_documentation_routes(repo):
+    home = (repo / "docs/README.md").read_text()
+    for name in ("operations.md", "verification.md", "documentation.md"):
+        assert f"({name})" in home
+
+    operations = (repo / "docs/operations.md").read_text()
+    assert 'release_profile.json' in operations
+    assert 'memory.db' in operations
+    assert '--sandbox-door' in operations
+    assert 'instance.tar.gz.sha256' in operations
+    assert 'sha256sum -c' in operations
+    assert 'Runtime.sleep()' in operations
+
+    legacy = (repo / "docs/OPERATIONS/README.md").read_text()
+    assert '../operations.md#резервное-копирование-v01' in legacy
+    assert 'memories.jsonl' in legacy  # Historical warning, not a backup prerequisite.
+    assert 'for name in state.json' not in legacy
+
+    verification = (repo / "docs/verification.md").read_text()
+    assert 'MEASURED_NOT_SLO_GATED' in verification
+    assert 'scripts.run_release_v01_gate' in verification
+    assert 'R-08' in verification and 'R-09' in verification and 'R-10' in verification
+
+    rules = (repo / "docs/documentation.md").read_text()
+    assert 'AUTO:roadmap:START/END' in rules
+    assert 'AUTO:results:START/END' in rules
+    assert 'RESEARCH/' in rules
+    check_documentation(repo)
+
+
+def test_case_only_documentation_paths_are_rejected(repo):
+    lower = repo / "docs/research"
+    if lower.exists():
+        pytest.skip("Case-insensitive filesystem cannot create distinct path")
+    lower.mkdir()
+    (lower / "collision.md").write_text("# Коллизия путей\n")
+    with pytest.raises(RuntimeError, match="Case-only documentation path collision"):
+        check_documentation(repo)
+
+
 def test_incomplete_report_is_rejected(repo):
     report = repo / "docs/TESTING/Results/TV-0001.md"
     report.write_text(report.read_text().replace("## Не доказано", "## Потерянный раздел"))
