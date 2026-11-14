@@ -2,7 +2,7 @@
 
 ## ANIMA v0.1 Integrated — M6-B1 real Godot source migration preflight (no executor)
 
-[M6-B1 contract](Memory_v1_Integrated_Godot_Migration_M6B1_v0.md): не переносим старые полномочия M5/M6-A на Godot автоматически. Вместо этого принимаем реальные P6/Godot наблюдения через `VALDoorPort` с исходными `source/producer/clock`, фиксируем `world_instance_id`, `epoch`, `world_revision`, `lab_sample` и их сравнение с исходной M5 lineage. Отдельное явное `APPROVE` в lab-host разрешает **только revalidation mapping**, не действие. [Код](../../labs/virtual_anima_lab/python/m6b1_godot_migration.py), [live Godot gate](../../labs/virtual_anima_lab/python/m6b1_live_gate.py), [negative tests](../../tests/test_memory_v1_godot_migration_gate.py). B1 не изменяет P2/Core и не создаёт исполнительного интерфейса, B2 — отдельный будущий gate на изоляцию P2 и разрешённый эффект.
+[M6-B1 contract](Memory_v1_Integrated_Godot_Migration_M6B1_v0.md): не переносим старые полномочия M5/M6-A на Godot автоматически. Вместо этого принимаем реальные P6/Godot наблюдения через `VALDoorPort` с исходными `source/producer/clock`, фиксируем `world_instance_id`, `epoch`, `world_revision`, `lab_sample` и их сравнение с исходной M5 lineage. Отдельное явное `APPROVE` в lab-host разрешает **только revalidation mapping**, не действие. Модуль `labs/virtual_anima_lab/python/m6b1_godot_migration.py`, live Godot gate `labs/virtual_anima_lab/python/m6b1_live_gate.py`, [negative tests](../../tests/test_memory_v1_godot_migration_gate.py). B1 не изменяет P2/Core и не создаёт исполнительного интерфейса, B2 — отдельный будущий gate на изоляцию P2 и разрешённый эффект.
 
 ## ANIMA v0.1 Integrated — M6-A single-use execution admission (same M5 source)
 
