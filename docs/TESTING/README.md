@@ -1,5 +1,9 @@
 # Проверки и наблюдение
 
+## ANIMA v0.1 Integrated — M6-B1 real Godot source migration preflight (no executor)
+
+[M6-B1 contract](Memory_v1_Integrated_Godot_Migration_M6B1_v0.md): не переносим старые полномочия M5/M6-A на Godot автоматически. Вместо этого принимаем реальные P6/Godot наблюдения через `VALDoorPort` с исходными `source/producer/clock`, фиксируем `world_instance_id`, `epoch`, `world_revision`, `lab_sample` и их сравнение с исходной M5 lineage. Отдельное явное `APPROVE` в lab-host разрешает **только revalidation mapping**, не действие. [Код](../../labs/virtual_anima_lab/python/m6b1_godot_migration.py), [live Godot gate](../../labs/virtual_anima_lab/python/m6b1_live_gate.py), [negative tests](../../tests/test_memory_v1_godot_migration_gate.py). B1 не изменяет P2/Core и не создаёт исполнительного интерфейса, B2 — отдельный будущий gate на изоляцию P2 и разрешённый эффект.
+
 ## ANIMA v0.1 Integrated — M6-A single-use execution admission (same M5 source)
 
 [M6-A-контракт](Memory_v1_Integrated_Execution_Admission_M6A_v0.md): отдельное host-разрешение на **одну** реальную операцию проверяется до сборки исполнительного Core и повторно в самом Tool handler. Данные исходных M4/M5 Goal/Memory/Belief/ActionSpec валидируются повторно; M6-токен потребляется атомарно до эффекта; отдельный Core sensor Proof подтверждает результат. Экспериментальная сборка без P3-C использует оригинальные `virtual_door` source/producer и `lab_tick` — **не** Godot. Код: `labs/virtual_anima_lab/python/m6_execution_admission.py`, отдельный [M6-runner](../../scripts/run_memory_v1_execution_gate.py), [отрицательные тесты](../../tests/test_memory_v1_execution_gate.py). Прямой `build_core` за пределами этого лабораторного пути остаётся обходом: production firewall не реализован. M6-B Godot потребует нового, явно проверенного контракта migration (`lab_tick`→`lab_sample`, `virtual_door`→`VALDoorPort`). Никаких изменений в production `anima/`.
