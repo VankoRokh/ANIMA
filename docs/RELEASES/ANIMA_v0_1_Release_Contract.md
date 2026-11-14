@@ -19,6 +19,30 @@ Core owns all source registration, decision/admission, Goal/Task status and veri
 
 Pluggable FAST/DEEP/SLEEP facilities already present remain supported at their current tested contracts. Further model work, consolidation, meta-memory, graph databases, vector embeddings and sensor/peripheral modules are **not release blockers**.
 
+### Current implementation slice (not yet a release)
+
+The first runnable local entry point is:
+
+```bash
+python -m anima.release_v01 --data-dir /tmp/anima-v01-instance
+```
+
+It accepts **one JSON object per line** on stdin, for example:
+
+```json
+{"op":"report","text":"Unit ambercoil earlier reading 82 C"}
+{"op":"search_events","query":"ambercoil"}
+{"op":"context","query":"ambercoil"}
+{"op":"status"}
+{"op":"stop"}
+```
+
+`context` is a bounded, read-only Memory projection, **not** a model answer or confirmed truth. `search_events` requires a complete authoritative index and fails closed otherwise. Invalid commands do not grant sensor, Goal or Tool authority. The local process has a POSIX advisory single-writer lock; this is not a security sandbox against malicious local code. A fresh directory is required; adopting lab or legacy storage without a migration is refused.
+
+For **optional local Core execution acceptance only**, use a separate fresh data directory with `--sandbox-door`; its capability profile is pinned on disk. The sole extra request is `{"op":"ensure_sandbox_door_closed"}`. This operates on a local deterministic SQLite fixture; it is not Godot or physical actuation, and local operator identity is not authenticated.
+
+The old `scripts/run.sh` / `main.py` CLI remains unchanged during the transition. R-01–R-10 are not declared passed until the combined release acceptance and measured workload are complete.
+
 ## 3. Release acceptance matrix
 
 | Gate | Required result | Evidence |
