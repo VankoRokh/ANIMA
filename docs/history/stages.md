@@ -105,4 +105,6 @@
 
 Развитие **разветвилось**: typed Core v0.1 (P0–P6 и исправления B1–B4), read-only Stage 7, VAL/Godot, экспериментальная Memory (EXP-009, E1–E4, M0–M6-B2) и отдельная сборка `ANIMA v0.1 Foundation`. Это самостоятельные линии доказательств, не последовательное закрытие Stage 7→8→9.
 
+Подробные переходы после Stage 6: [typed Core, независимые проверки и P6](core-v0.1.md); [Memory Integration и M0–M6-B2](memory-integration.md).
+
 Актуальный состав выпуска см. в [контракте v0.1](../RELEASES/ANIMA_v0_1_Release_Contract.md), [карточке приёмки](../versions/v0.1/acceptance.md) и [дорожной карте](../roadmap.md). Первичные результаты доступны в [реестре TV](../TESTING/Results/README.md) и [лабораторных отчётах](../TESTING/Laboratory_Integrations.md).
