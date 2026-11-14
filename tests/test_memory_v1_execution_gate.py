@@ -106,7 +106,7 @@ def test_m6_rejects_unauthorized_or_noncanonical_direct_handler(tmp_path):
     with pytest.raises(SandboxToolError):
         handler(tmp_path/"world", {"subject_ref": DOOR_SUBJECT}, "xop_" + "0"*36)
     gate.decide(_receipt(ticket, "bad-operation"))
-    with pytest.raises(SandboxToolError, match=""):
+    with pytest.raises(SandboxToolError):
         handler(tmp_path/"world", {"subject_ref": DOOR_SUBJECT}, "xop_" + "0"*36)
     assert gate.ticket(ticket["ticket_id"])["status"] == "approved"
     assert _effects(tmp_path) == 0
