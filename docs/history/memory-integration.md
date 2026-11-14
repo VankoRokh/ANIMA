@@ -35,9 +35,9 @@ Stage 1 создал `EventLog`, SQLite `MemoryStore`, `LinkStore`, эпизод
 | M5 | Отдельный binding approval и новое зарегистрированное наблюдение | Исполнительный модуль |
 | M6-A | Третье разрешение и одноразовый эффект старого тестового мира | Перенос capability в Godot |
 | M6-B1 | New Godot lineage, `source/producer/epoch/revision`, явный mapping approval | Права на действие; 8/8 live, ноль эффектов |
-| M6-B2 | Независимые target P2/P3-A и конкретная Godot operation | Глобальный firewall; CI 10/10, локальный gate не подтверждён первичным CI-отчётом, `true_sigkill_tested=false` |
+| M6-B2 | Независимые target P2/P3-A и конкретная Godot operation | CI **10/10** на `318bb7f…` и отдельный пользовательский JSON **10/10** на `7465684…` (ноутбук Python 3.14.4 / Godot 4.7.2); `true_sigkill_tested=false`, нет production firewall |
 
-Для M6-B2 [первичный CI-отчёт](../TESTING/Memory_v1_Integrated_Godot_Execution_M6B2_CI_Result_v0.md) подтверждает 10/10 **в GitHub Actions**, но прямо исключает локальную приёмку ноутбука на том же SHA. Если владельцем был выполнен иной локальный gate, его результат нуждается в отдельной исходной записи, прежде чем он попадёт в таблицу.
+Для M6-B2 [первичный CI-отчёт](../TESTING/Memory_v1_Integrated_Godot_Execution_M6B2_CI_Result_v0.md) подтверждает **10/10 в GitHub Actions** на `318bb7f7228dccad07502a21f38de04a9d457afd`. Отдельный исходный файл владельца `anima-m6b2-PC-20261114-172243.json` подтверждает **10/10 локально** на commit `7465684725551188215a932dca6c42f98250c7d4`, Python 3.14.4, Godot 4.7.2, `world_effect_total=2`. JSON доступен в личной Library владельца, **не в Git-дереве**, поэтому для внешнего читателя это свидетельство, представленное владельцем, а не воспроизведённый независимый прогон. Подлинная аутентификация, production firewall, произвольный SIGKILL, power loss и Pi **не доказаны**.
 
 Исходные протоколы и фактические ограничения сохранены в [архивной сводке интеграций](../TESTING/Laboratory_Integrations.md) и отчётах по каждому M-срезу. Отдельные approval, source authority и readback — системные, не производные из свободного текста.
 
