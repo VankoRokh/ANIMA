@@ -31,13 +31,12 @@ def edit_project(repo, change):
 def test_generation_is_idempotent_and_preserves_human_text(repo):
     readme = repo / "README.md"
     readme.write_text(readme.read_text() + "\nРучная заметка владельца.\n")
-    edit_project(repo, lambda p: p.update(focus="Новая текущая работа."))
-    state = repo / "anima/core/state.py"
-    state.write_text(state.read_text().replace('"00.1-alpha"', '"00.2-test"'))
+    edit_project(repo, lambda p: p["stages"][0].update(outcome="Новая историческая запись."))
 
-    assert update(repo) == 2
-    assert "Новая текущая работа." in readme.read_text()
-    assert "00.2-test" in readme.read_text()
+    assert update(repo) == 1
+    assert "Новая историческая запись." in (repo / "docs/history/stages.md").read_text()
+    assert "Новая историческая запись." not in readme.read_text()
+    assert "Текущий фокус: **7" not in readme.read_text()
     assert readme.read_text().endswith("Ручная заметка владельца.\n")
     snapshot = {p: (repo / p).read_bytes() for p in BLOCKS}
     assert update(repo) == 0
@@ -46,7 +45,7 @@ def test_generation_is_idempotent_and_preserves_human_text(repo):
 
 
 def test_stale_check_is_read_only(repo):
-    edit_project(repo, lambda p: p.update(focus="Другой фокус."))
+    edit_project(repo, lambda p: p["stages"][0].update(outcome="Другая история."))
     before = {p: (repo / p).read_bytes() for p in BLOCKS}
     with pytest.raises(ValueError, match="Stale generated documentation"):
         update(repo, check=True)
@@ -84,7 +83,7 @@ def test_invalid_stage_metadata_fails(repo, fault, message):
 
 
 def test_all_markers_are_validated_before_writing(repo):
-    edit_project(repo, lambda p: p.update(focus="Сводки должны измениться."))
+    edit_project(repo, lambda p: p["stages"][0].update(outcome="Изменённый итог."))
     readme = repo / "README.md"
     before = readme.read_bytes()
     results = repo / "docs/TESTING/Results/README.md"
@@ -107,6 +106,17 @@ def test_result_index_uses_report_metadata(repo):
     assert "| Failed | не записан |" in index
     check_documentation(repo)
 
+
+
+def test_results_point_to_history_not_live_roadmap(repo):
+    results = (repo / "docs/TESTING/Results/README.md").read_text()
+    assert "../../history/stages.md#stage-9" in results
+    assert "../../ROADMAP/README.md#stage-9" not in results
+    roadmap = (repo / "docs/roadmap.md").read_text()
+    assert "R-08" in roadmap and "R-10" in roadmap
+    for suffix in ("d0", "d1", *(f"stage-{n}" for n in range(12))):
+        page = (repo / "docs/ROADMAP/README.md").read_text().lower()
+        assert f"../history/stages.md#{suffix}" in page
 
 def test_incomplete_report_is_rejected(repo):
     report = repo / "docs/TESTING/Results/TV-0001.md"
