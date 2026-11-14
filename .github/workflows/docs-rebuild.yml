@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - work/anima-v01-documentation-rebuild
+      - work/anima-v01-r08-diversity
   pull_request:
     branches:
       - release/v0.1
