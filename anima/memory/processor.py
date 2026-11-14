@@ -663,7 +663,6 @@ class MemoryProcessor:
             if len(token) >= 3
             and not token.isdecimal()
             and token not in ASSOCIATION_NOISE_TOKENS
-            and not token.startswith("zzanima")
         }
 
     @staticmethod
