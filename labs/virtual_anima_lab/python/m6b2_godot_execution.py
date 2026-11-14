@@ -23,6 +23,7 @@ from anima.core.goal_decision import CoreGoalDecision, GoalCriterion
 from anima.core.ingress import CoreIngress, SourceRegistration
 from anima.execution.sandbox import SandboxExecutor
 from anima.execution.store import ExecutionStore
+from anima.execution.contracts import thaw
 from anima.tasks.store import TaskStore
 from labs.virtual_anima_lab.python.core_port import VALDoorPort
 from labs.virtual_anima_lab.python.contracts import (
@@ -206,8 +207,25 @@ class M6B2Admission:
         m4row = self.b1.m5.m4.get_ticket(m5_saved["m4_ticket_id"])
         if (m4row is None or m4row["status"] != "committed"
                 or m4row["fingerprint"] != m5_saved["m4_fingerprint"]
-                or m4row["goal_id"] != saved["goal_id"]):
+                or m4row["goal_id"] != saved["goal_id"]
+                or not m4row["decision_json"]):
             raise ValueError("M6-B2 M4 Goal provenance changed")
+        # M4's source review is independent of Goal lifecycle, so it must
+        # also be checked after an already-applied effect on recovery.
+        self.b1.m5.m4._ensure_fresh(m4row)
+        initial = b1_saved["target"]
+        with closing(sqlite3.connect(self.port.database_file)) as db:
+            raw_first = db.execute(
+                "SELECT payload_json,instance_id,epoch,world_revision "
+                "FROM sample_log WHERE sample_seq=?",
+                (initial["lab_sample"],),
+            ).fetchone()
+        if (raw_first is None
+                or _sha(json.loads(raw_first[0])) != initial["raw_godot_sha256"]
+                or raw_first[1] != initial["world_instance_id"]
+                or raw_first[2] != initial["epoch"]
+                or raw_first[3] != initial["world_revision"]):
+            raise ValueError("M6-B2 original B1 Godot sample changed")
         event_ref = m5_saved["sensor"]
         original = self.b1.m5.core.core_events.ingress.get_event(event_ref["event_id"])
         if original is None or original["content_sha256"] != event_ref["content_sha256"]:
@@ -494,7 +512,7 @@ class M6B2Admission:
                 or action.to_dict()["arguments"] != {"subject_ref": DOOR_SUBJECT}
                 or spec.goal_id != saved["goal_id"]
                 or spec.criterion_kind != "world.property_equals"
-                or dict(spec.parameters) != {
+                or thaw(spec.parameters) != {
                     "subject_ref": DOOR_SUBJECT,
                     "predicate_ref": DOOR_PREDICATE,
                     "expected": {"type": "symbol", "value": "closed"},
