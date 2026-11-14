@@ -1,6 +1,6 @@
-# Stage 6 — реализованный Cognitive Integration Core
+# Stage 6 — реализованное когнитивное ядро
 
-> Исторический снимок реализованной и подтверждённой архитектуры Stage 6. Динамический статус проекта хранится только в `docs/project.json`.
+> **Историческая детализация Stage 6.** Общая карта механизмов всех стадий доступна в [архитектуре](README.md), хронология — в [истории Stage](../STAGES/README.md). Статусы прошлого плана хранятся в `docs/project.json`, готовность конкретного релиза определяет [RELEASES](../RELEASES/README.md).
 
 ## Итоговый контур
 
@@ -36,7 +36,7 @@ CanonicalTask / deterministic resolution
 
 Sleep, restart recovery и persistent unified trace участвуют в том же lifecycle.
 
-## Ownership
+## Разделение полномочий
 
 Подтверждены следующие границы:
 
@@ -48,7 +48,7 @@ Sleep, restart recovery и persistent unified trace участвуют в том
 - успешный execution receipt не завершает Goal без independent Observation/Verification;
 - Stage 4 Planner/AgentRun/AgentStep не являются Stage 6 cognitive core.
 
-## Persistent Tasks
+## Постоянные задачи (Tasks)
 
 `TaskStore` хранит отдельные persistent work units в `tasks.db` с append-only transition history.
 
@@ -60,7 +60,7 @@ queued → active ↔ interrupted → completed / failed / cancelled
 
 Task может ссылаться на Goal, но не владеет Goal lifecycle и не содержит backend/planner semantics.
 
-## Coordinator, Router, FAST и DEEP
+## Координатор и маршрутизация FAST/DEEP
 
 `CognitiveCoordinator` связывает active persistent Task с одним `CanonicalTask`, вызывает authoritative deterministic resolver и возвращает только системную directive.
 
@@ -75,13 +75,13 @@ FAST и DEEP реализуют общий `CognitiveBackend` contract и воз
 
 Первый real DEEP profile — `SmolLM3-3B-Q8_0`, но модель не закодирована в DEEP role. FAST/DEEP используют общий neutral llama.cpp transport; model profile заменяем без переноса system ownership.
 
-## Goals, Internal State и Choice
+## Цели, внутреннее состояние и выбор
 
 `ActionChoiceCoordinator` принимает только уже проверенный resolver-ом candidate set и существующий active Goal. Candidate IDs обязаны точно совпадать с verified remaining set.
 
 ChoiceEngine сохраняет baseline и bounded state-modified evaluation. Подтверждено причинное влияние `uncertainty` через configured information-gain/risk modifiers; Internal State не получает route/Goal authority.
 
-## Execution и independent verification
+## Исполнение и независимая проверка
 
 Stage 6 использует отдельный system execution boundary без Planner semantics.
 
@@ -105,7 +105,7 @@ VerificationResult
 GoalVerificationBridge
 ```
 
-## Sleep lifecycle
+## Жизненный цикл SLEEP
 
 Stage 3 Sleep возвращён в общий Task lifecycle без изменения его persistent contracts.
 
@@ -113,7 +113,7 @@ Stage 3 Sleep возвращён в общий Task lifecycle без измен�
 
 Sleep запрещён на unresolved execution boundary (`prepared`, `executing`, `uncertain`). После wake Task возвращается в `active`; completed/committed side effect не повторяется из-за sleep/wake.
 
-## Recovery и unified trace
+## Восстановление и единый причинный журнал
 
 `UnifiedTraceStore` (`trace.db`) сохраняет причинную последовательность Stage 6, но не владеет system state.
 
@@ -143,7 +143,7 @@ succeeded  → succeeded
 
 Committed `succeeded` effect не откатывается и не исполняется повторно.
 
-## Mini experiments 6.7
+## Мини-эксперименты 6.7
 
 Stage 6 не включил экспериментальные механизмы автоматически.
 
@@ -153,7 +153,7 @@ Stage 6 не включил экспериментальные механизм�
 
 Production flags после экспериментов не изменены.
 
-## Final acceptance 6.8
+## Итоговая приёмка 6.8
 
 Финальный controlled-restart scenario подтвердил единый lifecycle:
 
