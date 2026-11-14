@@ -50,6 +50,12 @@ _EXP009_DOC_SOURCES = frozenset({
     Path("labs/exp009/e4_alias_lifecycle_probe.py"),
     Path("labs/exp009/e4_scale_probe.py"),
 })
+# Only the exact VAL files linked by canonical documentation are copied.
+# Keep the rest of labs/ excluded from bounded fixture snapshots.
+_VAL_DOC_SOURCES = frozenset({
+    Path("labs/virtual_anima_lab/README.md"),
+    Path("labs/virtual_anima_lab/python/core_port.py"),
+})
 
 # These are never source subdirectories, even when a filename looks like source.
 _ARTIFACT_DIRS = {"__pycache__", "node_modules", "__pypackages__", "venv", "env",
@@ -75,7 +81,7 @@ def _allowed(path):
     tokens = set(re.split(r"[_.-]+", path.name.lower()))
     if tokens & _PRIVATE_TOKENS or (path.suffix == ".json" and tokens & {"key", "keys", "token", "tokens", "auth"}):
         return False
-    if path in _EXP009_DOC_SOURCES:
+    if path in _EXP009_DOC_SOURCES or path in _VAL_DOC_SOURCES:
         return True
     if len(parts) == 1:
         return path.name in _ROOT_FILES or (path.name.startswith("requirements") and path.suffix == ".txt")
@@ -105,7 +111,7 @@ def source_manifest(root):
                 names.extend(str((Path(parent) / name).relative_to(root)) for name in files)
     # Include only existing, explicitly documented lab sources in both Git and
     # source-only modes. Keep the general lab tree excluded from source copies.
-    names.extend(str(path) for path in _EXP009_DOC_SOURCES if (root / path).is_file())
+    names.extend(str(path) for path in (_EXP009_DOC_SOURCES | _VAL_DOC_SOURCES) if (root / path).is_file())
     return tuple(sorted({path for name in names if _allowed(path := _relative(name))}))
 
 
