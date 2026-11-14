@@ -28,7 +28,9 @@
 
 [CI-отчёт M6-B2](../TESTING/Memory_v1_Integrated_Godot_Execution_M6B2_CI_Result_v0.md), **14 ноября 2026**, head SHA `318bb7f7228dccad07502a21f38de04a9d457afd`, [run 43598961064](https://github.com/VankoRokh/ANIMA/actions/runs/43598961064): **10/10 M6B2_CASE_PASS**, Godot **4.7.2**, Python **3.14.10**, `world_effect_total=2`, повторного эффекта нет. Перед эффектом `os._exit(74)` оставлял неопределённую операцию и 0 эффектов; после эффекта `os._exit(73)` восстановление сохраняло единственный эффект и отдельный sensor proof. Изменённая и затем восстановленная дверь отклонялась по `world_revision`, хотя видимое состояние совпадало.
 
-**Граница:** в опубликованном CI report `operator_authenticated=false`, `production_firewall=false`, `true_sigkill_tested=false`, `pi_tested=false`, `power_loss_tested=false`. Он **явно не подтверждает** результат владельческого ноутбука для этого exact branch — если локальный прогон существует, его надо привязать отдельно к файлу/SHA. Ветка #4 на момент отчёта была draft, а не принятый релиз.
+**Отдельное ноутбучное свидетельство владельца:** исходный `anima-m6b2-PC-20261114-172243.json` (14 ноября 2026, личная Library, вне Git-репозитория), commit `7465684725551188215a932dca6c42f98250c7d4`, Linux x86_64, Python **3.14.4**, Godot **4.7.2**. Raw JSON: `status=M6B2_GODOT_LIVE_GATE_PASS`, **10/10** `M6B2_CASE_PASS`, `world_effect_total=2`, только `normal` и `after_effect` имеют по одному эффекту. Этот локальный результат **не является** запуском CI-SHA `318bb7f…` и не объявляет Foundation, M6-B2 production или весь Stage 8 принятыми.
+
+**Граница обоих свидетельств:** `operator_authenticated=false`, `production_firewall=false`, `true_sigkill_tested=false`, `pi_tested=false`, `power_loss_tested=false`. В CI отчёте отдельно перечислены `os._exit` cutpoints, но это не kernel `SIGKILL`. Исходный ноутбучный JSON доступен владельцу вне Git; внешняя воспроизводимость требует повторного прогона указанного SHA и публикации нового evidence. Ветка #4 на момент CI была draft.
 
 ## Не путать со Stage 8 и выпуском
 
