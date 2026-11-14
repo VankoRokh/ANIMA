@@ -9,6 +9,11 @@ on:
       - work/anima-v01-integrated-m6b2
   workflow_dispatch:
 
+
+concurrency:
+  group: anima-v01-${{ github.head_ref || github.ref_name }}
+  cancel-in-progress: true
+
 jobs:
   release-baseline:
     name: Foundation / Python ${{ matrix.python-version }}
