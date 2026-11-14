@@ -58,10 +58,15 @@ def _invariants(bridge, goal_id):
     assert core.internal_state.goals.goal_count() == 1
     assert core.internal_state.goals.get_goal(goal_id)["status"] == "active"
     assert core.core_decision.tasks.list_tasks() == []
-    # No ExecutionStore is ever opened by the preflight.
+    # M5 fixture originally built a non-running P3-B Core once; the SQLite
+    # ExecutionStore can exist but MUST contain zero operations. M6-B1 never
+    # invokes or installs its executor in this or the follow-up Core.
     with sqlite3.connect(core.memory_store.database_file) as db:
         assert db.execute("SELECT COUNT(*) FROM knowledge").fetchone()[0] == 0
-    assert not (bridge.root / "runtime" / "execution.db").exists()
+    with sqlite3.connect(bridge.root / "runtime" / "execution.db") as db:
+        assert db.execute(
+            "SELECT COUNT(*) FROM execution_operations"
+        ).fetchone()[0] == 0
 
 
 def seed(root, case, port_num):
