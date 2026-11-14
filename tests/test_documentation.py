@@ -186,7 +186,7 @@ def test_architecture_requires_a_test_reference(repo):
         if row.startswith("| [Runtime]("):
             cells = row.split("|")
             assert len(cells) >= 5
-            cells[3] = " Проверки потеряны "
+            cells[3] = cells[3].replace("[test_runtime.py](../../tests/test_runtime.py)", "Проверки потеряны")
             rows[index] = "|".join(cells)
             updated = True
             break
