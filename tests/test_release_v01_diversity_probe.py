@@ -57,7 +57,10 @@ def test_diverse_ingestion_reopen_search_and_raw_diagnostic_report(mode):
     assert result["identity_reopen"] is True
     assert result["raw_marker_probes_passed"] == len(TOPICS) * 2
     assert result["negative_search_empty"] is True
-    assert result["memory_count"] >= 1
+    # The curated fixture uses stable, distinct subject prefixes.
+    # This is a structural test, not a semantic comprehension score.
+    assert result["memory_count"] == len(TOPICS)
+    assert result["memories_crossing_topics"] == 0
     assert result["model_calls"] == 0
     assert result["report_latency_ms"]["p95"] > 0
     assert len(result["context_responses"]) == len(TOPICS)
@@ -65,6 +68,7 @@ def test_diverse_ingestion_reopen_search_and_raw_diagnostic_report(mode):
         bundle = row["raw_context_response"]
         assert bundle["selection_stats"]["items_used"] <= 4
         assert bundle["selection_stats"]["chars_used"] <= 900
+        assert bundle["selection_stats"]["items_used"] >= 1
     for row in result["raw_probes"]:
         assert row["raw_search_response"]["coverage"]["status"] == "complete"
         assert any(
