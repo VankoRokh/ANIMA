@@ -1,50 +1,50 @@
-# Исследования и экспериментальные ветки ANIMA
+# Исследования ANIMA
 
-> **Исторический навигационный адрес.** Каноническая современная карта — [`docs/research/`](../research/README.md), с тематическими страницами [Retrieval](../research/retrieval.md), [E1–E4](../research/memory-encoding.md), [Stage 7](../research/semantics.md), [VAL/M0–M6-B2](../research/virtual-world.md) и [дальнейшими исследованиями](../research/future-directions.md). Таблицы ниже сохранены для прежних ссылок; текущие выводы и SHA сверяются с тематическими страницами.
+**Назначение:** карта гипотез, экспериментов, принятых отдельных механизмов и ограничений. Здесь **нет** обязательного рабочего плана выпуска. Актуальные требования к `ANIMA v0.1 Foundation` — [контракт](../versions/v0.1/contract.md), фактическая сборка — [архитектура](../system/README.md), оставшиеся релизные действия — [Roadmap](../roadmap.md).
 
-Этот раздел — **навигация по исследованиям, а не релизный Roadmap**. Статус `PASS` относится к конкретной гипотезе, test fixture и commit. Он не подтверждает включение алгоритма в рабочую ANIMA.
+## Правила доказательств
 
-**Что входит в текущую версию:** [ANIMA v0.1 — контракт](../RELEASES/ANIMA_v0_1_Release_Contract.md) и [фактическая архитектура](../ARCHITECTURE/README.md).  
-**Реестр исследовательских вопросов:** [исторический Research Track](../ROADMAP/Research.md).
+- **Research / Proposed** — гипотеза или дизайн, без подтверждённого результата.
+- **Validated Lab** — успех конкретного теста на конкретном корпусе, SHA и окружении. Не означает production integration.
+- **Implemented / Integrated** — механизм присутствует в коде или в названной сборке; это не статус релизной приёмки.
+- **Release Accepted** — требуется отдельный gate на конкретном чистом Git tree и решение по требованиям версии.
+- **Failed / Inconclusive / NO-GO** — не удалять; отрицательные наблюдения определяют границы безопасности и следующий эксперимент.
+
+Используем оригинальные технические имена и ID, но объяснения на русском. Внутри каждого обзора — цель, метод, первичные материалы, результат, граница вывода и решение о применении. **Исторические документы и TV не редактируются задним числом.**
+
+## Каталог
+
+| Направление | Состояние и главное решение | Читать |
+| --- | --- | --- |
+| EXP-009 / Event Retrieval v1 | Контролируемый A/B/C/D; выбран отдельный индекс исходных Events, встроен в базовый релизный read path | [Поиск и происхождение данных](retrieval.md) |
+| Memory Encoding E1–E4 | E1 shadow PASS; E2/E3 — отдельные лабораторные границы; E4 authority/crash/scale только в изолированной лаборатории, production **NO-GO** | [Кодирование и отзыв](memory-encoding.md) |
+| Stage 7 / Semantic Boundary | Frozen read-only `classify_relation/0.1`; deterministic baseline PASS, model residual Inconclusive | [Семантика](semantics.md) |
+| VAL / Godot, P5/P6, M0–M6-B2 | Изолированные и live проверки; M6-B2 10/10 CI, не весь Stage 8 или релиз | [Виртуальная среда и интеграции](virtual-world.md) |
+| Core P0–P6 и аудит B1–B4 | Исправления и независимые ограничения; исторический путь реализации | [История Core](../history/core-v0.1.md) |
+| Pi, FAST/DEEP/SLEEP, perception, метапамять | Отдельные пробы и будущие варианты; не навязаны Foundation | [Аппаратные и дальнейшие направления](future-directions.md) |
+
+## Где находятся первичные данные
+
+**Канонические тематические обзоры** — в `docs/RESEARCH/`. Ранее созданные файлы `docs/ROADMAP/`, исторические перечни из [legacy-index](legacy-index.md), `docs/TESTING/` и отчёты `TV-*.md` **сохраняют исходные адреса**. Это deliberate compatibility, а не свидетельство, что их названия «Roadmap» делают их актуальным планом.
+
+[Исторический реестр исследовательских вопросов](../ROADMAP/Research.md) объединяет идеи разных дат; отдельные пометки `OPEN` внутри него означают состояние **того исторического текста**, а не автоматически состояние нынешнего релиза. [Архив исходных лабораторий](../TESTING/Laboratory_Integrations.md) хранит команды и ограничения сценариев. [Реестр TV](../TESTING/Results/README.md) — исходные metadata, версии и результаты.
+
+## От исследования к продукту
+
+`Гипотеза → frozen критерии и данные → отрицательные проверки → воспроизводимый lab → явное решение → production code → release gate`. Успех в одном звене не подменяет соседнее. Нельзя выдавать метку `source="user"` за аутентификацию или переносить выполнение Godot по уже существовавшему разрешению другой среды.
+
+## Совместимость со старым индексом
+
+Прежние якоря сохранены для существующих ссылок. Сами исторические перечни находятся в [неизменённом по смыслу индексе](legacy-index.md); он фиксирует прежнюю группировку, но не новый статус релиза.
 
 ## Отдельные направления
 
-| Направление | Источник | Статус относительно ANIMA v0.1 |
-| --- | --- | --- |
-| Event Retrieval, эксперимент EXP-009 | [Memory Architecture v1 Roadmap](../ROADMAP/Memory_Architecture_v1_Roadmap.md) | Подтверждённый opt-in Event Retrieval используется в release-профиле; дальнейшее исследование отдельно |
-| Memory Encoding E1–E4 | [Результаты E1](../ROADMAP/Memory_Encoding_E1_Results.md) и [план Memory](../ROADMAP/Memory_Architecture_v1_Roadmap.md) | Shadow / lab; новая production-ассоциация **не** принята автоматически |
-| M0–M6-B2 интеграционные лаборатории | [M0](../TESTING/Memory_v1_Integrated_Read_Path_M0_v0.md), [M6-B2](../TESTING/Memory_v1_Integrated_Godot_Execution_M6B2_CI_Result_v0.md) | Источники проверенных сценариев; **не** обязательный Godot runtime релиза |
-| Virtual ANIMA / Godot | [Сводка полигона](../ROADMAP/Virtual_ANIMA_Lab_P5C_Scenario_Replay_Draft.md) | Отдельная проверочная среда; не обязательна для v0.1 |
-| Stage 7 semantic lifecycle | [Принятая read-only граница](../ROADMAP/Stage_7_Semantic_Boundary_v0.md) | Будущий сложный Knowledge lifecycle; не часть минимального релиза |
-| Hardware Pi / performance | [TV-0054](../TESTING/Results/TV-0054.md) | Предыдущие Core-пробы; перенос на Pi не обязателен для v0.1 |
-| FAST/DEEP/SLEEP refinement и meta-memory | [Research Track](../ROADMAP/Research.md) | Будущее развитие; контракты существующих систем не удаляются |
+[Историческая таблица направлений](legacy-index.md#отдельные-направления).
 
 ## Иерархия
 
-1. **Implemented:** модуль используется в основном коде и отражён в архитектуре.
-2. **Release-accepted:** реализованное поведение прошло release gate на точном снимке.
-3. **Validated lab:** отдельный эксперимент подтвердил заявленные сценарии, но релизный путь не изменён.
-4. **Research:** гипотеза или предложение, нуждающееся в исследовании.
-5. **Historical / archived:** завершённая или отвергнутая линия, сохранённая ради воспроизводимости.
-
-Это **категории**, а не обязательные стадии. Для каждой ветки решение о переносе в релиз принимается отдельно, без изменения исходных отчётов.
-
-После окончательного принятия v0.1 можно перемещать устаревшие документы и папки по согласованной карте ссылок. Историю Git и первичные результаты не переписывать.
-
+[Историческая классификация](legacy-index.md#иерархия); актуальные правила доказательств — [выше](#правила-доказательств).
 
 ## Карта прежних исследовательских документов
 
-В старом каталоге `ROADMAP/` пока остались материалы, созданные **до разделения Stage и Release**. Это не текущая рабочая очередь. Сохранение прежних путей необходимо для обратных ссылок из TV-отчётов, тестов и истории Git. Ниже перечислены тематические группы, чтобы их можно было найти без просмотра полного списка старых файлов.
-
-| Направление | Основные материалы | Статус относительно v0.1 |
-| --- | --- | --- |
-| Ревизия исполнительного Core | [Границы аудита](../ROADMAP/Core_v0_1_Audit_Boundaries.md), [исправления B1–B4](../ROADMAP/Core_v0_1_Independent_Audit_Remediation_Draft.md), [план Core/VAL](../ROADMAP/Core_v0_1_VAL_v0_1_Plan_Draft.md) | История инвариантов, не новый обязательный Stage |
-| Развитие Memory | [Memory v1 Roadmap](../ROADMAP/Memory_Architecture_v1_Roadmap.md), [baseline](../ROADMAP/Memory_Stage0_Baseline_Remediation_Brief.md) | Исследовательский план; отдельные функции уже интегрированы, остальные открыты |
-| Event Retrieval / EXP-009 | [Контракт](../ROADMAP/Memory_Event_Retrieval_v1_Brief.md), [результаты](../ROADMAP/Memory_Event_Retrieval_v1_Results.md), [A–D](../ROADMAP/Memory_EXP009_Retrieval_ABCD_Results.md) | Opt-in Event Retrieval используется в релизном read path |
-| Memory Encoding | [E1 результаты](../ROADMAP/Memory_Encoding_E1_Results.md), [E2](../ROADMAP/Memory_Encoding_E2_Brief.md), [E3](../ROADMAP/Memory_Encoding_E3_Review_Brief.md) | Shadow и исследовательские альтернативы; не замена production MemoryProcessor |
-| Memory E4 / Alias | [Архитектура](../ROADMAP/Memory_E4_Architecture_Contract_Draft.md), [лаборатории](../TESTING/Laboratory_Integrations.md) | Изолированный эксперимент, не общая политика Core/Knowledge |
-| Семантическая граница | [Контракт Stage 7](../ROADMAP/Stage_7_Semantic_Boundary_v0.md), [корпус](../TESTING/Stage7_Conformance_v0.md) | Часть baseline проверена, полный Knowledge lifecycle остаётся Planned |
-| Виртуальная среда | [VAL/P5C](../ROADMAP/Virtual_ANIMA_Lab_P5C_Scenario_Replay_Draft.md), [M0–M6-B2](../TESTING/Laboratory_Integrations.md) | Лаборатория, не обязательный runtime v0.1 |
-| Общие гипотезы | [Research Track](../ROADMAP/Research.md) | Исследовательский журнал, не расписание работ |
-
-**Правило принятия:** исследование → измеренный результат → явное решение → изменение production-модуля → отдельная приёмка релиза. При успешном тесте нельзя автоматически расширять полномочия источников или объявлять новый механизм обязательной частью ANIMA.
+[Прежняя карта Roadmap и исследовательских файлов](legacy-index.md#карта-прежних-исследовательских-документов).
