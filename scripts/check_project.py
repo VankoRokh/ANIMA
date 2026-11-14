@@ -65,6 +65,18 @@ def check_documentation(root=ROOT):
     update(root, check=True)
     docs = sorted((root / "docs").rglob("*.md"))
     require(docs, "docs is empty")
+    # A checkout may work on Linux but collide on case-insensitive filesystems.
+    # Validate paths for all files and directories, not just Markdown pages.
+    folded = {}
+    for item in sorted((root / "docs").rglob("*")):
+        rel = item.relative_to(root).as_posix()
+        normalized = rel.casefold()
+        previous = folded.get(normalized)
+        require(
+            previous is None or previous == rel,
+            f"Case-only documentation path collision: {previous} / {rel}",
+        )
+        folded[normalized] = rel
     pages = [root / "README.md", *docs]
     visible = {}
     for page in pages:
@@ -118,15 +130,34 @@ def check_documentation(root=ROOT):
             visited.add(page)
             pending.extend(edges[page] - visited)
     require(set(pages) <= visited, "Unreachable documentation: " + ", ".join(str(p.relative_to(root)) for p in set(pages) - visited))
-    arch = visible[root / "docs/ARCHITECTURE/README.md"]
-    table = arch.split("## Компоненты и подтверждение\n", 1)
-    require(len(table) == 2, "Missing implemented architecture table")
-    rows = [line for line in table[1].split("\n## ", 1)[0].splitlines() if line.startswith("| ")][1:]
-    require(rows, "Empty architecture table")
+    arch = visible[root / "docs/system/README.md"]
+    table = arch.split("## Разделы по ответственности\n", 1)
+    require(len(table) == 2, "Missing canonical architecture index")
+    rows = [
+        line for line in table[1].split("\n## ", 1)[0].splitlines()
+        if line.startswith("| ") and not line.startswith("| ---")
+    ][1:]
+    require(rows, "Empty canonical architecture index")
     for row in rows:
         paths = [unquote(urlsplit(t).path) for t in LINK.findall(row)]
-        require(any(p.endswith(".py") and (p.startswith("../../anima/") or p in {"../../main.py", "../../tests/harness.py"}) for p in paths), f"Missing architecture code reference: {row}")
-        require(any(p.startswith("../../tests/test_") and p.endswith(".py") for p in paths), f"Missing architecture test reference: {row}")
+        require(
+            any(
+                (root / "docs/system" / p).resolve().is_relative_to(root)
+                and (root / "docs/system" / p).resolve().is_file()
+                and p.endswith(".py") and "/anima/" in p
+                for p in paths
+            ),
+            f"Missing architecture code reference: {row}",
+        )
+        require(
+            any(
+                (root / "docs/system" / p).resolve().is_relative_to(root)
+                and (root / "docs/system" / p).resolve().is_file()
+                and p.endswith(".py") and "/tests/test_" in p
+                for p in paths
+            ),
+            f"Missing architecture test reference: {row}",
+        )
     print(f"[OK] Documentation: {len(docs)} pages, {links} local links; all pages reachable; generated blocks current; architecture references valid.")
 
 

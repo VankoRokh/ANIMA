@@ -1,6 +1,6 @@
 # Проверки и наблюдаемость
 
-**Начните с текущего релиза:** [контракт приёмки v0.1](../RELEASES/ANIMA_v0_1_Release_Contract.md), [отчёт ноутбука](../RELEASES/ANIMA_v0_1_Notebook_Evidence.md), [реестр исторических результатов](Results/README.md).
+**Каноническая методика текущего релиза:** [Verification](../verification.md), [контракт v0.1](../versions/v0.1/contract.md), [карточка приёмки](../versions/v0.1/acceptance.md). Ниже сохранены профильные лабораторные процедуры и исторические исследования; это не самостоятельный альтернативный release gate. [Исходный ноутбучный отчёт](../RELEASES/ANIMA_v0_1_Notebook_Evidence.md) и [архив TV](Results/README.md) относятся к своим SHA.
 
 ## Проверки текущей версии ANIMA v0.1
 
@@ -25,7 +25,7 @@ bash scripts/check.sh
 
 ## Команды
 
-Из корня проекта после [Setup](../OPERATIONS/README.md#установка):
+Из корня проекта после [Setup](../operations.md#требования-и-установка):
 
 ```bash
 bash scripts/check.sh
@@ -177,8 +177,7 @@ Synthetic SQLite seed нужен только для воспроизводим�
 
 До реализации этапа задаются Goal, Observable result, условия старта, Required
 work, Test scenarios, Regression scope, Acceptance criteria и Evidence.
-Критерии конкретных этапов — в [Roadmap](../ROADMAP/README.md), эксперименты —
-в [Research](../ROADMAP/Research.md). Список функций не заменяет проверяемый
+Текущие релизные критерии — в [контракте v0.1](../versions/v0.1/contract.md), а исторические этапы — в [хронологии](../history/stages.md). Эксперименты — в [RESEARCH](../RESEARCH/README.md) и первичном [Research Track](../ROADMAP/Research.md). Список функций не заменяет проверяемый
 результат. Если свойство нельзя наблюдать, сначала создаётся наблюдаемость.
 
 ## Показательные отчёты

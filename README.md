@@ -16,7 +16,7 @@ Godot и Raspberry Pi. История уже завершённых стадий
 
 ## Активная версия: ANIMA v0.1 Foundation (кандидат)
 
-Главный путь разработки — создание **постоянного детерминированного экземпляра** без обязательных LLM, Godot, Raspberry Pi и периферии. Цели и приёмка — в [релизах](docs/RELEASES/README.md); [полная история Stage D0–6](docs/STAGES/README.md) и [карта механизмов](docs/ARCHITECTURE/README.md) отделены от рабочего плана. Проверенный владельцем ноутбука срез `d77974b` прошёл локальную функциональную приёмку; **финальный релиз ещё не объявлен**.
+Главный путь разработки — создание **постоянного детерминированного экземпляра** без обязательных LLM, Godot, Raspberry Pi и периферии. Цели и приёмка — в [контракте версии](docs/versions/v0.1/contract.md); [полная история Stage D0–6](docs/history/stages.md) и [карта исполняемых механизмов](docs/system/README.md) отделены от рабочего плана. Проверенный владельцем ноутбука срез `d77974b` прошёл локальную функциональную приёмку; **финальный релиз ещё не объявлен**.
 
 Запуск из новой пустой директории данных (Linux, Python 3.12+):
 
@@ -28,20 +28,14 @@ Godot и Raspberry Pi. История уже завершённых стадий
 
 Существующие Stage ниже описывают **историю развития и архитектурные исследования**; их `Complete/Planned` не являются критерием выпуска v0.1. Будущие релизы пока не детализируются.
 
-## Состояние
+## Состояние кандидата
 
-<!-- AUTO:summary:START -->
-Версия прототипа: **00.1-alpha** (из кода).
+На 14 ноября 2026 года `ANIMA v0.1 Foundation` остаётся **кандидатом**: релизный `v0.1` tag и формальная приёмка не оформлены. Проверки относятся к определённым SHA и профилям — [карточка приёмки](docs/versions/v0.1/acceptance.md). Поле `current_stage=7` в [историческом `project.json`](docs/project.json) не обозначает рабочий фокус релиза.
 
-Текущий фокус: **7 — Semantic Lifecycle & Refinement** (Planned).
+[Актуальные задачи](docs/roadmap.md) · [Хронология разработки](docs/history/stages.md).
 
-Stage 6 Cognitive Integration Core завершён и подтверждён TV-0051. Для Stage 7 принят pre-training semantic boundary v0: immutable qualified/time-scoped Claim, отдельные Evidence/Source/Producer/provenance, typed Value v0, explicit temporal semantics, независимые CONTENT/REVISION results и read-only classify_relation/0.1 с deterministic-first processing. Stage 7 implementation остаётся Planned; DP-08, DP-09, полная dependency policy DP-10 и production integration DP-11 открыты. До model training обязательны conformance corpus и измерение реального model residual; LoRA/SFT не начаты.
-
-[Этапы и критерии](docs/ROADMAP/README.md).
-<!-- AUTO:summary:END -->
-
-Рабочие компоненты и ограничения — в [архитектуре](docs/ARCHITECTURE/README.md),
-[завершённые и остановленные стадии](docs/STAGES/README.md) — в хронологии,
+Рабочие компоненты и ограничения — в [архитектуре](docs/system/README.md),
+[завершённые и остановленные стадии](docs/history/stages.md) — в хронологии,
 показательные проверки — в [результатах](docs/TESTING/Results/README.md).
 
 ## Принципы
@@ -79,5 +73,5 @@ bash scripts/run.sh
 
 Run создаёт или продолжает локальный экземпляр. Его данные резервируются
 отдельно от Git. Восстановление, внешний ANIMA_DATA_DIR и наблюдение тестов —
-в [Operations](docs/OPERATIONS/README.md) и [Testing](docs/TESTING/README.md).
+в [эксплуатации](docs/operations.md), [проверках](docs/verification.md) и [правилах документации](docs/documentation.md).
 Полная навигация: [документация](docs/README.md).
