@@ -1,0 +1,31 @@
+name: M6-B2 laboratory isolation
+
+on:
+  push:
+    branches:
+      - work/anima-v01-integrated-m6b2
+  pull_request:
+    branches:
+      - work/anima-v01-integrated-m6b1
+  workflow_dispatch:
+
+jobs:
+  b2-offline:
+    name: Offline B2 / Python ${{ matrix.python-version }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.12", "3.13", "3.14"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - run: python -m pip install -r requirements-dev.txt
+      - name: B2 synthetic VAL isolated tests (not real Godot)
+        run: python -m pytest -q tests/test_memory_v1_godot_execution_gate.py
+      - name: Documentation and syntax checks
+        run: bash scripts/check.sh
+      - name: Full regression
+        run: python -m pytest -q
