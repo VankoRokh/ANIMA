@@ -18,7 +18,7 @@
 
 ## Что не является блокером выпуска
 
-Stage 7 write/revision, E4/L2, обязательный Godot/VAL, Raspberry Pi, FAST/DEEP LLM и расширенный SLEEP не входят в обязательный базовый контур. Их прогресс и ограничения объясняются в [исследованиях](research/README.md), а [история Stage](history/stages.md) не служит графом зависимостей этого релиза.
+Stage 7 write/revision, E4/L2, обязательный Godot/VAL, Raspberry Pi, FAST/DEEP LLM и расширенный SLEEP не входят в обязательный базовый контур. Их прогресс и ограничения объясняются в [исследованиях](RESEARCH/README.md), а [история Stage](history/stages.md) не служит графом зависимостей этого релиза.
 
 ## Порядок работы
 
