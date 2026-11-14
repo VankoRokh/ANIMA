@@ -1,77 +1,87 @@
-# ANIMA v0.1 — release contract
+# ANIMA v0.1 — контракт первого релиза
 
-**Status:** working release contract; acceptance **OPEN**, no tag or release declared.  
-**Target:** Linux x86-64 notebook, Python 3.12+ (CI matrix 3.12/3.13/3.14).  
-**Implementation track:** `work/anima-v0-1-release`, starting from `7465684725551188215a932dca6c42f98250c7d4`.  
-**Scope:** one reproducible, persistent, deterministic **system-owned** instance. Experimental branches and later releases are outside this gate.
+**Статус:** кандидат; окончательный Release Acceptance и тег ещё не подтверждены.  
+**Платформа основной приёмки:** ноутбук Linux x86-64, Python 3.14.4. Совместимость проверяется в CI на Python 3.12, 3.13 и 3.14.  
+**Рабочая ветка:** `work/anima-v0-1-release`, основана на `7465684725551188215a932dca6c42f98250c7d4`.  
+**Задача:** получить первый воспроизводимый, устойчивый, детерминированный **самостоятельный программный экземпляр ANIMA**.
 
-## 1. Product boundary
+## 1. Границы версии
 
-ANIMA v0.1 is a stable *foundation*, not an intelligent general-purpose assistant. It must work without a required LLM, Godot, Raspberry Pi, camera, microphone, external network or GPU. Deterministic means that the same committed state, ordered inputs and approved fixed rules produce the same semantic decisions; UUIDs, wall-clock timestamps and OS scheduling are not required to be byte-identical. Local trusted operator commands are not proof of remote identity authentication.
+ANIMA v0.1 — фундамент для последующего развития, а не универсальный интеллектуальный агент. Необходимые свойства: постоянная идентичность, системное управление событиями и внутренним состоянием, сохранение опыта с источниками, ограниченное извлечение, контролируемые Goals/Tasks, проверка разрешённых действий и продолжение работы после штатного или предусмотренного аварийного завершения.
 
-No claim of consciousness, autonomous learning, unrestricted self-generated goals, model reliability, real-world safety, exact-once for arbitrary external tools, power-loss durability or Stage 7 completion is part of v0.1.
+**Детерминированность** относится к системным решениям при одинаковом сохранённом состоянии, упорядоченных входах и фиксированных правилах. Она не означает побайтового совпадения UUID, системного времени или поведения внешнего мира.
 
-## 2. Required running instance
+**Модульность** не требует неизменности Core. Развитие и миграция допустимы, если изменения контрактов явны и сохраняется проверяемая непрерывность данных.
 
-The release entry point must use the **production** `build_core` and `Runtime`, not copy their logic into a lab. A single instance has a durable identity, state, legacy raw EventLog, MemoryProcessor/MemoryStore, provenance links, incremental read-only Event Retrieval, bounded Retrieval/Context, Internal State/GoalStore, and opt-in typed Core Event/Belief/Task interfaces. It must provide a multi-event headless operation mode and clean shutdown; absence of user input may block waiting for events without busy polling.
+Отсутствие LLM, Godot, Raspberry Pi, камеры, микрофона, сети или GPU не должно мешать работе базового экземпляра.
 
-Core owns all source registration, decision/admission, Goal/Task status and verification. The default headless profile has **no external execution capabilities** and must not silently grant local text input trusted sensor authority. Demonstrations with a deterministic in-process world are separately opt-in and must not be needed to boot the base profile.
+**Не обещаем:** сознание, универсальное понимание, автономное обучение, свободное самостоятельное целеполагание, абсолютную безопасность внешних действий, защиту от злонамеренного локального администратора, атомарность всех SQLite/JSONL файлов при отключении питания и корректность произвольной периферии.
 
-Pluggable FAST/DEEP/SLEEP facilities already present remain supported at their current tested contracts. Further model work, consolidation, meta-memory, graph databases, vector embeddings and sensor/peripheral modules are **not release blockers**.
+## 2. Обязательная исполняемая система
 
-### Current implementation slice (not yet a release)
+Точка входа `anima/release_v01.py` должна использовать штатные `build_core()` и `Runtime`, а не дублировать их в отдельном тестовом агенте.
 
-The first runnable local entry point is:
+В состав входят Identity, State, EventLog, EventProcessingCoordinator, MemoryStore/LinkStore, EventRetrieval, ограниченные Retrieval/Context, InternalState/GoalStore и доступные typed Core-интерфейсы. Реальное состояние Knowledge не повышается до `confirmed` только на основании пользовательского сообщения.
+
+У базового профиля **нет** зарегистрированных внешних источников фактов или исполнительных полномочий. Одно локальное текстовое сообщение не может выдать себя за доверенный сенсор либо создать разрешённое действие.
+
+**Дополнительная тестовая возможность** `--sandbox-door` подключается только в отдельном каталоге экземпляра. Она демонстрирует существующие Goal → Task → Policy → Execution → независимая Verification на детерминированной SQLite-фикстуре, без Godot и физического эффекта.
+
+FAST/DEEP/SLEEP в уже реализованных контрактах остаются в кодовой базе. Новые модели, метапамять, графовые БД, расширенная консолидация SLEEP, полноценный Stage 7 lifecycle и аппаратные модули **не блокируют** v0.1.
+
+## 3. Запуск
 
 ```bash
-python -m anima.release_v01 --data-dir /tmp/anima-v01-instance
+.venv/bin/python -m anima.release_v01 --data-dir "$HOME/anima-v01"
 ```
 
-It accepts **one JSON object per line** on stdin, for example:
+Нужен новый пустой каталог. На входе — по одному JSON-объекту в строке:
 
 ```json
-{"op":"report","text":"Unit ambercoil earlier reading 82 C"}
+{"op":"report","text":"Unit ambercoil temperature reported as 82 C"}
 {"op":"search_events","query":"ambercoil"}
 {"op":"context","query":"ambercoil"}
 {"op":"status"}
 {"op":"stop"}
 ```
 
-`context` is a bounded, read-only Memory projection, **not** a model answer or confirmed truth. `search_events` requires a complete authoritative index and fails closed otherwise. Invalid commands do not grant sensor, Goal or Tool authority. The local process has a POSIX advisory single-writer lock; this is not a security sandbox against malicious local code. A fresh directory is required; adopting lab or legacy storage without a migration is refused.
+`context` возвращает ограниченную проекцию Memory, не окончательный ответ и не достоверное Knowledge. При неполном индексе запрещено утверждать, что данные отсутствуют. `release_profile.json` фиксирует тип доверенных возможностей экземпляра; непомеченные старые каталоги и несовместимые профили отвергаются. `fcntl.flock` — кооперативная Linux-блокировка двух штатных writers, не защита от прямого доступа к файлам другим локальным процессом.
 
-For **optional local Core execution acceptance only**, use a separate fresh data directory with `--sandbox-door`; its capability profile is pinned on disk. The sole extra request is `{"op":"ensure_sandbox_door_closed"}`. This operates on a local deterministic SQLite fixture; it is not Godot or physical actuation, and local operator identity is not authenticated.
+Для тестового мира в отдельном каталоге:
 
-The old `scripts/run.sh` / `main.py` CLI remains unchanged during the transition. R-01–R-10 are not declared passed until the combined release acceptance and measured workload are complete.
+```bash
+.venv/bin/python -m anima.release_v01 --data-dir /tmp/anima-v01-sandbox --sandbox-door
+```
 
-## 3. Release acceptance matrix
+Дополнительная команда: `{"op":"ensure_sandbox_door_closed"}`. Старый `scripts/run.sh` остаётся совместимым CLI, но **не является** новой релизной точкой входа.
 
-| Gate | Required result | Evidence |
-| --- | --- | --- |
-| R-01 Boot | Standard entry point creates one persistent instance, no model or VAL | Clean source snapshot + subprocess report |
-| R-02 Multi-event | One process processes multiple distinct ordered user reports, preserves raw Events and Memory source links | Raw journal + MemoryStore |
-| R-03 Retrieval | Exact earlier source detail retrievable even when compressed Memory omits it; bounded context and explicit complete/partial coverage | Event Retrieval + ContextBuilder |
-| R-04 Reopen | Fresh Python interpreter opens the same data directory, retains identity/history/links, no duplicate replay | Two-process gate |
-| R-05 Boundary | Arbitrary local report cannot masquerade as registered Core sensor, create authenticated authorization, or execute tool | Negative tests |
-| R-06 Core integration | Verified existing Core Goal/Task, policy, action, independent proof, and one-effect recovery tested against an *opt-in local deterministic adapter* | Existing P3-C/Core acceptance plus release-specific composition evidence |
-| R-07 Failure | Abrupt process death leaves recoverable committed records; unsaved input is not claimed as durable; external side effect is never blindly replayed | Controlled SIGKILL/process-cut test, with limitations |
-| R-08 Resources | Measure representative fixed notebook workload with CPU/RSS/latency/disk; decide budgets *before* verdict | Recorded baseline; no mandatory Pi |
-| R-09 Compatibility | Python 3.12/3.13/3.14 regression and `scripts/check.sh`; supported migration/reopen path is explicit | CI + owner laptop verification |
-| R-10 Audit | Exact clean SHA, scoped code review, unresolved risks, no secret data, release documentation | Review + release record |
+## 4. Приёмка R-01–R-10
 
-A PASS for M0–M6, T6–T9 or Stage 6 is reusable **historical evidence**, not an automatic R-01–R-10 verdict for a new source snapshot. No release tag until a final end-to-end gate passes.
+| Gate | Проверяемое требование |
+| --- | --- |
+| **R-01 / Boot** | Из чистого исходного снимка запускается постоянный экземпляр без моделей и внешней среды |
+| **R-02 / Events** | Несколько событий сохраняются по порядку с первичными ссылками и доступными raw Events |
+| **R-03 / Memory** | Старые детали доступны из Event Retrieval; Context ограничен бюджетом; неполнота явна |
+| **R-04 / Recovery** | Повторное открытие в новом Python-процессе сохраняет Identity и историю без дублей |
+| **R-05 / Authority** | Текстовый пользовательский report не создаёт доверенный Belief, Goal permission или Tool execution |
+| **R-06 / Core** | В отдельном явно включённом sandbox проверены Goal/Task, действие, independent proof, replay |
+| **R-07 / Faults** | Реальный SIGKILL после подтверждённой записи не теряет её; неподтверждённый эффект нельзя слепо повторять |
+| **R-08 / Resources** | Фиксированный сценарий на ноутбуке измеряет latency, throughput, RSS, storage; ресурсная норма оценивается отдельно от функционального PASS |
+| **R-09 / Regression** | `scripts/check.sh` и полный pytest на поддерживаемых Python; актуальный чистый SHA |
+| **R-10 / Release** | Документы, ограничения, принятие финального commit и выпуск версии, а не только lab PASS |
 
-## 4. Blocking vs deferred
+Для R-08 первичный baseline на ноутбуке 128 событий уже измерен в [отчёте](ANIMA_v0_1_Notebook_Evidence.md). Не будем задним числом объявлять этот результат заранее утверждённым SLO. Первые практические ресурсные ориентиры для следующих независимых прогонов: p95 < 100 мс и RSS < 256 MiB на фиксированной нагрузке 128 синтетических reports, без возврата к полному чтению журнала на каждый штатный Event Retrieval. Эти пороги — **предложенные операционные границы для v0.1**, не доказательство масштабирования до 10⁵ событий.
 
-**Block:** source/provenance loss; incorrect promotion of reports to truth; unauthorised effects; lost committed state; duplicate effects on supported recovery path; non-reproducible release assembly; inability to continue in a fresh process.
+## 5. Блокеры и отложенные задачи
 
-**Deferred with documented limit:** CPU/SQLite optimisation that stays inside an agreed budget, Graph/Meta-memory/L2, autonomous Knowledge write lifecycle, cognitive backend training, extended SLEEP, hardware portability, GUI, mobile and physical peripherals.
+**Блокирующие дефекты:** потеря подтверждённых исходных данных или связей, необоснованное повышение полномочий, неавторизованный эффект, нарушение идентичности экземпляра, недопустимое дублирование на поддержанном recovery-пути, невозможность штатного повторного запуска, неустойчивая регрессия точного релизного снимка.
 
-## 5. Execution plan
+**Отложенные задачи:** улучшение качества группировки эпизодов сверх минимального сохранения источников, не достигнутая универсальная семантика, новые модели и обучение, метапамять, сложные SLEEP-представления, sensors, Godot как обязательная зависимость, Pi-перенос, оптимизация на больших корпусах. Ограничения должны быть явно указаны при выпуске, а не замаскированы зелёными тестами.
 
-1. Compare this contract with the real source and register only verified gaps.
-2. Introduce one normal release profile without changing historical tests or production Core contracts unnecessarily.
-3. Add positive, negative, restart and SIGKILL evidence; record resource budgets before interpreting timings.
-4. Run full Python regression and a notebook acceptance.
-5. Only after acceptance: tag the exact clean release commit and reorganise navigation into `docs/RELEASES/`, `ARCHITECTURE/`, `TESTING/`, `DECISIONS/`, `RESEARCH/`, `ARCHIVE/`. Do **not** rewrite historical experiment results.
+## 6. Принятие версии
 
-Future versions remain conceptual until separately scoped. The official Stage history in `docs/project.json` is historical status, not the release acceptance verdict.
+Путь: [Gap Audit](ANIMA_v0_1_Gap_Audit.md) → релизный entry point → позитивные/негативные тесты → восстановление → Notebook Acceptance → полная регрессия на точном чистом SHA → окончательное решение о релизе и его документация.
+
+Исторические результаты Stage 6, T6–T9.7 и M0–M6-B2 используются как подтверждение отдельных решений, но **не переносят автоматически статус PASS** на новый release snapshot. `docs/project.json` остаётся историей Stage и не назначает версию продукта.
+
+Следующие версии пока существуют как идеи, без зафиксированных дат и подробных Stage.
