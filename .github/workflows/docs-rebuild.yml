@@ -4,10 +4,12 @@ on:
   push:
     branches:
       - work/anima-v01-documentation-rebuild
+      - develop
   pull_request:
     branches:
       - release/v0.1
       - work/anima-v01-documentation-rebuild
+      - develop
   workflow_dispatch:
 
 concurrency:
