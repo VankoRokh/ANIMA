@@ -1,221 +1,31 @@
 # Работа с проектом
 
+> **Совместимый адрес прежней инструкции.** Для действующей сборки использовать [`docs/operations.md`](../operations.md); для критериев принятия — [`docs/verification.md`](../verification.md); для поддержания документации — [`docs/documentation.md`](../documentation.md). Старые команды резервирования **не применять к v0.1**: там требовался `memories.jsonl`, тогда как современный `release_v01` сохраняет `memory.db` и другие SQLite. Полный первоначальный текст доступен в [снимке до миграции](https://github.com/VankoRokh/ANIMA/blob/bdb63a5a52902802ab192426f462fb4760d7fed1/docs/OPERATIONS/README.md).
+
 ## Установка
 
-Linux, Bash, Git, Python 3.12+ и venv. На Ubuntu при необходимости установить
-git/python3/python3-venv. Рабочий код и генератор документации используют
-стандартную библиотеку; pytest — отдельная зависимость разработки.
-
-```bash
-git clone https://github.com/VankoRokh/ANIMA.git
-cd ANIMA
-bash scripts/setup.sh
-bash scripts/check.sh
-.venv/bin/python -m pytest -q
-```
-
-Setup создаёт .venv, проверяет версию и устанавливает requirements-dev.txt.
-Существующую непригодную среду не удаляет. Другой интерпретатор:
-`ANIMA_PYTHON=python3.14 bash scripts/setup.sh`.
-Окружение создаётся заново, а не переносится между компьютерами.
-Условия конкретных проверенных прогонов — в [результатах](../TESTING/Results/README.md).
+[Требования Linux / Python 3.12+ и установка `.venv`](../operations.md#требования-и-установка).
 
 ## Активный релизный профиль v0.1 (Linux, headless)
 
-Начинать с [контракта релиза](../RELEASES/ANIMA_v0_1_Release_Contract.md). Для новой ANIMA v0.1 использовать отдельный **пустой** каталог экземпляра. Не указывать путь от старого CLI или экспериментального Core: миграция несовместимых регистраций источников не выполняется автоматически.
-
-```bash
-.venv/bin/python -m anima.release_v01 --data-dir "$HOME/anima-v01"
-```
-
-После сообщения `ready` можно подавать одну JSON-команду на строку:
-
-```json
-{"op":"report","text":"Unit ambercoil temperature reported as 82 C"}
-{"op":"search_events","query":"ambercoil"}
-{"op":"context","query":"ambercoil"}
-{"op":"status"}
-{"op":"stop"}
-```
-
-Базовый режим не подключает инструменты, LLM, Godot, сетевой сервер и аппаратную периферию. `context` — представление найденного опыта, а не автоматически подтверждённый ответ. Ошибки источника/индекса не трактуются как отсутствие данных. Сохранённый `release_profile.json` запрещает случайно менять тип экземпляра. `.anima-v01.lock` предназначен для кооперативной блокировки одного writer; это не защита от произвольного локального процесса.
-
-**Опциональный тестовый мир** (только для локальной проверки Core/Goal/Task/Verification) требует другого нового каталога:
-
-```bash
-.venv/bin/python -m anima.release_v01 --data-dir /tmp/anima-v01-sandbox --sandbox-door
-```
-
-В нём дополнительно разрешена локальная команда `{"op":"ensure_sandbox_door_closed"}`. Это детерминированная SQLite-фикстура, не Godot и не реальный исполнитель.
-
-Функциональная и ресурсная приёмка (из точного чистого Git checkout):
-
-```bash
-.venv/bin/python -m pytest -q tests/test_release_v01.py tests/test_release_v01_acceptance.py
-.venv/bin/python -m scripts.run_release_v01_gate --events 128 --report /tmp/anima-v01-evidence.json
-```
-
-Runner не использует рабочие данные и пишет в отдельные временные каталоги. JSON-отчёт не перезаписывается. При остановке процесса после неподтверждённой команды не объявлять её сохранённой. Резервировать весь каталог экземпляра после штатной остановки, включая журнал, SQLite и профиль; см. [резервирование](#резервирование).
+[Базовый профиль и JSONL-протокол](../operations.md#запуск-базового-экземпляра-v01), [дополнительная SQLite-дверь](../operations.md#дополнительный-sandbox-профиль), [контракт v0.1](../versions/v0.1/contract.md).
 
 ### Старый интерактивный CLI
 
-`scripts/run.sh` / `main.py` остаются доступными для совместимости, но **не являются новым v0.1 headless-профилем**. Не считать их однострочную CLI-сессию приёмкой релиза.
+[`scripts/run.sh` и `ANIMA_DATA_DIR` относятся к отдельному совместимому интерфейсу](../operations.md#дополнительный-sandbox-профиль); не использовать его данные как новый релизный экземпляр.
 
 ## Запуск и обновление
 
-```bash
-bash scripts/run.sh
-```
-
-Одна строка ввода, затем Enter для сна; EOF/Ctrl+C на точках ввода также
-завершают сессию. Скрипты выбирают .venv/bin/python, иначе python3;
-ANIMA_PYTHON явно переопределяет выбор. Run работает из корня проекта.
-Для внешнего экземпляра:
-
-```bash
-ANIMA_DATA_DIR="$HOME/anima-instance" bash scripts/run.sh
-```
-
-Правила путей и состав данных — в [архитектуре](../ARCHITECTURE/README.md#каталог-и-контракты-данных).
-Без восстановленных данных запуск создаёт новый экземпляр.
-
-Перед обновлением сохранить незавершённые изменения и проверить состояние:
-
-```bash
-git status --short --branch
-git pull --ff-only
-```
-
-При расхождении веток выяснить причину; принудительный reset не является
-процедурой обновления. Локальные незакоммиченные файлы ноутбука не видны через GitHub.
-В VS Code открывается вся папка проекта, доступны Setup/Check/Test/Run/Update Docs.
-Obsidian может открыть docs как vault; личные .obsidian/.trash не входят в Git.
-Обычные относительные Markdown-ссылки и Mermaid читаются без Obsidian.
+[Обновление и защита данных экземпляра](../operations.md#обновление-кода).
 
 ## Ведение документации
 
-Один факт — одно каноническое место ([навигация](../README.md)). Релизные требования, история Stage и текущая архитектура **разделены**; исторический `current_stage` не задаёт приоритет сегодняшних задач.
-
-| Изменение | Что редактировать |
-|---|---|
-| Исторические статусы и зависимости Stage | docs/project.json; [хронология стадий](../STAGES/README.md) |
-| Цель и критерии активного релиза | [RELEASES](../RELEASES/README.md); [рабочий маршрут](../ROADMAP/README.md) |
-| Нереализованная идея/эксперимент | [RESEARCH](../RESEARCH/README.md); старый [Research.md](../ROADMAP/Research.md) пока сохранён |
-| Подтверждённый механизм и его код | [ARCHITECTURE](../ARCHITECTURE/README.md) с кодом и тестами |
-| Существенная причина/выбор | DECISIONS/README.md |
-| Показательный прогон | Один TESTING/Results/TV-NNNN.md |
-| Обычный успешный прогон | Документы не меняются |
-
-project.json содержит schema_version=1, current_stage (ID), focus и stages.
-У этапа: id, title, status, depends_on (IDs) и outcome для сводки.
-Stage statuses: Planned/InProgress/Complete/Blocked/Stopped; текущий этап не может
-быть Complete или Stopped. Зависимости ссылаются на существующие IDs, без циклов;
-Complete требует завершённых зависимостей. Статус — решение по критериям, он не
-выводится из числа зелёных тестов автоматически. Содержательная смена критериев
-согласуется с владельцем; мелкие исправления ссылок/разметки не требуют отдельного
-решения.
-
-```bash
-python3 scripts/update_docs.py
-python3 scripts/update_docs.py --check
-bash scripts/check.sh
-```
-
-JSON выбран вместо необязательного YAML-файла из обсуждения: читается штатной
-библиотекой, не требует дополнительного пакета. Генератор обновляет только
-AUTO:summary/roadmap/results между START/END; остальной текст сохраняется.
-Обновление детерминировано, повтор не меняет файлы; --check ничего не пишет и
-завершается ошибкой при устаревшей сводке. Ошибочные метаданные/маркеры также дают ошибку.
-
-Версия читается из AnimaState._default_state без запуска экземпляра. Число тестов
-и текущие результаты берутся из pytest, Git хранит историю — их не нужно
-переписывать по страницам. Нет автозаписи текущей даты, HEAD или длительности
-прогона в живые страницы. Даты/commit в отчётах обозначают исторические измерения.
-Формат отчёта — [Testing](../TESTING/README.md#показательные-отчёты).
-
-После изменения выполнить релевантные тесты и просмотреть `git diff --check`,
-`git diff --stat`, `git diff`. Перед завершением сессии обновить focus, если
-изменился следующий незаконченный шаг. После перерыва начать с docs/README,
-Roadmap и последних commit; отдельная страница контекста помощнику не нужна.
+[Единые правила и генератор AUTO-блоков](../documentation.md#генерируемые-блоки), [методики тестирования](../verification.md).
 
 ## Резервирование
 
-Остановить ANIMA до копирования: разные файлы при записи не образуют общий snapshot.
-Git хранит код/документацию, а не опыт. Сохраняются весь каталог экземпляра,
-commit кода и версия Python; в будущем — конфигурация/версии моделей. Секреты
-остаются приватными; .venv не архивируется как переносимая среда.
-
-Из корня проекта после хотя бы одной полной сессии:
-
-```bash
-task_python="${ANIMA_PYTHON:-$PWD/.venv/bin/python}"
-task_data_dir="$("$task_python" -c 'from anima.config.paths import get_data_dir; print(get_data_dir())')"
-task_backup_dir="$HOME/ANIMA-backups"
-task_backup_stamp="$(date +%Y%m%d-%H%M%S)"
-task_backup_file="$task_backup_dir/ANIMA-$task_backup_stamp.tar.gz"
-mkdir -p -- "$task_backup_dir"
-
-for name in state.json identity.json events.jsonl memories.jsonl; do
-    test -f "$task_data_dir/$name" || {
-        echo "Missing instance file: $task_data_dir/$name" >&2
-        exit 1
-    }
-done
-
-git rev-parse HEAD > "$task_backup_file.commit"
-"$task_python" --version > "$task_backup_file.python"
-tar -C "$task_data_dir" -czf "$task_backup_file" .
-(
-    cd -- "$task_backup_dir"
-    sha256sum "$(basename "$task_backup_file")" > "$(basename "$task_backup_file").sha256"
-)
-```
-
-Если рабочий каталог внешний, ANIMA_DATA_DIR должен быть тем же, что при запуске.
-Архив/commit/python/sha256 скопировать на независимый носитель или приватное
-хранилище. Копия на том же ноутбуке не покрывает его потерю. Резервировать после
-значимых сессий и до смены схемы/переноса. Шифрование, ротация, расписание и место
-реальной независимой копии ещё не настроены; исключение из Git копию не создаёт.
+[Безопасное резервирование **всего каталога v0.1 после остановки**](../operations.md#резервное-копирование-v01). Не требовать наличие `memories.jsonl` и не копировать отдельные SQLite во время записи.
 
 ## Восстановление
 
-Использовать доверенную копию. В её папке проверить соответствующий
-`sha256sum -c ANIMA-....tar.gz.sha256` и `tar -tzf ANIMA-....tar.gz`.
-Ожидается содержимое каталога экземпляра, возможно с `./`, без старого абсолютного пути.
-
-```bash
-git clone https://github.com/VankoRokh/ANIMA.git ANIMA-restored
-cd ANIMA-restored
-task_backup_file="/absolute/path/ANIMA-YYYYMMDD-HHMMSS.tar.gz"
-task_commit="$(cat "$task_backup_file.commit")"
-git checkout --detach "$task_commit"
-bash scripts/setup.sh
-bash scripts/check.sh
-
-task_restore_data_dir="$PWD/data"
-test ! -e "$task_restore_data_dir" || {
-    echo "Restore target already exists: $task_restore_data_dir" >&2
-    exit 1
-}
-mkdir -p -- "$task_restore_data_dir"
-tar -C "$task_restore_data_dir" -xzf "$task_backup_file"
-```
-
-Путь может быть новым внешним каталогом. До запуска проверить identity/state,
-session и JSONL, при доступном исходнике — побайтное совпадение. Затем:
-
-```bash
-ANIMA_DATA_DIR="$task_restore_data_dir" bash scripts/run.sh
-```
-
-Подтвердить прежний ID и продолжение истории. Сумма проверяет целостность архива,
-продолжение экземпляра — восстановимость. Исходные повреждённые файлы сохраняются
-для анализа. Если commit старше scripts, следовать его инструкциям и не запускать
-произвольную новую версию как «миграцию». Несовместимость схем требует отдельного
-плана и backup. Без копии Git не восстановит опыт.
-Регрессия restore входит в pytest, а не в быстрый Check; ручное доказательство —
-[TV-0001](../TESTING/Results/TV-0001.md).
-
-Потерянная документация восстанавливается новым clone с предварительным
-сохранением незакоммиченных заметок. Неотправленные изменения не восстанавливаются
-из GitHub автоматически.
+[Проверка хэша и восстановление в новый каталог](../operations.md#восстановление-на-отдельном-пути). Обязательно проверить `instance_id`, raw Events и совместимость `release_profile.json`.
