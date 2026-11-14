@@ -2,6 +2,7 @@
 import json
 import os
 import signal
+import sqlite3
 import subprocess
 import sys
 from pathlib import Path
@@ -14,10 +15,14 @@ from anima.release_v01 import open_release
 ROOT = Path(__file__).resolve().parents[1]
 
 
-def _run(root, *commands):
+def _run(root, *commands, sandbox_door=False):
     text = "".join(json.dumps(command, ensure_ascii=False) + "\n" for command in commands)
+    cmd = [sys.executable, "-B", "-m", "anima.release_v01",
+           "--data-dir", str(root)]
+    if sandbox_door:
+        cmd.append("--sandbox-door")
     proc = subprocess.run(
-        [sys.executable, "-B", "-m", "anima.release_v01", "--data-dir", str(root)],
+        cmd,
         cwd=ROOT,
         input=text,
         text=True,
@@ -143,3 +148,38 @@ def test_release_sigkill_recovers_committed_report_in_new_process(tmp_path):
     assert restarted[0]["result"]["instance_id"] == identity
     assert [r["id"] for r in restarted[1]["result"]["results"]] == [original_id]
     assert restarted[1]["result"]["coverage"]["status"] == "complete"
+
+
+def test_release_explicit_sandbox_goal_task_independent_proof_and_reopen(tmp_path):
+    first = _run(
+        tmp_path,
+        {"op": "report", "text": "The door is closed, according to the user."},
+        {"op": "ensure_sandbox_door_closed"},
+        {"op": "stop"},
+        sandbox_door=True,
+    )
+    assert first[0]["result"]["sandbox_adapter_enabled"] is True
+    goal = first[2]
+    assert goal["ok"] is True
+    assert goal["goal_status"] == "completed"
+    assert goal["task_statuses"] == ["completed"]
+    assert len(goal["operation_ids"]) == 1
+    identity = first[0]["result"]["instance_id"]
+
+    again = _run(tmp_path, {"op": "status"}, sandbox_door=True)
+    assert again[0]["result"]["instance_id"] == identity
+    with sqlite3.connect(tmp_path / "sandbox_world" / "virtual_door.db") as db:
+        effects = db.execute(
+            "SELECT COUNT(*) FROM door_effects WHERE applied=1"
+        ).fetchone()[0]
+        assert effects == 1
+
+    # Pinned composition: never load the same persistent source history with
+    # a different registry / capability map without an explicit migration.
+    wrong = subprocess.run(
+        [sys.executable, "-B", "-m", "anima.release_v01",
+         "--data-dir", str(tmp_path)],
+        cwd=ROOT, input="", text=True, capture_output=True, timeout=30,
+    )
+    assert wrong.returncode != 0
+    assert "capability profile mismatch" in wrong.stderr
