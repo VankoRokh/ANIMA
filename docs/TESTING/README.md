@@ -41,7 +41,7 @@ Harness создаёт данные в tmp_path; subprocess-тесты явно 
 ## Соответствие семантическому контракту Stage 7
 
 Принятый pre-training/read-only semantic boundary проверяется отдельным
-[Stage 7 Semantic Conformance v0](Stage7_Conformance_v0.md).
+[Stage 7 Semantic Conformance v0](Stage7_Conformance_v0.md), [корпус проверок](Stage7_Conformance_Corpus_v0.md) и [журнал рецензирования](Stage7_Conformance_Review_Log.md).
 
 До model training порядок такой:
 
