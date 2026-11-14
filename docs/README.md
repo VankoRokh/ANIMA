@@ -4,7 +4,7 @@
 
 ## Куда идти
 
-Канонические входы: [дорожная карта](roadmap.md), [история](history/README.md), [архитектура](system/README.md), [исследования](RESEARCH/README.md), [контракт v0.1](versions/v0.1/contract.md), [приёмка v0.1](versions/v0.1/acceptance.md), [эксплуатация](operations.md), [верификация](verification.md) и [правила ведения](documentation.md). Старые пути `ROADMAP/`, `STAGES/` и `RELEASES/` пока сохранены для исторических ссылок.
+Канонические входы: [дорожная карта](roadmap.md), [история](history/README.md), [архитектура](system/README.md), [исследования](RESEARCH/README.md), [контракт v0.1](versions/v0.1/contract.md), [приёмка v0.1](versions/v0.1/acceptance.md), [эксплуатация](operations.md), [рабочее пространство](workspace.md), [верификация](verification.md) и [правила ведения](documentation.md). Старые пути `ROADMAP/`, `STAGES/` и `RELEASES/` пока сохранены для исторических ссылок.
 
 | Вопрос | Раздел | Что там находится |
 | --- | --- | --- |
@@ -16,6 +16,7 @@
 | Что подтверждено испытаниями? | [Проверки и доказательства](verification.md), [исторические методики](TESTING/README.md) и [TV](TESTING/Results/README.md) | Условия, сценарии, SHA, Passed/Failed/Inconclusive, release gate и ограничения |
 | Почему приняты именно такие решения? | [Архитектурные решения](DECISIONS/README.md) | ADR-001–010 и причины отказа от альтернатив |
 | Как запустить и перенести экземпляр? | [Эксплуатация](operations.md) | Установка, профили v0.1, резервирование и восстановление |
+| Как устроить локальные папки, модели, llama.cpp, worktree? | [Рабочее пространство](workspace.md) | Пути, локальная конфигурация, правила очистки и Obsidian |
 | Где прежние материалы? | [Архив](ARCHIVE/README.md) | История старых структур и переносов |
 
 **Быстрый маршрут:** [назначение ANIMA](../README.md) → [релиз v0.1](versions/v0.1/acceptance.md) → [действующая архитектура](system/README.md) → [история развития](history/stages.md).

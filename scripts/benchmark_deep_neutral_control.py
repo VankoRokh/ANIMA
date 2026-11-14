@@ -21,6 +21,8 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
+from scripts.workspace_paths import models_root, llama_server_binary
+
 from anima.cognition.llm_transport import LlamaCppTransport
 from anima.experiments.deep_audit import AuditDifficulty
 from anima.experiments.deep_audit_v02 import (
@@ -213,11 +215,11 @@ def summarize(rows):
 
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--models-root", type=Path, default=Path.home() / "Projects/models")
+    parser.add_argument("--models-root", type=Path, default=models_root())
     parser.add_argument(
         "--server-binary",
         type=Path,
-        default=Path.home() / "Projects/llama.cpp/build/bin/llama-server",
+        default=llama_server_binary(),
     )
     parser.add_argument("--port", type=int, default=8083)
     parser.add_argument("--timeout", type=float, default=120.0)

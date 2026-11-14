@@ -23,6 +23,8 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
+from scripts.workspace_paths import models_root, llama_server_binary
+
 from anima.cognition import CognitivePipeline
 from anima.core.event_bus import Event
 from anima.diagnostics.trace import DiagnosticTrace
@@ -284,8 +286,8 @@ def write_summary(output, reports):
 
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--models-root', type=Path, default=Path.home()/'Projects/models')
-    parser.add_argument('--server-binary', type=Path, default=Path.home()/'Projects/llama.cpp/build/bin/llama-server')
+    parser.add_argument('--models-root', type=Path, default=models_root())
+    parser.add_argument('--server-binary', type=Path, default=llama_server_binary())
     parser.add_argument('--port', type=int, default=8081)
     parser.add_argument('--timeout', type=float, default=120)
     parser.add_argument('--output-dir', type=Path, default=ROOT/'.benchmarks/stage5-v2'/datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%SZ'))
