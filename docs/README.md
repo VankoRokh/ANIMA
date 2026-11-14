@@ -8,7 +8,7 @@
 | --- | --- | --- |
 | Что мы хотим получить прямо сейчас? | [Релизы](RELEASES/README.md) | Граница текущей версии, критерии приёмки и фактический результат |
 | Как мы сюда пришли? | [История стадий](STAGES/README.md) | Подробно Stage D0, 0, D1 и 1–6: задача, механизмы, проверки, ограничения |
-| Как устроена система сегодня? | [Архитектура](ARCHITECTURE/README.md) | Фундамент, Memory, Goals, Internal State, SLEEP, FAST/DEEP, Policy/Execution и Runtime |
+| Как устроена система сегодня? | [Архитектура](ARCHITECTURE/README.md) и [словарь механизмов](ARCHITECTURE/Glossary.md) | Фундамент, Memory, Goals, Internal State, SLEEP, FAST/DEEP, Policy/Execution и Runtime |
 | Какие работы сейчас нужны? | [Дорожная карта](ROADMAP/README.md) | Только цель активного релиза и проверяемые действия до выпуска |
 | Какие идеи остались экспериментами? | [Исследования](RESEARCH/README.md) | Memory E1–E4, VAL/M0–M6, альтернативы и не принятые гипотезы |
 | Что подтверждено испытаниями? | [Тестирование](TESTING/README.md) и [отчёты TV](TESTING/Results/README.md) | Условия, сценарии, SHA, PASS/FAIL/Inconclusive и ограничения выводов |
