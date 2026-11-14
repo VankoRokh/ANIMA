@@ -131,7 +131,7 @@ def run_gate(events=128):
             # A raw source must not silently disappear when Memory is compressed.
             report_ids = {
                 event["id"] for event in instance.core.event_log.load_events()
-                if event["event_type"] == "conversation.user"
+                if event["type"] == "conversation.user"
             }
             assert len(report_ids) == events
             assert report_ids <= mapped
@@ -170,7 +170,7 @@ def run_gate(events=128):
                 "p99": _percentile(latency, 0.99),
             },
             "report_throughput_per_s": round(events / total_s, 2),
-            "peak_child_or_self_rss_kib": resource.getrusage(resource.RUSAGE_SELF).ru_maxrss,
+            "peak_self_rss_kib": resource.getrusage(resource.RUSAGE_SELF).ru_maxrss,
             "storage_bytes": sizes,
             "two_process_m0_s": round(first_s + second_s, 3),
             "sandbox_action_and_reopen_s": round(action_s + again_s, 3),
