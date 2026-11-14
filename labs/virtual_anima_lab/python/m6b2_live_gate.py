@@ -40,7 +40,7 @@ from scripts.run_memory_v1_binding_gate import _m5, seed as m5_seed
 CASES = (
     "normal", "unapproved", "rejected", "source_modified",
     "target_binding_modified", "sample_corrupt", "world_restarted",
-    "before_effect", "after_effect",
+    "world_revision_changed", "before_effect", "after_effect",
 )
 CUT_CODES = {"before_effect": 74, "after_effect": 73}
 MANIFEST = "m6b2_manifest.json"
@@ -169,6 +169,7 @@ def exercise(root: Path, case: str, port: int):
     if case in (
         "unapproved", "rejected", "source_modified",
         "target_binding_modified", "sample_corrupt", "world_restarted",
+        "world_revision_changed",
     ):
         try:
             gate.assemble(row["ticket_id"])
@@ -304,6 +305,23 @@ def run_case(godot, scratch, case):
                 world = start_godot(godot, port, log)
                 after_restart = call(port, "agent", "hello")["data"]
                 assert after_restart["world_instance_id"] != before["world_instance_id"]
+            elif case == "world_revision_changed":
+                # Test-only operator modifies and restores the *visible* state.
+                # Final door=open, but revised history must invalidate B2 pin.
+                initial_revision = call(port, "agent", "observe")["data"][
+                    "world_revision"
+                ]
+                assert call(port, "operator", "set_door", open=False)["data"][
+                    "open"
+                ] is False
+                assert call(port, "operator", "set_door", open=True)["data"][
+                    "open"
+                ] is True
+                final_revision = call(port, "agent", "observe")["data"][
+                    "world_revision"
+                ]
+                assert final_revision > initial_revision
+                assert effect_events(port) == []
             worker = _worker("exercise", root, case, port)
             if case in CUT_CODES:
                 assert worker.returncode == CUT_CODES[case], (
