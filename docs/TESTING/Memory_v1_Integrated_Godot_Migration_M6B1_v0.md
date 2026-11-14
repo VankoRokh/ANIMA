@@ -1,6 +1,6 @@
 # ANIMA Memory v1 — M6-B1 explicit Godot source migration preflight
 
-**Status:** CI VERIFIED — real Godot 4.7.2 eight-case source mapping preflight PASS (zero effects) + full Python 3.12–3.14 regressions PASS; owner laptop acceptance OPEN.  
+**Status:** CI VERIFIED — real Godot 4.7.2 eight-case source mapping preflight PASS (zero effects) + full Python 3.12–3.14 regressions PASS; owner-reported laptop M6-B1 PASS (Python 3.14.4, Linux x86_64, exact Git SHA included).  
 **Base:** owner-accepted M6-A `0d81fb74c07ed4c523e2a10fafd7b1fd92363b71`; branch `work/anima-v01-integrated-m6b1`.
 
 ## Why M6-B is split
@@ -69,7 +69,7 @@ The normal and all denied cases verify: the existing canonical Goal remains acti
 
 **Observed correction:** an initial CI run passed all 102 targeted tests and the real Godot gate but failed three unrelated documentation fixture tests because `docs/TESTING/README.md` linked to newly added external Python files that were omitted from synthetic docs-only test repositories. The index now represents those code locations as literal paths rather than broken relative Markdown links. The final run above passed the full 1749-test regression on all Python versions. No behavior or `anima/` production code was modified by that correction.
 
-### Owner laptop acceptance — OPEN
+### Owner laptop acceptance — owner-reported PASS
 
 Use a fresh isolated `ANIMA-M6B1` worktree and local Python 3.14.4 with **Godot 4.7.2**. Run from the repository root:
 
@@ -80,6 +80,29 @@ python -m labs.virtual_anima_lab.python.m6b1_live_gate \
 ```
 
 The runner starts and terminates its own eight local headless Godot processes on random loopback ports and uses disposable temporary Core data directories; **no production ANIMA data**. It refuses existing reports and repo-internal report paths. Report fields include `commit`, `godot_version`, `python`, eight cases, and `world_effect_total=0`. Expected `status=M6B1_GODOT_SOURCE_PREFLIGHT_PASS`. **Do not claim owner's laptop PASS until the original JSON has been examined.**
+
+### Owner laptop evidence — 2026-11-14
+
+**Original owner-uploaded file:** `anima-m6b1-PC.json`, independently parsed. This is a user-provided result file, **not** remote terminal or cryptographic attestation. The report includes `commit=66a25ef4a0d0d02506c354e62fe00758d1173b70`, the exact M6-B1 code/doc branch revision that was built and CI-verified (GitHub Actions #43592735635 SUCCESS). Unlike earlier M3–M6-A notebook reports, M6-B1 includes source revision identity in JSON.
+
+Top level: `schema=anima.memory_v1.godot_migration_m6b1/0.1`, `status=M6B1_GODOT_SOURCE_PREFLIGHT_PASS`, `python=3.14.4`, `machine=x86_64`, `godot_version=4.7.2`, `godot_tested=true`. **Eight** individually reported `M6B1_CASE_PASS` results:
+
+| Case | Final disposition | Initial → fresh `lab_sample` | Effects |
+| --- | --- | --- | ---: |
+| `normal` | `M6B1_SOURCE_MAPPING_REVALIDATED` | 1 → 2 | 0 |
+| `unapproved` | `M6B1_MIGRATION_DENIED` | 1 → none | 0 |
+| `rejected` | `M6B1_MIGRATION_DENIED` | 1 → none | 0 |
+| `stale` | `M6B1_MIGRATION_DENIED` | 1 → none | 0 |
+| `mapping_changed` | `M6B1_MIGRATION_DENIED` | 1 → none | 0 |
+| `source_modified` | `M6B1_MIGRATION_DENIED` | 1 → none | 0 |
+| `sample_corrupt` | `M6B1_MIGRATION_DENIED` | 1 → none | 0 |
+| `world_restarted` | `M6B1_MIGRATION_DENIED` | 1 → none | 0 |
+
+Each case reports `knowledge_count=0`, `task_count=0`, `world_effect_count=0`, `m5_origin_remains_virtual=true`, `source_migration_executable=false`, `target_p2_registered=false`. Top-level `world_effect_total=0`, `tasks_created=0`, `migration_executable=false`, `target_p2_registered=false`, `operator_authenticated=false`, `pi_tested=false`, `production_code_changed=false`. There is exactly one existing M4 Goal per case, not a newly created Goal.
+
+**Interpretation:** normal case verifies a newer, separately sourced Godot observation without equating Godot's `lab_sample` with M5 `lab_tick`; all seven fail-closed cases preserve the original M5 source without installing an executor or changing the original Core P2 source. `stale` specifically injects the stored sample through a test replacement method; it does not prove the external Godot process naturally reissued a duplicate observation. `world_restarted` genuinely replaces the Godot process and is rejected on changed identity.
+
+**Scope/decision:** M6-B1 **accepted as a functional real-Godot laptop preflight** in addition to all-green CI. It is **not** M6-B2, not approved migration of trusted P2 source, and not permission to execute a Godot action. The report's `operator_authenticated=false` and non-executable flags are deliberate. No official Stage completion or `docs/project.json` mutation.
 
 ### Explicit stop before M6-B2
 
