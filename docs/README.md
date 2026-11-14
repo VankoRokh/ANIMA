@@ -4,12 +4,12 @@
 
 ## Куда идти
 
-Канонические входы: [дорожная карта](roadmap.md), [история](history/stages.md), [архитектура](system/README.md), [контракт v0.1](versions/v0.1/contract.md) и [приёмка v0.1](versions/v0.1/acceptance.md). Старые пути `ROADMAP/`, `STAGES/` и `RELEASES/` пока сохранены для исторических ссылок.
+Канонические входы: [дорожная карта](roadmap.md), [история](history/README.md), [архитектура](system/README.md), [контракт v0.1](versions/v0.1/contract.md) и [приёмка v0.1](versions/v0.1/acceptance.md). Старые пути `ROADMAP/`, `STAGES/` и `RELEASES/` пока сохранены для исторических ссылок.
 
 | Вопрос | Раздел | Что там находится |
 | --- | --- | --- |
 | Что мы хотим получить прямо сейчас? | [Контракт](versions/v0.1/contract.md) и [приёмка v0.1](versions/v0.1/acceptance.md) | Профили, требования R-01–R-10, подтверждения на SHA и открытые решения |
-| Как мы сюда пришли? | [История стадий](history/stages.md), [Core](history/core-v0.1.md) и [Memory](history/memory-integration.md) | Stage D0–11, typed Core и параллельная интеграция после Stage 6 |
+| Как мы сюда пришли? | [История разработки](history/README.md), [Core](history/core-v0.1.md) и [Memory](history/memory-integration.md) | Stage D0–11, typed Core и параллельная интеграция после Stage 6 |
 | Как устроена система сегодня? | [Архитектура и исполняемые профили](system/README.md) | Runtime, Events/Authority, Memory, Goals/Execution, FAST/DEEP и SLEEP с кодом и профильными тестами |
 | Какие работы сейчас нужны? | [Дорожная карта](roadmap.md) | Только цель активного релиза и проверяемые действия до выпуска |
 | Какие идеи остались экспериментами? | [Исследования](RESEARCH/README.md) | Memory E1–E4, VAL/M0–M6, альтернативы и не принятые гипотезы |
