@@ -165,14 +165,14 @@ def test_unclosed_fence_fails(repo):
 
 
 def test_architecture_requires_a_test_reference(repo):
-    path = repo / "docs/ARCHITECTURE/README.md"
+    path = repo / "docs/system/README.md"
     rows = path.read_text().splitlines()
     updated = False
     for index, row in enumerate(rows):
-        if row.startswith("| Runtime |"):
+        if row.startswith("| [Runtime]("):
             cells = row.split("|")
-            assert len(cells) >= 6
-            cells[4] = " Проверки потеряны "
+            assert len(cells) >= 5
+            cells[3] = " Проверки потеряны "
             rows[index] = "|".join(cells)
             updated = True
             break
