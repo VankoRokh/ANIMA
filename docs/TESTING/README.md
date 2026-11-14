@@ -4,7 +4,7 @@
 
 [Контракт M6-B2](Memory_v1_Integrated_Godot_Execution_M6B2_Design_v0.md): оригинальный M4 GoalStore и история M5 сохраняются; новая P6/Godot исполнительная цепочка использует отдельные target P2, P3-A, Task и Operation SQLite и собственное одноразовое host-разрешение. Код `labs/virtual_anima_lab/python/m6b2_godot_execution.py`, [offline tests](../../tests/test_memory_v1_godot_execution_gate.py), `labs/virtual_anima_lab/python/core_port.py` (проверка согласованных экземпляра/эпохи/ревизии). Нет P3-C или переноса старого M6-A допуска, нет изменений `anima/`. M6-B2.2 offline + full regression PASS на Python 3.12/3.13/3.14 (CI run `43598096331`, commit `8e003400532a81d52711d751c06a4e4a7d148e2c`); **это не real Godot acceptance**.
 
-Новый live-runner `labs/virtual_anima_lab/python/m6b2_live_gate.py` — **отдельный незавершённый M6-B2.3 gate**. Он изолирует мир каждого сценария, проверяет реальный Godot 4.7.2, единичный эффект, отсутствие повторов и две точки `os._exit` между подготовкой операции и получением результата. В CI предусмотрен отдельный job `b2-godot-live` с официальным бинарником и проверкой контрольной суммы. Локально, из корня репозитория:
+Live-runner `labs/virtual_anima_lab/python/m6b2_live_gate.py` проверяет реальный Godot 4.7.2, единичный эффект, отсутствие повторов и две точки `os._exit` между подготовкой операции и получением результата. GitHub Actions job `b2-godot-live` **PASS 9/9** (run `43598681388`, Godot 4.7.2, Python 3.14.10, 2 разрешённых эффекта, 0 дублей; `true_sigkill_tested=false`). [Разбор evidence](Memory_v1_Integrated_Godot_Execution_M6B2_CI_Result_v0.md). **CI не заменяет локальную проверку на ноутбуке**. Локально, из корня репозитория:
 
 ```bash
 .venv/bin/python -m labs.virtual_anima_lab.python.m6b2_live_gate \\
@@ -12,7 +12,7 @@
   --report "/tmp/anima-m6b2-$(date +%s).json"
 ```
 
-Режим `--case normal` выполняет только положительный сценарий. Мировые воздействия допускаются **только в созданных runner временных Godot-средах**, не в рабочем экземпляре ANIMA. До подтверждённого live PASS не считать M6-B2.3 закрытым. Не подтверждены: реальный SIGKILL/отказ питания, Pi, аутентификация оператора, глобальный production firewall или физический мир.
+Режим `--case normal` выполняет только положительный сценарий. Мировые воздействия допускаются **только в созданных runner временных Godot-средах**, не в рабочем экземпляре ANIMA. CI live-gate PASS подтверждён; локальный laptop gate и Pi по-прежнему не подтверждены. Не доказаны: реальный SIGKILL/отказ питания, Pi, аутентификация оператора, глобальный production firewall или физический мир.
 
 ## ANIMA v0.1 Integrated — M6-B1 real Godot source migration preflight (no executor)
 
