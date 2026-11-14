@@ -1,6 +1,6 @@
 # ANIMA Memory v1 — M6-A executable startup + pre-effect admission
 
-**Status:** CI VERIFIED — seven-case M6-A admission/execution/recovery and complete Python 3.12–3.14 regression PASS; owner's laptop gate OPEN.  
+**Status:** CI VERIFIED — seven-case M6-A gate and complete Python 3.12–3.14 regression PASS; owner-reported laptop M6-A PASS on Python 3.14.4 (Linux x86_64). Raspberry Pi and real Godot deferred.  
 **Branch:** `work/anima-v01-integrated-m6`, based on owner-accepted M5 `1ec7674773ba2202035ecb9d013773a74dfadef5`.
 
 ## Architectural blocker: M5 vs P6/Godot provenance
@@ -69,7 +69,7 @@ M6-A therefore verifies the *entire* M3→M4→M5 chain through an independently
 
 **Observed remediation:** the first M6 CI exposed a repeated-use test invoking the *new admission check* after Core had appended service events and before the Event Retrieval index caught up. Admission correctly denied an incomplete index. The replay test was corrected to call existing **Core read-only operation recovery** instead of seeking a second execution admission. No source completeness requirement or Tool guard was weakened. The final matrix above includes this correction.
 
-### Owner notebook acceptance — OPEN
+### Owner notebook acceptance — owner-reported PASS
 
 From a separate `ANIMA-M6A` worktree on Linux x86_64 with Python 3.14.4:
 
@@ -78,6 +78,28 @@ python -m scripts.run_memory_v1_execution_gate --report /tmp/anima-m6a-PC.json
 ```
 
 This runner constructs seven **new isolated** `TemporaryDirectory` fixture worlds, runs each case in fresh Python child processes, and deletes its own temporary data on exit. It intentionally uses `os._exit` for the two cut points, not SIGKILL. **Godot is not required and not tested.** The report location must not already exist and must be outside the repo. Expected top-level `status=M6_EXECUTION_ADMISSION_PASS`; accept physical-laptop PASS only after inspecting the original owner-provided JSON.
+
+### Owner-provided laptop evidence — 2026-11-14
+
+The original uploaded file `anima-m6a-PC.json` was parsed directly after upload and its top-level status, seven child-case PASS statuses, summed effect count, and explicit no-duplicate/no-auto flags were checked against its contents. This is an **owner-provided local-run JSON**, not a remote authenticated execution trace. It reports `schema=anima.memory_v1.execution_admission_m6a/0.1`, `status=M6_EXECUTION_ADMISSION_PASS`, `python=3.14.4`, `machine=x86_64`.
+
+| Case | Goal complete | Operation status | Permit claimed | Effects | Verdict |
+| --- | :---: | --- | :---: | ---: | --- |
+| `normal` | yes | `succeeded` | yes | 1 | `M6_CASE_PASS` |
+| `before_effect` | no | `uncertain` | no | 0 | `M6_CASE_PASS` |
+| `after_effect` | yes | `succeeded` | yes | 1 | `M6_CASE_PASS` |
+| `no_approval` | no | no operation | no | 0 | `M6_CASE_PASS` |
+| `rejected` | no | no operation | no | 0 | `M6_CASE_PASS` |
+| `source_modified` | no | no operation | no | 0 | `M6_CASE_PASS` |
+| `world_changed` | no | no operation | no | 0 | `M6_CASE_PASS` |
+
+**Count verification:** `effect_total=2` equals the sum of all seven reported `world_effect_count` values; exactly two effects in `normal` and `after_effect`, none elsewhere. Each case has `no_duplicate_effect=true`, `independent_sensor_only=true`, `auto_core_enabled=false` and `status=M6_CASE_PASS`. In `before_effect`, the `uncertain` operation is intentionally left unexecuted, with `permit_claimed=false`, rather than retrying speculatively. In `after_effect`, the already applied operation is reconciled, not run twice.
+
+**Provenance limitation:** the uploaded JSON **contains no Git commit SHA or signed machine attestation**. The source code at exact local execution revision therefore cannot be proved from the report alone. The repository's separately verified CI snapshot `de364f589e0e6956139e3108d972821d7b06bf26` passed 85 targeted and 1732 full regression tests on Python 3.12/3.13/3.14; subsequent documentation-only snapshot `dc10f92bb56fc9a942a97217d905d3b2e14d24a5` also passed GitHub Actions run #43590380756.
+
+**Nonclaims from owner JSON:** `godot_tested=false`, `llm_used=false`, `pi_tested=false`, `operator_authenticated=false`, `true_sigkill_tested=false`, `production_code_changed=false`. The test does not establish a global `build_core` enforcement boundary or protect against an attacker with unrestricted local code/SQLite access.
+
+**Decision:** **M6-A accepted as an owner-reported functional laptop gate** together with independent GitHub CI evidence. **M6-B remains a separate, unopened contract** for authorized migration from M5 `lab_tick` / virtual sensor to the real Godot `lab_sample` / VAL adapter, with independent verification and negative tests. No change to official Stage status or `docs/project.json` is implied.
 
 ### Mandatory caveats for M6-B
 
