@@ -10,11 +10,11 @@
 
 ## E2 — unverified relation candidates
 
-[Контракт E2](../ROADMAP/Memory_Encoding_E2_Brief.md) вводит **непроверенные** возможные связи вместо автоматического merge. Исходный brief на 12 ноября указывает `CI/gold gate OPEN`; это не означает, что каждое последующее лабораторное выполнение осталось открытым. До указания точного более позднего проверенного артефакта не присваивать E2 production PASS. `Candidate` не равно утверждённое `Relation`.
+[Контракт E2](../ROADMAP/Memory_Encoding_E2_Brief.md) вводит **непроверенные** возможные связи вместо автоматического merge. Исходный brief на 12 ноября указывает `CI/gold gate OPEN` **на дату составления**. Поздний [CI run 43417725518](https://github.com/VankoRokh/ANIMA/actions/runs/43417725518), ветка `experiment/core-memory-information-baseline`, SHA `9df779d14f03ff6d0bd514ecf880547621063678`, завершился **success**: отдельный шаг `Run weak episode-link E2 experiment` выполнен на Python 3.14. В независимом первоначальном аудите зафиксированы **3 weak candidates: 1 целевая пара и 2 ложные**. Это лабораторный результат с false positives, **не** приёмка нового production merge. `Candidate` не равно утверждённое `Relation`.
 
 ## E3 — review uncertain episode links
 
-[Контракт E3](../ROADMAP/Memory_Encoding_E3_Review_Brief.md): спорная ассоциация проходит отдельные отрицательные и adversarial проверки, включая ложный bridge и дедупликацию. Исходный brief отмечает `CI gate OPEN`; не подменять его более поздними лабораторными результатами без явной связи с SHA. E3 не даёт LLM права переписывать raw Events или автоматически соединять эпизоды.
+[Контракт E3](../ROADMAP/Memory_Encoding_E3_Review_Brief.md): спорная ассоциация проходит отдельные отрицательные и adversarial проверки, включая ложный bridge и дедупликацию. Исходный brief отмечает `CI gate OPEN` **на дату составления**; поздний [run 43417725518](https://github.com/VankoRokh/ANIMA/actions/runs/43417725518) на SHA `9df779d14f03ff6d0bd514ecf880547621063678` выполнил шаг `Run E3 weak link review triage` на Python 3.14 (SUCCESS). По первоначальному аудиту adversarial review **снизил precision готовности к разбору с 1,0 до 0,5**. Исполнение CI **не** отменяет отрицательный вывод о качестве и не предоставляет автоматического права связать эпизоды, переписать Events или создавать Goal.
 
 ## E4 — revision/alias lifecycle: последовательность проверок
 
