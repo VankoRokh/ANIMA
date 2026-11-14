@@ -81,3 +81,18 @@ def test_diverse_ingestion_reopen_search_and_raw_diagnostic_report(mode):
 def test_invalid_corpus_mode_rejected():
     with pytest.raises(ValueError, match="mode"):
         generate_corpus(events=32, mode="unknown")
+
+
+@pytest.mark.parametrize("mode", ["plain", "labeled"])
+def test_160_event_topic_purity_regression(mode):
+    """Fixed eight-subject synthetic fixture: structural grouping only."""
+    result = run_probe(events=160, seed=7, mode=mode)
+    assert result["integrity_status"] == "PASS"
+    assert result["memory_count"] == len(TOPICS)
+    assert result["memories_crossing_topics"] == 0
+    assert result["raw_marker_probes_passed"] == 2 * len(TOPICS)
+    assert result["raw_source_links"] == "ALL_ACCOUNTED"
+    assert all(
+        row["raw_context_response"]["selection_stats"]["items_used"] >= 1
+        for row in result["context_responses"]
+    )
