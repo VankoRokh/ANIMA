@@ -63,7 +63,7 @@ Before **any** action-capable target assembly or Task/Operation creation:
 Actual Tool-worker guard (not merely a caller-side check):
 
 - Verify handler root, action/argument identity, Goal/Task lifecycle, persisted canonical `ExecutionAction` + `VerificationSpec`, exact `operation_id`, B2 decision and target binding/registry against the frozen fingerprints.
-- Take a **new** Godot observation via P6 and admit it in target P2. Check it is later than the reviewed/admission samples, belongs to the same world instance/epoch, is open/fresh, has an accepted authoritative Belief, and is supported by the unmodified P6 sample ledger.
+- Take a **new** Godot observation via P6 and admit it in target P2. Check it is later than the reviewed/admission samples; belongs to the same world instance/epoch; retains the **exact reviewed pre-action world_revision**; is open/fresh; has an accepted authoritative Belief; and is supported by the unmodified P6 sample ledger. Any revision change before the effect invalidates this approval, even if the door is open again.
 - Atomically claim the B2 single-use ticket for this operation before calling `VALDoorPort.execute`. `VALDoorPort.execute` itself observes again and sends `expected_epoch` + `expected_revision` to Godot; an intervening world change must reject, not force a close.
 - Invoke **exactly one** `act_door` at most. Do not auto-reissue an ambiguous side effect.
 - Keep `reconcile` and `replay_output` read-only (no `act_door`); only independent target P2 evidence can complete the canonical Goal. Tool receipt alone never implies success.
