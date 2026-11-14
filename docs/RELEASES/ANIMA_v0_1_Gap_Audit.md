@@ -1,44 +1,42 @@
-# ANIMA v0.1 — release gap audit (working record)
+# ANIMA v0.1 — ревизия готовности (Gap Audit)
 
-**Status:** release engineering IN PROGRESS, not an ANIMA v0.1 PASS.  
-**Branch:** `work/anima-v0-1-release` (draft PR #5, based on experimental M6-B2 branch).  
-**Scope:** source/contract review and evidence mapping; no independent full security/code audit claimed.  
-**Release definition:** [ANIMA v0.1 Release Contract](ANIMA_v0_1_Release_Contract.md).
+**Статус:** проверенный кандидат, **не** выпущенный релиз.  
+**Ветка:** `work/anima-v0-1-release`; черновой PR #5, базируется на экспериментальной ветке M6-B2.  
+**Ревизия:** архитектурные контракты, релизный entry point и результаты испытаний; полный независимый security review здесь **не заявляется**.  
+**Критерии:** [Release Contract v0.1](ANIMA_v0_1_Release_Contract.md).
 
-## Evidence separation
+## Что подтверждено
 
-Official Stage 6 has an earlier accepted result ([TV-0051](../TESTING/Results/TV-0051.md)). Core v0.1 PC/Pi T6–T9.7 results are recorded in [TV-0054](../TESTING/Results/TV-0054.md), with a *dirty* checkout and limited hardware claims. Integrated M0–M6-B2 are separate laboratory checks, not production release certification. The current release branch inherits research/lab files; **the release entry point imports none of the Godot/E4/M6 laboratory modules**.
+- **Ранее:** Stage 6 принят по [TV-0051](../TESTING/Results/TV-0051.md); Core прошёл исследовательскую серию T6–T9.7 по [TV-0054](../TESTING/Results/TV-0054.md) с незафиксированным локальным патчем. M0–M6-B2 — отдельные лабораторные результаты, а не полная релизная приёмка.
+- **В новом пути:** `anima/release_v01.py` использует настоящий `CoreAssembly/Runtime`, MemoryStore, Event Retrieval, ContextBuilder и сохраняемую Identity. Базовый профиль не подключает LLM, Godot, внешний Tool Executor или доверенный sensor. Локальный `--sandbox-door` включается только отдельно.
+- **На ноутбуке владельца:** commit `d77974b0a8604f45300614a8581e3845b2ea9ee6`, `bash scripts/check.sh` PASS, 7/7 целевых тестов PASS, [локальный интеграционный отчёт](ANIMA_v0_1_Notebook_Evidence.md) `FUNCTIONAL_GATE_PASS`, исходные Events/связи сохранены, sandbox-эффект 1.
+- **В CI:** полный pytest на Python 3.12/3.13/3.14 был успешно пройден на более раннем кандидатном снимке (run `43606870693`). Для окончательного SHA требуется собственная успешная матрица — результаты промежуточного commit не подменяют итоговый release gate.
 
-The first release runtime is `anima/release_v01.py`. It invokes existing `build_core()` with production Memory and opt-in Event Retrieval; the regular local profile registers **no trusted external sensor sources or tool handlers**. An isolated, explicitly pinned `--sandbox-door` profile connects existing P3-C/VirtualDoorWorld for deterministic execution acceptance only.
+## Матрица рисков
 
-## Gate status / release blockers
-
-| Gate | Checked on the new release path? | Remaining boundary |
+| Требование | Подтверждено | Что остаётся ограничением |
 | --- | --- | --- |
-| R-01 Boot | First 4 subprocess tests PASS on CI Python 3.12/3.13/3.14 | Final clean head + notebook acceptance |
-| R-02 Multiple reports | Tested with one persistent process; Event/Memory links checked after restart | Final integrated gate |
-| R-03 Raw retrieval | Search and ContextBuilder work in the new headless path | Stronger retrieval-quality corpus belongs to future Memory work |
-| R-04 Fresh-process reopen | Explicit two-process release test passed | Final integrated gate |
-| R-05 Untrusted input | Unsupported source/tool operations fail closed; no actuator in normal profile | No authenticated operator or malicious-local-code firewall claimed |
-| R-06 Goal/Task/verification | Explicit sandbox mode tested; one keyed action + completed Goal/Task | Not generalized to arbitrary real-world effect adapters |
-| R-07 SIGKILL | Release process-kill after acknowledged report tested | More diverse cuts and real power loss not automatically covered |
-| R-08 Resources | Notebook-sized gate runner now exists and reports p50/p95/p99, RSS and disk | Need measured result and chosen release budget; no hardware Pi gate |
-| R-09 Regression | CI full Python 3.12/3.13/3.14 regression PASS on earlier release slice (`43606870693`) | Re-run on exact candidate head including acceptance runner |
-| R-10 Release | Draft PR, version remains alpha, no release tag | Final clean SHA, owner laptop run, concise limitations, release notes |
+| R-01 — R-04: запуск, события, память, повторное открытие | На локальном `d77974b`: PASS | Не все формы поиска и не широкий набор реальных воспоминаний |
+| R-05: полномочия источников | Подмена источника и незарегистрированные команды отвергаются | Нет аутентификации внешнего оператора; используется локальный stdin |
+| R-06: Goal/Task/Verification | Одно разрешённое действие, подтверждённый результат в SQLite sandbox | Нет произвольного executor, реального мира или Godot как части релиза |
+| R-07: отказ и восстановление | SIGKILL после подтверждённой записи проходит целевой тест | Нет физического отключения питания, проверки повреждённых дисков и произвольных fault points в release-режиме |
+| R-08: ресурсы | 128 событий; p95 9.823 мс, RSS 33640 KiB | До измерения SLO не был согласован; проба не демонстрирует масштабирование 10³–10⁵ |
+| R-09: регрессия | Есть PASS прежней матрицы, локальный docs check и 7 целевых тестов | Финальный SHA должен пройти CI и проверку ссылок |
+| R-10: выпуск | Контракт и отчёт подготовлены | Нет финального release approval, тега и version bump |
 
-## Source-reviewed hazards and decisions
+## Критические архитектурные границы
 
-1. `main.py` / `scripts/run.sh` still launch the older one-input CLI by default. **The release profile uses an explicit new entry point**; replacing default CLI is deferred until evidence and documentation are accepted.
-2. Memory's legacy composition can hide raw detail. The release profile uses derived, rebuildable Event Retrieval; `context` does not assert factual truth, and incomplete index cannot masquerade as no-match.
-3. `CoreAutonomy` and Goal/Task integration are optional capabilities with strict registration; the base profile does not accept untrusted typed sensor packets or automatically convert reports to goals.
-4. The persistent `release_profile.json` pins the capability set. Existing unlabelled data directories and mismatched capabilities are refused, rather than silently reinterpreting old Beliefs/Goal bindings.
-5. `fcntl.flock` enforces cooperative single-writer execution for the release entry point on Linux. A malicious local process or direct database writer remains outside the security boundary.
-6. The release branch is a **candidate on top of a draft laboratory branch**. Before the final tag, review ancestry and which experimental files should remain development-only; do not merge all experiment PRs just to reach a green test.
+1. **Identity и исходные данные** — собственность экземпляра. Релиз не меняет source registry на существующем неподготовленном каталоге. Для миграции потребуется отдельная проверяемая процедура.
+2. **Memory ≠ истина.** Сжатая сводка может объединить разные сообщения; raw Events с происхождением доступны через derived Event Retrieval. Ни одна текстовая запись не выдаётся за подтверждённое Knowledge.
+3. **Core-owned решение.** Базовый режим не имеет разрешённых внешних действий; demo/sandbox-путь только явно opt-in.
+4. **Single writer.** `fcntl.flock` защищает штатные процессы, но прямой доступ к SQLite в обход runtime этим не ограничен.
+5. **Производительность.** 128 однотипных reports создали 1 Memory. Это доказательство сохраняемости источников, но **не** качества кластеризации. Критический дефект возникнет, если raw данные потеряются либо их неполнота будет скрыта.
+6. **Ветки и лаборатории.** Рабочая релизная ветка происходит от чернового M6-B2 PR, но релизная точка входа не импортирует Godot/E4/M6 лабораторный код. Экспериментальные материалы сохраняются отдельно как исторические файлы и задачи, без объявления их production-модулями.
+7. **Старый CLI** `main.py` / `scripts/run.sh` остаётся прежним, однострочным и совместимым; новый профиль имеет отдельную команду. До итоговой фиксации версии `AnimaState.version` остаётся `00.1-alpha`.
 
-## Out of scope for v0.1
+## Решение о следующих действиях
 
-Full Stage 7 Knowledge lifecycle, LLM/FAST/DEEP training and model-quality claims, extended SLEEP consolidation, meta-memory, cameras/microphones/speakers, Godot dependence, Raspberry Pi transfer, external network authentication, arbitrary autonomous goals and physical expansion. Later releases stay conceptual.
-
-## Next controlled actions
-
-Complete the current release CI matrix and snapshot audit, inspect measured notebook workload, then run the exact candidate on the owner's Ubuntu laptop in a **fresh** data directory. Fix only confirmed release blockers. After an accepted v0.1 gate, create the release record/tag and restructure documentation navigation so that actual runtime, current release requirements, research, archived experiments and future concepts are distinct. Historical TV results remain immutable.
+- Не добавлять Stage 7 целиком, метапамять, FAST/DEEP/SLEEP enhancements, датчики, Pi или обязательный Godot.
+- Проверить **точный последний commit** полного релизного PR и итоговые ресурсные результаты; документировать отклонения.
+- При отсутствии критических блокеров зафиксировать версию, релизный commit/тег и отчёт о принятии. Не переименовывать экспериментальные ветки в production и не переписывать исторические TV отчёты.
+- Подробные планы следующего релиза не создавать, пока не начата отдельная работа над ним.
