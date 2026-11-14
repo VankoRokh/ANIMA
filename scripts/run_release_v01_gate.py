@@ -50,17 +50,26 @@ def _percentile(values, quantile):
     return round(ordered[math.ceil(quantile * len(ordered)) - 1], 3)
 
 
-def _git_sha():
-    result = subprocess.run(
+def _git_snapshot():
+    revision = subprocess.run(
         ["git", "rev-parse", "HEAD"], cwd=ROOT,
         capture_output=True, text=True, timeout=10,
     )
-    return result.stdout.strip() if result.returncode == 0 else "unavailable"
+    changed = subprocess.run(
+        ["git", "status", "--porcelain", "--untracked-files=normal"],
+        cwd=ROOT, capture_output=True, text=True, timeout=10,
+    )
+    if revision.returncode or changed.returncode or changed.stdout.strip():
+        raise AssertionError(
+            "Release evidence requires a clean tracked/untracked Git worktree"
+        )
+    return revision.stdout.strip()
 
 
 def run_gate(events=128):
     if not isinstance(events, int) or isinstance(events, bool) or not 16 <= events <= 1000:
         raise ValueError("events must be an integer between 16 and 1000")
+    snapshot = _git_snapshot()
     with tempfile.TemporaryDirectory(prefix="anima-v01-acceptance-") as folder:
         root = Path(folder)
         base = root / "base"
@@ -149,7 +158,7 @@ def run_gate(events=128):
             "schema": SCHEMA,
             "test_status": "FUNCTIONAL_GATE_PASS",
             "performance_status": "MEASURED_NOT_SLO_GATED",
-            "source_sha": _git_sha(),
+            "source_sha": snapshot,\n            "checkout_clean": True,
             "python": platform.python_version(),
             "machine": platform.machine(),
             "platform": platform.platform(),
