@@ -4,9 +4,11 @@ on:
   push:
     branches:
       - work/anima-v01-documentation-rebuild
+      - work/anima-documentation-migration-v2
   pull_request:
     branches:
       - release/v0.1
+      - work/anima-v01-documentation-rebuild
   workflow_dispatch:
 
 concurrency:
