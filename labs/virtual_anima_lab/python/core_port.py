@@ -217,8 +217,25 @@ class VALDoorPort:
             raise VALPortError("invalid P6 door receipt")
         return data
 
-    def execute(self, root, arguments: dict, operation_id: str) -> dict:
+    def execute(
+        self, root, arguments: dict, operation_id: str, *,
+        expected_world_instance: str | None = None,
+        expected_epoch: int | None = None,
+        expected_revision: int | None = None,
+    ) -> dict:
+        """Optional B2 pinned conditions; legacy callers preserve old behavior.
+
+        The Godot act_door request already checks epoch/revision atomically
+        inside the world. B2 must *not* silently refresh an approved revision.
+        """
         self._target(arguments)
+        if (expected_world_instance is not None
+                and (type(expected_world_instance) is not str
+                     or not expected_world_instance)):
+            raise SandboxToolError("PIN_INVALID", "invalid world pin", effect_possible=False)
+        for pin in (expected_epoch, expected_revision):
+            if pin is not None and (type(pin) is not int or pin < 0):
+                raise SandboxToolError("PIN_INVALID", "invalid clock pin", effect_possible=False)
         try:
             with self._client() as client:
                 ident = self._identity(client.call("hello")["data"])
@@ -226,6 +243,23 @@ class VALDoorPort:
                 obs = validate_observation(envelope["data"], envelope)
                 epoch = obs["observed_at"]["epoch"]
                 self._check_binding(ident, epoch)
+                if (expected_world_instance is not None
+                        and ident != expected_world_instance):
+                    raise SandboxToolError(
+                        "WORLD_CHANGED", "world instance differs from approved world",
+                        effect_possible=False,
+                    )
+                if (expected_epoch is not None and epoch != expected_epoch):
+                    raise SandboxToolError(
+                        "EPOCH_CHANGED", "world epoch differs from approved epoch",
+                        effect_possible=False,
+                    )
+                if (expected_revision is not None
+                        and obs["world_revision"] != expected_revision):
+                    raise SandboxToolError(
+                        "REVISION_CHANGED", "world revision differs from approved revision",
+                        effect_possible=False,
+                    )
                 reading = self._door_reading(obs)
                 if reading is None:
                     raise SandboxToolError(

@@ -1,0 +1,70 @@
+name: M6-B2 laboratory isolation
+
+on:
+  push:
+    branches:
+      - work/anima-v01-integrated-m6b2
+  pull_request:
+    branches:
+      - work/anima-v01-integrated-m6b1
+  workflow_dispatch:
+
+jobs:
+  b2-offline:
+    name: Offline B2 / Python ${{ matrix.python-version }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.12", "3.13", "3.14"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - run: python -m pip install -r requirements-dev.txt
+      - name: B2 synthetic VAL isolated tests (not real Godot)
+        run: python -m pytest -q tests/test_memory_v1_godot_execution_gate.py
+      - name: Documentation and syntax checks
+        run: bash scripts/check.sh
+      - name: Full regression
+        run: python -m pytest -q
+
+  b2-godot-live:
+    name: Real Godot 4.7.2 / Python 3.14 (headless)
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+      - run: python -m pip install -r requirements-dev.txt
+      - name: Download and verify official Godot 4.7.2 x86_64
+        shell: bash
+        run: |
+          set -euo pipefail
+          release="https://github.com/godotengine/godot-builds/releases/download/4.7.2-stable"
+          cd "${RUNNER_TEMP}"
+          curl -fL --retry 3 --max-time 150 -o Godot_v4.7.2-stable_linux.x86_64.zip \
+            "${release}/Godot_v4.7.2-stable_linux.x86_64.zip"
+          curl -fL --retry 3 --max-time 45 -o SHA512-SUMS.txt \
+            "${release}/SHA512-SUMS.txt"
+          grep -F "Godot_v4.7.2-stable_linux.x86_64.zip" SHA512-SUMS.txt | sha512sum --check -
+          unzip -q Godot_v4.7.2-stable_linux.x86_64.zip
+          chmod +x Godot_v4.7.2-stable_linux.x86_64
+          ./Godot_v4.7.2-stable_linux.x86_64 --headless --version
+          echo "GODOT_BIN=${RUNNER_TEMP}/Godot_v4.7.2-stable_linux.x86_64" >> "${GITHUB_ENV}"
+      - name: Import Godot laboratory project (headless)
+        run: timeout 100s "$GODOT_BIN" --headless --path labs/virtual_anima_lab/godot --editor --import
+      - name: M6-B2.3 real Godot isolation, effect, hard-exit and recovery
+        run: |
+          python -m labs.virtual_anima_lab.python.m6b2_live_gate \
+            --godot "$GODOT_BIN" --report "$RUNNER_TEMP/anima-m6b2-godot-live.json"
+      - name: Preserve real Godot evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: anima-m6b2-godot-4-7-2-live
+          if-no-files-found: warn
+          path: ${{ runner.temp }}/anima-m6b2-godot-live.json
