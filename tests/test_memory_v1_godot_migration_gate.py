@@ -70,7 +70,7 @@ def test_m6b1_typed_operator_receipt_validation():
     )
     assert receipt.action == "APPROVE"
     assert replace(receipt,action="REJECT").action == "REJECT"
-    with pytest.raises(ValueError, match="separate"):
+    with pytest.raises(ValueError, match="unknown laboratory"):
         OperatorMigrationDecision(
             ticket_id="t", fingerprint="a" * 64,
             decision_id="r1", operator_ref="test.operator.m6a",
