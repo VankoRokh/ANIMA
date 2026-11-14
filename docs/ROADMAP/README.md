@@ -2,16 +2,20 @@
 
 **Источник статусов и зависимостей — [`docs/project.json`](../project.json).** Таблица ниже создаётся автоматически. Этот документ содержит только ближайшие задачи и минимальные критерии этапов, а не повторяет историю всех промежуточных коммитов.
 
-## Ближайший маршрут
+## Ближайший маршрут — активный релиз ANIMA v0.1
 
-1. **Core v0.1:** завершить повторный независимый аудит источников наблюдений, Belief, Goals/Tasks, допуска действий, независимой Verification, повторов и recovery; зафиксировать точный проверенный SHA. [Критерии ревизии](Core_v0_1_Audit_Boundaries.md).
-2. **Virtual Lab:** P5-A/B/C и интерфейс Normal/Debug завершили локальные испытания, **Core не подключён**. [Сводка полигона](Virtual_ANIMA_Lab_P5C_Scenario_Replay_Draft.md).
-3. **P6 — интеграция Core ↔ Lab:** только после аудита проектировать доверенный адаптер с реальными полномочиями источников и повторной проверкой результатов.
-4. **Stage 7:** принят [семантический контракт](Stage_7_Semantic_Boundary_v0.md) для ограниченного read-only интерфейса, но полный жизненный цикл Knowledge остаётся Planned. Открыты DP-08/09/10b/11; [корпус соответствия](../TESTING/Stage7_Conformance_v0.md).
+**Главный источник критериев:** [RELEASES / v0.1](../RELEASES/README.md), [Release Contract](../RELEASES/ANIMA_v0_1_Release_Contract.md) и [Gap Audit](../RELEASES/ANIMA_v0_1_Gap_Audit.md). Статусы в `docs/project.json` описывают **исторический Stage lifecycle**, а не разрешение выпускать или задерживать v0.1.
+
+1. **Функциональный экземпляр:** поддерживать один headless `anima.release_v01` с Core, Memory, Retrieval, сохранением Identity, Goal/Task boundary и проверяемым восстановлением. Без обязательных LLM/Godot/ARM64.
+2. **Верификация:** использовать локальный [ноутбучный результат](../RELEASES/ANIMA_v0_1_Notebook_Evidence.md), точный clean SHA, последнюю полную CI-регрессию и ограниченную метрику ресурсов. Исправлять только дефекты, нарушающие контракт v0.1.
+3. **Приёмка:** принять R-01–R-10 с явно перечисленными непротестированными режимами. Только после этого оформлять релизный commit/tag.
+4. **Документация:** разделить [RELEASES](../RELEASES/README.md), [ARCHITECTURE](../ARCHITECTURE/README.md), [RESEARCH](../RESEARCH/README.md) и исторические Stage/Testing/Archive без изменения первичных отчётов.
+
+**Не блокируют v0.1:** полный Stage 7 Knowledge lifecycle, полный Stage 8 Godot/VAL, Stage 9 Raspberry Pi, дальнейшее развитие FAST/DEEP/SLEEP, метапамять, камеры, микрофоны, динамики или обучение весов. После выпуска следующий релиз формируется отдельно, а не автоматически из старой Stage-очереди.
 
 **Технические ориентиры:** [архитектура](../ARCHITECTURE/README.md), [рабочий план Core/VAL](Core_v0_1_VAL_v0_1_Plan_Draft.md), [результаты испытаний](../TESTING/Results/README.md), [принятые решения](../DECISIONS/README.md), [исследовательский backlog](Research.md), [старые редакции](../ARCHIVE/Development_Snapshots.md).
 
-**Межэтапная дорожная карта Memory:** [Memory Architecture v1.0 / v1.1](Memory_Architecture_v1_Roadmap.md) — согласованный план укрепления Event Retrieval, Memory Encoding, read-only семантики, SLEEP Consolidation и сквозной проверки. Это рабочий план ветки, **не изменение статусов Stage**; исполнение этапов и их приёмка пока не подтверждены.
+**Отдельное направление Memory:** [Memory Architecture v1.0 / v1.1](Memory_Architecture_v1_Roadmap.md) содержит исследовательские и межэтапные решения. Только принятые и реально подключённые элементы входят в v0.1; остальные [учитываются как эксперименты](../RESEARCH/README.md). Исторические статусы Stage неизменны.
 
 <!-- AUTO:roadmap:START -->
 **Текущая работа:** Stage 6 Cognitive Integration Core завершён и подтверждён TV-0051. Для Stage 7 принят pre-training semantic boundary v0: immutable qualified/time-scoped Claim, отдельные Evidence/Source/Producer/provenance, typed Value v0, explicit temporal semantics, независимые CONTENT/REVISION results и read-only classify_relation/0.1 с deterministic-first processing. Stage 7 implementation остаётся Planned; DP-08, DP-09, полная dependency policy DP-10 и production integration DP-11 открыты. До model training обязательны conformance corpus и измерение реального model residual; LoRA/SFT не начаты.
