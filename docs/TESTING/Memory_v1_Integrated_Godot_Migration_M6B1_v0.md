@@ -1,6 +1,6 @@
 # ANIMA Memory v1 — M6-B1 explicit Godot source migration preflight
 
-**Status:** PREDECLARED — pending independent negative tests and real Godot CI.  
+**Status:** CI VERIFIED — real Godot 4.7.2 eight-case source mapping preflight PASS (zero effects) + full Python 3.12–3.14 regressions PASS; owner laptop acceptance OPEN.  
 **Base:** owner-accepted M6-A `0d81fb74c07ed4c523e2a10fafd7b1fd92363b71`; branch `work/anima-v01-integrated-m6b1`.
 
 ## Why M6-B is split
@@ -34,6 +34,54 @@ The Core P2 SQLite state is persisted at `runtime/core_state.db`, and the existi
 
 The Godot loopback role and source ref are not cryptographic authentication; an attacker with arbitrary local socket/process/SQLite access could spoof data or bypass laboratory composition. A live freshness sample cannot stop a world changing after the check (TOCTOU). No physical sensor, Raspberry Pi, real `SIGKILL`, power loss or permission isolation is demonstrated in B1. **A green B1 cannot be described as successful M6-B executable migration.**
 
-## Results
+## Results — GitHub CI, 2026-11-14
 
-Pending.
+**Frozen executable SHA:** `7694efea93049fff9c3b367890ab73d7204cc281`.  
+**Workflow:** [GitHub Actions #43592321747](https://github.com/VankoRokh/ANIMA/actions/runs/43592321747) — **SUCCESS in all four Linux jobs**.
+
+| Gate | Python 3.12 | Python 3.13 | Python 3.14 |
+| --- | ---: | ---: | ---: |
+| M0–M6-B1 targeted tests | **102 PASS** | **102 PASS** | **102 PASS** |
+| Full repository regression | **1749 PASS** | **1749 PASS** | **1749 PASS** |
+| Documentation/syntax gate | PASS | PASS | PASS |
+| Real Godot 4.7.2 pinned binary | — | — | **PASS (separate lane)** |
+
+### Actual live Godot preflight (NOT execution)
+
+The live lane obtained the official Linux x86_64 Godot `4.7.2-stable` ZIP, verified SHA256 `cadd3204e728a35d3f13adb7fd0d7902636b79f6b95c40c265eb73b6c35329e4`, and also ran existing `BridgeP6DoorTest.gd`. It then started eight **separate live Godot processes** for the new migration preflight.
+
+The emitted `M6B1_GODOT_SOURCE_PREFLIGHT_PASS` JSON contains eight `M6B1_CASE_PASS` results; the total Godot world effects is **0**.
+
+| Case | Expected / observed gate behavior |
+| --- | --- |
+| `normal` | exact original M4/M5 Goal and immutable source map reviewed; separate typed host APPROVE; fresh second P6 observation from same world identity/epoch/revision; mapping revalidated with `action_authorized=false` |
+| `unapproved` | no host migration APPROVE → denied |
+| `rejected` | explicit host REJECT remains terminal → denied |
+| `stale` | **synthetic adapter replay** of the original stored sample → rejected as stale (not an actual repeated Godot observation) |
+| `mapping_changed` | deliberate mutation of stored producer mapping → rejected (test-only SQLite injection) |
+| `source_modified` | deliberate mutation of original historical Memory after review → rejected |
+| `sample_corrupt` | deliberate mutation of original P6 sample ledger revision → rejected |
+| `world_restarted` | **actual Godot process replacement** with different `world_instance_id` → rejected |
+
+The normal and all denied cases verify: the existing canonical Goal remains active and bound only under its original M5 virtual source; no Task, new Goal, Knowledge or Operation is created; no Godot `act_door` call occurs. No `CoreDoorExecution` or P3-C is installed by B1.
+
+**Provenance semantics:** `lab_tick`, Godot `epoch/tick` and adapter `lab_sample` are stored as distinct domains. The source map explicitly sets `same_source_authority=false`, `clock_conversion_authorized=false`, `target_p2_registered=false`, `execution_permission=false`. A successful mapping does **not** make M5's existing Core P2 Belief valid for Godot.
+
+**Observed correction:** an initial CI run passed all 102 targeted tests and the real Godot gate but failed three unrelated documentation fixture tests because `docs/TESTING/README.md` linked to newly added external Python files that were omitted from synthetic docs-only test repositories. The index now represents those code locations as literal paths rather than broken relative Markdown links. The final run above passed the full 1749-test regression on all Python versions. No behavior or `anima/` production code was modified by that correction.
+
+### Owner laptop acceptance — OPEN
+
+Use a fresh isolated `ANIMA-M6B1` worktree and local Python 3.14.4 with **Godot 4.7.2**. Run from the repository root:
+
+```bash
+python -m labs.virtual_anima_lab.python.m6b1_live_gate \\
+  --godot "$HOME/.local/opt/godot/Godot_v4.7.2-stable_linux.x86_64" \\
+  --report /tmp/anima-m6b1-PC.json
+```
+
+The runner starts and terminates its own eight local headless Godot processes on random loopback ports and uses disposable temporary Core data directories; **no production ANIMA data**. It refuses existing reports and repo-internal report paths. Report fields include `commit`, `godot_version`, `python`, eight cases, and `world_effect_total=0`. Expected `status=M6B1_GODOT_SOURCE_PREFLIGHT_PASS`. **Do not claim owner's laptop PASS until the original JSON has been examined.**
+
+### Explicit stop before M6-B2
+
+M6-B1 is **only** a non-executable source migration preflight. The next step must design how to isolate the P6 target P2 lineage from old M5 `runtime/core_state.db`, while retaining the canonical Goal and raw Memory/Event provenance. The target P2 source must be registered anew, checked against the approved mapping, and require **fresh action-scoped authorization** before a Godot Tool handler is installed. The M6-A single-use permit cannot be used for Godot. Preserve read-only `door_operation_status` reconciliation, independent P6 sensor Proof, and no retry after uncertain effects. A global production `build_core` authorization firewall and operator authentication remain unresolved and are not silently claimed.
+
