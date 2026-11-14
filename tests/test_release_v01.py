@@ -183,3 +183,17 @@ def test_release_explicit_sandbox_goal_task_independent_proof_and_reopen(tmp_pat
     )
     assert wrong.returncode != 0
     assert "capability profile mismatch" in wrong.stderr
+
+
+def test_release_refuses_silent_migration_of_existing_lab_storage(tmp_path):
+    sentinel = tmp_path / "core_state.db"
+    sentinel.write_text("protected legacy fixture", encoding="utf-8")
+    attempted = subprocess.run(
+        [sys.executable, "-B", "-m", "anima.release_v01",
+         "--data-dir", str(tmp_path)],
+        cwd=ROOT, input="", text=True, capture_output=True, timeout=30,
+    )
+    assert attempted.returncode != 0
+    assert "Unlabelled nonempty instance directory" in attempted.stderr
+    assert sentinel.read_text(encoding="utf-8") == "protected legacy fixture"
+    assert not (tmp_path / "release_profile.json").exists()
