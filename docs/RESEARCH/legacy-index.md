@@ -2,7 +2,7 @@
 
 Этот раздел — **навигация по исследованиям, а не релизный Roadmap**. Статус `PASS` относится к конкретной гипотезе, test fixture и commit. Он не подтверждает включение алгоритма в рабочую ANIMA.
 
-**Что входит в текущую версию:** [ANIMA v0.1 — контракт](../RELEASES/ANIMA_v0_1_Release_Contract.md) и [фактическая архитектура](../ARCHITECTURE/README.md).  
+**Что входит в текущую версию:** [ANIMA v0.1 — контракт](../RELEASES/ANIMA_v0_1_Release_Contract.md) и [фактическая архитектура](../ARCHITECTURE/README.md).
 **Реестр исследовательских вопросов:** [исторический Research Track](../ROADMAP/Research.md).
 
 ## Отдельные направления
