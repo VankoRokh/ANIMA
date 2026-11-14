@@ -4,7 +4,7 @@
 
 ## Куда идти
 
-Канонические входы: [дорожная карта](roadmap.md), [история](history/README.md), [архитектура](system/README.md), [исследования](RESEARCH/README.md), [контракт v0.1](versions/v0.1/contract.md), [приёмка v0.1](versions/v0.1/acceptance.md), [эксплуатация](operations.md), [рабочее пространство](workspace.md), [верификация](verification.md) и [правила ведения](documentation.md). Старые пути `ROADMAP/`, `STAGES/` и `RELEASES/` пока сохранены для исторических ссылок.
+Канонические входы: [дорожная карта](roadmap.md), [история](history/README.md), [архитектура](system/README.md), [исследования](RESEARCH/README.md), [контракт v0.1](versions/v0.1/contract.md), [приёмка v0.1](versions/v0.1/acceptance.md), [ресурсы R-08](versions/v0.1/resources.md), [эксплуатация](operations.md), [рабочее пространство](workspace.md), [верификация](verification.md) и [правила ведения](documentation.md). Старые пути `ROADMAP/`, `STAGES/` и `RELEASES/` пока сохранены для исторических ссылок.
 
 | Вопрос | Раздел | Что там находится |
 | --- | --- | --- |
