@@ -128,7 +128,7 @@ def test_canonical_release_and_architecture_routes(repo):
     assert "## 4. Приёмка R-01–R-10" in legacy_contract
     architecture = (repo / "docs/system/README.md").read_text()
     assert "CoreIngress" in architecture and "sandbox-door" in architecture
-    assert "CoreDoorExecution" in architecture and "core_execution=None" in architecture
+    assert "| `CoreDoorExecution` / `CoreAutonomy` | Нет |" in architecture
     check_documentation(repo)
 
 
