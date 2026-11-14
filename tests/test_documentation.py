@@ -159,8 +159,10 @@ def test_research_catalog_preserves_negative_evidence(repo):
     assert "operator_authenticated=false" in virtual
     assert "опубликованном CI report" in virtual and "владельческого ноутбука" in virtual
 
-    legacy = (repo / "docs/RESEARCH/README.md").read_text()
-    assert "../RESEARCH/README.md" in legacy
+    legacy = (repo / "docs/RESEARCH/legacy-index.md").read_text()
+    assert "## Отдельные направления" in legacy
+    assert "legacy-index.md" in index
+    assert not (repo / "docs/research").exists()
     check_documentation(repo)
 
 
