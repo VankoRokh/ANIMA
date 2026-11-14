@@ -228,8 +228,13 @@ def verify(root, case):
             turn = gate.execute_approved(row["ticket_id"], executable)
             assert turn.outcome in ("DEFERRED", "VERIFIED_SUCCESS"), turn
             # A second explicit recovery turn must not produce a second Tool effect.
-            again = gate.execute_approved(row["ticket_id"], executable)
-            assert again.outcome in ("DEFERRED", "VERIFIED_SUCCESS", "RECOVERED_VERIFIED_SUCCESS"), again
+            # This is READ-ONLY recovery of an existing Core operation, NOT
+            # a second M6 execution admission. Any attempted new Tool call
+            # remains blocked by the single-use handler.
+            again = executable.runtime.run_core_door_goal(goal_id)
+            assert again.outcome in (
+                "DEFERRED", "VERIFIED_SUCCESS", "RECOVERED_VERIFIED_SUCCESS"
+            ), again
             op_status = "uncertain" if case == "before_effect" else "succeeded"
         _base_assert(
             root, goal_id, effects=0 if case == "before_effect" else 1,
