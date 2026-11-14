@@ -43,6 +43,6 @@ Stage 1 создал `EventLog`, SQLite `MemoryStore`, `LinkStore`, эпизод
 
 ## 5. Граница Foundation
 
-Релиз включает `EventRetrieval`, полное проверяемое индексирование, ограниченный Memory Context и возможность точечного raw provenance. E1–E4, Stage 7 write/revision и M6-B2 как обязательный Godot runtime **не входят** в базовый профиль. Конкретные требования — в [контракте](../versions/v0.1/contract.md), включённые механизмы — в [архитектуре Memory](../system/memory-and-retrieval.md) и [исследованиях](../research/README.md).
+Релиз включает `EventRetrieval`, полное проверяемое индексирование, ограниченный Memory Context и возможность точечного raw provenance. E1–E4, Stage 7 write/revision и M6-B2 как обязательный Godot runtime **не входят** в базовый профиль. Конкретные требования — в [контракте](../versions/v0.1/contract.md), включённые механизмы — в [архитектуре Memory](../system/memory-and-retrieval.md) и [исследованиях](../RESEARCH/README.md).
 
 **Не доказано:** полнота смыслового поиска, идеальная сегментация эпизодов, production-допуск E4/L2, физически независимый source authentication. Для E4 сохранён `NO-GO` до отдельной приёмки.
