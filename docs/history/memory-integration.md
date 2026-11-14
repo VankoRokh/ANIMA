@@ -35,12 +35,12 @@ Stage 1 создал `EventLog`, SQLite `MemoryStore`, `LinkStore`, эпизод
 | M5 | Отдельный binding approval и новое зарегистрированное наблюдение | Исполнительный модуль |
 | M6-A | Третье разрешение и одноразовый эффект старого тестового мира | Перенос capability в Godot |
 | M6-B1 | New Godot lineage, `source/producer/epoch/revision`, явный mapping approval | Права на действие; 8/8 live, ноль эффектов |
-| M6-B2 | Независимые target P2/P3-A и конкретная Godot operation | Глобальный firewall; CI 10/10, ноутбук 10/10, `true_sigkill_tested=false` |
+| M6-B2 | Независимые target P2/P3-A и конкретная Godot operation | Глобальный firewall; CI 10/10, локальный gate не подтверждён первичным CI-отчётом, `true_sigkill_tested=false` |
 
-Исходные протоколы и фактические ограничения сохранены в [архивной сводке интеграций](../TESTING/Laboratory_Integrations.md) и отчётах по каждому M-срезу. Отдельные approval, source authority и readback — системные, не производные из свободного текста.
+Для M6-B2 [первичный CI-отчёт](../TESTING/Memory_v1_Integrated_Godot_Execution_M6B2_CI_Result_v0.md) подтверждает 10/10 **в GitHub Actions**, но прямо исключает локальную приёмку ноутбука на том же SHA. Если владельцем был выполнен иной локальный gate, его результат нуждается в отдельной исходной записи, прежде чем он попадёт в таблицу.\n\nИсходные протоколы и фактические ограничения сохранены в [архивной сводке интеграций](../TESTING/Laboratory_Integrations.md) и отчётах по каждому M-срезу. Отдельные approval, source authority и readback — системные, не производные из свободного текста.
 
 ## 5. Граница Foundation
 
-Релиз включает `EventRetrieval`, полное проверяемое индексирование, ограниченный Memory Context и возможность точечного raw provenance. E1–E4, Stage 7 write/revision и M6-B2 как обязательный Godot runtime **не входят** в базовый профиль. Конкретные требования — в [контракте](../versions/v0.1/contract.md), включённые механизмы — в [архитектуре Memory](../system/memory-and-retrieval.md).
+Релиз включает `EventRetrieval`, полное проверяемое индексирование, ограниченный Memory Context и возможность точечного raw provenance. E1–E4, Stage 7 write/revision и M6-B2 как обязательный Godot runtime **не входят** в базовый профиль. Конкретные требования — в [контракте](../versions/v0.1/contract.md), включённые механизмы — в [архитектуре Memory](../system/memory-and-retrieval.md) и [исследованиях](../research/README.md).
 
 **Не доказано:** полнота смыслового поиска, идеальная сегментация эпизодов, production-допуск E4/L2, физически независимый source authentication. Для E4 сохранён `NO-GO` до отдельной приёмки.
