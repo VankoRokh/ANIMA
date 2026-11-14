@@ -1,6 +1,8 @@
 # Исследования и экспериментальные ветки ANIMA
 
-> **Исторический навигационный адрес.** Каноническая современная карта — [`docs/research/`](../research/README.md), с тематическими страницами [Retrieval](../research/retrieval.md), [E1–E4](../research/memory-encoding.md), [Stage 7](../research/semantics.md), [VAL/M0–M6-B2](../research/virtual-world.md) и [дальнейшими исследованиями](../research/future-directions.md). Таблицы ниже сохранены для прежних ссылок; текущие выводы и SHA сверяются с тематическими страницами.\n\nЭтот раздел — **навигация по исследованиям, а не релизный Roadmap**. Статус `PASS` относится к конкретной гипотезе, test fixture и commit. Он не подтверждает включение алгоритма в рабочую ANIMA.
+> **Исторический навигационный адрес.** Каноническая современная карта — [`docs/research/`](../research/README.md), с тематическими страницами [Retrieval](../research/retrieval.md), [E1–E4](../research/memory-encoding.md), [Stage 7](../research/semantics.md), [VAL/M0–M6-B2](../research/virtual-world.md) и [дальнейшими исследованиями](../research/future-directions.md). Таблицы ниже сохранены для прежних ссылок; текущие выводы и SHA сверяются с тематическими страницами.
+
+Этот раздел — **навигация по исследованиям, а не релизный Roadmap**. Статус `PASS` относится к конкретной гипотезе, test fixture и commit. Он не подтверждает включение алгоритма в рабочую ANIMA.
 
 **Что входит в текущую версию:** [ANIMA v0.1 — контракт](../RELEASES/ANIMA_v0_1_Release_Contract.md) и [фактическая архитектура](../ARCHITECTURE/README.md).  
 **Реестр исследовательских вопросов:** [исторический Research Track](../ROADMAP/Research.md).
