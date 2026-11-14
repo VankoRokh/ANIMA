@@ -1,7 +1,6 @@
 """Render documentation summaries from canonical metadata, using only stdlib."""
 
 import argparse
-import ast
 from datetime import date
 import json
 from pathlib import Path
@@ -17,8 +16,7 @@ REPORT_SECTIONS = (
     "Фактический результат", "Метрики", "Доказано", "Не доказано",
 )
 BLOCKS = {
-    "README.md": "summary",
-    "docs/ROADMAP/README.md": "roadmap",
+    "docs/history/stages.md": "roadmap",
     "docs/TESTING/Results/README.md": "results",
 }
 
@@ -80,22 +78,6 @@ def load_project(root):
     return project
 
 
-def prototype_version(root):
-    # Parse the default literal without importing/instantiating an ANIMA runtime.
-    path = root / "anima/core/state.py"
-    tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
-    for cls in tree.body:
-        if isinstance(cls, ast.ClassDef) and cls.name == "AnimaState":
-            for method in cls.body:
-                if isinstance(method, ast.FunctionDef) and method.name == "_default_state":
-                    for node in ast.walk(method):
-                        if isinstance(node, ast.Return) and isinstance(node.value, ast.Dict):
-                            for key, value in zip(node.value.keys, node.value.values):
-                                if isinstance(key, ast.Constant) and key.value == "version":
-                                    return plain(ast.literal_eval(value), "prototype version")
-    raise ValueError("Cannot read prototype version from AnimaState._default_state")
-
-
 def load_reports(root, project):
     reports = []
     ids = set()
@@ -134,18 +116,7 @@ def stage_anchor(stage_id):
 def render_blocks(root):
     project = load_project(root)
     reports = load_reports(root, project)
-    registry = {s["id"]: s for s in project["stages"]}
-    current = registry[project["current_stage"]]
-    version = prototype_version(root)
-    summary = (
-        f"Версия прототипа: **{version}** (из кода).\n\n"
-        f"Текущий фокус: **{current['id']} — {current['title']}** ({current['status']}).\n\n"
-        f"{project['focus']}\n\n"
-        "[Этапы и критерии](docs/ROADMAP/README.md).\n"
-    )
     roadmap = [
-        f"**Текущая работа:** {project['focus']}", "",
-        f"**Фокус:** {current['id']} — {current['title']} ({current['status']}).", "",
         "| Этап | Проверяемый результат | Статус | Зависимости |",
         "|---|---|---|---|",
     ]
@@ -163,9 +134,9 @@ def render_blocks(root):
         stage = report["stage"]
         results.append(
             f"| [{report['id']} — {report['title']}]({report['id']}.md) | {report['date']} | "
-            f"[{stage}](../../ROADMAP/README.md#{stage_anchor(stage)}) | {report['result']} | {snapshot} |"
+            f"[{stage}](../../history/stages.md#{stage_anchor(stage)}) | {report['result']} | {snapshot} |"
         )
-    contents = {"summary": summary, "roadmap": "\n".join(roadmap) + "\n", "results": "\n".join(results) + "\n"}
+    contents = {"roadmap": "\n".join(roadmap) + "\n", "results": "\n".join(results) + "\n"}
     rendered = {}
     for relative, block in BLOCKS.items():
         path = root / relative
