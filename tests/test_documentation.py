@@ -162,7 +162,8 @@ def test_research_catalog_preserves_negative_evidence(repo):
     legacy = (repo / "docs/RESEARCH/legacy-index.md").read_text()
     assert "## Отдельные направления" in legacy
     assert "legacy-index.md" in index
-    assert not (repo / "docs/research").exists()
+    names = [p.name.casefold() for p in (repo / "docs").iterdir() if p.is_dir()]
+    assert len(names) == len(set(names)), "Case-only docs directories collide"
     check_documentation(repo)
 
 
