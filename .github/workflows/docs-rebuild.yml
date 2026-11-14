@@ -49,17 +49,23 @@ jobs:
         run: |
           python -m scripts.run_release_v01_gate --events 128 \
             --report "${{ runner.temp }}/anima-v01-docsmigration.json"
-      - name: R-08 / диагностический корпус 160 событий (не release-gate)
+      - name: R-08 / разнородные события без служебной разметки
         run: |
-          python -m scripts.run_release_v01_diversity_probe --events 160 --seed 7 \
-            --report "${{ runner.temp }}/anima-v01-r08-diversity.json"
-      - name: Сохранить R-08 сырые данные
+          python -m scripts.run_release_v01_diversity_probe --events 160 --seed 7 --mode plain \
+            --report "${{ runner.temp }}/anima-v01-r08-plain.json"
+      - name: R-08 / контроль с общей служебной разметкой
+        run: |
+          python -m scripts.run_release_v01_diversity_probe --events 160 --seed 7 --mode labeled \
+            --report "${{ runner.temp }}/anima-v01-r08-labeled.json"
+      - name: Сохранить R-08 исходные JSON обеих нагрузок
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: anima-v01-r08-diversity-${{ matrix.python-version }}
           if-no-files-found: warn
-          path: ${{ runner.temp }}/anima-v01-r08-diversity.json
+          path: |
+            ${{ runner.temp }}/anima-v01-r08-plain.json
+            ${{ runner.temp }}/anima-v01-r08-labeled.json
       - name: Сохранить первичный JSON gate
         if: always()
         uses: actions/upload-artifact@v4
