@@ -1,0 +1,48 @@
+name: ANIMA v0.1 foundation acceptance (provisional)
+
+on:
+  push:
+    branches:
+      - work/anima-v0-1-release
+  pull_request:
+    branches:
+      - work/anima-v01-integrated-m6b2
+  workflow_dispatch:
+
+
+concurrency:
+  group: anima-v01-${{ github.head_ref || github.ref_name }}
+  cancel-in-progress: true
+
+jobs:
+  release-baseline:
+    name: Foundation / Python ${{ matrix.python-version }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.12", "3.13", "3.14"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - run: python -m pip install -r requirements-dev.txt
+      - name: v0.1 release-profile targeted tests (including process SIGKILL)
+        run: python -m pytest -q tests/test_release_v01.py
+      - name: Integrated v0.1 evidence (not performance SLA)
+        run: |
+          python -m scripts.run_release_v01_gate --events 128 \
+            --report "${{ runner.temp }}/anima-v01-foundation.json"
+      - name: Preserve v0.1 evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: anima-v01-foundation-${{ matrix.python-version }}
+          if-no-files-found: warn
+          path: ${{ runner.temp }}/anima-v01-foundation.json
+      - name: Repository integrity / documentation checks
+        run: bash scripts/check.sh
+      - name: Full regression (no optional Godot binary or LLM required)
+        run: python -m pytest -q

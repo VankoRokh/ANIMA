@@ -9,6 +9,18 @@ Stage 6 завершён и является текущей реализован
 Принятый Stage 7 semantic boundary пока **не реализован**; он документирован в
 [Stage 7 Semantic Boundary v0](../ROADMAP/Stage_7_Semantic_Boundary_v0.md).
 
+## Релизная сборка ANIMA v0.1
+
+**Исполняемая точка входа кандидата:** [`anima/release_v01.py`](../../anima/release_v01.py). Составляет уже существующие `CoreAssembly` и `Runtime` через `build_core`; не заменяет внутренние жизненные циклы своей реализацией. Для текущей версии используется persistent Identity, State, EventLog, EventProcessingCoordinator, MemoryStore/LinkStore, EventRetrieval (opt-in), RetrievalEngine + ContextBuilder, InternalState/GoalStore и CoreIngress/GoalDecision без зарегистрированных внешних источников и исполнительных capabilities.
+
+**Default:** локальный JSONL stdin driver, поддерживает несколько пользовательских reports, bounded чтение памяти, статус и остановку; LLM, сеть, Godot и внешние исполнители отсутствуют. Сообщения `conversation.user` не являются доверенными `state.property` наблюдениями, поэтому не создают Core Beliefs или подтверждённое Knowledge автоматически.
+
+**Только в отдельно включаемой локальной фикстуре:** `--sandbox-door` регистрирует известный сенсор/действие VirtualDoorWorld и проверяет Goal/Task, допуск, keyed effect и independent verification. Реальный внешний доверенный адаптер не входит в релизный профиль.
+
+Профиль возможностей записывается в `release_profile.json`. `flock` защищает от одновременной работы двух штатных экземпляров с одним каталогом. Непустой каталог неизвестного профиля и попытка переключить активный профиль без миграции отклоняются. Это минимальная защита согласованности **кооперативного Linux runtime**, а не система аутентификации операторов или граница для недоверенного локального кода.
+
+**Release gates и доказательства:** [RELEASES](../RELEASES/README.md). Предыдущие Stage 6 и Memory v1 лаборатории остаются источниками кода и исторических свидетельств, но не должны автоматически обозначаться как принятые части v0.1.
+
 ## Текущий system-owned контур
 
 ```text
