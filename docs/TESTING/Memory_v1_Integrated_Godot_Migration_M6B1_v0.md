@@ -74,8 +74,8 @@ The normal and all denied cases verify: the existing canonical Goal remains acti
 Use a fresh isolated `ANIMA-M6B1` worktree and local Python 3.14.4 with **Godot 4.7.2**. Run from the repository root:
 
 ```bash
-python -m labs.virtual_anima_lab.python.m6b1_live_gate \\
-  --godot "$HOME/.local/opt/godot/Godot_v4.7.2-stable_linux.x86_64" \\
+python -m labs.virtual_anima_lab.python.m6b1_live_gate \
+  --godot "$HOME/.local/opt/godot/Godot_v4.7.2-stable_linux.x86_64" \
   --report /tmp/anima-m6b1-PC.json
 ```
 
