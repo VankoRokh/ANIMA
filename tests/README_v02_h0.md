@@ -2,6 +2,8 @@
 
 **Статус:** первый пакет тестов сохранён в отдельной ветке, **без исправлений production-кода**.
 
+> **H3 (N5/N8):** ветка `work/v02-h3-retrieval-eligibility` переводит N5 и N8 в PASS. Для текущего H0-файла ожидаются `7 PASS + 2 XFAIL`; остаются N1 и N2. Новые 16 H3-тестов и правила времени/усечения описаны в `tests/README_v02_h3.md`.
+
 > **H2.2:** `work/v02-h2-evidence-dependencies` переводит N4 в PASS за счёт запрета удаления Memory с зависимостями и проверки действительности Knowledge evidence. В H0 теперь `5 PASS + 4 XFAIL`: остаются N1, N2, N5, N8. См. `tests/README_v02_h2_2.md`.
 
 > **H2.1:** `work/v02-h2-knowledge-confirmation-guard` переводит N3 в PASS (отказ прямого создания `confirmed`); в H0 теперь `4 PASS + 5 XFAIL`. Известные проблемы действительности существующих `supports` остаются задачей H2.2. См. `tests/README_v02_h2_1.md`.
