@@ -53,6 +53,14 @@
 
 **Расчёт полного pytest — `2038 passed` (2030 + 8). Это НЕ исполненный результат.**
 
+## Регрессионный отказ Stage 6 и исправление фикстуры
+
+Первый полный прогон владельца завершился **`2035 passed, 3 failed` за 88,18 с**. Все три падения — `tests/test_stage6_experiments.py::test_request_more_context_*`: тестовый `FixtureRetrieval.retrieve()` возвращал `stats={candidates:1,returned:1}` без полей `fts_truncated` и `filters_truncated`, а `ContextBuilder` по контракту F-07 требует эти флаги.
+
+Исправлен **только тестовый адаптер** `tests/test_stage6_experiments.py`: он явно возвращает оба поля со значением `False`. Это достоверно для фиксированного синтетического адаптера с одним заранее известным результатом и без поиска в FTS/фильтрах. Production `ContextBuilder` и `RetrievalEngine` не изменены, **не** используются `.get(..., False)` или молчаливые значения по умолчанию. Отсутствие данных о покрытии по-прежнему вызывает отказ, а не ложное `retrieval_coverage.complete=True`.
+
+Количество pytest cases **не изменилось**, расчёт полной регрессии по-прежнему `2038 passed`. После изменения фикстуры **повторный прогон ещё не сообщён**.
+
 ## Команды на ноутбуке владельца
 
 ```bash
@@ -62,6 +70,7 @@ git rev-parse HEAD
 PYTHONPATH="$PWD" .venv/bin/python -m pytest -q -rx \
   tests/test_v02_h55_r4_4_context_coverage.py \
   tests/test_context_builder.py \
+  tests/test_stage6_experiments.py \
   tests/test_v02_h3_2_retrieval_eligibility.py \
   tests/test_v02_h55_r4_3_temporal_confirmation.py \
   tests/test_v02_h55_r4_2_temporal_merge.py \
