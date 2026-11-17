@@ -98,9 +98,19 @@ def test_h1_3_missing_prior_locator_refuses_extension(tmp_path):
             "DELETE FROM indexed_events WHERE event_id = ?",
             (make_event(4, "ignored").event_id,),
         )
-    log.write(make_event(100, "append after removed locator"))
-    with pytest.raises(ValueError, match="Indexed EventLog prefix changed"):
+    cursor_before = index.status()["indexed_bytes"]
+    appended = make_event(100, "append after removed locator")
+    log.write(appended)
+    with pytest.raises(
+        ValueError, match="Indexed EventLog prefix locator count mismatch"
+    ):
         index.sync(max_events=128)
+
+    # The failure is diagnostic, with no index checkpoint advancement.
+    after = index.status()
+    assert after["indexed_bytes"] == cursor_before
+    assert after["status"] == "partial"
+    assert index.get(appended.event_id, require_complete=False) is None
 
 
 def test_h1_3_existing_blank_spacer_lines_are_not_mistaken_for_events(tmp_path):
