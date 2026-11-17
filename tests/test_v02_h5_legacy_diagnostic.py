@@ -114,11 +114,11 @@ def test_h5_legacy_orphaned_relation_is_detected_without_repair(tmp_path):
         "orphan_relation_source",
         "orphan_relation_provenance",
         "invalid_active_knowledge_evidence",
-        "confirmed_without_live_closed_support",
     ):
-        assert relation["id"] in report["findings"][code]["ids"] if code != (
-            "confirmed_without_live_closed_support"
-        ) else kn_id in report["findings"][code]["ids"]
+        assert relation["id"] in report["findings"][code]["ids"]
+    assert kn_id in report["findings"][
+        "confirmed_without_live_closed_support"
+    ]["ids"]
     assert store.database_file.read_bytes() == before
     assert links.get_relation(relation["id"]) is not None
 
