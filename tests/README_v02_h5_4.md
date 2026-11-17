@@ -1,7 +1,7 @@
 # ANIMA v0.2 — H5.4 / Backup, Migration, Compatibility & Rollback
 
-**Статус:** H5.4a — кандидат, **не испытан**. H5.4 целиком **не принят**.  
-**Ветка:** `work/v02-h5-backup-rollback`.  
+**Статус:** H5.4a **принят** по отчёту владельца: адресные `35 passed` за 2,57 с, полная регрессия `1959 passed` за 89,24 с. H5.4b — проверка pinned ledger/legacy authority, **ожидает испытаний**. H5.4 целиком не принят.  
+**Ветка H5.4a:** `work/v02-h5-backup-rollback`. **Ветка H5.4b:** `work/v02-h5-compatibility-contract`.  
 **Основа:** H5.3c после полного прогона владельца: `1947 passed`, 93,68 с. 160/640 × 1/8 Memory × 3 повторения: при 8 Memory process p95 сократился примерно на 28–32% (синтетика; при 1 Memory устойчивого ускорения не установлено).
 
 ## H5.4a — Контракт безопасного восстановления
@@ -51,7 +51,7 @@ PYTHONPATH="$PWD" .venv/bin/python -m pytest -q \
 PYTHONPATH="$PWD" .venv/bin/python -m pytest -q
 ```
 
-Полная регрессия **расчётно `1959 passed`**, если состав предыдущего набора остался неизменным (1947 + 12). **До исполнения это не PASS.**
+**Подтверждено владельцем:** `35 passed` (адресные) / 2,57 с, `1959 passed` (полная регрессия) / 89,24 с. Это evidence выполнения на ноутбуке владельца, не независимое воспроизведение.
 
 ### Команды после приёмки (только остановленный, проверенный экземпляр)
 
@@ -70,7 +70,7 @@ PYTHONPATH="$PWD" .venv/bin/python -m labs.v02_h5_snapshot restore \
 
 Операции возвращают JSON с хешем manifest; для внешнего хранения идентичности использовать `sha256sum /ABSOLUTE/PATH/TO/NEW-SNAPSHOT/h5_snapshot_manifest.json`. При ошибке до manifest может остаться **частичная** новая папка: её нельзя восстанавливать; инструмент намеренно не удаляет и не переиспользует такую директорию автоматически.
 
-## H5.4b — Явные решения по совместимости (ещё не принято)
+## H5.4b — Pinned ledger & legacy authority (кандидат; испытания не выполнены)
 
 | Контракт | Текущее состояние | Риск / решение |
 |---|---|---|
@@ -80,6 +80,46 @@ PYTHONPATH="$PWD" .venv/bin/python -m labs.v02_h5_snapshot restore \
 | `EventRetrieval` index schema | additive `prefix_digest`, `indexed_count` | На месте — проверяемая миграция и пересчёт старого префикса. При восстановлении в новый каталог — отбросить производный индекс и построить из Raw. |
 | Старые `confirmed` / `about` / `relations` | не исправлены автоматически | H5.0 обнаруживает ряд нарушений Evidence/Orphan. Исторические `about` без достоверной authority provenance требуют отдельного review; нельзя считать все `about` действительными или безусловно удалить. |
 | Python 3.12 / Pi | `NOT_TESTED` | Отдельное обязательное/условное evidence, не подменять результатами 3.14. |
+
+### Принятый технический принцип H5.4b
+
+`EventProcessingCoordinator.PROCESSOR_VERSION = "1.0"` обозначает **namespace идемпотентности** по ключу `(event_id, processor, processor_version)`, а не идентичность всех семантических алгоритмов MemoryProcessor. После H4 новые ассоциации изменились, но старые `done/skipped` без отдельной явной миграции должны остаться финализированными. Просто поднять номер до `2.0` опасно: старые `done` перестали бы учитываться новым coordinator, возник бы риск повторной обработки и дублирования эффектов.
+
+В `labs/v02_h5_compatibility.py` добавлен **read-only аудит только согласованной офлайновой копии** `memory.db` + `events.jsonl`, совместно с H5.0. Никакого `MemoryStore`, новой схемы, `EventProcessingCoordinator.recover()`, фонового исправления, reprocessing, переписывания Raw или изменения status не производится.
+
+Диагностика возвращает:
+- `NO_ISSUES_DETECTED`: не обнаружены нарушения проверяемых контрактов. Это **не** автоматическое разрешение RC, миграции или запуска реального экземпляра.
+- `REVIEW_REQUIRED`: встречены исторические `memory → entity:about` без достаточных метаданных о полномочиях источника или записи `memory_processor` из других версий. Эти записи не объявляются ложными автоматически; они требуют отдельной ручной аттестации на копии.
+- `BLOCKED`: H5.0 выявил нарушения integrity, отсутствует Raw для любого processing row, `done` без `memory_sources`, `skipped` с `memory_sources`, незавершённая обработка с уже сохранёнными Memory sources или один Event обработан под разными версиями.
+
+Список finding ограничен 8 идентификаторами на категорию; тексты Memory не экспортируются. Отчёт содержит реальное распределение ledger по версиям и status, ожидаемые `SCHEMA_VERSION=1`, `PROTOCOL=anima.release.v0_1/0.1` и `PROCESSOR_VERSION=1.0`.
+
+**8 новых тестов** в `tests/test_v02_h5_4_compatibility.py`: чистое состояние и неизменность файлов, legacy `about` + повтор старого `done` + новый конфликтующий Entity claim, иной processor version, двойная версия одного Event, `done` без источника, `skipped` с неожиданным источником, `pending` с источником, `pending` без Raw.
+
+Команды локального прогона:
+```bash
+git status --short
+git rev-parse HEAD
+PYTHONPATH="$PWD" .venv/bin/python -m pytest -q -rx \
+  tests/test_v02_h5_4_compatibility.py \
+  tests/test_v02_h5_4_snapshot_restore.py \
+  tests/test_v02_h5_legacy_diagnostic.py \
+  tests/test_v02_h4_identity_guard.py
+
+PYTHONPATH="$PWD" .venv/bin/python -m pytest -q
+```
+
+**Расчётно `1967 passed`** (1959 + 8 новых), это **не результат исполнения**.
+
+После приёмки запускать CLI можно **только на согласованной offline-копии**, например на новом snapshot из H5.4a:
+```bash
+PYTHONPATH="$PWD" .venv/bin/python -m labs.v02_h5_compatibility \
+  --memory-db /path/to/SNAPSHOT/memory.db \
+  --events /path/to/SNAPSHOT/events.jsonl \
+  --output /tmp/anima-h54b-compatibility.json
+```
+
+Для `REVIEW_REQUIRED` или `BLOCKED` exit code 2 — это статус диагностики, не повод игнорировать проблему или запускать repair. Реальные исторические `about` и `confirmed` не следует переименовывать в доверенные знания без authority/provenance review.
 
 **Решение, требующее утверждения до RC:** как фиксировать изменение семантики процессора H4, не перезапуская старые финализированные события; какие legacy записи маркировать как `requires_review` без неподтверждённой автоматической коррекции. Дальнейшее расширение H5.4 — отдельный version/migration contract, не скрытый побочный эффект snapshot.
 
