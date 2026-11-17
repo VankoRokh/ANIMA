@@ -104,6 +104,34 @@ def _relation_active_at(relation, when):
     return ended is None or instant < datetime.fromisoformat(ended)
 
 
+def _evidence_intervals_overlap(
+    *, first_start, first_end, second_start, second_end,
+):
+    """True if two offset-aware half-open Relation windows intersect.
+
+    Bounds are instants, not ISO strings. Empty/invalid intervals are never
+    valid Evidence; rejecting them here does not alter unrelated Relations.
+    """
+    left_start = datetime.fromisoformat(first_start)
+    left_end = (
+        None if first_end is None else datetime.fromisoformat(first_end)
+    )
+    right_start = datetime.fromisoformat(second_start)
+    right_end = (
+        None if second_end is None else datetime.fromisoformat(second_end)
+    )
+    if (
+        left_end is not None and left_end <= left_start
+    ) or (
+        right_end is not None and right_end <= right_start
+    ):
+        raise ValueError("Invalid Knowledge evidence relation interval")
+    return (
+        (right_end is None or left_start < right_end)
+        and (left_end is None or right_start < left_end)
+    )
+
+
 def _clean_name(value, label):
     if not isinstance(value, str) or not value.strip():
         raise ValueError(f"{label} must be a non-empty string")
@@ -518,6 +546,54 @@ class LinkStore:
                     raise ValueError(
                         f"Unknown {kind}: {object_id}"
                     )
+            # R3 / F-04: a Memory cannot be a simultaneous witness
+            # both for and against the same Knowledge. Check before INSERT
+            # while holding the same SQLite writer lock, including for
+            # provisional Knowledge and future-dated / finite intervals.
+            # Disjoint half-open windows remain legal historical evidence.
+            if (
+                source_kind == "memory"
+                and target_kind == "knowledge"
+                and relation_type in {"supports", "contradicts"}
+            ):
+                if (
+                    valid_until is not None
+                    and datetime.fromisoformat(valid_until)
+                    <= datetime.fromisoformat(created_at)
+                ):
+                    raise ValueError(
+                        "Invalid Knowledge evidence relation interval"
+                    )
+                opposite = (
+                    "contradicts" if relation_type == "supports"
+                    else "supports"
+                )
+                opposed = connection.execute(
+                    """
+                    SELECT public_id, created_at, valid_until
+                    FROM relations
+                    WHERE source_kind = 'memory'
+                      AND source_id = ?
+                      AND target_kind = 'knowledge'
+                      AND target_id = ?
+                      AND relation_type = ?
+                    ORDER BY row_id
+                    """,
+                    (source_id, target_id, opposite),
+                ).fetchall()
+                for existing in opposed:
+                    if _evidence_intervals_overlap(
+                        first_start=created_at,
+                        first_end=valid_until,
+                        second_start=existing["created_at"],
+                        second_end=existing["valid_until"],
+                    ):
+                        raise ValueError(
+                            "Memory cannot both support and contradict "
+                            "the same knowledge in overlapping intervals: "
+                            f"{existing['public_id']}"
+                        )
+
             if valid_until is None:
                 duplicate = connection.execute(
                     """
