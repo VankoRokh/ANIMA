@@ -1,8 +1,8 @@
 # ANIMA v0.2 — H5 / Integration, Legacy Data & Release Candidate Gates
 
-**Статус H5:** H5.0 и H5.2 приняты, H5.1 подтверждён на x86_64 / Python 3.14.4 (Python 3.12 NOT_TESTED); H5.3 прошёл полную регрессию и первый benchmark, но эксплуатационный performance gate остаётся открытым. H5.3b — диагностика причин масштабирования, ожидает испытаний. **H5/RC не принят**.  
+**Статус H5:** H5.0/H5.2 приняты; H5.1 подтверждён на x86_64 / Python 3.14.4 (Python 3.12 NOT_TESTED); H5.3b подтверждён владельцем (1944 PASS) и выявил горячий путь. H5.3c — ограниченная оптимизация, **ещё не испытана**. Эксплуатационный performance gate и H5/RC не приняты.  
 **База для работ:** H4 `work/v02-h4-identity-guard`, принятый владельцем после `1903 passed` за 86,95 с, без XFAIL. Quality probe: 4 синтетические пары; 0 false merges, 1 false split; precision 1.0, recall 0.5 (эти числа не переносить на реальные данные).  
-**Ветка H5.0:** `work/v02-h5-readonly-release-gates`. **Рабочая ветка H5.1:** `work/v02-h5-portability-profile`. **Рабочая ветка H5.2:** `work/v02-h5-fault-recovery`. **Рабочая ветка H5.3:** `work/v02-h5-performance-profile`. **H5.3b:** `work/v02-h5-performance-diagnostics`.
+**Ветка H5.0:** `work/v02-h5-readonly-release-gates`. **Рабочая ветка H5.1:** `work/v02-h5-portability-profile`. **Рабочая ветка H5.2:** `work/v02-h5-fault-recovery`. **Рабочая ветка H5.3:** `work/v02-h5-performance-profile`. **H5.3b:** `work/v02-h5-performance-diagnostics`. **H5.3c:** `work/v02-h5-performance-entity-query`.
 
 ## Позиция перед RC
 
@@ -282,6 +282,44 @@ PYTHONPATH="$PWD" .venv/bin/python -m labs.v02_h5_scaling_diagnostics \
 Расчётный полный pytest при неизменном составе: **`1944 passed`** (1936 + 8 новых). Это не результат исполнения.
 
 **Критерий следующего решения:** сравнить медиану/диапазон process p95 между 1 и 8 историями, долю raw_guard/association, количество Raw-сканирований и ложных смешиваний. По итогам составить адресный план безопасной оптимизации с независимым негативным gate N1–N9. Не менять Raw authority, Event IDs, idempotence, H1.3 и H2/H4 по результату одного синтетического измерения.
+
+## Принятые результаты H5.3b и переход к H5.3c
+
+По первичному отчёту владельца `anima.v02.h5.scaling/0.1`, **snapshot `7b701a0f19be20bb7771ddd4161614a3d0da3605`**, Git clean, x86_64 / Python 3.14.4 / SQLite 3.46.1:
+
+- Полная регрессия **`1944 passed` / 88,23 с**. В каждой конфигурации выполнены три независимых прогона.
+- Для **160 событий / 1 Memory**: process p95 median **7,487 мс**, association p95 median **4,506 мс**, raw guard p95 median **2,117 мс**, throughput median **186,951 событий/с**.
+- Для **160 событий / 8 Memory**: process p95 median **17,4898 мс**, association **14,3091 мс**, raw guard **2,248 мс**, throughput **69,687 событий/с**.
+- Для **640 событий / 1 Memory**: process p95 median **21,9708 мс**, association **12,2866 мс**, raw guard **8,732 мс**, throughput **75,988 событий/с**.
+- Для **640 событий / 8 Memory**: process p95 median **36,7278 мс**, association **26,5307 мс**, raw guard **9,644 мс**, throughput **43,691 событий/с**.
+- Raw сканируется **дважды на событие** во всех профилях, то есть 320 чтений при 160 и 1280 при 640.
+- `false_cross_group_memory_count=0` и `extra_memory_fragments=0` во всех 12 прогонах; единственная Memory в профильном `streams=1` и ровно восемь в `streams=8`.
+
+**Анализ:** у памяти есть как зависимость от объёма Raw при предварительной проверке и загрузке Event sources, так и заметная зависимость `association` от числа эпизодов. Вложенные времена нельзя складывать: `association` уже включает один из двух полных сканов Raw. Сценарии сугубо синтетические, benchmark не измеряет качество свободной семантики.
+
+### H5.3c — Удаление бесполезных Entity SQL (кандидат)
+
+Ветка `work/v02-h5-performance-entity-query` **не меняет семантику**: в `MemoryProcessor._score_candidate` при `entity_ids=[]` больше не вызывается `_memory_entities(memory_id)`. После H4 `_event_entity_ids()` проверяет ID, но выдаёт пустой список доверенных привязок; следовательно прежний `entity_overlap=0` независимо от результата SQLite. При **непустом** `entity_ids` прежняя логика SQL-проверки и начисления бонуса сохранена. Тесты устанавливают этот контракт.
+
+Это **только первая безопасная микрооптимизация**. Два полных сканирования Raw остаются неизменными. Никакого кэширования Raw без новой модели инвалидации, никакого обхода H1.3, никакой миграции или коррекции старых `about`. 
+
+Добавлены **3 регрессионных теста** в `tests/test_v02_h5_3_entity_query_short_circuit.py`. Расчёт полной регрессии при неизменном составе: **`1947 passed`** (1944 + 3). Локального исполнения нового изменения ещё не было.
+
+```bash
+git status --short
+git rev-parse HEAD
+PYTHONPATH="$PWD" .venv/bin/python -m pytest -q \
+  tests/test_v02_h5_3_entity_query_short_circuit.py \
+  tests/test_v02_h5_3_scaling_diagnostics.py \
+  tests/test_v02_h4_identity_guard.py \
+  tests/test_v02_h0_foundation_contracts.py
+PYTHONPATH="$PWD" .venv/bin/python -m pytest -q
+PYTHONPATH="$PWD" .venv/bin/python -m labs.v02_h5_scaling_diagnostics \
+  --events 160 640 --streams 1 8 --repeats 3 \
+  --output /tmp/anima-h53c-160-640.json
+```
+
+Для A/B нужно сравнить **медианы трёх прогонов H5.3b против H5.3c** в каждой паре `count/streams`. Не объявлять ускорение гарантированным до получения результатов, рассматривать разброс `min/max`, отсутствие ложных объединений/разделений и полную регрессию. Если эффекта практически нет, **не наращивать оптимизацию наугад**: следующая область профилирования — пакетный доступ к Memory sources, синтаксический анализ источников и индексированное получение Raw с точной инвалидацией.
 
 ## H5.4 — Migration, compatibility & rollback (TODO)
 
