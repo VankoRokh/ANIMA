@@ -57,11 +57,17 @@ def one_size(count, repeats):
             raise RuntimeError("Initial benchmark index did not converge")
 
         # In-memory override on this disposable benchmark instance only.
-        # This is NOT how ANIMA should be run in production.
-        index._verify_indexed_prefix = lambda *_args: None
+        # The prior verified hasher is trusted without checking the changed
+        # file identity. This is NOT an operationally safe production mode.
+        baseline_hasher = index._prefix_cache[0].copy()
+        index._cached_prefix_hasher = (
+            lambda _cursor, _stat: baseline_hasher.copy()
+        )
         log.write(make_event(count + 1))
-        unchecked_ms, unchecked = measure(index.sync)
-        del index._verify_indexed_prefix
+        try:
+            unchecked_ms, unchecked = measure(index.sync)
+        finally:
+            del index._cached_prefix_hasher
         if unchecked["status"] != "complete":
             raise RuntimeError("Unchecked benchmark append failed")
 
