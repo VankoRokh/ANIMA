@@ -1,8 +1,8 @@
 # ANIMA v0.2 — H5 / Integration, Legacy Data & Release Candidate Gates
 
-**Статус H5:** H5.0 принят, H5.1 подготовлен к испытаниям. **H5/RC целиком не принят**.  
+**Статус H5:** H5.0 принят; H5.1 подтверждён на x86_64 / Python 3.14.4, Python 3.12 остаётся NOT_TESTED; H5.2 подготовлен к испытаниям. **H5/RC целиком не принят**.  
 **База для работ:** H4 `work/v02-h4-identity-guard`, принятый владельцем после `1903 passed` за 86,95 с, без XFAIL. Quality probe: 4 синтетические пары; 0 false merges, 1 false split; precision 1.0, recall 0.5 (эти числа не переносить на реальные данные).  
-**Ветка H5.0:** `work/v02-h5-readonly-release-gates`. **Рабочая ветка H5.1:** `work/v02-h5-portability-profile`.
+**Ветка H5.0:** `work/v02-h5-readonly-release-gates`. **Рабочая ветка H5.1:** `work/v02-h5-portability-profile`. **Рабочая ветка H5.2:** `work/v02-h5-fault-recovery`.
 
 ## Позиция перед RC
 
@@ -121,16 +121,54 @@ PYTHONPATH="$PWD" .venv/bin/python -m labs.v02_h5_portability \
 
 **Границы:** адресный H5.1 набор специально ограничен: H0, H1.3, H2.2, H3.1–H3.2, H4, H5.0 и Stage1. Он **не** заменяет полную регрессию на 3.14, настоящий процессный crash test или проверку Raspberry Pi/aarch64. Отсутствующий aarch64 сохраняется в статусе `NOT VERIFIED`.
 
-## H5.2 — Fault injection & recovery (TODO)
+## Принятые результаты H5.1
 
-- Cut до/после append и projection commit; tombstones / torn JSONL tail.
-- Interrupted sync / reopen, середина проиндексированного JSONL изменена + append.
-- Повторный replay без удвоения эффектов (несколько циклов).
-- Два независимых процесса: блокировка Release, конкурентные обращения к SQLite, отсутствие двусмысленного writer.
-- `healthy/degraded` при недоступном Raw; не объявлять scope-покрытие полным без верификации.
-- Раздельная проверка `RetrievalEngine`, `ContextBuilder`, `ProvenanceResolver` после Recovery.
+По отчёту владельца **на snapshot `8d7f2f79fd10aa6c27ffd660891ef164a852b24d`**:
+- `1921 passed` за 88,08 с, полная регрессия CPython 3.14.4, Linux x86_64.
+- Адресный profile `65 passed` за 1,52 с; `sys_prefix` — проектное `.venv`, SQLite 3.46.1, FTS5/JSON1 доступны.
+- `git status_porcelain` пустой; report для CPython 3.14.4 — `PASS`.
+- `python3.12` не найден — `NOT_TESTED`, поэтому агрегированный profile `INCOMPLETE`.
 
-Симулированное завершение процесса **не равно физическому power-loss**.
+**Решение:** H5.1 выполнен для профиля 3.14.4; кросс-версионная совместимость 3.12 **не подтверждена** и остаётся релизным вопросом. Не использовать `INCOMPLETE` как доказательство ошибки производственного кода.
+
+## H5.2 — Fault injection & recovery (кандидат; локально не запускался)
+
+`tests/test_v02_h5_2_fault_recovery.py` добавляет 7 сценариев:
+
+1. **Принудительный `os._exit(73)` в отдельном процессе** после Raw append и создания ещё незафиксированного Memory, но до `SQLite COMMIT`. После рестарта: SQLite rollback, Raw не потерян, Recovery принимает его один раз, 3 повтора без дубля.
+2. Raw append выполнен до вызова EventProcessingCoordinator → restart/adoption/replay, затем EventRetrieval догоняет Raw до полного индекса.
+3. Memory processing уже зафиксирован, но индекс ещё не создан → restart, sync; без повторной обработки.
+4. Искусственное исключение на втором Raw во время SQLite index transaction → rollback строк, FTS и курсора; повторный sync после reopen восстанавливает производный индекс.
+5. Подмена содержимого в **середине** проиндексированного JSONL с последующим append → индекс отклоняет расширение, курсор и количество строк сохраняются.
+6. Незавершённая физическая LF-строка → `recover()` и `EventLog.write()` отказ; EventRetrieval показывает `partial` и не выдаёт ложного `complete`.
+7. Два отдельных Linux-процесса: блокировка `_single_writer` не выдаётся второму; после уничтожения держателя ОС освобождает блокировку.
+
+Все операции с повреждениями, исключениями, смертью процессов и SQLite происходят **только в `pytest tmp_path`**. Эти испытания имитируют **процессный crash/rollback**, не реальную потерю питания. На других платформах два процессно-специфичных теста SKIP, не PASS.
+
+### Запуск H5.2
+
+```bash
+git status --short
+git rev-parse HEAD
+PYTHONPATH="$PWD" .venv/bin/python -m pytest -q -rx \
+  tests/test_v02_h5_2_fault_recovery.py \
+  tests/test_event_processing.py \
+  tests/test_release_v01.py \
+  tests/test_v02_h1_2_finalized_raw.py \
+  tests/test_v02_h1_3_prefix_digest.py
+
+PYTHONPATH="$PWD" .venv/bin/python -m pytest -q
+```
+
+**Расчёт:** `1928 passed` (1921 + 7), если все существующие тесты остались неизменными. Это **не исполненный результат**.
+
+### Ограничения / оставшиеся испытания
+
+- SIGKILL во время полноценного release + параллельный внешний executor, а также недопустимые source authorities остаются предметом независимого аудита; существующие `test_release_v01.py` и H1 покрывают часть сценариев.
+- `EventLog.write()` не делает файлового `fsync` на каждом событии, а отдельные SQLite/Raw хранилища не имеют общего транзакционного журнала. Строгую гарантию durability при физическом выключении питания **не заявлять**.
+- Стоимость полного `Raw` сканирования на каждом `coordinator.process()` пока не решена: она должна попасть в H5.3 performance decision.
+- `PROCESSOR_VERSION="1.0"` после изменения H4 остаётся вопросом H5.4.
+- Часть высокорисковых сценариев остаётся за рамками 7 тестов: ручные изменения SQLite и Raw одновременно, consistency враждебного writer, truncation recovery через реальные disk faults.
 
 ## H5.3 — Performance / long-run (TODO)
 
