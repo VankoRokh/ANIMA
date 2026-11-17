@@ -2,9 +2,9 @@
 
 **Тип работы:** независимая техническая проверка состояния Foundation Hardening без права изменять GitHub.  
 **Репозиторий:** `VankoRokh/ANIMA`.  
-**Рабочая ветка:** `work/v02-h5-readonly-release-gates`.  
+**Рабочая ветка:** `work/v02-h5-portability-profile` (H5.0 + кандидат H5.1).  
 **Snapshot:** reviewer обязан зафиксировать **фактический** `git rev-parse HEAD` перед началом. Не подменять snapshot именем ветки.  
-**База:** после H4 владелец сообщил `1903 passed` / 86,95 с, quality probe 4 pairs: false merges 0, false splits 1. Эти результаты **reported by owner**, не считать независимым воспроизведением.
+**База:** после H4 владелец сообщил `1903 passed` / 86,95 с, quality probe 4 pairs: false merges 0, false splits 1; после H5.0 — `1911 passed` / 87,92 с. Эти результаты **reported by owner**, не считать независимым воспроизведением. H5.1 на момент фиксации этого ТЗ не испытан.
 
 ## Роль
 
@@ -18,7 +18,7 @@
 
 1. Независимый `ANIMA R1-S1 Structural Memory Audit` от 17.11.2026 (N1–N9), результаты M-T2/M-T2B/M-T2C и утверждённые контрактные цели. **Если первичные отчёты не находятся в доступном репозитории, запросить их как отдельные вложения и пометить непроверяемые тезисы как reported, а не воспроизведённые.**
 2. `ANIMA_v0.2_Foundation_Hardening_Plan.md`, особенно INV-E1/E2/E3/K1/K2/R1/Q1/A1/M1 и H2.3/H5.
-3. Тесты `tests/test_v02_h0_foundation_contracts.py` (9 обычных PASS на H4), `test_v02_h1_*`, `test_v02_h2_*`, `test_v02_h3_*`, `test_v02_h4_*`, `test_v02_h5_legacy_diagnostic.py`.
+3. Тесты `tests/test_v02_h0_foundation_contracts.py` (9 обычных PASS на H4), `test_v02_h1_*`, `test_v02_h2_*`, `test_v02_h3_*`, `test_v02_h4_*`, `test_v02_h5_legacy_diagnostic.py`, `test_v02_h5_portability.py`, `labs/v02_h5_portability.py`.
 4. `anima/memory/{event_log,event_processing,event_retrieval,memory_store,knowledge,link_store,retrieval,processor,provenance,context_builder}.py`, `anima/release_v01.py`, `labs/v02_h5_legacy_diagnostic.py`.
 
 ## Проверочные вопросы высокого риска
@@ -40,7 +40,7 @@
 ## Минимальное воспроизведение
 
 - Сохранить SHA `HEAD`, ветку, Python, SQLite, CPU architecture и `git status --short`.
-- Полный pytest на Python 3.14.4. Для Python 3.12 — доступный subset, честно сообщать пропуски и причины.
+- Полный pytest на Python 3.14.4. Для Python 3.12 — доступный subset, честно сообщать пропуски и причины. H5.1 CLI обязан показывать `NOT_TESTED` для отсутствующих интерпретаторов и `INCOMPLETE` для грязного Git; это не эквивалент независимого подтверждения.
 - Изолированные tests для H5.0 + N1–N9, затем аварийные и отрицательные сценарии сверх существующих тестов.
 - Diagnostic запускать **только на согласованных временных копиях** (не реальных экземплярах).
 - Проверить, что результаты независимого прогона воспроизводимы при смене порядка тестов и повторном запуске.
