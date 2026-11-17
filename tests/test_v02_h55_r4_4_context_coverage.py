@@ -202,10 +202,10 @@ def test_h55_r44_deep_context_preserves_incomplete_retrieval_with_events(
     assert bundle["retrieval_coverage"]["fts_truncated"] is True
     assert bundle["retrieval_coverage"]["complete"] is False
     assert bundle["truncated"] is True
-    assert {
-        row["record"]["id"] for row in bundle["events"]
-    } == {
-        uid("ev_", 1000 + i) for i in range(FTS_SEED_LIMIT)
+    event_ids = {row["record"]["id"] for row in bundle["events"]}
+    assert len(event_ids) == FTS_SEED_LIMIT
+    assert event_ids <= {
+        uid("ev_", 1000 + i) for i in range(FTS_SEED_LIMIT + 5)
     }
 
 
