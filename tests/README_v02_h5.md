@@ -1,8 +1,8 @@
 # ANIMA v0.2 — H5 / Integration, Legacy Data & Release Candidate Gates
 
-**Статус H5:** H5.0 принят; H5.1 подтверждён на x86_64 / Python 3.14.4, Python 3.12 остаётся NOT_TESTED; H5.2 подготовлен к испытаниям. **H5/RC целиком не принят**.  
+**Статус H5:** H5.0 и H5.2 приняты по полной регрессии владельца, H5.1 подтверждён на x86_64 / Python 3.14.4 (Python 3.12 NOT_TESTED); H5.3 подготовлен к измерениям. **H5/RC целиком не принят**.  
 **База для работ:** H4 `work/v02-h4-identity-guard`, принятый владельцем после `1903 passed` за 86,95 с, без XFAIL. Quality probe: 4 синтетические пары; 0 false merges, 1 false split; precision 1.0, recall 0.5 (эти числа не переносить на реальные данные).  
-**Ветка H5.0:** `work/v02-h5-readonly-release-gates`. **Рабочая ветка H5.1:** `work/v02-h5-portability-profile`. **Рабочая ветка H5.2:** `work/v02-h5-fault-recovery`.
+**Ветка H5.0:** `work/v02-h5-readonly-release-gates`. **Рабочая ветка H5.1:** `work/v02-h5-portability-profile`. **Рабочая ветка H5.2:** `work/v02-h5-fault-recovery`. **Рабочая ветка H5.3:** `work/v02-h5-performance-profile`.
 
 ## Позиция перед RC
 
@@ -131,7 +131,7 @@ PYTHONPATH="$PWD" .venv/bin/python -m labs.v02_h5_portability \
 
 **Решение:** H5.1 выполнен для профиля 3.14.4; кросс-версионная совместимость 3.12 **не подтверждена** и остаётся релизным вопросом. Не использовать `INCOMPLETE` как доказательство ошибки производственного кода.
 
-## H5.2 — Fault injection & recovery (кандидат; локально не запускался)
+## H5.2 — Fault injection & recovery (✅ принято владельцем)
 
 `tests/test_v02_h5_2_fault_recovery.py` добавляет 7 сценариев:
 
@@ -160,7 +160,7 @@ PYTHONPATH="$PWD" .venv/bin/python -m pytest -q -rx \
 PYTHONPATH="$PWD" .venv/bin/python -m pytest -q
 ```
 
-**Расчёт:** `1928 passed` (1921 + 7), если все существующие тесты остались неизменными. Это **не исполненный результат**.
+**Подтверждено владельцем:** адресные `38 passed` за 2,32 с, полная регрессия `1928 passed` за 87,62 с. H5.2 принят по согласованным сценариям процессных прерываний; physical power-loss не проверялся.
 
 ### Ограничения / оставшиеся испытания
 
@@ -170,17 +170,65 @@ PYTHONPATH="$PWD" .venv/bin/python -m pytest -q
 - `PROCESSOR_VERSION="1.0"` после изменения H4 остаётся вопросом H5.4.
 - Часть высокорисковых сценариев остаётся за рамками 7 тестов: ручные изменения SQLite и Raw одновременно, consistency враждебного writer, truncation recovery через реальные disk faults.
 
-## H5.3 — Performance / long-run (TODO)
+## H5.3 — Performance & Endurance (измеритель подготовлен; результаты не получены)
 
-До приёмки зафиксировать **численные** p50/p95 бюджета и максимально допустимую производственную нагрузку. Повторить наборы 160/640 Events и длинный поток, получить:
+Ветка `work/v02-h5-performance-profile` добавляет **только лабораторный измеритель**, без изменения production алгоритмов.
 
-- ingest latency p50/p95, throughput, peak RSS, startup/reopen latency;
-- размер Raw/Memory/Index и рост при N;
-- стоимость H1.3 `prefix_digest` при 1k/10k/50k: принятый ориентир ноутбука 1.934/10.480/46.662 ms verified append, но **O(bytes)** остаётся;
-- стоимость Recovery полного EventLog, повторного bootstrap, FTS и фильтрации;
-- оценка ложных объединений/разделений на расширенном M-T2B/C, не только 4 пары H4.
+`labs/v02_h5_performance.py` создаёт отдельный ephemeral каталог + дочерний Python-процесс **для каждого** размера нагрузки. Используется детерминированный синтетический поток `conversation.user` с фиксированной структурой текста. Это не эталон реальной пользовательской памяти.
 
-Не уменьшать верификацию ради benchmark без независимого safety review.
+Сценарии по умолчанию: **160 и 640 Raw Events**. Для каждого измеряются:
+
+- `append` — p50, p95, max записи одного Event в Raw;
+- `process` — p50, p95, max обработки одного Event через `EventProcessingCoordinator`; индекс эффектов и ссылки `memory_sources` сверяются с количеством Raw;
+- сквозные `ingest_wall_s`, `throughput_events_s`, распределение действий `create/update/create_related`;
+- `process_early_quartile_p50_ms` против `process_late_quartile_p50_ms` и коэффициент роста для поиска накопления задержек;
+- `reopen_ms`, `recovery_first_ms`, `recovery_repeat_ms`; два повторных Recovery должны оставаться идемпотентными;
+- `index_initialize_ms`, `index_initial_sync_ms`, `index_unchanged_sync_ms` с требованием `complete`;
+- пять повторных запросов к `EventRetrieval.search()`, `RetrievalEngine.retrieve()` и `ContextBuilder.build()` — p50/p95/max;
+- размеры `events.jsonl`, `memory.db`, `event_index.db` и `peak_rss_mib` (Linux ru_maxrss, пик всего рабочего процесса).
+- сравнение роста p95 обработки и времени первого Recovery для 160→640; `p95` определён методом **nearest-rank**.
+
+`tests/test_v02_h5_3_performance.py`: **8 регрессионных проверок** корректности p95/median, численных ограничений, небольшой end-to-end обработки с полной provenance, независимого subprocess worker, коэффициентов роста и запрета перезаписи JSON-доказательства.
+
+### Запуск
+
+```bash
+git status --short
+git rev-parse HEAD
+
+PYTHONPATH="$PWD" .venv/bin/python -m pytest -q \
+  tests/test_v02_h5_3_performance.py
+
+PYTHONPATH="$PWD" .venv/bin/python -m pytest -q
+```
+
+Если существующий набор не изменится, расчётно ожидается **`1936 passed`** (1928 + 8). Это не исполненный прогон.
+
+Сбор метрик в новый, отдельный файл **вне репозитория**:
+
+```bash
+PYTHONPATH="$PWD" .venv/bin/python -m labs.v02_h5_performance \
+  --events 160 640 \
+  --output /tmp/anima-h5-performance-160-640.json
+```
+
+Повторить отдельный, ранее принятый H1.3 benchmark на тех же CPU/диске:
+
+```bash
+PYTHONPATH="$PWD" .venv/bin/python \
+  tests/bench_v02_h1_3_index_prefix.py \
+  --events 1000 10000 50000
+```
+
+Четырёхпарный H4 quality probe (`tests/bench_v02_h4_identity_quality.py`) **не равнозначен** расширенной оценке false merges/splits. Критерий семантической точности на реальных многоязычных потоках нужно определить отдельно. Полный M-T2B/C корпус нельзя заменять этой синтетикой.
+
+### Интерпретация и release gate
+
+Отчёт H5.3 **всегда помечен** `measurement_status=MEASURED_NO_RELEASE_SLO`. Успешный запуск фиксирует поведение, но **не** является доказательством, что задержки приемлемы. Численные бюджеты p50/p95 и предельную загрузку необходимо согласовать **после** получения текущих измерений, не задним числом под увиденные значения.
+
+Сравнить рост размера Raw, пикового RSS, p95 processing и Recovery при увеличении числа событий в 4 раза. Не скрывать O(N) чтение Raw в `EventProcessingCoordinator._require_raw_event` и `_best_candidate` и O(bytes) на H1.3 prefix verification.
+
+**Границы:** измеряется один синтетический запуск на размер (нужны повторные прогоны для дисперсии), без реальной многозадачности, графического окружения, LLM, датчиков, внешнего исполнителя и физического power-loss. Скрипт ничего не удаляет вне `TemporaryDirectory`, пишет отчёт только по явно указанному новому пути. H5.3 не принят, пока не получены результаты измерений и не сформулированы эксплуатационные ограничения.
 
 ## H5.4 — Migration, compatibility & rollback (TODO)
 
