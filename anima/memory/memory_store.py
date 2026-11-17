@@ -762,6 +762,34 @@ class MemoryStore:
             if exists is None:
                 return False
 
+            # R4.1/F-03: a committed "done" processing ledger entry
+            # owns the durable Event -> Memory projection. Deleting its
+            # last (or any) Memory would leave a finalized event without a
+            # recoverable result: replay would otherwise return
+            # already_done/memory_id=None. The guard is in the SAME writer
+            # transaction as DELETE and covers all historical processor
+            # versions, while preserving deletion of unprocessed fixtures.
+            finalized_projection = connection.execute(
+                """
+                SELECT ep.event_id, ep.processor_version
+                FROM memory_sources AS ms
+                JOIN event_processing AS ep ON ep.event_id = ms.event_id
+                WHERE ms.memory_id = ?
+                  AND ep.processor = 'memory_processor'
+                  AND ep.status = 'done'
+                ORDER BY ep.event_id, ep.processor_version
+                LIMIT 1
+                """,
+                (public_id,),
+            ).fetchone()
+            if finalized_projection is not None:
+                raise ValueError(
+                    "Cannot delete Memory with finalized Event processing "
+                    "projection: "
+                    f"{public_id} (event={finalized_projection['event_id']}, "
+                    f"version={finalized_projection['processor_version']})"
+                )
+
             related = connection.execute(
                 """
                 SELECT 1 FROM relations
