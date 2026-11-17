@@ -4,7 +4,7 @@ All fixtures are disposable. Deliberate raw SQL damage simulates historical
 orphan evidence only inside pytest's tmp_path, never on user instance data.
 """
 
-from uuid import UUID
+from uuid import UUID, uuid4
 
 import pytest
 
@@ -55,6 +55,28 @@ def relation(links, source, target, *, kind="supports", until=None, at=T1):
         relation_type=kind, target_kind="knowledge", target_id=target["id"],
         created_at=at, valid_until=until,
     )
+
+
+def legacy_opposite_sql(store, source, fact, *, until=None):
+    """Inject an old contradictory relation past the R3 public writer.
+
+    KnowledgeLayer must still reject historical damaged evidence; the
+    ordinary LinkStore.create_relation now refuses overlapping polarities.
+    This modifies ONLY a disposable pytest Memory database.
+    """
+    relation_id = f"rel_{uuid4()}"
+    with store.transaction() as connection:
+        connection.execute(
+            """
+            INSERT INTO relations(
+                public_id, source_kind, source_id, relation_type,
+                target_kind, target_id, created_at, valid_until,
+                source_memory_id
+            ) VALUES (?, 'memory', ?, 'contradicts', 'knowledge', ?, ?, ?, ?)
+            """,
+            (relation_id, source["id"], fact["id"], T1, until, source["id"]),
+        )
+    return relation_id
 
 
 def test_h2_2_closed_memory_support_confirms_and_is_auditable(tmp_path):
@@ -142,7 +164,7 @@ def test_h2_2_active_self_contradictory_evidence_is_rejected(tmp_path):
     source = memory(store, 108)
     fact = knowledge(links, 208)
     relation(links, source, fact, kind="supports")
-    relation(links, source, fact, kind="contradicts")
+    legacy_opposite_sql(store, source, fact)
     with pytest.raises(ValueError, match="both support and contradict"):
         layer.confirm(fact["id"], confirmed_at=T3)
     assert layer.get(fact["id"])["status"] == "provisional"
@@ -153,7 +175,7 @@ def test_h2_2_expired_contradiction_from_same_memory_is_not_current(tmp_path):
     source = memory(store, 109)
     fact = knowledge(links, 209)
     relation(links, source, fact, kind="supports")
-    relation(links, source, fact, kind="contradicts", until=T2)
+    legacy_opposite_sql(store, source, fact, until=T2)
     assert layer.confirm(
         fact["id"], confirmed_at=T3,
     )["knowledge"]["status"] == "confirmed"
