@@ -2,6 +2,8 @@
 
 **Статус:** первый пакет тестов сохранён в отдельной ветке, **без исправлений production-кода**.
 
+> **Обновление для ветки H1.2:** в `work/v02-h1-finalized-raw-integrity` снята также метка `xfail` для N9. Ожидается `2 PASS + 7 XFAIL` в исходном H0-файле; детали — `tests/README_v02_h1_2.md`.
+
 > **Обновление для ветки H1.1:** исторический baseline `9 XFAIL` сохранён в `work/v02-h0-regression-baseline`. В текущей `work/v02-h1-eventlog-tail` дефект N7 исправляется, его `xfail` удалён: ожидается `1 PASS + 8 XFAIL` в H0-файле. См. `tests/README_v02_h1_1.md`.
 
 - База: `b461a51a6349c8d18dd27da423f1bcac0811eb99`.
