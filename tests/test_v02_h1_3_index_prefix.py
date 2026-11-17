@@ -137,16 +137,16 @@ def test_h1_3_new_nonblank_content_in_prior_spacer_is_detected(tmp_path):
     for i in range(1, 33):
         if i == 17:
             with log.log_file.open("ab") as stream:
-                stream.write(b" " * 512 + b"\\n")
+                stream.write(b" " * 512 + b"\n")
         log.write(make_event(i, f"unrelated event {i:02d} " + "x" * 1000))
     baseline = index_to_end(index)
     assert baseline["indexed_events"] == 32
     source = log.log_file.read_bytes()
-    spacer = b" " * 512 + b"\\n"
+    spacer = b" " * 512 + b"\n"
     if source.count(spacer) != 1:
         raise RuntimeError("Fixture spacer not found exactly once")
     log.log_file.write_bytes(
-        source.replace(spacer, b"X" + b" " * 511 + b"\\n", 1)
+        source.replace(spacer, b"X" + b" " * 511 + b"\n", 1)
     )
     log.write(make_event(100, "new record after mutated spacer"))
     with pytest.raises(ValueError, match="Indexed EventLog prefix changed"):
