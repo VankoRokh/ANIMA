@@ -196,7 +196,6 @@ def test_h0_n7_unterminated_jsonl_is_not_accepted_as_complete(tmp_path):
 
 
 # N8: terminal FTS matches must not consume the entire pre-filter seed window.
-@pytest.mark.xfail(strict=True, raises=AssertionError, reason="R1-S1 N8: FTS seeds exhausted")
 def test_h0_n8_merged_fts_candidates_do_not_hide_open_memory(tmp_path):
     store = MemoryStore(tmp_path / "memory.db")
     links = LinkStore(store)
