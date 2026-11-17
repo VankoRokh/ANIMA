@@ -7,6 +7,7 @@ from anima.memory.link_store import (
     RELATION_ID_PREFIX,
     _validate_public_id,
     _validate_timestamp,
+    _relation_active_at,
 )
 from anima.memory.memory_store import (
     MEMORY_DOMAINS,
@@ -909,12 +910,14 @@ class KnowledgeLayer:
         if knowledge is None:
             raise ValueError(f"Unknown knowledge: {knowledge_id}")
 
+        # Share the same half-open temporal semantics as Retrieval. Read
+        # history without deleting it, then project only current relations.
+        as_of = self._now()
         with self.memory_store.transaction() as connection:
             incoming = connection.execute(
                 """
                 SELECT * FROM relations
                 WHERE target_kind = 'knowledge' AND target_id = ?
-                  AND valid_until IS NULL
                 ORDER BY row_id
                 """,
                 (knowledge_id,),
@@ -923,7 +926,6 @@ class KnowledgeLayer:
                 """
                 SELECT * FROM relations
                 WHERE source_kind = 'knowledge' AND source_id = ?
-                  AND valid_until IS NULL
                 ORDER BY row_id
                 """,
                 (knowledge_id,),
@@ -931,9 +933,11 @@ class KnowledgeLayer:
 
         incoming_relations = [
             self._relation_row_to_dict(row) for row in incoming
+            if _relation_active_at(row, as_of)
         ]
         outgoing_relations = [
             self._relation_row_to_dict(row) for row in outgoing
+            if _relation_active_at(row, as_of)
         ]
 
         supporting = [
