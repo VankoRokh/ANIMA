@@ -125,9 +125,9 @@ PYTHONPATH="$PWD" .venv/bin/python -m pytest -q
 
 Открытая после R2 граница — standalone `MemoryStore` без `schema_meta.knowledge_raw_provenance_policy` раньше **молча пропускал** проверку при `KnowledgeLayer.confirm/reject/supersede`, потому что `require_knowledge_raw_sources()` возвращал `False`, а вызывающий слой не проверял этот результат.
 
-В `work/v02-h55-r5-raw-authority-enforcement`, основанной на принятом R4.5, этот silent fallback заменён **fail-closed `ValueError`**. Standalone по-прежнему поддерживает `provisional/get/describe/history`; для терминального Knowledge необходимо явно привязать канонический EventLog и иметь **физические исходные Raw Events**. Ни схемы, ни автоматической миграции legacy, ни тестового обхода. Четыре прежние тестовые фабрики переведены на настоящие синтетические Raw.
+В `work/v02-h55-r5-raw-authority-enforcement`, основанной на принятом R4.5, silent fallback заменён **fail-closed `ValueError`**. Standalone по-прежнему поддерживает `provisional/investigate/get/describe/history`; для `confirm/challenge/reject/supersede` необходимо явно привязать канонический EventLog и иметь **физические исходные Raw Events**. `KnowledgeLayer.challenge()` теперь проверяет Raw перед переводом подтверждённого знания в challenged. Ни новой схемы, ни автоматической миграции legacy, ни тестового обхода. Четыре прежние тестовые фабрики переведены на настоящие синтетические Raw.
 
-Добавлено **8 новых pytest cases** `tests/test_v02_h55_r5_standalone_raw_authority.py`. **Расчёт полной регрессии `2052 passed` (2044 + 8)**, **пока не исполнялся**. Не считать F-02 глобально закрытой до независимого review всех terminal Knowledge writers и проверки этого нового SHA.
+Добавлено **10 новых pytest cases** `tests/test_v02_h55_r5_standalone_raw_authority.py`. **Расчёт полной регрессии `2054 passed` (2044 + 10)**, **пока не исполнялся**. Не считать F-02 глобально закрытой до независимого review всех публичных Knowledge writers и проверки этого нового SHA.
 
 ## Оставшиеся блокеры
 
