@@ -37,9 +37,9 @@ def add_event(log, event_id, text, timestamp):
 
 
 def build_stack(tmp_path):
-    store = MemoryStore(tmp_path / "memory.db")
-    links = LinkStore(store)
     log = EventLog(tmp_path / "events.jsonl")
+    store = MemoryStore(tmp_path / "memory.db", event_log=log)
+    links = LinkStore(store)
 
     add_event(
         log,
