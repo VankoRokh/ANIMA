@@ -189,6 +189,9 @@ class EventProcessingCoordinator:
             record["id"]: self._event_from_record(record)
             for record in records
         }
+        # Fail closed before adopting or replaying any work. A finalized
+        # SQLite ledger entry must not silently outlive its raw evidence.
+        self._require_finalized_raw_events(set(events))
         adopted = self._bootstrap_missing(events)
 
         with self.memory_store.transaction() as connection:
@@ -231,6 +234,40 @@ class EventProcessingCoordinator:
             "retried": len(recovered),
             "finalized": self.finalized_count(),
         }
+
+    def _require_finalized_raw_events(self, raw_event_ids):
+        """Detect lost sources for previously finalized processing.
+
+        This checks the current processor/version ledger. Recovery has already
+        read and validated the complete Raw EventLog. Do not mutate SQLite or
+        the source file on mismatch: the operator must investigate the loss.
+        """
+        with self.memory_store.transaction() as connection:
+            rows = connection.execute(
+                """
+                SELECT event_id FROM event_processing
+                WHERE processor = ? AND processor_version = ?
+                  AND status IN ('done', 'skipped')
+                ORDER BY event_id
+                """,
+                (self.processor_name, self.processor_version),
+            ).fetchall()
+
+        missing = [
+            row["event_id"]
+            for row in rows
+            if row["event_id"] not in raw_event_ids
+        ]
+        if missing:
+            sample = ", ".join(missing[:3])
+            remainder = (
+                f" (+{len(missing) - 3} more)" if len(missing) > 3 else ""
+            )
+            raise ValueError(
+                "Missing finalized raw event(s) for "
+                f"{self.processor_name} {self.processor_version}: "
+                f"{sample}{remainder}; recovery refused"
+            )
 
     def _require_raw_event(self, event):
         expected = event.to_dict()
