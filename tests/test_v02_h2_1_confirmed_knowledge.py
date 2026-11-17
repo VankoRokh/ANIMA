@@ -9,6 +9,8 @@ from uuid import UUID
 
 import pytest
 
+from anima.core.event_bus import Event
+from anima.memory.event_log import EventLog
 from anima.memory.knowledge import KnowledgeLayer
 from anima.memory.link_store import LinkStore
 from anima.memory.memory_store import MemoryStore
@@ -24,13 +26,25 @@ def uid(prefix, number):
 
 
 def stack(tmp_path):
-    store = MemoryStore(tmp_path / "memory.db")
+    log = EventLog(tmp_path / "events.jsonl")
+    store = MemoryStore(tmp_path / "memory.db", event_log=log)
     links = LinkStore(store)
     layer = KnowledgeLayer(memory_store=store)
     return store, links, layer
 
 
 def closed_memory(store, number):
+    # H5.5 R5: terminal Knowledge tests must use actual synthetic Raw,
+    # not fabricated dangling IDs or an unsafe test-only bypass.
+    event_id = uid("ev_", number)
+    EventLog(store.database_file.parent / "events.jsonl").write(Event(
+        "conversation.user",
+        {"text": f"Evidence for hypothesis {number}"},
+        source="user",
+        session_id="session_00000001",
+        timestamp=T0,
+        event_id=event_id,
+    ))
     return store.create_memory(
         memory_type="episodic",
         domain="project",
