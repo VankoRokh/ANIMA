@@ -42,6 +42,7 @@ from contextlib import closing, contextmanager
 from pathlib import Path
 from urllib.parse import quote
 
+from anima.memory.event_log import EventLog
 from anima.release_v01 import PROTOCOL
 
 SCHEMA = "anima.v02.h5.snapshot/0.1"
@@ -196,6 +197,10 @@ def create_snapshot(source, destination):
         if MANIFEST in files:
             raise ValueError("Snapshot manifest name is reserved")
         _require_release_files(files, profile["capability"])
+        # A recovery-ready snapshot cannot bless malformed or torn Raw.
+        # EventLog.load_events() validates LF, IDs and complete records,
+        # without writing the original source.
+        EventLog(source / "events.jsonl").load_events()
         # Reserve the output only after validating source/lock. If a copy
         # fails, the partial folder has NO manifest and cannot be restored.
         destination.mkdir(mode=0o700)
