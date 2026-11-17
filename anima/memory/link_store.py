@@ -175,6 +175,16 @@ class LinkStore:
         if status not in KNOWLEDGE_STATUSES:
             raise ValueError(f"Unknown knowledge status: {status!r}")
 
+        # A base storage writer cannot certify a fact. Confirmation must
+        # validate supporting Memory and persist a lifecycle transition via
+        # KnowledgeLayer.confirm(). Otherwise callers could bypass evidence
+        # and history by selecting the final status at INSERT time.
+        if status == "confirmed":
+            raise ValueError(
+                "Confirmed Knowledge requires evidence; "
+                "use KnowledgeLayer.confirm()"
+            )
+
         public_id = public_id or f"{KNOWLEDGE_ID_PREFIX}{uuid4()}"
         created_at = created_at or _now()
         _validate_public_id(
