@@ -145,7 +145,9 @@ class MemoryLifecycle:
         merged_at = merged_at or self._now()
         _validate_timestamp(merged_at, "Memory merged_at")
 
-        with self.memory_store.transaction() as connection:
+        # A concurrent Knowledge confirm must not occur between checking
+        # source/target dependencies and the corresponding Memory updates.
+        with self.memory_store.transaction(immediate=True) as connection:
             source_row = connection.execute(
                 "SELECT * FROM memories WHERE public_id = ?",
                 (source_id,),
@@ -170,6 +172,15 @@ class MemoryLifecycle:
                 raise ValueError("Cannot merge memories with different types")
             if source_row["domain"] != target_row["domain"]:
                 raise ValueError("Cannot merge memories with different domains")
+
+            # Merge makes the source MERGED and updates the target content.
+            # Either change invalidates active confirmed Knowledge evidence.
+            self.memory_store._require_no_confirmed_knowledge_dependencies(
+                connection, source_id,
+            )
+            self.memory_store._require_no_confirmed_knowledge_dependencies(
+                connection, target_id,
+            )
 
             self._require_not_before(
                 merged_at,
