@@ -13,7 +13,7 @@ from anima.sleep.store import SleepStore
 
 def _source_fixture(tmp_path):
     event_log = EventLog(tmp_path / "events.jsonl")
-    memory_store = MemoryStore(tmp_path / "memory.db")
+    memory_store = MemoryStore(tmp_path / "memory.db", event_log=event_log)
     knowledge_layer = KnowledgeLayer(memory_store=memory_store)
 
     event = Event(
