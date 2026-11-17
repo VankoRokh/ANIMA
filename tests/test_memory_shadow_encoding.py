@@ -153,23 +153,26 @@ def test_compression_is_not_part_of_shadow_decision():
     assert first.episodes() == second.episodes()
 
 
-def test_adversarial_compaction_probe_exposes_both_boundaries(tmp_path):
+def test_h4_compression_probe_no_longer_uses_unverified_entity_as_merge_key(tmp_path):
     result = run_shadow(tmp_path / "work")
     probe = result["compression_adversary"]
     input_ids = [row["id"] for row in probe["input_events"]]
     first, decision, followup = input_ids
 
-    # Under the short budget, a new high-priority decision displaces the
-    # earlier "Copper calibration" phrase; association of the third Event
-    # changes even though the raw source history has not changed.
+    # H4 changed the current MemoryProcessor, previously called "legacy"
+    # here. Equal raw Entity ID without lexical evidence is not a license
+    # to merge the first two messages. A later unclaimed event also cannot
+    # inherit the earlier claimed identity by assumption.
     small = probe["legacy_64"]["assignments"]
     large = probe["legacy_512"]["assignments"]
     shadow = probe["shadow"]["assignments"]
-    assert small[first] == small[decision]
-    assert small[followup] != small[first]
-    assert large[first] == large[decision] == large[followup]
+    assert len({small[first], small[decision], small[followup]}) == 3
+    assert len({large[first], large[decision], large[followup]}) == 3
+    # The independent experimental Shadow still compares raw token groups:
+    # it can group the first and third without Entity-only evidence.
     assert shadow[first] == shadow[followup]
-    assert shadow[decision] != shadow[first]  # entity-only paraphrase missed
-    assert probe["legacy_64"]["metrics"]["false_split_pairs"] > 0
-    assert probe["legacy_512"]["metrics"]["false_split_pairs"] == 0
-    assert probe["shadow"]["metrics"]["false_split_pairs"] > 0
+    assert shadow[decision] != shadow[first]
+    assert probe["legacy_64"]["metrics"]["false_merge_pairs"] == 0
+    assert probe["legacy_512"]["metrics"]["false_merge_pairs"] == 0
+    assert probe["legacy_64"]["metrics"]["false_split_pairs"] >= 1
+    assert probe["legacy_512"]["metrics"]["false_split_pairs"] >= 1
