@@ -260,6 +260,101 @@ class KnowledgeLayer:
         ).fetchone()
         return cls._relation_row_to_dict(row), True
 
+    @classmethod
+    def _require_effective_memory_evidence(
+        cls, connection, *, knowledge_id, relation_type, at,
+    ):
+        """Require real, CLOSED Memory evidence valid at the transition time.
+
+        A relation row is not itself proof. Reject orphaned, open, merged,
+        mislabeled, and self-contradicting active evidence. Older expired or
+        future-dated relations do not count as support at this timestamp.
+        """
+        if relation_type not in {"supports", "contradicts"}:
+            raise ValueError("Unexpected Knowledge evidence type")
+        when = cls._parsed_time(at)
+        rows = connection.execute(
+            """
+            SELECT * FROM relations
+            WHERE target_kind = 'knowledge' AND target_id = ?
+              AND relation_type = ?
+            ORDER BY row_id
+            """,
+            (knowledge_id, relation_type),
+        ).fetchall()
+        opposite = (
+            "contradicts" if relation_type == "supports" else "supports"
+        )
+        valid_sources = []
+        for row in rows:
+            if cls._parsed_time(row["created_at"]) > when:
+                continue
+            if (
+                row["valid_until"] is not None
+                and cls._parsed_time(row["valid_until"]) <= when
+            ):
+                continue
+
+            source_id = row["source_memory_id"]
+            if (
+                row["source_kind"] != "memory"
+                or row["source_id"] != source_id
+                or not source_id
+            ):
+                raise ValueError(
+                    "Invalid active Knowledge evidence source: "
+                    f"{row['public_id']}"
+                )
+            source = connection.execute(
+                "SELECT status, updated_at FROM memories WHERE public_id = ?",
+                (source_id,),
+            ).fetchone()
+            if source is None or source["status"] != "closed":
+                raise ValueError(
+                    "Active Knowledge evidence requires existing CLOSED Memory: "
+                    f"{row['public_id']}"
+                )
+            if cls._parsed_time(source["updated_at"]) > when:
+                raise ValueError(
+                    "Knowledge evidence Memory changed after transition time: "
+                    f"{source_id}"
+                )
+
+            opposing = connection.execute(
+                """
+                SELECT created_at, valid_until FROM relations
+                WHERE target_kind = 'knowledge' AND target_id = ?
+                  AND relation_type = ?
+                  AND source_kind = 'memory' AND source_id = ?
+                  AND source_memory_id = ?
+                """,
+                (knowledge_id, opposite, source_id, source_id),
+            ).fetchall()
+            if any(
+                cls._parsed_time(item["created_at"]) <= when
+                and (
+                    item["valid_until"] is None
+                    or cls._parsed_time(item["valid_until"]) > when
+                )
+                for item in opposing
+            ):
+                raise ValueError(
+                    "Memory cannot both support and contradict the same knowledge"
+                )
+            valid_sources.append(source_id)
+        if not valid_sources:
+            action = (
+                "confirmed" if relation_type == "supports" else "rejected"
+            )
+            requirement = (
+                "support" if relation_type == "supports" else "contradiction"
+            )
+            raise ValueError(
+                f"Knowledge cannot be {action} without {requirement} "
+                "from a valid CLOSED Memory"
+            )
+        return valid_sources
+
     def create_candidate(
         self,
         *,
@@ -464,17 +559,12 @@ class KnowledgeLayer:
                     "Challenged knowledge requires new supporting evidence"
                 )
 
-            support_count = connection.execute(
-                """
-                SELECT COUNT(*) AS count FROM relations
-                WHERE target_kind = 'knowledge' AND target_id = ?
-                  AND relation_type = 'supports'
-                  AND valid_until IS NULL
-                """,
-                (knowledge_id,),
-            ).fetchone()["count"]
-            if support_count == 0:
-                raise ValueError("Knowledge cannot be confirmed without support")
+            self._require_effective_memory_evidence(
+                connection,
+                knowledge_id=knowledge_id,
+                relation_type="supports",
+                at=confirmed_at,
+            )
 
             previous = knowledge["status"]
             connection.execute(
@@ -634,17 +724,12 @@ class KnowledgeLayer:
                     reject_duplicate=False,
                 )
 
-            contradiction_count = connection.execute(
-                """
-                SELECT COUNT(*) AS count FROM relations
-                WHERE target_kind = 'knowledge' AND target_id = ?
-                  AND relation_type = 'contradicts'
-                  AND valid_until IS NULL
-                """,
-                (knowledge_id,),
-            ).fetchone()["count"]
-            if contradiction_count == 0:
-                raise ValueError("Knowledge cannot be rejected without contradiction")
+            self._require_effective_memory_evidence(
+                connection,
+                knowledge_id=knowledge_id,
+                relation_type="contradicts",
+                at=rejected_at,
+            )
 
             connection.execute(
                 """
