@@ -44,7 +44,7 @@ def uid(n):
 def event(n, marker="valid"):
     return Event(
         "conversation.user",
-        {"text": f"h55r2{marker} event {n}"},
+        {"text": f"h55r2group{n:04d}: {marker} source event {n}"},
         source="user", session_id="session_00000001",
         timestamp=T0, event_id=uid(n),
     )
