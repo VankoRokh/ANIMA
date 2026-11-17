@@ -77,8 +77,12 @@ def test_entity_alias_resolution_is_conservative(tmp_path):
 
 
 def test_relations_validate_direction_and_provenance(tmp_path):
-    memory_store = MemoryStore(tmp_path / "memory.db")
+    event_log = EventLog(tmp_path / "events.jsonl")
+    memory_store = MemoryStore(
+        tmp_path / "memory.db", event_log=event_log,
+    )
     links = LinkStore(memory_store)
+    create_event(event_log, EVENT_1, "SQLite was selected as the baseline.")
 
     create_memory(
         memory_store,
