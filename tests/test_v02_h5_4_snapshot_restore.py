@@ -314,3 +314,16 @@ def test_h54_untrusted_manifest_path_is_rejected_before_restore(tmp_path):
         restore_snapshot(snap, restored)
     assert not restored.exists()
     assert not (tmp_path / "escape.json").exists()
+
+
+def test_h54_torn_original_raw_refused_before_any_snapshot_output(tmp_path):
+    source, snap = tmp_path / "source", tmp_path / "snapshot"
+    _create_instance(source)
+    raw = source / "events.jsonl"
+    with raw.open("ab") as handle:
+        handle.write(b'{"id":"ev_uncommitted"')  # Disposable torn tail.
+    before = raw.read_bytes()
+    with pytest.raises(ValueError, match="unterminated"):
+        create_snapshot(source, snap)
+    assert not snap.exists()
+    assert raw.read_bytes() == before
