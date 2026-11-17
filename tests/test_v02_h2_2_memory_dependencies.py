@@ -148,6 +148,40 @@ def test_h2_2_legacy_knowledge_sources_cannot_cascade_silently(tmp_path):
         ).fetchone() is not None
 
 
+def test_h2_2_legacy_memory_entity_link_is_not_cascaded(tmp_path):
+    store, links = stack(tmp_path)
+    src = memory(store, 311)
+    entity = links.create_entity(
+        entity_type="concept", canonical_name="Legacy fixture",
+        public_id=uid("ent_", 411),
+    )
+    with store.transaction() as conn:
+        conn.execute(
+            "INSERT INTO memory_entities(memory_id, entity_id) VALUES (?, ?)",
+            (src["id"], entity["id"]),
+        )
+    with pytest.raises(ValueError, match="Cannot delete Memory with"):
+        store.delete_memory(src["id"])
+    with store.transaction() as conn:
+        assert conn.execute(
+            "SELECT 1 FROM memory_entities WHERE memory_id=?",
+            (src["id"],),
+        ).fetchone() is not None
+
+
+def test_h2_2_merge_target_cannot_be_deleted_while_referenced(tmp_path):
+    store, _links = stack(tmp_path)
+    source = memory(store, 312)
+    target = memory(store, 313)
+    store.update_memory(
+        source["id"], status="merged", merged_into=target["id"],
+        updated_at=T1,
+    )
+    with pytest.raises(ValueError, match="Cannot delete Memory with"):
+        store.delete_memory(target["id"])
+    assert store.get_memory(source["id"])["merged_into"] == target["id"]
+
+
 def test_h2_2_pure_unlinked_memory_remains_deletable(tmp_path):
     store, _links = stack(tmp_path)
     src = memory(store, 308)
