@@ -159,8 +159,8 @@ CORPUS = [
 
 
 def build_stack(data_dir):
-    store = MemoryStore(data_dir / "memory.db")
     event_log = EventLog(data_dir / "events.jsonl")
+    store = MemoryStore(data_dir / "memory.db", event_log=event_log)
     links = LinkStore(store)
     processor = MemoryProcessor(
         memory_store=store,
