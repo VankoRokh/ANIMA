@@ -64,6 +64,9 @@ print(json.dumps({
     "fts5": fts5,
     "json1": json1,
     "pytest_available": importlib.util.find_spec("pytest") is not None,
+    "sys_prefix": sys.prefix,
+    "sys_base_prefix": sys.base_prefix,
+    "executable": sys.executable,
 }, sort_keys=True))
 """
 
@@ -122,10 +125,17 @@ def classify_profile(probe, regression):
 
 
 def inspect_interpreter(executable, *, timeout=240):
-    """Do not silently substitute the launcher when target is unavailable."""
+    """Keep the requested Python launch path: realpath strips venv context.
+
+    The CPython venv lookup depends on the path used to launch Python.
+    A typical .venv/bin/python is a symlink to /usr/bin/python3.x; using
+    Path.resolve() silently changes the interpreter environment and masks
+    installed packages. Absolute lexical paths preserve that symlink.
+    """
+    candidate = Path(executable).expanduser()
     resolved = (
-        str(Path(executable).resolve())
-        if Path(executable).is_file()
+        str(candidate.absolute())
+        if candidate.is_file()
         else shutil.which(executable)
     )
     if resolved is None:
