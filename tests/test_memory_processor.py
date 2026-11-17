@@ -185,8 +185,14 @@ def test_canonical_corpus_groups_events_explainably(tmp_path):
         direction="outgoing",
         relation_types={"about"},
     )
-    assert len(sqlite_about) == 1
-    assert sqlite_about[0]["target_id"] == ENTITY_SQLITE
+    # Typed Event references remain raw, unverified identity claims. The
+    # legacy processor may not elevate them into a current about relation.
+    assert sqlite_about == []
+    assert any(
+        record["id"] == EVENT_IDS[1]
+        and record["references"] == [{"kind": "entity", "id": ENTITY_SQLITE}]
+        for record in event_log.load_events()
+    )
 
     trace_text = "\n".join(trace.lines())
     assert "action=create" in trace_text
@@ -196,7 +202,7 @@ def test_canonical_corpus_groups_events_explainably(tmp_path):
     assert "reasons=" in trace_text
 
 
-def test_entity_overlap_can_associate_without_shared_words(tmp_path):
+def test_unverified_entity_overlap_cannot_associate_without_shared_words(tmp_path):
     processor, event_log, store, links, _ = build_processor(tmp_path)
     links.create_entity(
         entity_type="technology",
@@ -227,10 +233,13 @@ def test_entity_overlap_can_associate_without_shared_words(tmp_path):
     second_result = processor.process_event(second)
 
     assert first_result["action"] == "create"
-    assert second_result["action"] == "update"
-    assert second_result["memory_id"] == first_result["memory_id"]
-    assert "entity_overlap:+1" in second_result["reasons"]
-    assert store.count() == 1
+    assert second_result["action"] == "create"
+    assert second_result["memory_id"] != first_result["memory_id"]
+    assert not any(
+        reason.startswith("entity_overlap:")
+        for reason in second_result["reasons"]
+    )
+    assert store.count() == 2
 
 
 def test_closed_memory_is_not_update_candidate(tmp_path):
