@@ -31,6 +31,9 @@ class EventRetrieval:
         self.database_file = Path(database_file)
         self.database_file.parent.mkdir(parents=True, exist_ok=True)
         self.memory_store = memory_store
+        # Digest state is reusable only while file identity and metadata
+        # match the previously committed sync for this instance.
+        self._prefix_cache = None
         self._initialize()
 
     def _connect(self):
@@ -64,6 +67,16 @@ class EventRetrieval:
                 CREATE VIRTUAL TABLE IF NOT EXISTS indexed_event_fts
                     USING fts5(event_id UNINDEXED, content);
             """)
+            # Legacy indexes have per-record SHA-256 but no prefix digest.
+            columns = {
+                row[1] for row in conn.execute(
+                    "PRAGMA table_info(event_index_state)"
+                )
+            }
+            if "prefix_digest" not in columns:
+                conn.execute(
+                    "ALTER TABLE event_index_state ADD COLUMN prefix_digest TEXT"
+                )
 
     @staticmethod
     def _state(conn):
@@ -127,6 +140,39 @@ class EventRetrieval:
             raise ValueError(
                 "Indexed EventLog prefix locator mismatch: rebuild required"
             )
+
+    @staticmethod
+    def _hash_indexed_prefix(stream, cursor):
+        """Hash previously indexed bytes with bounded sequential reads."""
+        digest = sha256()
+        stream.seek(0)
+        remaining = cursor
+        while remaining:
+            block = stream.read(min(1_048_576, remaining))
+            if not block:
+                raise ValueError(
+                    "Indexed EventLog prefix truncated: rebuild required"
+                )
+            digest.update(block)
+            remaining -= len(block)
+        return digest
+
+    def _cached_prefix_hasher(self, cursor, stat):
+        cached = self._prefix_cache
+        if cached is None:
+            return None
+        fingerprint = (
+            cursor, stat.st_dev, stat.st_ino, stat.st_size,
+            stat.st_mtime_ns, stat.st_ctime_ns,
+        )
+        return cached[0].copy() if cached[1] == fingerprint else None
+
+    @staticmethod
+    def _fingerprint(cursor, stat):
+        return (
+            cursor, stat.st_dev, stat.st_ino, stat.st_size,
+            stat.st_mtime_ns, stat.st_ctime_ns,
+        )
 
     @staticmethod
     def _content(record):
@@ -199,7 +245,7 @@ class EventRetrieval:
         """Index a bounded complete prefix; commit rows and cursor atomically.
 
         A torn trailing JSONL line is deliberately left pending. If source
-        identity, indexed prefix locators/digests or size regress, require rebuild().
+        identity, indexed prefix hash or size regress, require rebuild().
         """
         self._limits(max_events, max_bytes)
         path = self.event_log.log_file
@@ -231,17 +277,18 @@ class EventRetrieval:
                             stat.st_ctime_ns != state["ctime_ns"]
                         ):
                             raise ValueError("EventLog modified in place: rebuild required")
-                        if stat.st_size > cursor and (
-                            stat.st_mtime_ns != state["mtime_ns"]
-                            or stat.st_ctime_ns != state["ctime_ns"]
-                        ):
-                            # Head/tail anchors cannot detect same-length
-                            # mutations in the middle of the indexed prefix.
-                            # Recheck all prior Event digests when the physical
-                            # source changed since the last indexed batch.
-                            # An unchanged source needs no repeated full scan
-                            # while a large backlog is indexed in chunks.
+                    # Existing per-row digests are the trust anchor for
+                    # an index created before prefix_digest was introduced.
+                    prefix_hasher = self._cached_prefix_hasher(cursor, stat)
+                    if prefix_hasher is None:
+                        if cursor and state["prefix_digest"] is None:
                             self._verify_indexed_prefix(stream, conn, cursor)
+                        prefix_hasher = self._hash_indexed_prefix(stream, cursor)
+                        if cursor and state["prefix_digest"] is not None:
+                            if prefix_hasher.hexdigest() != state["prefix_digest"]:
+                                raise ValueError(
+                                    "Indexed EventLog prefix changed: rebuild required"
+                                )
                     source_size = stat.st_size
                     stream.seek(cursor)
                     processed_bytes = 0
@@ -260,6 +307,8 @@ class EventRetrieval:
                         scanned_lines += 1
                         processed_bytes += len(raw)
                         cursor = stream.tell()
+                        # Byte-exact, including unindexed whitespace lines.
+                        prefix_hasher.update(raw)
                         if not raw.strip():
                             continue
                         record = self._parse(raw, start)
@@ -288,22 +337,32 @@ class EventRetrieval:
                         )
                         processed += 1
                     # Detect source rotation during ingestion, not just before.
-                    if (path.stat().st_dev, path.stat().st_ino) != (
-                        stat.st_dev, stat.st_ino
+                    after_stat = path.stat()
+                    if (
+                        after_stat.st_dev != stat.st_dev
+                        or after_stat.st_ino != stat.st_ino
+                        or after_stat.st_size != stat.st_size
+                        or after_stat.st_mtime_ns != stat.st_mtime_ns
+                        or after_stat.st_ctime_ns != stat.st_ctime_ns
                     ):
-                        raise ValueError("EventLog rotated during indexing")
+                        raise ValueError("EventLog changed during indexing")
                     head, tail = self._anchors(stream, cursor)
                     conn.execute(
                         "UPDATE event_index_state SET cursor=?, dev=?, ino=?, "
-                        "mtime_ns=?, ctime_ns=?, head_digest=?, tail_digest=? "
-                        "WHERE singleton=1",
+                        "mtime_ns=?, ctime_ns=?, head_digest=?, tail_digest=?, "
+                        "prefix_digest=? WHERE singleton=1",
                         (
                             cursor, stat.st_dev, stat.st_ino,
                             stat.st_mtime_ns, stat.st_ctime_ns, head, tail,
+                            prefix_hasher.hexdigest(),
                         ),
                     )
                 conn.commit()
+                self._prefix_cache = (
+                    prefix_hasher.copy(), self._fingerprint(cursor, stat),
+                )
             except BaseException:
+                self._prefix_cache = None
                 conn.rollback()
                 raise
         return {"indexed_now": processed, **self.status()}
@@ -318,9 +377,10 @@ class EventRetrieval:
                 conn.execute(
                     "UPDATE event_index_state SET cursor=0, dev=NULL, ino=NULL,"
                     " mtime_ns=NULL, ctime_ns=NULL, head_digest=NULL,"
-                    " tail_digest=NULL WHERE singleton=1"
+                    " tail_digest=NULL, prefix_digest=NULL WHERE singleton=1"
                 )
                 conn.commit()
+                self._prefix_cache = None
             except BaseException:
                 conn.rollback()
                 raise
