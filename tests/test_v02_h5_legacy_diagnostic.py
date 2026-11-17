@@ -27,8 +27,8 @@ def uid(prefix, number):
 
 def seed(tmp_path):
     root = tmp_path
-    store = MemoryStore(root / "memory.db")
     log = EventLog(root / "events.jsonl")
+    store = MemoryStore(root / "memory.db", event_log=log)
     links = LinkStore(store)
     layer = KnowledgeLayer(memory_store=store)
 
