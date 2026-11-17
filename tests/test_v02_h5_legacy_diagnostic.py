@@ -176,3 +176,17 @@ def test_h5_legacy_missing_schema_is_detected_without_bootstrap(tmp_path):
     assert report["status"] == "degraded"
     assert report["findings"]["missing_table"]["count"] >= 1
     assert database.read_bytes() == before
+
+def test_h5_legacy_unsupported_schema_version_is_not_adopted(tmp_path):
+    store, log, _links, _layer, _mem, _kn = seed(tmp_path)
+    with store.transaction() as conn:
+        conn.execute(
+            "UPDATE schema_meta SET value='999' WHERE key='schema_version'"
+        )
+    before = store.database_file.read_bytes()
+    report = diagnostics(store, log)
+    assert report["status"] == "degraded"
+    assert "999" in report["findings"][
+        "unsupported_memory_schema_version"
+    ]["ids"]
+    assert store.database_file.read_bytes() == before
