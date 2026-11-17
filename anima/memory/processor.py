@@ -386,15 +386,14 @@ class MemoryProcessor:
             self._declared_entity_ids(record.get("references") or [])
             for record in source_events
         ]
-        # These are explicitly stated (not verified) identities. Use a
-        # mismatch only to avoid merging unrelated raw source histories.
-        # A missing claim is neutral; an intersecting multi-subject claim
-        # is NOT enough to establish that two episodes are the same.
-        identity_conflict = bool(
-            claimed and any(
-                previous and previous != claimed
-                for previous in source_signatures
-            )
+        # These are explicitly stated (not verified) identities. Differing
+        # sets cannot prove distinct objects, but are grounds to refuse a
+        # potentially destructive merge. Missing claims cannot inherit the
+        # previously declared object identity and vice versa. This includes
+        # multi-subject bridges; splitting is deliberate until review.
+        identity_conflict = any(
+            previous != claimed and (previous or claimed)
+            for previous in source_signatures
         )
         if identity_conflict:
             reasons.append("entity_claim_conflict:block_association")
