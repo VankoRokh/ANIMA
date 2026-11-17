@@ -1,6 +1,6 @@
 # ANIMA v0.2 — H5.5 remediation / Evidence Lifecycle
 
-**Статус:** R1/F-01 принят (`1975 passed`), R2/F-02 Core-bound принят (`1987 passed`, standalone/unbound остаётся открытым), R3/F-04 принят (`1999 passed`), R4.1/F-03 принят (`2007 passed`), R4.2/F-05 принят (`2017 passed`), R4.3/F-06 принят (`2030 passed`). R4.4/F-07 реализован; первый прогон дал **2035 passed / 3 failed** из-за старого Stage 6 mock, адаптер исправлен, повторный прогон ожидается. F-08 остаётся. v0.2 RC **BLOCKED**.
+**Статус:** R1/F-01 принят (`1975 passed`), R2/F-02 Core-bound принят (`1987 passed`, standalone/unbound остаётся открытым), R3/F-04 принят (`1999 passed`), R4.1/F-03 принят (`2007 passed`), R4.2/F-05 принят (`2017 passed`), R4.3/F-06 принят (`2030 passed`), R4.4/F-07 принят после повторной регрессии (`2038 passed` / 88,34 с). R4.5/F-08 — уточнение WAL/SHM контракта, подготовлен к испытаниям. v0.2 RC **BLOCKED**.
 
 ## Источник и ревизия
 
@@ -103,13 +103,21 @@ PYTHONPATH="$PWD" .venv/bin/python -m pytest -q
 
 Создано **10 функций / 13 новых pytest cases** в `tests/test_v02_h55_r4_3_temporal_confirmation.py`. Аудиторский F-06 требует старое конфликтное состояние, которое после R3 запрещено создавать через `LinkStore`; поэтому оно воспроизводится только через SQL в `pytest tmp_path`. **Владелец подтвердил:** адресные `70 passed` / 1,58 с и полный pytest `2030 passed` / 88,65 с. Данные пользователей не исправляются.
 
-## R4.4 / F-07 — Context Retrieval Coverage (кандидат)
+## R4.4 / F-07 — Context Retrieval Coverage (принят владельцем)
 
 **Контракт, риски, тесты:** [README_v02_h55_r4_4.md](README_v02_h55_r4_4.md).
 
 В `work/v02-h55-r4-context-coverage` (основана на принятом R4.3) `ContextBuilder` сохраняет upstream-флаги `RetrievalEngine.stats.fts_truncated` и `filters_truncated`, отдельно обозначает `top_k_truncated`, возвращает `retrieval_coverage.complete` как отсутствие этих ограничений и устанавливает общий `ContextBundle.truncated` даже при `candidates==returned`, когда seed-окно урезано. Бюджет Context продолжает учитываться независимо через `selection_stats.omitted_budget`.
 
-Добавлены **8 тестов** `tests/test_v02_h55_r4_4_context_coverage.py` на реальном FTS/SQLite и DEEP provenance. **Первый полный прогон:** `2035 passed, 3 failed` (88,18 с), все ошибки в `tests/test_stage6_experiments.py` — тестовая FixtureRetrieval без новых `fts_truncated/filters_truncated`. Фикстура исправлена, production не ослаблен; после фикса расчёт `2038 passed`, повторно ещё не проверено. Ранжирование, записи Memory, Raw, Knowledge и протокол не изменены.
+Добавлены **8 тестов** `tests/test_v02_h55_r4_4_context_coverage.py` на реальном FTS/SQLite и DEEP provenance. **Первый полный прогон:** `2035 passed, 3 failed` (88,18 с), все ошибки в `tests/test_stage6_experiments.py` — тестовая FixtureRetrieval без новых `fts_truncated/filters_truncated`. Фикстура исправлена без ослабления production, после чего владелец подтвердил **`2038 passed` / 88,34 с**. Ранжирование, записи Memory, Raw, Knowledge и протокол не изменены.
+
+## R4.5 / F-08 — SQLite WAL/SHM backup boundary (кандидат)
+
+**Контракт, источник независимого контрпримера и тесты:** [README_v02_h55_r4_5.md](README_v02_h55_r4_5.md).
+
+В `work/v02-h55-r4-wal-readonly-contract` (от принятой R4.4) уточнена **операционная гарантия**, а не алгоритм `sqlite3.backup`: успешный offline SQLite snapshot сохраняет committed WAL, но read-only SQL соединение может обновить исходный `*-shm`, поэтому forensic byte-stability всех исходных файлов **не обещается**. У `create_snapshot` появились аддитивные выходные поля `source_read_only_scope` и `forensic_byte_stability_guaranteed=false`; существующие manifest/schema/restore/Raw остаются прежними.
+
+Добавлено **6 pytest cases** в `tests/test_v02_h55_r4_5_wal_scope.py`: три committed WAL базы, normal profile, CLI disclosure и физический клон оригинала перед backup. **Расчётная полная регрессия `2044 passed` (2038 + 6), ещё не исполнялась.** Это не forensic workflow автоматически; отдельное физическое клонирование и хеши — обязанности оператора.
 
 ## Оставшиеся блокеры
 
@@ -117,6 +125,6 @@ R2 / F-02 — Core-bound пройден по регрессии владельц
 
 R3 / F-04 — runtime writer и offline diagnostic прошли регрессию владельца; требуется независимый повторный аудит нового snapshot.
 
-R4 — F-03/F-05/F-06 приняты в пределах штатных API; F-07 подготовлен в R4.4, F-08 остаётся. Не выполнять молчаливую повторную проекцию `done` или автоправку legacy-данных.
+R4 — F-03/F-05/F-06/F-07 приняты в пределах штатных API; F-08 подготовлен в R4.5 и требует проверки нового SHA. Не выполнять молчаливую повторную проекцию `done` или автоправку legacy-данных.
 
 После устранения подтверждённых дефектов — новый фиксированный SHA и независимый аудит. Текущий v0.2 RC не принят.
