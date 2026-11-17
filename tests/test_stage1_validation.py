@@ -407,8 +407,22 @@ def test_stage1_corpus_survives_restart_and_replay(tmp_path):
         direction="outgoing",
         relation_types={"about"},
     )
-    assert [relation["target_id"] for relation in sqlite_about] == [
-        SQLITE_ENTITY
+    # H4: typed references in Raw Events are claims, not authority to
+    # publish a verified memory -> Entity about relation.
+    assert sqlite_about == []
+    raw_initial = next(
+        row for row in stack.event_log.load_events()
+        if row["id"] == corpus.events["sqlite_initial"].event_id
+    )
+    raw_followup = next(
+        row for row in stack.event_log.load_events()
+        if row["id"] == corpus.events["sqlite_followup"].event_id
+    )
+    assert raw_initial["references"] == [
+        {"kind": "entity", "id": SQLITE_ENTITY}
+    ]
+    assert raw_followup["references"] == [
+        {"kind": "entity", "id": SQLITE_ENTITY}
     ]
 
     print(
