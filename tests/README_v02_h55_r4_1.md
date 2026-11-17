@@ -1,6 +1,6 @@
 # ANIMA v0.2 — H5.5 R4.1 / F-03 (Finalized Projection Retention)
 
-**Статус:** исправление подготовлено; **испытания не выполнены**.  
+**Статус:** R4.1/F-03 **принят владельцем** по адресным `73 passed` за 3,01 с и полной регрессии `2007 passed` за 88,16 с. Независимый повторный H5.5 ещё не выполнен.  
 **Ветка:** `work/v02-h55-r4-projection-retention`, основана на принятом R3 @ `65d09495c31d7b094283ee16b01edf9929927417`.  
 **R3 подтверждён владельцем:** адресные `68 passed` за 1,51 с; полная регрессия `1999 passed` за 88,71 с.  
 **RC:** `BLOCKED` (R4.1 — только первый из пяти P2; raw-unbound R2 и независимый повторный review остаются).
@@ -57,7 +57,7 @@ LIMIT 1;
 7. Прямое legacy SQL-повреждение: `recover()` отказывает перед adoption новых Raw Events и не выполняет replay. H5.4b сообщает `BLOCKED`.
 8. `skipped` Event с отсутствующей Memory успешно проходит `recover()`.
 
-**Расчётное количество полной регрессии — `2007 passed` (1999 + 8). Это не результат запуска.**
+**Подтверждено владельцем:** адресные `73 passed` / 3,01 с и полная регрессия `2007 passed` / 88,16 с. Следующий R4.2 требует отдельной проверки.
 
 ### Локальный запуск
 
@@ -86,7 +86,7 @@ PYTHONPATH="$PWD" .venv/bin/python -m pytest -q
 
 ## После R4.1
 
-R4.2 — F-05 (Temporal Relations при `MemoryLifecycle.merge`).  
+R4.2 — F-05 (Temporal Relations при `MemoryLifecycle.merge`) — [подготовлен в следующей ветке](README_v02_h55_r4_2.md), ещё не испытан.  
 R4.3 — F-06 (одинаковые правила `KnowledgeLayer.confirm()` с/без source ID при будущих Relations).  
 R4.4 — F-07 (передача `Retrieval.fts_truncated` в `ContextBuilder`).  
 R4.5 — F-08 (уточнение forensic byte-read-only границы SQLite WAL/SHM snapshot).
