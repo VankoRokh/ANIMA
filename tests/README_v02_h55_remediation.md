@@ -1,6 +1,6 @@
 # ANIMA v0.2 — H5.5 remediation / Evidence Lifecycle
 
-**Статус:** R1/F-01 принят (`1975 passed`), R2/F-02 Core-bound принят (`1987 passed`), R3/F-04 принят (`1999 passed`), R4.1/F-03 принят (`2007 passed`), R4.2/F-05 принят (`2017 passed`), R4.3/F-06 принят (`2030 passed`), R4.4/F-07 принят (`2038 passed`), R4.5/F-08 принят владельцем (`2044 passed` / 89,61 с). R5/F-02 standalone terminal Raw enforcement подготовлен, **не испытан**. v0.2 RC **BLOCKED**.
+**Статус:** R1/F-01 принят (`1975 passed`), R2/F-02 Core-bound принят (`1987 passed`), R3/F-04 принят (`1999 passed`), R4.1/F-03 принят (`2007 passed`), R4.2/F-05 принят (`2017 passed`), R4.3/F-06 принят (`2030 passed`), R4.4/F-07 принят (`2038 passed`), R4.5/F-08 принят владельцем (`2044 passed` / 89,61 с). R5/F-02 standalone Raw enforcement: первый прогон `2022 passed / 32 failed` (89,22 с), все ошибки — старые тестовые фикстуры без привязки к Raw. Исправлено 9 тестовых наборов, повторная регрессия ожидается. v0.2 RC **BLOCKED**.
 
 ## Источник и ревизия
 
@@ -127,7 +127,7 @@ PYTHONPATH="$PWD" .venv/bin/python -m pytest -q
 
 В `work/v02-h55-r5-raw-authority-enforcement`, основанной на принятом R4.5, silent fallback заменён **fail-closed `ValueError`**. Standalone по-прежнему поддерживает `provisional/investigate/get/describe/history`; для `confirm/challenge/reject/supersede` необходимо явно привязать канонический EventLog и иметь **физические исходные Raw Events**. `KnowledgeLayer.challenge()` теперь проверяет Raw перед переводом подтверждённого знания в challenged. Ни новой схемы, ни автоматической миграции legacy, ни тестового обхода. Четыре прежние тестовые фабрики переведены на настоящие синтетические Raw.
 
-Добавлено **10 новых pytest cases** `tests/test_v02_h55_r5_standalone_raw_authority.py`. **Расчёт полной регрессии `2054 passed` (2044 + 10)**, **пока не исполнялся**. Не считать F-02 глобально закрытой до независимого review всех публичных Knowledge writers и проверки этого нового SHA.
+Добавлено **10 новых pytest cases** `tests/test_v02_h55_r5_standalone_raw_authority.py`. **Первый полный pytest: `2022 passed, 32 failed` / 89,22 с (устаревшие unbound фабрики). После фикса 9 тестовых файлов расчёт `2054 passed` (2044 + 10) ещё не подтверждён.** Не считать F-02 глобально закрытой до независимого review всех публичных Knowledge writers и проверки этого нового SHA.
 
 ## Оставшиеся блокеры
 
