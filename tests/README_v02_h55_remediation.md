@@ -1,10 +1,10 @@
 # ANIMA v0.2 — H5.5 remediation / Evidence Lifecycle
 
-**Статус:** R1/F-01 принят (`1975 passed`), R2/F-02 Core-bound принят (`1987 passed`), R3/F-04 принят (`1999 passed`), R4.1/F-03 принят (`2007 passed`), R4.2/F-05 принят (`2017 passed`), R4.3/F-06 принят (`2030 passed`), R4.4/F-07 принят (`2038 passed`), R4.5/F-08 принят владельцем (`2044 passed` / 89,61 с). R5/F-02 standalone Raw enforcement: первый прогон `2022 passed / 32 failed` (89,22 с), все ошибки — старые тестовые фикстуры без привязки к Raw. Исправлено 9 тестовых наборов, повторная регрессия ожидается. v0.2 RC **BLOCKED**.
+**Статус:** R1/F-01 принят (`1975 passed`), R2/F-02 Core-bound принят (`1987 passed`), R3/F-04 принят (`1999 passed`), R4.1/F-03 принят (`2007 passed`), R4.2/F-05 принят (`2017 passed`), R4.3/F-06 принят (`2030 passed`), R4.4/F-07 принят (`2038 passed`), R4.5/F-08 принят владельцем (`2044 passed` / 89,61 с). R5/F-02 standalone Raw enforcement принят владельцем после исправления 9 тестовых наборов: повторный полный прогон **`2054 passed` / 88,75 с** (первый прогон был `2022 passed / 32 failed`). v0.2 RC **BLOCKED**.
 
 ## Источник и ревизия
 
-- Независимый аудит проводился на commit `28e8438f8408e85b52e237eaedcf024354a4522a`. Исправления выполняются только в ветке `work/v02-h55-evidence-remediation` от этого SHA; ветка `audit/v02-h5-rc-candidate` не изменялась.
+- Независимый первый аудит проводился на commit `28e8438f8408e85b52e237eaedcf024354a4522a`. Исправления поэтапно выполнялись в отдельных ветках R1–R5, финальная испытанная ревизия R5 — `3639d4deb4636e14b027dc1ef50703503b697784`. Исходная `audit/v02-h5-rc-candidate` не изменялась. Новый аудиторский snapshot будет содержать только документационные поправки поверх этой испытанной ревизии.
 - Предоставленный владельцем `ANIMA_v0.2_H5.5_evidence.zip` проверен по `evidence_manifest.json`: **351/351** файлов совпали по размеру и SHA-256. Изучены `h55_work/independent_probes.py` (точные сценарии `evidence_merge`, `evidence_update`) и `h55_work/independent*.json` с подтверждёнными аудитором контрпримерами. Архив не публикуется в Git и не исполнялся при подготовке R1.
 - Отчёт H5.5: **BLOCKED**; три P1 — F-01, F-02, F-04. 1967 PASS на 3.14.4 и 3.12.14 — результаты независимого аудита **исходной**, не исправленной ревизии.
 
@@ -119,7 +119,7 @@ PYTHONPATH="$PWD" .venv/bin/python -m pytest -q
 
 Добавлено **6 pytest cases** в `tests/test_v02_h55_r4_5_wal_scope.py`: три committed WAL базы, normal profile, CLI disclosure и физический клон оригинала перед backup. **Владелец подтвердил полный pytest `2044 passed` / 89,61 с.** Это не forensic workflow автоматически; отдельное физическое клонирование и хеши — обязанности оператора.
 
-## R5 / F-02 — Standalone Raw Authority Enforcement (кандидат)
+## R5 / F-02 — Standalone Raw Authority Enforcement (принят владельцем)
 
 **Подробный контракт, compatibility и команды:** [README_v02_h55_r5.md](README_v02_h55_r5.md).
 
@@ -127,14 +127,14 @@ PYTHONPATH="$PWD" .venv/bin/python -m pytest -q
 
 В `work/v02-h55-r5-raw-authority-enforcement`, основанной на принятом R4.5, silent fallback заменён **fail-closed `ValueError`**. Standalone по-прежнему поддерживает `provisional/investigate/get/describe/history`; для `confirm/challenge/reject/supersede` необходимо явно привязать канонический EventLog и иметь **физические исходные Raw Events**. `KnowledgeLayer.challenge()` теперь проверяет Raw перед переводом подтверждённого знания в challenged. Ни новой схемы, ни автоматической миграции legacy, ни тестового обхода. Четыре прежние тестовые фабрики переведены на настоящие синтетические Raw.
 
-Добавлено **10 новых pytest cases** `tests/test_v02_h55_r5_standalone_raw_authority.py`. **Первый полный pytest: `2022 passed, 32 failed` / 89,22 с (устаревшие unbound фабрики). После фикса 9 тестовых файлов расчёт `2054 passed` (2044 + 10) ещё не подтверждён.** Не считать F-02 глобально закрытой до независимого review всех публичных Knowledge writers и проверки этого нового SHA.
+Добавлено **10 новых pytest cases** `tests/test_v02_h55_r5_standalone_raw_authority.py`. **Первый полный pytest: `2022 passed, 32 failed` / 89,22 с (устаревшие unbound фабрики). После исправления 9 тестовых файлов владелец повторил полный pytest: `2054 passed` / 88,75 с (2044 + 10 новых случаев).** Не считать F-02 глобально закрытой до независимого review всех публичных Knowledge writers и проверки этого нового SHA.
 
 ## Оставшиеся блокеры
 
-R2 + R5 / F-02 — Core-bound принят; standalone terminal fail-closed реализован в R5, требует новой регрессии и независимого подтверждения.
+R2 + R5 / F-02 — Core-bound и standalone terminal fail-closed прошли регрессию владельца, требуют независимого подтверждения нового snapshot.
 
 R3 / F-04 — runtime writer и offline diagnostic прошли регрессию владельца; требуется независимый повторный аудит нового snapshot.
 
 R4 — F-03/F-05/F-06/F-07/F-08 приняты в пределах штатных API и ограничений backup. Независимый повторный аудит исправленного SHA остаётся обязательным. Не выполнять молчаливую повторную проекцию `done` или автоправку legacy-данных.
 
-После устранения подтверждённых дефектов — новый фиксированный SHA и независимый аудит. Текущий v0.2 RC не принят.
+Следующий шаг — [повторный независимый аудит H5.5](../docs/TESTING/ANIMA_v0_2_H5_5_Independent_Reaudit_Brief.md) на новой замороженной ревизии. Исходная регрессия 2054 PASS относится к рабочему SHA R5, а не доказывает отсутствие новых межкомпонентных ошибок. Текущий v0.2 RC не принят.
