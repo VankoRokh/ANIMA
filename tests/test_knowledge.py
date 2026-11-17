@@ -33,8 +33,8 @@ KNOWLEDGE_2 = "kn_66666666-ffff-4666-8666-666666666666"
 
 
 def build_stack(tmp_path):
-    store = MemoryStore(tmp_path / "memory.db")
     event_log = EventLog(tmp_path / "events.jsonl")
+    store = MemoryStore(tmp_path / "memory.db", event_log=event_log)
     lifecycle = MemoryLifecycle(memory_store=store)
     knowledge = KnowledgeLayer(memory_store=store)
     links = LinkStore(store)
