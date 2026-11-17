@@ -1,6 +1,6 @@
 # ANIMA v0.2 — H5.5 remediation / Evidence Lifecycle
 
-**Статус:** R1/F-01 принят (`1975 passed`), R2/F-02 Core-bound принят (`1987 passed`, standalone/unbound остаётся открытым), R3/F-04 принят (`1999 passed`), R4.1/F-03 принят (`2007 passed`), R4.2/F-05 принят (`2017 passed`), R4.3/F-06 принят (`2030 passed`), R4.4/F-07 принят после повторной регрессии (`2038 passed` / 88,34 с). R4.5/F-08 — уточнение WAL/SHM контракта, подготовлен к испытаниям. v0.2 RC **BLOCKED**.
+**Статус:** R1/F-01 принят (`1975 passed`), R2/F-02 Core-bound принят (`1987 passed`), R3/F-04 принят (`1999 passed`), R4.1/F-03 принят (`2007 passed`), R4.2/F-05 принят (`2017 passed`), R4.3/F-06 принят (`2030 passed`), R4.4/F-07 принят (`2038 passed`), R4.5/F-08 принят владельцем (`2044 passed` / 89,61 с). R5/F-02 standalone terminal Raw enforcement подготовлен, **не испытан**. v0.2 RC **BLOCKED**.
 
 ## Источник и ревизия
 
@@ -111,20 +111,30 @@ PYTHONPATH="$PWD" .venv/bin/python -m pytest -q
 
 Добавлены **8 тестов** `tests/test_v02_h55_r4_4_context_coverage.py` на реальном FTS/SQLite и DEEP provenance. **Первый полный прогон:** `2035 passed, 3 failed` (88,18 с), все ошибки в `tests/test_stage6_experiments.py` — тестовая FixtureRetrieval без новых `fts_truncated/filters_truncated`. Фикстура исправлена без ослабления production, после чего владелец подтвердил **`2038 passed` / 88,34 с**. Ранжирование, записи Memory, Raw, Knowledge и протокол не изменены.
 
-## R4.5 / F-08 — SQLite WAL/SHM backup boundary (кандидат)
+## R4.5 / F-08 — SQLite WAL/SHM backup boundary (принят владельцем)
 
 **Контракт, источник независимого контрпримера и тесты:** [README_v02_h55_r4_5.md](README_v02_h55_r4_5.md).
 
 В `work/v02-h55-r4-wal-readonly-contract` (от принятой R4.4) уточнена **операционная гарантия**, а не алгоритм `sqlite3.backup`: успешный offline SQLite snapshot сохраняет committed WAL, но read-only SQL соединение может обновить исходный `*-shm`, поэтому forensic byte-stability всех исходных файлов **не обещается**. У `create_snapshot` появились аддитивные выходные поля `source_read_only_scope` и `forensic_byte_stability_guaranteed=false`; существующие manifest/schema/restore/Raw остаются прежними.
 
-Добавлено **6 pytest cases** в `tests/test_v02_h55_r4_5_wal_scope.py`: три committed WAL базы, normal profile, CLI disclosure и физический клон оригинала перед backup. **Расчётная полная регрессия `2044 passed` (2038 + 6), ещё не исполнялась.** Это не forensic workflow автоматически; отдельное физическое клонирование и хеши — обязанности оператора.
+Добавлено **6 pytest cases** в `tests/test_v02_h55_r4_5_wal_scope.py`: три committed WAL базы, normal profile, CLI disclosure и физический клон оригинала перед backup. **Владелец подтвердил полный pytest `2044 passed` / 89,61 с.** Это не forensic workflow автоматически; отдельное физическое клонирование и хеши — обязанности оператора.
+
+## R5 / F-02 — Standalone Raw Authority Enforcement (кандидат)
+
+**Подробный контракт, compatibility и команды:** [README_v02_h55_r5.md](README_v02_h55_r5.md).
+
+Открытая после R2 граница — standalone `MemoryStore` без `schema_meta.knowledge_raw_provenance_policy` раньше **молча пропускал** проверку при `KnowledgeLayer.confirm/reject/supersede`, потому что `require_knowledge_raw_sources()` возвращал `False`, а вызывающий слой не проверял этот результат.
+
+В `work/v02-h55-r5-raw-authority-enforcement`, основанной на принятом R4.5, этот silent fallback заменён **fail-closed `ValueError`**. Standalone по-прежнему поддерживает `provisional/get/describe/history`; для терминального Knowledge необходимо явно привязать канонический EventLog и иметь **физические исходные Raw Events**. Ни схемы, ни автоматической миграции legacy, ни тестового обхода. Четыре прежние тестовые фабрики переведены на настоящие синтетические Raw.
+
+Добавлено **8 новых pytest cases** `tests/test_v02_h55_r5_standalone_raw_authority.py`. **Расчёт полной регрессии `2052 passed` (2044 + 8)**, **пока не исполнялся**. Не считать F-02 глобально закрытой до независимого review всех terminal Knowledge writers и проверки этого нового SHA.
 
 ## Оставшиеся блокеры
 
-R2 / F-02 — Core-bound пройден по регрессии владельца; unbound standalone API остаётся отдельной границей, указанной выше.
+R2 + R5 / F-02 — Core-bound принят; standalone terminal fail-closed реализован в R5, требует новой регрессии и независимого подтверждения.
 
 R3 / F-04 — runtime writer и offline diagnostic прошли регрессию владельца; требуется независимый повторный аудит нового snapshot.
 
-R4 — F-03/F-05/F-06/F-07 приняты в пределах штатных API; F-08 подготовлен в R4.5 и требует проверки нового SHA. Не выполнять молчаливую повторную проекцию `done` или автоправку legacy-данных.
+R4 — F-03/F-05/F-06/F-07/F-08 приняты в пределах штатных API и ограничений backup. Независимый повторный аудит исправленного SHA остаётся обязательным. Не выполнять молчаливую повторную проекцию `done` или автоправку legacy-данных.
 
 После устранения подтверждённых дефектов — новый фиксированный SHA и независимый аудит. Текущий v0.2 RC не принят.
