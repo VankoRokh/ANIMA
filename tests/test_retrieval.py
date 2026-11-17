@@ -1,5 +1,7 @@
 import pytest
 
+from anima.core.event_bus import Event
+from anima.memory.event_log import EventLog
 from anima.memory.knowledge import KnowledgeLayer
 from anima.memory.link_store import LinkStore
 from anima.memory.memory_store import MemoryStore
@@ -29,8 +31,21 @@ EV_4 = "ev_44444444-dddd-4444-8444-444444444444"
 
 
 def build_corpus(tmp_path):
-    store = MemoryStore(tmp_path / "memory.db")
+    log = EventLog(tmp_path / "events.jsonl")
+    store = MemoryStore(tmp_path / "memory.db", event_log=log)
     links = LinkStore(store)
+    # All four Memory sources are synthetic but physically verifiable.
+    for event_id, timestamp, text in (
+        (EV_1, T1, "SQLite concurrent writes require WAL mode."),
+        (EV_2, T2, "benchmarkprobe reproduced write contention."),
+        (EV_3, T3, "Current open discussion about CM5 cooling."),
+        (EV_4, T1, "Old merged SQLite note."),
+    ):
+        log.write(Event(
+            "conversation.user", {"text": text}, source="user",
+            session_id="session_00000001",
+            event_id=event_id, timestamp=timestamp,
+        ))
 
     store.create_memory(
         memory_type="episodic",
