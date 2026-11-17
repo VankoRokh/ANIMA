@@ -2,6 +2,8 @@
 
 **Статус:** первый пакет тестов сохранён в отдельной ветке, **без исправлений production-кода**.
 
+> **H2.1:** `work/v02-h2-knowledge-confirmation-guard` переводит N3 в PASS (отказ прямого создания `confirmed`); в H0 теперь `4 PASS + 5 XFAIL`. Известные проблемы действительности существующих `supports` остаются задачей H2.2. См. `tests/README_v02_h2_1.md`.
+
 > **Оптимизация H1.3:** ветка `work/v02-h1-index-prefix-digest` сохраняет 3 PASS + 6 XFAIL для N6/N7/N9 и добавляет 9 проверок потокового SHA-256 префикса. Подробности и условия performance gate — `tests/README_v02_h1_3.md`.
 
 > **Обновление для ветки H1.3:** в `work/v02-h1-index-prefix-verification` N6 также переведён в `PASS`. В H0-файле ожидаются `3 PASS + 6 XFAIL`; подробности — `tests/README_v02_h1_3.md`.
