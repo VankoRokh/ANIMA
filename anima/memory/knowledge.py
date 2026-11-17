@@ -8,6 +8,7 @@ from anima.memory.link_store import (
     _validate_public_id,
     _validate_timestamp,
     _relation_active_at,
+    _evidence_intervals_overlap,
 )
 from anima.memory.memory_store import (
     MEMORY_DOMAINS,
@@ -179,17 +180,26 @@ class KnowledgeLayer:
         memory_id,
         knowledge_id,
         relation_type,
+        at,
     ):
+        """Check opposite Evidence at the same instant as the transition.
+
+        A future open-ended relation (valid_until=NULL) is not yet active.
+        This matches _require_effective_memory_evidence() and the canonical
+        half-open [created_at, valid_until) relation semantics.
+        """
         opposite = "contradicts" if relation_type == "supports" else "supports"
-        if cls._relation_exists(
-            connection,
-            source_kind="memory",
-            source_id=memory_id,
-            relation_type=opposite,
-            target_kind="knowledge",
-            target_id=knowledge_id,
-            source_memory_id=memory_id,
-        ) is not None:
+        rows = connection.execute(
+            """
+            SELECT created_at, valid_until FROM relations
+            WHERE source_kind = 'memory' AND source_id = ?
+              AND relation_type = ?
+              AND target_kind = 'knowledge' AND target_id = ?
+              AND source_memory_id = ?
+            """,
+            (memory_id, opposite, knowledge_id, memory_id),
+        ).fetchall()
+        if any(_relation_active_at(row, at) for row in rows):
             raise ValueError(
                 "Memory cannot both support and contradict the same knowledge"
             )
@@ -228,6 +238,42 @@ class KnowledgeLayer:
                 (duplicate["public_id"],),
             ).fetchone()
             return cls._relation_row_to_dict(row), False
+
+        # R3/F-04 also applies to this internal relation writer.
+        # A new permanent support/contradiction cannot overlap a future
+        # opposite interval. Reusing an existing support is not a new
+        # relation and is checked only at the effective transition time.
+        if (
+            source_kind == "memory"
+            and target_kind == "knowledge"
+            and relation_type in {"supports", "contradicts"}
+        ):
+            opposite = (
+                "contradicts" if relation_type == "supports"
+                else "supports"
+            )
+            rows = connection.execute(
+                """
+                SELECT created_at, valid_until FROM relations
+                WHERE source_kind = 'memory' AND source_id = ?
+                  AND relation_type = ?
+                  AND target_kind = 'knowledge' AND target_id = ?
+                """,
+                (source_id, opposite, target_id),
+            ).fetchall()
+            if any(
+                _evidence_intervals_overlap(
+                    first_start=created_at,
+                    first_end=None,
+                    second_start=row["created_at"],
+                    second_end=row["valid_until"],
+                )
+                for row in rows
+            ):
+                raise ValueError(
+                    "Memory cannot both support and contradict "
+                    "the same knowledge in overlapping intervals"
+                )
 
         public_id = f"{RELATION_ID_PREFIX}{uuid4()}"
         connection.execute(
@@ -527,6 +573,7 @@ class KnowledgeLayer:
                     memory_id=source_memory_id,
                     knowledge_id=knowledge_id,
                     relation_type="supports",
+                    at=confirmed_at,
                 )
                 if (
                     knowledge["status"] == "challenged"
@@ -639,6 +686,7 @@ class KnowledgeLayer:
                 memory_id=contradiction_memory_id,
                 knowledge_id=knowledge_id,
                 relation_type="contradicts",
+                at=challenged_at,
             )
             contradiction, _ = self._insert_relation(
                 connection,
@@ -717,6 +765,7 @@ class KnowledgeLayer:
                     memory_id=contradiction_memory_id,
                     knowledge_id=knowledge_id,
                     relation_type="contradicts",
+                    at=rejected_at,
                 )
                 added, _ = self._insert_relation(
                     connection,
