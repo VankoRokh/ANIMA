@@ -19,6 +19,26 @@ class EventLog:
 
         return self._known_ids
 
+    def _require_complete_tail(self):
+        """Refuse append when the existing JSONL lacks a final LF.
+
+        A syntactically valid JSON object without LF is not committed JSONL.
+        Never append to that tail and never silently truncate source bytes.
+        """
+        try:
+            with self.log_file.open("rb") as stream:
+                stream.seek(0, 2)
+                if stream.tell() == 0:
+                    return
+                stream.seek(-1, 2)
+                if stream.read(1) != b"\n":
+                    raise ValueError(
+                        f"Invalid event log {self.log_file}: "
+                        "unterminated trailing JSONL record; append refused"
+                    )
+        except FileNotFoundError:
+            return
+
     def write(self, event):
         if not isinstance(event, Event):
             raise ValueError(
@@ -35,9 +55,12 @@ class EventLog:
                 f"Duplicate event id: {record['id']}"
             )
 
+        # _known_ids may be cached: always inspect the physical tail.
+        self._require_complete_tail()
         with self.log_file.open(
             "a",
             encoding="utf-8",
+            newline="\n",
         ) as file:
             json.dump(
                 record,
@@ -59,11 +82,19 @@ class EventLog:
         with self.log_file.open(
             "r",
             encoding="utf-8",
+            newline="\n",
         ) as file:
             for line_number, line in enumerate(
                 file,
                 start=1,
             ):
+                # Match EventRetrieval: a record ends only at a physical LF.
+                # newline="\\n" disables universal newline conversion.
+                if line and not line.endswith("\n"):
+                    raise ValueError(
+                        f"Invalid event log {self.log_file}, "
+                        f"line {line_number}: unterminated JSONL record"
+                    )
                 line = line.strip()
 
                 if not line:
