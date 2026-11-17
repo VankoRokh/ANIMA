@@ -46,8 +46,8 @@ def add_memory(store, log, lifecycle, memory_id, event_id, text, created_at, clo
 
 
 def build_confirmed(tmp_path):
-    store = MemoryStore(tmp_path / "memory.db")
     log = EventLog(tmp_path / "events.jsonl")
+    store = MemoryStore(tmp_path / "memory.db", event_log=log)
     lifecycle = MemoryLifecycle(memory_store=store)
     layer = KnowledgeLayer(memory_store=store)
     add_memory(
@@ -109,8 +109,8 @@ def test_confirmed_cannot_skip_challenged_state(tmp_path):
 
 
 def test_terminal_knowledge_cannot_open_new_investigation(tmp_path):
-    store = MemoryStore(tmp_path / "memory.db")
     log = EventLog(tmp_path / "events.jsonl")
+    store = MemoryStore(tmp_path / "memory.db", event_log=log)
     lifecycle = MemoryLifecycle(memory_store=store)
     layer = KnowledgeLayer(memory_store=store)
 
