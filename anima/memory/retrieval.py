@@ -135,6 +135,8 @@ class RetrievalEngine:
             "entities": 0,
             "fts": 0,
             "relations": 0,
+            "filters_truncated": False,
+            "fts_truncated": False,
         }
 
         for public_id in object_ids:
@@ -161,13 +163,14 @@ class RetrievalEngine:
             )
             stats["exact"] += 1
 
-        filter_records = self._filter_records(
+        filter_records, filters_truncated = self._filter_records(
             kinds,
             domain=domain,
             memory_types=memory_types,
             memory_statuses=memory_statuses,
             knowledge_statuses=knowledge_statuses,
         )
+        stats["filters_truncated"] = filters_truncated
         for kind, record in filter_records:
             if not self._allowed(
                 kind,
@@ -221,10 +224,16 @@ class RetrievalEngine:
         if text_query is not None:
             fts_query = self._fts_query(text_query)
             if fts_query is not None:
-                for kind, record, rank_index in self._fts_records(
+                fts_records, fts_truncated = self._fts_records(
                     fts_query,
                     kinds,
-                ):
+                    domain=domain,
+                    memory_types=memory_types,
+                    memory_statuses=memory_statuses,
+                    knowledge_statuses=knowledge_statuses,
+                )
+                stats["fts_truncated"] = fts_truncated
+                for kind, record, rank_index in fts_records:
                     if not self._allowed(
                         kind,
                         record,
@@ -494,6 +503,7 @@ class RetrievalEngine:
         knowledge_statuses,
     ):
         records = []
+        truncated = False
         with self.memory_store.transaction() as connection:
             if "memory" in kinds and any(
                 value is not None
@@ -508,19 +518,26 @@ class RetrievalEngine:
                     placeholders = ",".join("?" for _ in memory_types)
                     clauses.append(f"type IN ({placeholders})")
                     values.extend(sorted(memory_types))
-                if memory_statuses is not None:
-                    placeholders = ",".join("?" for _ in memory_statuses)
-                    clauses.append(f"status IN ({placeholders})")
-                    values.extend(sorted(memory_statuses))
+
+                # Apply default or explicit eligibility before LIMIT.
+                allowed = sorted(
+                    DEFAULT_MEMORY_STATUSES
+                    if memory_statuses is None else memory_statuses
+                )
+                clauses.append(
+                    "status IN (" + ",".join("?" for _ in allowed) + ")"
+                )
+                values.extend(allowed)
                 rows = connection.execute(
                     "SELECT * FROM memories WHERE "
                     + " AND ".join(clauses)
                     + " ORDER BY updated_at DESC, row_id DESC LIMIT ?",
-                    values + [FTS_SEED_LIMIT],
+                    values + [FTS_SEED_LIMIT + 1],
                 ).fetchall()
+                truncated = truncated or len(rows) > FTS_SEED_LIMIT
                 records.extend(
                     ("memory", self.memory_store._row_to_memory(row))
-                    for row in rows
+                    for row in rows[:FTS_SEED_LIMIT]
                 )
 
             if "knowledge" in kinds and any(
@@ -532,72 +549,116 @@ class RetrievalEngine:
                 if domain is not None:
                     clauses.append("domain = ?")
                     values.append(domain)
-                if knowledge_statuses is not None:
-                    placeholders = ",".join("?" for _ in knowledge_statuses)
-                    clauses.append(f"status IN ({placeholders})")
-                    values.extend(sorted(knowledge_statuses))
+
+                allowed = sorted(
+                    DEFAULT_KNOWLEDGE_STATUSES
+                    if knowledge_statuses is None else knowledge_statuses
+                )
+                clauses.append(
+                    "status IN (" + ",".join("?" for _ in allowed) + ")"
+                )
+                values.extend(allowed)
                 rows = connection.execute(
                     "SELECT * FROM knowledge WHERE "
                     + " AND ".join(clauses)
                     + " ORDER BY updated_at DESC, row_id DESC LIMIT ?",
-                    values + [FTS_SEED_LIMIT],
+                    values + [FTS_SEED_LIMIT + 1],
                 ).fetchall()
+                truncated = truncated or len(rows) > FTS_SEED_LIMIT
                 records.extend(
                     ("knowledge", self.link_store._row_to_knowledge(row))
-                    for row in rows
+                    for row in rows[:FTS_SEED_LIMIT]
                 )
-        return records
+        return records, truncated
 
-    def _fts_records(self, fts_query, kinds):
+    def _fts_records(
+        self,
+        fts_query,
+        kinds,
+        *,
+        domain,
+        memory_types,
+        memory_statuses,
+        knowledge_statuses,
+    ):
         records = []
+        truncated = False
         try:
             with self.memory_store.transaction() as connection:
                 if "memory" in kinds:
+                    clauses = ["memory_fts MATCH ?"]
+                    values = [fts_query]
+                    if domain is not None:
+                        clauses.append("m.domain = ?")
+                        values.append(domain)
+                    if memory_types is not None:
+                        selected = sorted(memory_types)
+                        clauses.append(
+                            "m.type IN (" + ",".join("?" for _ in selected) + ")"
+                        )
+                        values.extend(selected)
+                    statuses = sorted(
+                        DEFAULT_MEMORY_STATUSES
+                        if memory_statuses is None else memory_statuses
+                    )
+                    clauses.append(
+                        "m.status IN (" + ",".join("?" for _ in statuses) + ")"
+                    )
+                    values.extend(statuses)
                     rows = connection.execute(
-                        """
-                        SELECT m.*, bm25(memory_fts) AS fts_rank
-                        FROM memory_fts
-                        JOIN memories m ON m.row_id = memory_fts.rowid
-                        WHERE memory_fts MATCH ?
-                        ORDER BY fts_rank, m.row_id
-                        LIMIT ?
-                        """,
-                        (fts_query, FTS_SEED_LIMIT),
+                        "SELECT m.*, bm25(memory_fts) AS fts_rank "
+                        "FROM memory_fts "
+                        "JOIN memories m ON m.row_id = memory_fts.rowid "
+                        "WHERE " + " AND ".join(clauses)
+                        + " ORDER BY fts_rank, m.row_id LIMIT ?",
+                        values + [FTS_SEED_LIMIT + 1],
                     ).fetchall()
+                    truncated = truncated or len(rows) > FTS_SEED_LIMIT
                     records.extend(
                         (
                             "memory",
                             self.memory_store._row_to_memory(row),
                             index,
                         )
-                        for index, row in enumerate(rows)
+                        for index, row in enumerate(rows[:FTS_SEED_LIMIT])
                     )
 
                 if "knowledge" in kinds:
+                    clauses = ["knowledge_fts MATCH ?"]
+                    values = [fts_query]
+                    if domain is not None:
+                        clauses.append("k.domain = ?")
+                        values.append(domain)
+                    statuses = sorted(
+                        DEFAULT_KNOWLEDGE_STATUSES
+                        if knowledge_statuses is None else knowledge_statuses
+                    )
+                    clauses.append(
+                        "k.status IN (" + ",".join("?" for _ in statuses) + ")"
+                    )
+                    values.extend(statuses)
                     rows = connection.execute(
-                        """
-                        SELECT k.*, bm25(knowledge_fts) AS fts_rank
-                        FROM knowledge_fts
-                        JOIN knowledge k ON k.row_id = knowledge_fts.rowid
-                        WHERE knowledge_fts MATCH ?
-                        ORDER BY fts_rank, k.row_id
-                        LIMIT ?
-                        """,
-                        (fts_query, FTS_SEED_LIMIT),
+                        "SELECT k.*, bm25(knowledge_fts) AS fts_rank "
+                        "FROM knowledge_fts "
+                        "JOIN knowledge k ON k.row_id = knowledge_fts.rowid "
+                        "WHERE " + " AND ".join(clauses)
+                        + " ORDER BY fts_rank, k.row_id LIMIT ?",
+                        values + [FTS_SEED_LIMIT + 1],
                     ).fetchall()
+                    truncated = truncated or len(rows) > FTS_SEED_LIMIT
                     records.extend(
                         (
                             "knowledge",
                             self.link_store._row_to_knowledge(row),
                             index,
                         )
-                        for index, row in enumerate(rows)
+                        for index, row in enumerate(rows[:FTS_SEED_LIMIT])
                     )
         except sqlite3.OperationalError as error:
             raise ValueError(
                 f"FTS retrieval failed for query {fts_query!r}: {error}"
             ) from error
-        return records
+        return records, truncated
 
     @staticmethod
     def _tokens(text):
