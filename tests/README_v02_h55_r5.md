@@ -9,13 +9,13 @@
 
 В R2 `build_core()` привязывал `MemoryStore` к `events.jsonl`, а `KnowledgeLayer.confirm/reject/supersede` требовали все declared Raw Events; политика сохранялась в `schema_meta`. Однако `MemoryStore(tmp_path / "memory.db")`, открытый **без** EventLog и без существующей политики, возвращал `False` из `require_knowledge_raw_sources()`; `KnowledgeLayer` **игнорировал этот результат**. Поэтому самостоятельный публичный Python API мог публиковать `confirmed/rejected` Knowledge без первичных событий — первоначальная F-02 оставалась возможной вне Core-bound окружения.
 
-**R5 делает fail-closed состояние обязательным для всех терминальных Knowledge-переходов** через официальный `KnowledgeLayer`: без зарегистрированного canonical Raw EventLog метод `require_knowledge_raw_sources` выдаёт `ValueError("Knowledge Raw provenance is unbound: ...")`, а не `False`. Нельзя подтвердить Knowledge на основании одного факта существования Memory.
+**R5 делает fail-closed Raw authority обязательной для всех переходов `KnowledgeLayer.confirm/challenge/reject/supersede`**, изменяющих достоверность Knowledge: без canonical Raw EventLog `require_knowledge_raw_sources` выдаёт `ValueError("Knowledge Raw provenance is unbound: ...")`, а не `False`. Нельзя подтвердить Knowledge или оспорить уже подтверждённое знание на основании одного факта существования Memory.
 
 ## Что меняется
 
-- **Один production-модуль:** `anima/memory/memory_store.py`. Если в `schema_meta` отсутствует `knowledge_raw_provenance_policy`, терминальный переход `confirm/reject/supersede` отказывается. Если metadata неизвестно или некорректно, прежний R2 fail-closed сохраняется. Если политика присутствует, все source Event IDs проверяются физическим `EventLog.load_events()`.
+- **Два production-модуля:** `anima/memory/memory_store.py` и `anima/memory/knowledge.py`. Если в `schema_meta` отсутствует `knowledge_raw_provenance_policy`, переход `confirm/challenge/reject/supersede` отказывается. `KnowledgeLayer.challenge()` дополнительно проверяет физическое Raw для источника нового противоречия до изменения Knowledge. Если metadata неизвестно или некорректно, прежний R2 fail-closed сохраняется. Если политика присутствует, все source Event IDs проверяются физическим `EventLog.load_events()`.
 - `KnowledgeLayer` **не получает** новый флаг обхода в тестах и production. `MemoryStore.bind_event_log(EventLog(<sibling>/events.jsonl))` остаётся явной штатной операцией для подготовки standalone к подтверждению. Привязка проверяет канонический путь, сохраняется в БД и **сама по себе не удостоверяет** старые `confirmed` либо целостность источников. Конкретные Raw ID проверяются именно при переходе.
-- Стандартное создание Memory, `provisional` Knowledge, чтение `get/describe/history`, диагностика, создание резервной копии, Raw и ledger остаются доступными **без принудительной миграции**. Старые `confirmed` не переводятся в `provisional`, и исторические данные не исправляются.
+- Стандартное создание Memory, `provisional` Knowledge, `investigate`, чтение `get/describe/history`, диагностика, создание резервной копии, Raw и ledger остаются доступными **без принудительной миграции**. Старые `confirmed` не переводятся в `provisional`, и исторические данные не исправляются.
 - `MemoryStore.SCHEMA_VERSION=1`, `EventProcessingCoordinator.PROCESSOR_VERSION=1.0`, `release_v01.PROTOCOL`, SQL schema, SQLite backup, Knowledge API parameters, Recovery и Raw EventLog не изменяются. Новых источников authority, LLM-решений и семантической аттестации текста Memory это не добавляет.
 - Строгое доказательство остается **экзистенциальным**: все объявленные ID соответствуют валидным LF-терминированным Raw Events на момент проверки. Семантика Memory, доверенность автора и кросс-файловая атомарность при некооперативных writers не доказаны. Прямой SQL вне официальных API остаётся за границей.
 
@@ -31,7 +31,7 @@
 
 ## Новые негативные и позитивные тесты
 
-Файл `tests/test_v02_h55_r5_standalone_raw_authority.py`: **8 pytest cases**:
+Файл `tests/test_v02_h55_r5_standalone_raw_authority.py`: **10 pytest cases**:
 
 1. Unbound `confirm(K)` отказывает, оставляет `provisional`, History/Memory/Raw/метаданные неизменными.
 2. Unbound `confirm(K, source_memory_id=M2)` откатывает даже предварительно вставленную Relation.
@@ -40,8 +40,10 @@
 5–6. У ранее `challenged` Knowledge после удаления policy в **исключительно тестовой** SQLite unbound `reject()` и `supersede()` отказывают до изменений.
 7. Standalone unbound позволяет `provisional`, `get/describe/history`; никакой автоматической записи Raw policy.
 8. Composed `build_core()` по-прежнему подтверждает Knowledge с настоящим Raw.
+9. Unbound legacy `confirmed` не может перейти в `challenged` по Memory без зарегистрированного Raw; никаких Relation и History при отказе.
+10. Даже в Core-bound системе новое противоречие без физического Raw не переводит ранее подтверждённый Knowledge в `challenged`.
 
-**Расчёт:** `2052 passed` (2044 + 8), **не результат запуска**. Существующая полная регрессия может выявить другие исторические фикстуры, которым потребуется реальный Raw; **не устранять ошибки отключением fail-closed**.
+**Расчёт:** `2054 passed` (2044 + 10), **не результат запуска**. Существующая полная регрессия может выявить другие исторические фикстуры, которым потребуется реальный Raw; **не устранять ошибки отключением fail-closed**.
 
 ### Команды
 
@@ -61,7 +63,7 @@ PYTHONPATH="$PWD" .venv/bin/python -m pytest -q -rx \
 PYTHONPATH="$PWD" .venv/bin/python -m pytest -q
 ```
 
-**Критерий приёмки:** все 8 новых сценариев PASS, полная регрессия PASS, терминальные переходы невозможны на unbound DB, отказ не изменяет SQLite/History/Raw. Новая привязка без соответствующего Raw не обходит guard, а корректный Raw позволяет подтверждение. Старые `provisional` и исторический read-only доступ не блокируются.
+**Критерий приёмки:** все 10 новых сценариев PASS, полная регрессия PASS, `confirm/challenge/reject/supersede` не используют Memory с unbound/отсутствующим Raw, отказ не изменяет SQLite/History/Raw. Новая привязка без соответствующего Raw не обходит guard, а корректный Raw позволяет подтверждение. Старые `provisional` и исторический read-only доступ не блокируются.
 
 ## После R5 — не объявлять RC автоматически
 
