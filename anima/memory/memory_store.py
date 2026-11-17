@@ -606,7 +606,47 @@ class MemoryStore:
     def delete_memory(self, public_id):
         _validate_memory_id(public_id)
 
-        with self.transaction() as connection:
+        # Relations have polymorphic IDs and no SQLite foreign keys to
+        # memories. A plain DELETE would strand evidence/provenance (N4).
+        # Prefer refusing deletion to silently cascading historical proof.
+        # BEGIN IMMEDIATE serializes this check with public relation writers.
+        with self.transaction(immediate=True) as connection:
+            exists = connection.execute(
+                "SELECT 1 FROM memories WHERE public_id = ?",
+                (public_id,),
+            ).fetchone()
+            if exists is None:
+                return False
+
+            related = connection.execute(
+                """
+                SELECT 1 FROM relations
+                WHERE (source_kind = 'memory' AND source_id = ?)
+                   OR (target_kind = 'memory' AND target_id = ?)
+                   OR source_memory_id = ?
+                LIMIT 1
+                """,
+                (public_id, public_id, public_id),
+            ).fetchone()
+            legacy_source = connection.execute(
+                "SELECT 1 FROM knowledge_sources WHERE memory_id = ? LIMIT 1",
+                (public_id,),
+            ).fetchone()
+            history_reference = connection.execute(
+                """
+                SELECT 1 FROM history
+                WHERE (source_kind = 'memory' AND source_id = ?)
+                   OR (object_kind = 'memory' AND object_id = ?)
+                LIMIT 1
+                """,
+                (public_id, public_id),
+            ).fetchone()
+            if related or legacy_source or history_reference:
+                raise ValueError(
+                    "Cannot delete Memory with evidence, relations or "
+                    f"history dependencies: {public_id}"
+                )
+
             cursor = connection.execute(
                 "DELETE FROM memories WHERE public_id = ?",
                 (public_id,),
