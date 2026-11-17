@@ -2,6 +2,8 @@
 
 **Статус:** первый пакет тестов сохранён в отдельной ветке, **без исправлений production-кода**.
 
+> **Оптимизация H1.3:** ветка `work/v02-h1-index-prefix-digest` сохраняет 3 PASS + 6 XFAIL для N6/N7/N9 и добавляет 9 проверок потокового SHA-256 префикса. Подробности и условия performance gate — `tests/README_v02_h1_3.md`.
+
 > **Обновление для ветки H1.3:** в `work/v02-h1-index-prefix-verification` N6 также переведён в `PASS`. В H0-файле ожидаются `3 PASS + 6 XFAIL`; подробности — `tests/README_v02_h1_3.md`.
 
 > **Обновление для ветки H1.2:** в `work/v02-h1-finalized-raw-integrity` снята также метка `xfail` для N9. Ожидается `2 PASS + 7 XFAIL` в исходном H0-файле; детали — `tests/README_v02_h1_2.md`.
