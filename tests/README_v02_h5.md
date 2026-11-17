@@ -344,9 +344,9 @@ PYTHONPATH="$PWD" .venv/bin/python -m labs.v02_h5_scaling_diagnostics \
 
 Ветка `work/v02-h5-backup-rollback`: `labs/v02_h5_snapshot.py` создаёт проверяемую **offline** копию остановленного `release_v01` экземпляра, проверяет SHA-256 manifest и восстанавливает **только в новый каталог**. SQLite копируется `sqlite3.backup()`, исходный Raw сохраняется побайтово, `event_index.db` в архиве остаётся, но при восстановлении **не активируется** (новый индекс строится из Raw из-за dev/inode привязки старого). Ни production-схемы, ни версии обработчика, ни пользовательские записи не изменяются.
 
-`tests/test_v02_h5_4_snapshot_restore.py` — **11 новых тестов**: identity/Raw IDs, sandbox effect, активный writer lock, отказ от overwrite, повреждённая копия, symlink/path traversal, неполное состояние, additive legacy index, legacy `confirmed` без автоматического ремонта.
+`tests/test_v02_h5_4_snapshot_restore.py` — **12 новых тестов**: identity/Raw IDs, sandbox effect, активный writer lock, отказ от overwrite, повреждённая копия, symlink/path traversal, неполное состояние, torn исходный Raw, additive legacy index, legacy `confirmed` без автоматического ремонта.
 
-**Расчётный результат полного pytest: `1958 passed`** (1947 + 11). Это **не** исполненный результат.
+**Расчётный результат полного pytest: `1959 passed`** (1947 + 12). Это **не** исполненный результат.
 
 ```bash
 git status --short
