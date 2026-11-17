@@ -252,3 +252,34 @@ def test_h55_r2_reject_cannot_use_ghost_source(tmp_path):
         )
     assert layer.get(claim)["status"] == "challenged"
     assert layer.history(claim) == before_history
+
+
+def test_h55_r2_malformed_completed_jsonl_record_is_rejected(tmp_path):
+    core = build_core(tmp_path)
+    _original, memory_id = project(core, 111)
+    close(core, memory_id)
+    layer, claim = candidate(core, memory_id, "malformed")
+    # Physical LF is present, but the record is not a valid Event.
+    with core.event_log.log_file.open("ab") as output:
+        output.write(b'{"bad":"not an Event"}\n')
+    before_raw = core.event_log.log_file.read_bytes()
+    with pytest.raises(ValueError, match="Invalid event log"):
+        layer.confirm(claim, confirmed_at=T3)
+    assert layer.get(claim)["status"] == "provisional"
+    assert core.event_log.log_file.read_bytes() == before_raw
+
+
+def test_h55_r2_unknown_persisted_raw_policy_fails_closed(tmp_path):
+    core = build_core(tmp_path)
+    _original, memory_id = project(core, 121)
+    close(core, memory_id)
+    layer, claim = candidate(core, memory_id, "unknown_policy")
+    with core.memory_store.transaction(immediate=True) as connection:
+        # Corrupted/forward-versioned metadata on disposable test data only.
+        connection.execute(
+            "UPDATE schema_meta SET value=? WHERE key=?",
+            ("unrecognized_policy_v99", RAW_PROVENANCE_META_KEY),
+        )
+    with pytest.raises(ValueError, match="Unsupported Raw provenance policy"):
+        layer.confirm(claim, confirmed_at=T3)
+    assert layer.get(claim)["status"] == "provisional"
