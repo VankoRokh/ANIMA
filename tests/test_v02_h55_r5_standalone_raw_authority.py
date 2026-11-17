@@ -226,3 +226,77 @@ def test_h55_r5_composed_core_still_publishes_with_real_raw(tmp_path):
         "knowledge"
     ]["status"] == "confirmed"
     assert core.event_processing.finalized_count() == 3
+
+
+
+def test_h55_r5_unbound_challenge_cannot_modify_confirmed_legacy_claim(
+    tmp_path,
+):
+    store, layer, _, claim = unbound(tmp_path)
+    contradiction = store.create_memory(
+        memory_type="episodic", domain="project", status="closed",
+        content="unverified contradictory evidence", created_at=T0,
+        public_id=uid("mem_", 12), source_event_id=uid("ev_", 12),
+    )["id"]
+    # Deliberate *legacy* confirmed state made only in disposable SQLite.
+    # No public API authorizes creating it without Raw.
+    with store.transaction(immediate=True) as conn:
+        conn.execute(
+            "UPDATE knowledge SET status='confirmed', updated_at=? "
+            "WHERE public_id=?", (T2, claim),
+        )
+    before_history = layer.history(claim)
+    before_db = store.database_file.read_bytes()
+
+    with pytest.raises(ValueError, match="Raw provenance is unbound"):
+        layer.challenge(claim, contradiction, challenged_at=T3)
+
+    assert layer.get(claim)["status"] == "confirmed"
+    assert layer.history(claim) == before_history
+    assert store.database_file.read_bytes() == before_db
+    with store.transaction() as conn:
+        assert conn.execute(
+            "SELECT COUNT(*) FROM relations WHERE source_id=? "
+            "AND target_id=? AND relation_type='contradicts'",
+            (contradiction, claim),
+        ).fetchone()[0] == 0
+
+
+def test_h55_r5_core_challenge_with_missing_raw_is_refused_atomically(
+    tmp_path,
+):
+    core = build_core(tmp_path)
+    event = _real_event(301)
+    core.event_log.write(event)
+    projected = core.event_processing.process(event)
+    assert projected["action"] == "create"
+    MemoryLifecycle(memory_store=core.memory_store).close(
+        projected["memory_id"], closed_at=T1,
+    )
+    layer = KnowledgeLayer(memory_store=core.memory_store)
+    claim = layer.create_candidate(
+        domain="user", statement="h55r5 confirmed original",
+        source_memory_id=projected["memory_id"], created_at=T2,
+    )["knowledge"]["id"]
+    assert layer.confirm(claim, confirmed_at=T3)[
+        "knowledge"
+    ]["status"] == "confirmed"
+
+    ghost = core.memory_store.create_memory(
+        memory_type="episodic", domain="user", status="closed",
+        content="h55r5 ghost challenge with nonexistent Raw",
+        created_at=T0, public_id=uid("mem_", 302),
+        source_event_id=uid("ev_", 302),
+    )["id"]
+    history_before = layer.history(claim)
+    db_before = core.memory_store.database_file.read_bytes()
+    raw_before = core.event_log.log_file.read_bytes()
+
+    with pytest.raises(ValueError, match="missing source Event"):
+        layer.challenge(claim, ghost, challenged_at=T4)
+
+    assert layer.get(claim)["status"] == "confirmed"
+    assert layer.history(claim) == history_before
+    assert core.memory_store.database_file.read_bytes() == db_before
+    assert core.event_log.log_file.read_bytes() == raw_before
+    assert core.event_processing.get(event.event_id)["status"] == "done"
