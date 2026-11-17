@@ -4,7 +4,9 @@ CREATE requires a STOPPED, labeled release_v01 instance with its advisory
 writer lock available, and creates a NEW snapshot directory exclusively.
 All SQLite databases are copied using SQLite's online-backup API; non-DB
 files are copied byte-exact with SHA-256 checks. Lock and SQLite transient
-WAL/SHM/journal files are never replayed. The source root is not modified.
+WAL/SHM/journal files are never replayed. The tool does not intentionally
+write source data, but SQLite's read-only connection may modify -shm and
+other transient sidecars. This is NOT a forensic byte-read-only snapshot.
 
 RESTORE verifies every snapshot entry BEFORE creating a NEW destination
 instance and intentionally excludes derived event_index.db, whose SQLite
@@ -13,9 +15,15 @@ Raw when open_release initializes. All other DBs/Raw/identity are restored.
 
 Security/atomicity scope: fcntl's release lock protects cooperative writers,
 not rogue direct DB/Raw writers; a cross-DB snapshot is only consistent when
-all instance writers are stopped. No physical power-loss/fsync guarantees.
-Neither step performs legacy Knowledge repairs. This is a LAB workflow,
-not a generic production migration tool.
+all instance writers are stopped. SQLite mode=ro + PRAGMA query_only does
+not guarantee byte immutability of the entire source tree: -shm can change
+while committed WAL content is safely included in a logical backup. For a
+forensic preservation requirement, first obtain an independently captured,
+byte-stable offline clone/image (including WAL/SHM), preserve its hashes,
+and run SQLite backup on a separate WORKING COPY, never on the evidence
+original. No physical power-loss/fsync guarantees. Neither step performs
+legacy Knowledge repairs. This is a LAB workflow, not a generic production
+migration tool.
 
 Examples:
   PYTHONPATH="$PWD" .venv/bin/python -m labs.v02_h5_snapshot create \
@@ -58,6 +66,10 @@ REQUIRED_SANDBOX = {
     "tasks.db", "execution.db",
 }
 IGNORED_SUFFIXES = ("-wal", "-shm", "-journal")
+# F-08: a SQLite read-only connection is logically read-only, but it
+# may update a shared-memory (-shm) sidecar as part of WAL bookkeeping.
+# Do not infer immutable source bytes from successful SQLite backup.
+SOURCE_READ_ONLY_SCOPE = "LOGICAL_SQLITE_BACKUP_SIDECARS_MAY_CHANGE"
 
 
 def _hash(path):
@@ -152,6 +164,12 @@ def _require_release_files(paths, capability):
 
 
 def _read_only_sqlite_backup(source, destination):
+    """Copy committed SQLite content (including WAL), not source file bytes.
+
+    mode=ro / query_only prevent application-level SQL writes, but SQLite
+    may still update -shm under WAL. This function must never be advertised
+    as forensic byte-read-only for the entire source filesystem.
+    """
     uri = "file:" + quote(str(source.resolve()), safe="/") + "?mode=ro"
     with closing(sqlite3.connect(uri, uri=True)) as original:
         original.execute("PRAGMA query_only=ON")
@@ -229,6 +247,10 @@ def create_snapshot(source, destination):
             "manifest_sha256": _hash(destination / MANIFEST),
             "protocol": manifest["release_protocol"],
             "derived_rebuild_on_restore": manifest["derived_rebuild_on_restore"],
+            # Operational honesty: a successful logical backup DOES NOT
+            # certify physical source byte stability, especially -shm.
+            "source_read_only_scope": SOURCE_READ_ONLY_SCOPE,
+            "forensic_byte_stability_guaranteed": False,
         }
 
 
