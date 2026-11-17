@@ -43,6 +43,11 @@ class FixtureRetrieval:
             "stats": {
                 "candidates": 1,
                 "returned": 1,
+                # Stage 6's bounded synthetic fixture fully controls its
+                # one returned record; it has no hidden FTS/filter seeds.
+                # R4.4 requires explicit coverage flags from every adapter.
+                "fts_truncated": False,
+                "filters_truncated": False,
             },
         }
 
