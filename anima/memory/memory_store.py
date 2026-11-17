@@ -7,6 +7,11 @@ from uuid import UUID, uuid4
 
 
 SCHEMA_VERSION = 1
+# R2: an instance-level, persistent opt-in for verifying Knowledge sources
+# against the canonical Raw EventLog. Kept in schema_meta without a table
+# migration; standalone legacy/unit-test MemoryStore remains unbound.
+RAW_PROVENANCE_META_KEY = "knowledge_raw_provenance_policy"
+RAW_PROVENANCE_META_VALUE = "canonical_events_jsonl_v1"
 MEMORY_TYPES = {"episodic", "procedural"}
 MEMORY_DOMAINS = {
     "self",
@@ -333,10 +338,110 @@ def validate_memory_record(memory):
 
 
 class MemoryStore:
-    def __init__(self, database_file="data/memory.db"):
+    def __init__(self, database_file="data/memory.db", *, event_log=None):
         self.database_file = Path(database_file)
         self.database_file.parent.mkdir(parents=True, exist_ok=True)
         self._initialize()
+        if event_log is not None:
+            self.bind_event_log(event_log)
+
+    def bind_event_log(self, event_log):
+        """Persist Raw verification for every KnowledgeLayer using this DB.
+
+        The binding must be the canonical sibling events.jsonl. A reopened
+        MemoryStore without an explicit EventLog still honors the persisted
+        policy; this prevents accidental bypass by a second Python store.
+        """
+        from anima.memory.event_log import EventLog
+
+        if not isinstance(event_log, EventLog):
+            raise TypeError("Raw provenance binding requires EventLog")
+        expected = (self.database_file.parent / "events.jsonl").resolve()
+        actual = event_log.log_file.resolve()
+        if actual != expected:
+            raise ValueError(
+                "Raw provenance requires canonical sibling events.jsonl"
+            )
+        with self.transaction(immediate=True) as connection:
+            existing = connection.execute(
+                "SELECT value FROM schema_meta WHERE key = ?",
+                (RAW_PROVENANCE_META_KEY,),
+            ).fetchone()
+            if (
+                existing is not None
+                and existing["value"] != RAW_PROVENANCE_META_VALUE
+            ):
+                raise ValueError("Unsupported Raw provenance policy")
+            if existing is None:
+                connection.execute(
+                    "INSERT INTO schema_meta(key, value) VALUES (?, ?)",
+                    (RAW_PROVENANCE_META_KEY, RAW_PROVENANCE_META_VALUE),
+                )
+
+    def require_knowledge_raw_sources(self, connection, memory_ids):
+        """Require all declared Memory source IDs to exist in complete Raw.
+
+        Runs inside the caller's Knowledge SQLite transaction. All Raw rows
+        are validated, not looked up in a stale ID cache. The check proves
+        Raw *existence*, not that Memory text faithfully represents Raw.
+        Cross-file atomicity against uncooperative writers is not claimed.
+
+        An unbound legacy store is intentionally compatibility-only; it
+        does not provide the v0.2 Core provenance guarantee.
+        """
+        from anima.memory.event_log import EventLog
+
+        policy = connection.execute(
+            "SELECT value FROM schema_meta WHERE key = ?",
+            (RAW_PROVENANCE_META_KEY,),
+        ).fetchone()
+        if policy is None:
+            return False
+        if policy["value"] != RAW_PROVENANCE_META_VALUE:
+            raise ValueError("Unsupported Raw provenance policy")
+
+        unique_ids = sorted(set(memory_ids))
+        if not unique_ids:
+            raise ValueError("Knowledge Raw provenance needs Memory evidence")
+        for memory_id in unique_ids:
+            _validate_memory_id(memory_id)
+        placeholders = ",".join("?" for _ in unique_ids)
+        rows = connection.execute(
+            "SELECT memory_id, event_id FROM memory_sources "
+            f"WHERE memory_id IN ({placeholders})",
+            tuple(unique_ids),
+        ).fetchall()
+        declared = {memory_id: set() for memory_id in unique_ids}
+        for row in rows:
+            declared[row["memory_id"]].add(row["event_id"])
+        missing_sources = [
+            memory_id for memory_id, event_ids in declared.items()
+            if not event_ids
+        ]
+        if missing_sources:
+            raise ValueError(
+                "Knowledge Raw provenance requires source Events for Memory: "
+                + ", ".join(missing_sources)
+            )
+
+        # EventLog.load_events validates every physical LF, Event shape and
+        # duplicate ID before returning; it does not trust an ID cache.
+        events_file = self.database_file.parent / "events.jsonl"
+        raw_ids = {
+            record["id"] for record in EventLog(events_file).load_events()
+        }
+        unavailable = sorted({
+            source_id
+            for event_ids in declared.values()
+            for source_id in event_ids
+            if source_id not in raw_ids
+        })
+        if unavailable:
+            raise ValueError(
+                "Knowledge Raw provenance missing source Event(s): "
+                + ", ".join(unavailable)
+            )
+        return True
 
     def _connect(self):
         connection = sqlite3.connect(self.database_file)
