@@ -1,6 +1,6 @@
 # ANIMA v0.2 — H5.5 remediation / Evidence Lifecycle
 
-**Статус:** R1/F-01 принят (`1975 passed`), R2/F-02 Core-bound принят (`1987 passed`; standalone/unbound остаётся открытым), R3/F-04 принят (`1999 passed`), R4.1/F-03 принят (`2007 passed`), R4.2/F-05 принят (`2017 passed`). R4.3/F-06 реализован, **ещё не испытан**; F-07/F-08 остаются. v0.2 RC **BLOCKED**.
+**Статус:** R1/F-01 принят (`1975 passed`), R2/F-02 Core-bound принят (`1987 passed`, standalone/unbound остаётся открытым), R3/F-04 принят (`1999 passed`), R4.1/F-03 принят (`2007 passed`), R4.2/F-05 принят (`2017 passed`), R4.3/F-06 принят (`2030 passed`). R4.4/F-07 реализован, **не испытан**; F-08 остаётся. v0.2 RC **BLOCKED**.
 
 ## Источник и ревизия
 
@@ -95,13 +95,21 @@ PYTHONPATH="$PWD" .venv/bin/python -m pytest -q
 
 Добавлено **10 тестов** `tests/test_v02_h55_r4_2_temporal_merge.py`, в том числе точный `temporal_merge` аудитора (future 2099 relation), finite/exact-end, expired, offsets, provenance и инвертированный legacy-интервал. **Результат владельца:** адресные `60 passed` / 1,18 с и полная регрессия `2017 passed` / 88,09 с.
 
-## R4.3 / F-06 — Temporal Knowledge Confirmation (кандидат)
+## R4.3 / F-06 — Temporal Knowledge Confirmation (принят владельцем)
 
 **Контракт и испытания:** [README_v02_h55_r4_3.md](README_v02_h55_r4_3.md).
 
 В `work/v02-h55-r4-temporal-confirm` от принятого R4.2 устранена асимметрия `KnowledgeLayer.confirm()` при будущей `contradicts`. `_require_no_opposite_evidence(..., at)` теперь проверяет `[created_at, valid_until)` на момент перехода, как и `_require_effective_memory_evidence`; `confirm/challenge/reject` передают соответствующий момент. Внутренний `_insert_relation` также проверяет **будущее пересечение** при создании новой бессрочной opposite Relation, сохраняя R3. Имеющийся `supports` можно переиспользовать без новой Relation, а текущая противоположная Evidence остаётся блокером.
 
-Создано **10 функций / 13 новых pytest cases** в `tests/test_v02_h55_r4_3_temporal_confirmation.py`. Аудиторский F-06 требует старое конфликтное состояние, которое после R3 запрещено создавать через `LinkStore`; поэтому оно воспроизводится только через SQL в `pytest tmp_path`. Расчётная полная регрессия **`2030 passed` (2017 + 13)**; **не выполнена**. Данные пользователей не исправляются.
+Создано **10 функций / 13 новых pytest cases** в `tests/test_v02_h55_r4_3_temporal_confirmation.py`. Аудиторский F-06 требует старое конфликтное состояние, которое после R3 запрещено создавать через `LinkStore`; поэтому оно воспроизводится только через SQL в `pytest tmp_path`. **Владелец подтвердил:** адресные `70 passed` / 1,58 с и полный pytest `2030 passed` / 88,65 с. Данные пользователей не исправляются.
+
+## R4.4 / F-07 — Context Retrieval Coverage (кандидат)
+
+**Контракт, риски, тесты:** [README_v02_h55_r4_4.md](README_v02_h55_r4_4.md).
+
+В `work/v02-h55-r4-context-coverage` (основана на принятом R4.3) `ContextBuilder` сохраняет upstream-флаги `RetrievalEngine.stats.fts_truncated` и `filters_truncated`, отдельно обозначает `top_k_truncated`, возвращает `retrieval_coverage.complete` как отсутствие этих ограничений и устанавливает общий `ContextBundle.truncated` даже при `candidates==returned`, когда seed-окно урезано. Бюджет Context продолжает учитываться независимо через `selection_stats.omitted_budget`.
+
+Добавлены **8 тестов** `tests/test_v02_h55_r4_4_context_coverage.py` на реальном FTS/SQLite и DEEP provenance. **Расчёт полного pytest: `2038 passed` (2030 + 8); не исполнялся.** Ранжирование, записи Memory, Raw, Knowledge и протокол не изменены.
 
 ## Оставшиеся блокеры
 
@@ -109,6 +117,6 @@ R2 / F-02 — Core-bound пройден по регрессии владельц
 
 R3 / F-04 — runtime writer и offline diagnostic прошли регрессию владельца; требуется независимый повторный аудит нового snapshot.
 
-R4 — F-03/F-05 приняты в пределах штатных API; F-06 подготовлен к проверке в R4.3; F-07/F-08 остаются. Не выполнять молчаливую повторную проекцию `done` или автоправку legacy-данных.
+R4 — F-03/F-05/F-06 приняты в пределах штатных API; F-07 подготовлен в R4.4, F-08 остаётся. Не выполнять молчаливую повторную проекцию `done` или автоправку legacy-данных.
 
 После устранения подтверждённых дефектов — новый фиксированный SHA и независимый аудит. Текущий v0.2 RC не принят.
