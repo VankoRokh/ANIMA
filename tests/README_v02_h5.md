@@ -1,8 +1,8 @@
 # ANIMA v0.2 — H5 / Integration, Legacy Data & Release Candidate Gates
 
-**Статус H5:** H5.0/H5.2 приняты; H5.1 подтверждён на x86_64 / Python 3.14.4 (Python 3.12 NOT_TESTED); H5.3c принят (`1947 passed`); H5.4a принят (`1959 passed`). H5.4b — read-only контракт совместимости и негативные тесты ожидают исполнения. H5/RC не принят.  
+**Статус H5:** H5.0–H5.4b приняты по отчётам владельца в пределах синтетических проверок; H5.4b — `37 passed` за 1,22 с и полный `1967 passed` за 95,42 с. Python 3.12, реальные legacy-данные и эксплуатационный SLO остаются непроверенными. H5.5 независимый аудит подготовлен, **ещё не проведён**. ANIMA v0.2 RC не принят.  
 **База для работ:** H4 `work/v02-h4-identity-guard`, принятый владельцем после `1903 passed` за 86,95 с, без XFAIL. Quality probe: 4 синтетические пары; 0 false merges, 1 false split; precision 1.0, recall 0.5 (эти числа не переносить на реальные данные).  
-**Ветка H5.0:** `work/v02-h5-readonly-release-gates`. **Рабочая ветка H5.1:** `work/v02-h5-portability-profile`. **Рабочая ветка H5.2:** `work/v02-h5-fault-recovery`. **Рабочая ветка H5.3:** `work/v02-h5-performance-profile`. **H5.3b:** `work/v02-h5-performance-diagnostics`. **H5.3c:** `work/v02-h5-performance-entity-query`. **H5.4a:** `work/v02-h5-backup-rollback`. **H5.4b:** `work/v02-h5-compatibility-contract`.
+**Ветка H5.0:** `work/v02-h5-readonly-release-gates`. **Рабочая ветка H5.1:** `work/v02-h5-portability-profile`. **Рабочая ветка H5.2:** `work/v02-h5-fault-recovery`. **Рабочая ветка H5.3:** `work/v02-h5-performance-profile`. **H5.3b:** `work/v02-h5-performance-diagnostics`. **H5.3c:** `work/v02-h5-performance-entity-query`. **H5.4a:** `work/v02-h5-backup-rollback`. **H5.4b:** `work/v02-h5-compatibility-contract`. **H5.5 frozen snapshot:** `audit/v02-h5-rc-candidate` @ `28e8438f8408e85b52e237eaedcf024354a4522a`; документация `work/v02-h5-independent-audit-prep`.
 
 ## Позиция перед RC
 
@@ -338,29 +338,24 @@ PYTHONPATH="$PWD" .venv/bin/python -m labs.v02_h5_scaling_diagnostics \
 
 **Решение по H5.3c:** владелец сообщил полную регрессию `1947 passed` за 93,68 с; микрооптимизация принята в оговорённой синтетической области. Два полных Raw сканирования и вопросы общего performance SLO остаются. Более глубокая оптимизация Raw/association без отдельного подтверждения безопасности не выполняется.
 
-## H5.4 — Migration, compatibility & rollback (H5.4a принят; H5.4b кандидат)
+## H5.4 — Migration, compatibility & rollback (✅ принят по результатам владельца)
 
-**Подробное ТЗ:** [README_v02_h5_4.md](README_v02_h5_4.md).
+**Подробный контракт:** [README_v02_h5_4.md](README_v02_h5_4.md).
 
-**H5.4a подтверждён владельцем:** адресные `35 passed` / 2,57 с, полная регрессия `1959 passed` / 89,24 с. Snapshot, SHA-256 manifest, restore в новый каталог, legacy index rebuild, sandbox state и отрицательные проверки пройдены на синтетических экземплярах. Backup/restore настоящего пользовательского экземпляра, физическая долговечность и некооперативные писатели не испытаны.
+H5.4a: адресные `35 passed` / 2,57 с, полный `1959 passed` / 89,24 с. H5.4b: адресные `37 passed` / 1,22 с, полный `1967 passed` / 95,42 с (сообщено владельцем). Независимое воспроизведение и проверка настоящего legacy instance ещё не проведены.
 
-**H5.4b** реализован в `work/v02-h5-compatibility-contract` без изменения production. В `labs/v02_h5_compatibility.py` — read-only аудит ledger и старых `about`; в `tests/test_v02_h5_4_compatibility.py` — 8 проверок. Версия `PROCESSOR_VERSION="1.0"` трактуется как namespace идемпотентности; повысить её без отдельной миграции — риск повторного проигрывания `done`. Старые `about` без авторизационного доказательства помещаются в категорию **REVIEW_REQUIRED**, не удаляются и не считаются автоматически ложными. Несоответствие Raw и ledger — **BLOCKED**.
+`labs/v02_h5_snapshot.py`: только explicit offline copy/verify/restore, без overwrite и исправлений legacy. `labs/v02_h5_compatibility.py`: read-only проверка ledger и старых `about`. Техническое решение: `PROCESSOR_VERSION="1.0"` — namespace идемпотентности, **не** сигнал переобработать старые `done/skipped`; их не мигрировать молча.
 
-```bash
-PYTHONPATH="$PWD" .venv/bin/python -m pytest -q -rx \
-  tests/test_v02_h5_4_compatibility.py \
-  tests/test_v02_h5_4_snapshot_restore.py \
-  tests/test_v02_h5_legacy_diagnostic.py
+**Открытый RC вопрос:** data migration/backup на реальной остановленной копии остаётся неподтверждённым, некоторые legacy `about` требуют authority review. Это не автоматическое разрешение к выпуску.
 
-PYTHONPATH="$PWD" .venv/bin/python -m pytest -q
-```
+## H5.5 — Independent review & RC (готово ТЗ, аудит не проводился)
 
-Ожидаемый, но **ещё не полученный** полный результат: `1967 passed` (1959 + 8).
+**Единая точка передачи:** [H5_5_INDEPENDENT_RELEASE_AUDIT.md](H5_5_INDEPENDENT_RELEASE_AUDIT.md).
 
-**Открытый RC вопрос:** реальная legacy DB пока не обследовалась. Без полномочий источников старых `about` нельзя признать их достоверными или автоматически пересобрать. Python 3.12 остаётся `NOT_TESTED`. Не маркировать v0.2 как RC при одном green pytest.
+**Проверяемый код:** `audit/v02-h5-rc-candidate` @ `28e8438f8408e85b52e237eaedcf024354a4522a` — неизменяемая по нашему процессу ветка без подготовительных docs-коммитов. Техническое задание размещено только в `work/v02-h5-independent-audit-prep`.
 
-## H5.5 — Independent review & RC (TODO)
+Независимому reviewer необходимо провести source review + воспроизведение там, где есть исполняемое окружение, дополнительные отрицательные испытания, legacy compatibility, crash/recovery, портативность и профили производительности; выдать `READY/BLOCKED/INSUFFICIENT EVIDENCE` с точными доказательствами. Без повторного запуска не утверждать, что тесты независимо подтверждены.
 
-Нужен внешний по отношению к автору изменений review snapshot с воспроизведением отрицательных и аварийных тестов, особенно N1/N2 authority, H2.3 legacy, H1.3 cache/DB checkpoints, performance O(N), аварийные переходы. Пакет для reviewer — `tests/H5_INDEPENDENT_REVIEW_BRIEF.md`.
+**Открытые вопросы:** Python 3.12 `NOT_TESTED`, Raspberry Pi / aarch64 `NOT_TESTED` в H5, настоящие old instance data и multi-DB restore `NOT VERIFIED`, Raw power loss `NOT VERIFIED`, p95/SLO `NOT AGREED`. Решение об обязательности каждого ограничения для узкого RC должно быть явно отражено в заключении.
 
-**Граница этапа:** H5.0 — только наблюдение на копиях, H5 целиком не принят. Пока нет H5.1–H5.5, запрещено маркировать v0.2 `RC` или `stable` даже при зелёном pytest.
+**ANIMA v0.2 RC не присваивать до приёмки H5.5.**
