@@ -77,6 +77,9 @@ def test_h53b_report_aggregates_three_independent_repetitions(monkeypatch):
     })
     report = scaling.build_report([160], [1, 8], 3)
     assert report["measurement_status"] == "MEASURED_NO_RELEASE_SLO"
+    assert report["synthetic_grouping_status"] == (
+        "NO_CROSS_GROUP_MERGE_OBSERVED"
+    )
     assert len(report["runs"]) == 6
     assert len(report["summary"]) == 2
     assert report["summary"][0]["count"] == 160
