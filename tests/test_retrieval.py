@@ -1,5 +1,6 @@
 import pytest
 
+from anima.memory.knowledge import KnowledgeLayer
 from anima.memory.link_store import LinkStore
 from anima.memory.memory_store import MemoryStore
 from anima.memory.retrieval import RetrievalEngine
@@ -75,7 +76,7 @@ def build_corpus(tmp_path):
     links.create_knowledge(
         domain="project",
         statement="SQLite WAL mode is required for concurrent writes.",
-        status="confirmed",
+        status="provisional",
         created_at=T3,
         public_id=K_CURRENT,
     )
@@ -133,6 +134,11 @@ def build_corpus(tmp_path):
         target_id=K_CURRENT,
         created_at=T3,
     )
+    # Confirm through the evidence-aware lifecycle, not the raw writer.
+    KnowledgeLayer(memory_store=store).confirm(
+        K_CURRENT, confirmed_at=T3
+    )
+
     links.create_relation(
         source_kind="knowledge",
         source_id=K_CURRENT,
