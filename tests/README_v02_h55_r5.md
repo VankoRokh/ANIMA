@@ -45,6 +45,23 @@
 
 **Расчёт:** `2054 passed` (2044 + 10), **не результат запуска**. Существующая полная регрессия может выявить другие исторические фикстуры, которым потребуется реальный Raw; **не устранять ошибки отключением fail-closed**.
 
+## Регрессия R5: старые тестовые фикстуры
+
+Первый полный прогон владельца завершился **`2022 passed, 32 failed` за 89,22 с**. Все 32 ошибки имели общий тип `ValueError: Knowledge Raw provenance is unbound` в прежних фабриках Context, Retrieval, Provenance, Sleep, Stage 1 и H5 legacy diagnostic. Это был **недостаток адаптации тестового окружения к новой обязательной Raw authority**, а не основание отключать проверку в production.
+
+Исправлено **9 существующих тестовых файлов**:
+
+- `tests/test_context_builder.py` — передача уже существующего `EventLog` в `MemoryStore`.
+- `tests/test_retrieval.py` — создание канонического EventLog и четырёх настоящих синтетических Event IDs перед Memory / confirmed Knowledge.
+- `tests/test_provenance.py` — локальная фикстура `test_relations_validate_direction_and_provenance` теперь пишет Event и привязывает его к MemoryStore; другие независимые тесты не меняются.
+- `tests/test_sleep_contracts.py`, `tests/test_sleep_derived_results.py`, `tests/test_sleep_stage_validation.py`, `tests/test_sleep_text_consolidation.py` — привязка уже создаваемого физического EventLog в соответствующих фабриках.
+- `tests/test_stage1_validation.py` — явная Raw-привязка при сборке тестового Stage 1 стека.
+- `tests/test_v02_h5_legacy_diagnostic.py` — исходная фикстура становится корректной; специальная SQL/Raw инъекция legacy повреждения и проверка `audit_snapshot` сохраняются.
+
+**Production-код R5 не изменялся** при исправлении этих 32 сбоев: `require_knowledge_raw_sources()` по-прежнему fail closed при unbound, `challenge()` требует реального Raw. Никаких `pytest`-исключений, скрытого автоматического Raw binding, `except ValueError` или обхода политика не добавлено. Изменилось только создание synthetic fixtures.
+
+**Общее число тестов не изменилось:** расчёт по-прежнему **`2054 passed`**, но **повторная регрессия ещё не подтверждена**. При новых падениях сначала изучать их traceback, а не ослаблять Raw authority.
+
 ### Команды
 
 ```bash
@@ -58,6 +75,15 @@ PYTHONPATH="$PWD" .venv/bin/python -m pytest -q -rx \
   tests/test_knowledge_evidence.py \
   tests/test_v02_h2_1_confirmed_knowledge.py \
   tests/test_v02_h2_2_evidence.py \
+  tests/test_context_builder.py \
+  tests/test_retrieval.py \
+  tests/test_provenance.py \
+  tests/test_sleep_contracts.py \
+  tests/test_sleep_derived_results.py \
+  tests/test_sleep_stage_validation.py \
+  tests/test_sleep_text_consolidation.py \
+  tests/test_stage1_validation.py \
+  tests/test_v02_h5_legacy_diagnostic.py \
   tests/test_v02_h55_r4_5_wal_scope.py
 
 PYTHONPATH="$PWD" .venv/bin/python -m pytest -q
