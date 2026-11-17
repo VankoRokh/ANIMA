@@ -311,9 +311,16 @@ def build_report(counts, streams, repeats, *, timeout=300):
                 ),
             })
 
+    safety_alert = any(
+        row["cross_group_merges"] > 0 for row in summaries
+    )
     return {
         "schema": SCHEMA,
         "measurement_status": "MEASURED_NO_RELEASE_SLO",
+        "synthetic_grouping_status": (
+            "CROSS_GROUP_MERGE_OBSERVED" if safety_alert
+            else "NO_CROSS_GROUP_MERGE_OBSERVED"
+        ),
         "git": _git_snapshot(),
         "environment": {
             "python": platform.python_version(),
