@@ -338,13 +338,13 @@ PYTHONPATH="$PWD" .venv/bin/python -m labs.v02_h5_scaling_diagnostics \
 
 **Решение по H5.3c:** владелец сообщил полную регрессию `1947 passed` за 93,68 с; микрооптимизация принята в оговорённой синтетической области. Два полных Raw сканирования и вопросы общего performance SLO остаются. Более глубокая оптимизация Raw/association без отдельного подтверждения безопасности не выполняется.
 
-## H5.4 — Migration, compatibility & rollback (H5.4a принят; H5.4b кандидат)
+## H5.4 — Migration, compatibility & rollback (прошла штатные тесты; H5.5 нашёл межкомпонентные дефекты)
 
 **Подробное ТЗ:** [README_v02_h5_4.md](README_v02_h5_4.md).
 
 **H5.4a подтверждён владельцем:** адресные `35 passed` / 2,57 с, полная регрессия `1959 passed` / 89,24 с. Snapshot, SHA-256 manifest, restore в новый каталог, legacy index rebuild, sandbox state и отрицательные проверки пройдены на синтетических экземплярах. Backup/restore настоящего пользовательского экземпляра, физическая долговечность и некооперативные писатели не испытаны.
 
-**H5.4b** реализован в `work/v02-h5-compatibility-contract` без изменения production. В `labs/v02_h5_compatibility.py` — read-only аудит ledger и старых `about`; в `tests/test_v02_h5_4_compatibility.py` — 8 проверок. Версия `PROCESSOR_VERSION="1.0"` трактуется как namespace идемпотентности; повысить её без отдельной миграции — риск повторного проигрывания `done`. Старые `about` без авторизационного доказательства помещаются в категорию **REVIEW_REQUIRED**, не удаляются и не считаются автоматически ложными. Несоответствие Raw и ledger — **BLOCKED**.
+**H5.4b** реализован в `work/v02-h5-compatibility-contract`; независимый аудитор воспроизвёл штатный успех тестов, но также обнаружил F-04 (ложный `NO_ISSUES_DETECTED` на противоречащих active evidence). В `labs/v02_h5_compatibility.py` — read-only аудит ledger и старых `about`; в `tests/test_v02_h5_4_compatibility.py` — 8 проверок. Версия `PROCESSOR_VERSION="1.0"` трактуется как namespace идемпотентности; повысить её без отдельной миграции — риск повторного проигрывания `done`. Старые `about` без авторизационного доказательства помещаются в категорию **REVIEW_REQUIRED**, не удаляются и не считаются автоматически ложными. Несоответствие Raw и ledger — **BLOCKED**.
 
 ```bash
 PYTHONPATH="$PWD" .venv/bin/python -m pytest -q -rx \
@@ -355,7 +355,7 @@ PYTHONPATH="$PWD" .venv/bin/python -m pytest -q -rx \
 PYTHONPATH="$PWD" .venv/bin/python -m pytest -q
 ```
 
-Ожидаемый, но **ещё не полученный** полный результат: `1967 passed` (1959 + 8).
+**Фактически воспроизведено:** `1967 passed` на Python 3.14.4 и 3.12.14 в независимом H5.5; наличие F-04 подтверждает недостаточность исходного набора тестов для общей непротиворечивости Evidence.
 
 **Открытый RC вопрос:** реальная legacy DB пока не обследовалась. Без полномочий источников старых `about` нельзя признать их достоверными или автоматически пересобрать. Python 3.12 остаётся `NOT_TESTED`. Не маркировать v0.2 как RC при одном green pytest.
 
