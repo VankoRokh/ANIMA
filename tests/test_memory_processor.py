@@ -194,7 +194,14 @@ def test_canonical_corpus_groups_events_explainably(tmp_path):
     trace_text = "\n".join(trace.lines())
     assert "action=create" in trace_text
     assert "action=update" in trace_text
-    assert "action=create_related" in trace_text
+    # H4 deliberately refuses the old unverified cross-identity
+    # create_related link. Verify the decision is reflected in trace.
+    assert "action=create_related" not in trace_text
+    later_trace = next(
+        line for line in trace.lines() if f"event={EVENT_IDS[6]}" in line
+    )
+    assert "action=create" in later_trace
+    assert f"memory={later_result['memory_id']}" in later_trace
     assert "score=" in trace_text
     assert "reasons=" in trace_text
 
