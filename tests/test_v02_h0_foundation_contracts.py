@@ -186,7 +186,6 @@ def test_h0_n6_middle_of_indexed_eventlog_is_not_silently_trusted(tmp_path):
 
 
 # N7: a syntactically valid JSON without final LF is an incomplete JSONL record.
-@pytest.mark.xfail(strict=True, raises=AssertionError, reason="R1-S1 N7: unterminated JSONL accepted")
 def test_h0_n7_unterminated_jsonl_is_not_accepted_as_complete(tmp_path):
     log = EventLog(tmp_path / "events.jsonl")
     log.write(event(701, "valid JSON but incomplete JSONL record"))
