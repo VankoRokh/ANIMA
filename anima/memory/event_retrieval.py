@@ -77,6 +77,10 @@ class EventRetrieval:
                 conn.execute(
                     "ALTER TABLE event_index_state ADD COLUMN prefix_digest TEXT"
                 )
+            if "indexed_count" not in columns:
+                conn.execute(
+                    "ALTER TABLE event_index_state ADD COLUMN indexed_count INTEGER"
+                )
 
     @staticmethod
     def _state(conn):
@@ -255,6 +259,17 @@ class EventRetrieval:
             try:
                 state = self._state(conn)
                 cursor = state["cursor"]
+                row_count = conn.execute(
+                    "SELECT COUNT(*) FROM indexed_events"
+                ).fetchone()[0]
+                if (
+                    state["indexed_count"] is not None
+                    and row_count != state["indexed_count"]
+                ):
+                    raise ValueError(
+                        "Indexed EventLog prefix locator count mismatch: "
+                        "rebuild required"
+                    )
                 try:
                     stream = path.open("rb")
                 except FileNotFoundError:
@@ -350,11 +365,12 @@ class EventRetrieval:
                     conn.execute(
                         "UPDATE event_index_state SET cursor=?, dev=?, ino=?, "
                         "mtime_ns=?, ctime_ns=?, head_digest=?, tail_digest=?, "
-                        "prefix_digest=? WHERE singleton=1",
+                        "prefix_digest=?, indexed_count=? WHERE singleton=1",
                         (
                             cursor, stat.st_dev, stat.st_ino,
                             stat.st_mtime_ns, stat.st_ctime_ns, head, tail,
                             prefix_hasher.hexdigest(),
+                            row_count + processed,
                         ),
                     )
                 conn.commit()
@@ -377,7 +393,8 @@ class EventRetrieval:
                 conn.execute(
                     "UPDATE event_index_state SET cursor=0, dev=NULL, ino=NULL,"
                     " mtime_ns=NULL, ctime_ns=NULL, head_digest=NULL,"
-                    " tail_digest=NULL, prefix_digest=NULL WHERE singleton=1"
+                    " tail_digest=NULL, prefix_digest=NULL, "
+                    "indexed_count=0 WHERE singleton=1"
                 )
                 conn.commit()
                 self._prefix_cache = None
