@@ -3,6 +3,7 @@ import pytest
 from anima.core.event_bus import Event
 from anima.memory.context_builder import ContextBuilder
 from anima.memory.event_log import EventLog
+from anima.memory.knowledge import KnowledgeLayer
 from anima.memory.link_store import LinkStore
 from anima.memory.memory_store import MemoryStore
 from anima.memory.provenance import ProvenanceResolver
@@ -88,7 +89,7 @@ def build_stack(tmp_path):
     links.create_knowledge(
         domain="project",
         statement="SQLite WAL mode is required for concurrent writes.",
-        status="confirmed",
+        status="provisional",
         created_at=T3,
         public_id=K_CURRENT,
     )
@@ -107,6 +108,11 @@ def build_stack(tmp_path):
         target_kind="knowledge",
         target_id=K_CURRENT,
         created_at=T3,
+    )
+
+    # Confirm through the evidence-aware lifecycle, not the raw writer.
+    KnowledgeLayer(memory_store=store).confirm(
+        K_CURRENT, confirmed_at=T3
     )
 
     retrieval = RetrievalEngine(memory_store=store, link_store=links)
