@@ -425,8 +425,15 @@ class MemoryProcessor:
             score += fts_score
             reasons.append(f"fts_overlap:+{fts_score}")
 
-        candidate_entities = self._memory_entities(memory["id"])
-        entity_overlap = len(candidate_entities & set(entity_ids))
+        # H4 marks typed Event.references as unverified and supplies no
+        # authorized Entity IDs. There is no reason to open a SQLite
+        # relation query per candidate when the right-hand set is empty.
+        # Preserve the legacy overlap score if an explicit trusted caller
+        # supplies non-empty entity_ids in a future authorized path.
+        entity_overlap = (
+            len(self._memory_entities(memory["id"]) & set(entity_ids))
+            if entity_ids else 0
+        )
         if entity_overlap:
             score += entity_overlap
             reasons.append(f"entity_overlap:+{entity_overlap}")
