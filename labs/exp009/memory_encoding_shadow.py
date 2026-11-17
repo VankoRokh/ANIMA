@@ -1,8 +1,12 @@
-"""EXP-009 E1: compare legacy MemoryProcessor with raw-source shadow episodes.
+"""EXP-009 E1: compare current MemoryProcessor with raw-source shadow episodes.
 
 Fixed 20 synthetic user Events, 2 composition budgets, one independent
 gold labeling. Nothing is inserted into production memory. Output raw
 per-Event decisions and pairwise boundary errors; no LLM and no refitting.
+
+The historic JSON result used the original v0.1 association policy. Reruns
+on H4 execute the *changed* processor (legacy_64/legacy_512 are retained as
+file-format labels), so those outputs are NOT historical v0.1 baselines.
 """
 
 import argparse
@@ -132,12 +136,13 @@ def _legacy(root, events, *, composition_budget):
 
 
 def _compression_adversary(root):
-    """A purpose-built boundary counterexample, NOT part of E1 gold scores.
+    """A historical composition/association counterexample, not E1 gold.
 
-    A typed Entity permits Legacy to associate a paraphrased decision. A
-    small composer then drops the older lexical anchor, changing which next
-    Event can join. Shadow preserves raw anchors but conservatively splits
-    the paraphrased decision: both limitations remain visible.
+    Under v0.1, a typed Entity could act as positive association evidence
+    and produce budget-sensitive merges. H4 intentionally removes this
+    positive authority from the current MemoryProcessor. Retain the fixture
+    to expose the change in false-split cost, not to claim the original
+    counterexample is still produced.
     """
     spec = (
         ("Copper calibration baseline", ENT_CPU_A),
@@ -179,7 +184,7 @@ def _compression_adversary(root):
             "assignments": shadow.event_assignments(),
             "turns": turns,
         },
-        "purpose": "isolate composer-loss vs raw-source/Entity-only association",
+        "purpose": "compare current processor vs raw-shadow on historical Entity-only association counterexample",
     }
 
 
