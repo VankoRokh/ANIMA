@@ -1,6 +1,6 @@
 # ANIMA v0.2 — H5.5 remediation / Evidence Lifecycle
 
-**Статус:** R1/F-01 принят (`1975 passed`), R2/F-02 Core-bound принят (`1987 passed`; standalone/unbound остаётся открытым), R3/F-04 принят владельцем (адресные `68 passed` / 1,51 с и полный `1999 passed` / 88,71 с). R4.1/F-03 подготовлен, **не испытан**; F-05–F-08 не устранены. v0.2 RC **BLOCKED**.
+**Статус:** R1/F-01 принят (`1975 passed`), R2/F-02 Core-bound принят (`1987 passed`, standalone/unbound остаётся открытым), R3/F-04 принят (`1999 passed`), R4.1/F-03 принят владельцем (адресные `73 passed` / 3,01 с, полный `2007 passed` / 88,16 с). R4.2/F-05 подготовлен, ещё не испытан. F-06/F-07/F-08 остаются; v0.2 RC **BLOCKED**.
 
 ## Источник и ревизия
 
@@ -72,7 +72,7 @@ PYTHONPATH="$PWD" .venv/bin/python -m pytest -q
 
 Добавлены **12 тестов** `tests/test_v02_h55_r3_evidence_consistency.py`. **Подтверждено владельцем:** адресные `68 passed` / 1,51 с, полный pytest `1999 passed` / 88,71 с. F-06 (асимметрия future contradictions в `KnowledgeLayer.confirm`) не входит в R3, как и глобальная версия Raw binding для standalone.
 
-## R4.1 / F-03 — Finalized Projection Retention (кандидат)
+## R4.1 / F-03 — Finalized Projection Retention (принят владельцем)
 
 **Подробный контракт, точный независимый сценарий и команды:** [README_v02_h55_r4_1.md](README_v02_h55_r4_1.md).
 
@@ -83,9 +83,17 @@ PYTHONPATH="$PWD" .venv/bin/python -m pytest -q
 - `EventProcessingCoordinator._replay_result()` отказывает в ложном `already_done` с `memory_id=None`; никакие старые `done` автоматически не перерабатываются.
 - `skipped` не требует Memory; standalone/unfinalized Memory остаётся удаляемой, если нет других ссылок.
 
-Добавлено **8 новых тестов** `tests/test_v02_h55_r4_1_projection_retention.py`, в том числе первичный сценарий `projection_delete` из аудиторского архива. Полная регрессия **расчётно `2007 passed` (1999 + 8)** — **пока не запускалась**.
+Добавлено **8 новых тестов** `tests/test_v02_h55_r4_1_projection_retention.py`, в том числе первичный сценарий `projection_delete` из аудиторского архива. **Подтверждено владельцем:** адресные `73 passed` / 3,01 с, полный pytest `2007 passed` / 88,16 с.
 
 **Граница R4.1:** штатные API и выявление уже повреждённых `done`; не решает direct SQL и не вводит протокол tombstones/repair. Старые повреждённые экземпляры требуют отдельной офлайновой диагностики и решения оператора.
+
+## R4.2 / F-05 — Temporal Memory Merge (кандидат)
+
+**Подробный контракт и команды:** [README_v02_h55_r4_2.md](README_v02_h55_r4_2.md).
+
+В `work/v02-h55-r4-temporal-merge`, от принятой R4.1, `MemoryLifecycle.merge()` перестал копировать все source `about` с `valid_until IS NULL` и создавать у target связь задним числом от `merged_at`, игнорируя исходный `created_at`. Новый переносимый период — `[max(source.created_at, merged_at), source.valid_until)`; истёкшие `about` не переносятся, а прежний `source_memory_id` сохраняется для provenance. Существующие target Relations не подавляют нужную передачу только из-за открытого `valid_until` без проверки начала и полного покрытия.
+
+Добавлено **10 тестов** `tests/test_v02_h55_r4_2_temporal_merge.py`, в том числе точный `temporal_merge` аудитора (future 2099 relation), finite/exact-end, expired, offsets, provenance и инвертированный legacy-интервал. Расчётная полная регрессия **`2017 passed` (2007+10)**, **не исполнялась**.
 
 ## Оставшиеся блокеры
 
@@ -93,6 +101,6 @@ R2 / F-02 — Core-bound пройден по регрессии владельц
 
 R3 / F-04 — runtime writer и offline diagnostic прошли регрессию владельца; требуется независимый повторный аудит нового snapshot.
 
-R4 — F-03 защищён кандидатом R4.1; F-05/F-06/F-07/F-08 остаются. Не выполнять молчаливую повторную проекцию `done` или автоправку legacy-данных.
+R4 — F-03 принят в пределах штатных API; F-05 подготовлен в R4.2, F-06/F-07/F-08 остаются. Не выполнять молчаливую повторную проекцию `done` или автоправку legacy-данных.
 
 После устранения подтверждённых дефектов — новый фиксированный SHA и независимый аудит. Текущий v0.2 RC не принят.
