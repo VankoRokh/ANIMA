@@ -60,10 +60,12 @@ def _hash(path):
 
 
 def _private_path(path):
-    resolved = Path(path).expanduser().absolute()
-    if resolved.is_symlink():
-        raise ValueError("Symlink root refused: " + str(resolved))
-    return resolved
+    candidate = Path(path).expanduser().absolute()
+    if candidate.is_symlink():
+        raise ValueError("Symlink root refused: " + str(candidate))
+    # Resolve PARENT symlinks too, otherwise a destination alias can evade
+    # the overlap gate and snapshot a source into itself.
+    return candidate.resolve(strict=False)
 
 
 def _refuse_overlap(source, destination):
@@ -254,6 +256,8 @@ def verify_snapshot(snapshot):
             or _hash(current) != entry["sha256"]
         ):
             raise ValueError("Snapshot hash mismatch: " + rel)
+    if "release_profile.json" not in files:
+        raise ValueError("Snapshot does not contain release_profile.json")
     profile = json.loads(files["release_profile.json"].read_text(encoding="utf-8"))
     if profile != {
         "schema": PROTOCOL, "capability": data["release_capability"],
