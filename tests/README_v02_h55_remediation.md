@@ -1,6 +1,6 @@
 # ANIMA v0.2 — H5.5 remediation / Evidence Lifecycle
 
-**Статус:** R1/F-01 принят (`1975 passed`), R2/F-02 Core-bound принят (`1987 passed`, standalone/unbound остаётся открытым), R3/F-04 принят (`1999 passed`), R4.1/F-03 принят (`2007 passed`), R4.2/F-05 принят (`2017 passed`), R4.3/F-06 принят (`2030 passed`). R4.4/F-07 реализован, **не испытан**; F-08 остаётся. v0.2 RC **BLOCKED**.
+**Статус:** R1/F-01 принят (`1975 passed`), R2/F-02 Core-bound принят (`1987 passed`, standalone/unbound остаётся открытым), R3/F-04 принят (`1999 passed`), R4.1/F-03 принят (`2007 passed`), R4.2/F-05 принят (`2017 passed`), R4.3/F-06 принят (`2030 passed`). R4.4/F-07 реализован; первый прогон дал **2035 passed / 3 failed** из-за старого Stage 6 mock, адаптер исправлен, повторный прогон ожидается. F-08 остаётся. v0.2 RC **BLOCKED**.
 
 ## Источник и ревизия
 
@@ -109,7 +109,7 @@ PYTHONPATH="$PWD" .venv/bin/python -m pytest -q
 
 В `work/v02-h55-r4-context-coverage` (основана на принятом R4.3) `ContextBuilder` сохраняет upstream-флаги `RetrievalEngine.stats.fts_truncated` и `filters_truncated`, отдельно обозначает `top_k_truncated`, возвращает `retrieval_coverage.complete` как отсутствие этих ограничений и устанавливает общий `ContextBundle.truncated` даже при `candidates==returned`, когда seed-окно урезано. Бюджет Context продолжает учитываться независимо через `selection_stats.omitted_budget`.
 
-Добавлены **8 тестов** `tests/test_v02_h55_r4_4_context_coverage.py` на реальном FTS/SQLite и DEEP provenance. **Расчёт полного pytest: `2038 passed` (2030 + 8); не исполнялся.** Ранжирование, записи Memory, Raw, Knowledge и протокол не изменены.
+Добавлены **8 тестов** `tests/test_v02_h55_r4_4_context_coverage.py` на реальном FTS/SQLite и DEEP provenance. **Первый полный прогон:** `2035 passed, 3 failed` (88,18 с), все ошибки в `tests/test_stage6_experiments.py` — тестовая FixtureRetrieval без новых `fts_truncated/filters_truncated`. Фикстура исправлена, production не ослаблен; после фикса расчёт `2038 passed`, повторно ещё не проверено. Ранжирование, записи Memory, Raw, Knowledge и протокол не изменены.
 
 ## Оставшиеся блокеры
 
