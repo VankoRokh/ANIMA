@@ -65,7 +65,6 @@ def _memory(store, number, content, *, status="open", timestamp=T0):
 
 
 # N1: text similarity alone must not merge explicitly disjoint object histories.
-@pytest.mark.xfail(strict=True, raises=AssertionError, reason="R1-S1 N1: cross-entity merge")
 def test_h0_n1_disjoint_registered_entities_do_not_merge(tmp_path):
     store, log, links, processor = _stack(tmp_path)
     vega = uid("ent_", 1001)
@@ -86,7 +85,6 @@ def test_h0_n1_disjoint_registered_entities_do_not_merge(tmp_path):
 
 
 # N2: existence is not a license to publish about an inactive entity.
-@pytest.mark.xfail(strict=True, raises=AssertionError, reason="R1-S1 N2: inactive entity accepted")
 def test_h0_n2_inactive_entity_reference_is_not_published_as_current(tmp_path):
     _, log, links, processor = _stack(tmp_path)
     inactive = uid("ent_", 2001)
