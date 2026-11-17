@@ -136,6 +136,15 @@ def audit_snapshot(memory_db, events_jsonl=None, *, at=None):
                 "limits": ["Incomplete schema; detailed checks not executed."],
             }
 
+        schema = conn.execute(
+            "SELECT value FROM schema_meta WHERE key='schema_version'"
+        ).fetchone()
+        if schema is None or schema["value"] != "1":
+            issue(
+                "unsupported_memory_schema_version",
+                "missing" if schema is None else schema["value"],
+            )
+
         quick_check = conn.execute("PRAGMA quick_check(1)").fetchone()[0]
         if quick_check != "ok":
             issue("sqlite_quick_check_failed", quick_check)
