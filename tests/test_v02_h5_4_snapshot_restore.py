@@ -270,3 +270,47 @@ def test_h54_orphaned_confirmed_is_not_auto_repaired_by_restore(tmp_path):
         ).fetchone()[0]
     assert status == "confirmed"
     assert verify_snapshot(snap)["status"] == "VERIFIED"
+
+
+def test_h54_incomplete_labeled_instance_cannot_be_blessed_as_snapshot(
+    tmp_path,
+):
+    source, snap = tmp_path / "source", tmp_path / "snap"
+    _create_instance(source)
+    (source / "identity.json").unlink()  # Only disposable test data.
+    with pytest.raises(ValueError, match="identity.json"):
+        create_snapshot(source, snap)
+    assert not snap.exists()
+
+
+def test_h54_parent_symlink_cannot_hide_nested_snapshot_destination(
+    tmp_path,
+):
+    source = tmp_path / "source"
+    _create_instance(source)
+    alias = tmp_path / "alias-to-source"
+    alias.symlink_to(source, target_is_directory=True)
+    inside = source / "nested-snap"
+    with pytest.raises(ValueError, match="overlap"):
+        create_snapshot(source, alias / "nested-snap")
+    assert not inside.exists()
+
+
+def test_h54_untrusted_manifest_path_is_rejected_before_restore(tmp_path):
+    source, snap, restored = (
+        tmp_path / "source", tmp_path / "snap", tmp_path / "restored"
+    )
+    _create_instance(source)
+    create_snapshot(source, snap)
+    manifest_file = snap / MANIFEST
+    manifest = json.loads(manifest_file.read_text(encoding="utf-8"))
+    manifest["entries"][0]["path"] = "../escape.json"
+    manifest_file.write_text(
+        json.dumps(manifest, sort_keys=True), encoding="utf-8",
+    )
+    with pytest.raises(ValueError, match="Unsafe"):
+        verify_snapshot(snap)
+    with pytest.raises(ValueError, match="Unsafe"):
+        restore_snapshot(snap, restored)
+    assert not restored.exists()
+    assert not (tmp_path / "escape.json").exists()
