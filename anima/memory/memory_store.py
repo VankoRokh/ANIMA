@@ -530,6 +530,40 @@ class MemoryStore:
 
         return [row["event_id"] for row in rows]
 
+    @staticmethod
+    def _require_no_confirmed_knowledge_dependencies(connection, memory_id):
+        """Fail closed before changing a Memory used by confirmed Knowledge.
+
+        A finalized Knowledge transition is not a permanent proof that the
+        supporting Memory will remain CLOSED and unchanged. Until an explicit
+        Knowledge revision/invalidation protocol exists, protect both current
+        and historical supports/contradicts dependencies, including relations
+        with a finite valid_until. The guard runs under the same SQLite writer
+        lock as the subsequent mutation; direct SQL remains outside the API
+        contract.
+        """
+        dependent = connection.execute(
+            """
+            SELECT r.public_id AS relation_id, k.public_id AS knowledge_id
+            FROM relations AS r
+            JOIN knowledge AS k ON k.public_id = r.target_id
+            WHERE k.status = 'confirmed'
+              AND r.target_kind = 'knowledge'
+              AND r.relation_type IN ('supports', 'contradicts')
+              AND (
+                    (r.source_kind = 'memory' AND r.source_id = ?)
+                    OR r.source_memory_id = ?
+                  )
+            LIMIT 1
+            """,
+            (memory_id, memory_id),
+        ).fetchone()
+        if dependent is not None:
+            raise ValueError(
+                "Cannot mutate Memory with confirmed Knowledge evidence: "
+                f"{memory_id} (knowledge={dependent['knowledge_id']})"
+            )
+
     def update_memory(
         self,
         public_id,
@@ -593,7 +627,12 @@ class MemoryStore:
         values.append(updated_at)
         values.append(public_id)
 
-        with self.transaction() as connection:
+        # Serialize the evidence check with Knowledge confirmation and
+        # public Relation writers. A separate preflight would race a confirm.
+        with self.transaction(immediate=True) as connection:
+            self._require_no_confirmed_knowledge_dependencies(
+                connection, public_id,
+            )
             connection.execute(
                 "UPDATE memories SET "
                 + ", ".join(assignments)
