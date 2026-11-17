@@ -168,10 +168,12 @@ def test_h0_n6_middle_of_indexed_eventlog_is_not_silently_trusted(tmp_path):
         log.write(event(600 + i, marker + " " + "x" * 1000))
     index = EventRetrieval(log, tmp_path / "event_index.db", memory_store=store)
     before = index.sync(max_events=128, max_bytes=2_000_000)
-    assert before["status"] == "complete"
+    if before["status"] != "complete":
+        raise RuntimeError("N6 fixture: baseline index did not reach complete")
     path = log.log_file
     data = path.read_bytes()
-    assert data.count(b"needleaaaa") == 1
+    if data.count(b"needleaaaa") != 1:
+        raise RuntimeError("N6 fixture: expected exactly one corruption marker")
     path.write_bytes(data.replace(b"needleaaaa", b"needlebbbb", 1))
     log.write(event(699, "new event after changed prefix"))
     try:
@@ -222,7 +224,8 @@ def test_h0_n9_missing_finalized_raw_is_not_silent_after_reopen(tmp_path):
     path = tmp_path / "events.jsonl"
     lines = path.read_text(encoding="utf-8").splitlines(keepends=True)
     kept = [line for line in lines if json.loads(line)["id"] != source_id]
-    assert len(kept) == len(lines) - 1
+    if len(kept) != len(lines) - 1:
+        raise RuntimeError("N9 fixture: report raw event not found exactly once")
     path.write_text("".join(kept), encoding="utf-8")
     try:
         with open_release(tmp_path) as instance:
