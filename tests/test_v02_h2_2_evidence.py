@@ -8,6 +8,8 @@ from uuid import UUID, uuid4
 
 import pytest
 
+from anima.core.event_bus import Event
+from anima.memory.event_log import EventLog
 from anima.memory.knowledge import KnowledgeLayer
 from anima.memory.link_store import LinkStore
 from anima.memory.memory_store import MemoryStore
@@ -26,13 +28,25 @@ def uid(prefix, i):
 
 
 def stack(tmp_path):
-    store = MemoryStore(tmp_path / "memory.db")
+    log = EventLog(tmp_path / "events.jsonl")
+    store = MemoryStore(tmp_path / "memory.db", event_log=log)
     links = LinkStore(store)
     layer = KnowledgeLayer(memory_store=store)
     return store, links, layer
 
 
 def memory(store, number, *, status="closed"):
+    # Real synthetic Raw is required even for unit-level evidence tests.
+    # Damaged/legacy scenarios below still inject only the damage they
+    # actually intend to test, under pytest tmp_path.
+    EventLog(store.database_file.parent / "events.jsonl").write(Event(
+        "conversation.user",
+        {"text": f"Evidence record {number}"},
+        source="user",
+        session_id="session_00000001",
+        timestamp=T0,
+        event_id=uid("ev_", number),
+    ))
     return store.create_memory(
         memory_type="episodic", domain="project",
         content=f"Evidence record {number}",
