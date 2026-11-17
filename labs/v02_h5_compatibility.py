@@ -26,6 +26,7 @@ import argparse
 import json
 import sqlite3
 from collections import Counter, defaultdict
+from contextlib import closing
 from pathlib import Path
 from urllib.parse import quote
 
@@ -66,7 +67,7 @@ def analyze_snapshot(memory_db, events_jsonl, *, at=None):
             }
 
     uri = "file:" + quote(str(memory_db.resolve()), safe="/") + "?mode=ro"
-    with sqlite3.connect(uri, uri=True) as conn:
+    with closing(sqlite3.connect(uri, uri=True)) as conn:
         conn.row_factory = sqlite3.Row
         conn.execute("PRAGMA query_only=ON")
 
