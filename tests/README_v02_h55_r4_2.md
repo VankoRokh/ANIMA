@@ -1,6 +1,6 @@
 # ANIMA v0.2 — H5.5 R4.2 / F-05: Temporal Merge Relations
 
-**Статус:** исправление подготовлено, **ещё не исполнялось**.  
+**Статус:** R4.2/F-05 **принят владельцем**: адресные `60 passed` / 1,18 с, полная регрессия `2017 passed` / 88,09 с. Это не заменяет независимый повторный аудит.  
 **Рабочая ветка:** `work/v02-h55-r4-temporal-merge` от принятой R4.1 @ `62115c4b6f86248de271908522e627ec9e8fd40f`.  
 **Результаты владельца R4.1:** адресные `73 passed` / 3,01 с; полный `2007 passed` / 88,16 с.  
 **Frozen audit:** `audit/v02-h5-rc-candidate` @ `28e8438f8408e85b52e237eaedcf024354a4522a`. RC остаётся `BLOCKED`.
@@ -52,7 +52,7 @@ transfer only if end is None or end > start
 9. UTC offsets сравниваются по инстантам.
 10. Инвертированный source interval из disposable legacy SQL — fail closed с откатом Memory/source links.
 
-**Расчёт полного pytest:** `2017 passed` (2007 + 10); **не выполнялся**. Нужен также повторный H3.1 и lifecycle regression.
+**Получено от владельца:** адресные `60 passed` / 1,18 с; полный pytest `2017 passed` / 88,09 с. Исходная синтетическая F-05 последовательность включена в новые тесты. Независимого повторного H5.5 на этом SHA ещё не было.
 
 ```bash
 git status --short
@@ -72,6 +72,6 @@ PYTHONPATH="$PWD" .venv/bin/python -m pytest -q
 
 ## Границы приёмки и дальнейшая работа
 
-Принимать R4.2 только после **полного regression PASS** и проверки отсутствия F-05 на исходной последовательности. Проверки обязаны сохранить идемпотентность, Evidence authority, temporal N5 и Recovery. Копия Relation не должна разрешать `about` раньше `max(original.created_at, merged_at)`.
+R4.2 принят после **полного regression PASS** владельца и проверки исходной последовательности F-05 в новых тестах. Проверки обязаны сохранить идемпотентность, Evidence authority, temporal N5 и Recovery. Копия Relation не должна разрешать `about` раньше `max(original.created_at, merged_at)`.
 
-Остаток R4: **F-06** (проверка future contradiction в Knowledge confirm), **F-07** (Context coverage/truncation) и **F-08** (SQLite WAL/SHM forensic read-only contract). В R2 сохраняется открытая граница standalone/unbound MemoryStore. Новый независимый H5.5 review на новом фиксированном SHA обязателен для решения о RC.
+Остаток R4: **F-06** готовится как [R4.3](README_v02_h55_r4_3.md), **F-07** (Context coverage/truncation) и **F-08** (SQLite WAL/SHM forensic read-only contract). В R2 сохраняется открытая граница standalone/unbound MemoryStore. Новый независимый H5.5 review на новом фиксированном SHA обязателен для решения о RC.
