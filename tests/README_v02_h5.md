@@ -92,7 +92,7 @@ sha256sum "$SNAP/memory.db" "$SNAP/events.jsonl"
 - `FAIL`: выполненный pytest вернул ненулевой код.
 - Общий `INCOMPLETE` при любой недостаточности доказательств, включая dirty Git. Скрипт возвращает exit code **2**: это может означать отсутствие Python 3.12, не обязательно дефект ANIMA.
 
-Новые `tests/test_v02_h5_portability.py`: **8 тестов** статусов probe, отсутствующего интерпретатора, независимости результатов, грязного HEAD и исполняемого SQLite probe. **Пока не выполнены.**
+`tests/test_v02_h5_portability.py`: **10 тестов** (8 исходных плюс 2 регрессионных проверки virtualenv/symlink). До исправления владелец подтвердил полную регрессию `1919 passed` за 87,93 с, но первый H5.1 CLI ошибочно раскрывал `.venv/bin/python` в `/usr/bin/python3.14` через `Path.resolve()` и обнаруживал чужое окружение без pytest. Теперь сохраняется путь запуска, а JSON probe включает `sys_prefix`, `sys_base_prefix` и `executable`. **Исправление требует повторного запуска.**
 
 ### Запуск H5.1
 
@@ -104,7 +104,7 @@ PYTHONPATH="$PWD" .venv/bin/python -m pytest -q \
 PYTHONPATH="$PWD" .venv/bin/python -m pytest -q
 ```
 
-Ожидаемый расчёт при прежнем наборе — **`1919 passed`** (1911 + 8), **не** отчёт о выполнении.
+**До исправления:** владелец сообщил `1919 passed` за 87,93 с. **После двух новых тестов:** расчётно ожидается `1921 passed` — это пока не результат исполнения.
 
 Проверка реальных интерпретаторов и публикация machine-readable отчёта **вне репозитория**:
 
@@ -112,8 +112,10 @@ PYTHONPATH="$PWD" .venv/bin/python -m pytest -q
 PYTHONPATH="$PWD" .venv/bin/python -m labs.v02_h5_portability \
   --python .venv/bin/python \
   --python python3.12 \
-  --output /tmp/anima-h5-portability.json
+  --output /tmp/anima-h5-portability-symlink-fix.json
 ```
+
+При успешном исправлении на машине владельца ожидается `runs[0].status=PASS`, `runs[0].probe.pytest_available=true`, `runs[0].probe.sys_prefix` указывает на `.venv`, а путь `runs[0].resolved` сохраняет `/.venv/bin/python`, **не** `/usr/bin/python3.14`. Прогон Python 3.12 остаётся отдельным.
 
 Если Python 3.12 не установлен или в нём нет pytest, его запуск будет помечен `NOT_TESTED`; отчёт `INCOMPLETE` и возврат 2 — корректное отсутствие evidence. **Не устанавливать библиотеки в рабочее окружение или менять project interpreter ради косметического PASS.** Можно предоставить изолированное окружение Python 3.12 позднее.
 
