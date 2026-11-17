@@ -158,10 +158,12 @@ def test_canonical_corpus_groups_events_explainably(tmp_path):
     assert cm5_followup_result["action"] == "update"
     assert cm5_followup_result["memory_id"] == cm5_first_result["memory_id"]
 
-    assert later_result["action"] == "create_related"
-    assert later_result["candidate_id"] == first_result["memory_id"]
+    # The later event has no typed claim. It must not inherit the earlier
+    # event's unverified SQLite identity, even when its text overlaps.
+    assert later_result["action"] == "create"
+    assert later_result["candidate_id"] is None
     assert later_result["memory_id"] != first_result["memory_id"]
-    assert "large_time_gap:block_update" in later_result["reasons"]
+    assert later_result["relation_id"] is None
 
     assert store.count() == 3
     assert store.source_events(first_result["memory_id"]) == [
@@ -173,11 +175,6 @@ def test_canonical_corpus_groups_events_explainably(tmp_path):
         EVENT_IDS[4],
     ]
     assert store.source_events(later_result["memory_id"]) == [EVENT_IDS[6]]
-
-    relation = links.get_relation(later_result["relation_id"])
-    assert relation["type"] == "related_to"
-    assert relation["source_id"] == later_result["memory_id"]
-    assert relation["target_id"] == first_result["memory_id"]
 
     sqlite_about = links.relations_for(
         "memory",
