@@ -108,7 +108,10 @@ def build_core(
     identity = Identity(root / "identity.json")
     event_bus = EventBus()
     event_log = EventLog(root / "events.jsonl")
-    memory_store = MemoryStore(root / "memory.db")
+    # R2: all KnowledgeLayer instances backed by this Memory DB must verify
+    # source IDs against Raw before publishing confirmed Knowledge. Binding
+    # lives in schema_meta, so reopening MemoryStore cannot silently bypass it.
+    memory_store = MemoryStore(root / "memory.db", event_log=event_log)
     event_retrieval = (
         EventRetrieval(event_log, root / "event_index.db", memory_store=memory_store)
         if enable_event_retrieval else None
