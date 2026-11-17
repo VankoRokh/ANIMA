@@ -291,10 +291,14 @@ class MemoryProcessor:
             )
             for memory in candidates
         ]
-        # A different explicit subject is negative evidence, even when two
-        # records share boilerplate, time and session. Never select the
-        # conflicting candidate over a genuine matching episode.
-        scored = [item for item in scored if not item["anchor_conflict"]]
+        # Untrusted, explicitly different Entity claims are NEGATIVE
+        # evidence for coalescing episodes, never positive identity proof.
+        # Mixed multi-subject source groups must not bridge independent
+        # one-subject episodes through lexical/transitive similarity.
+        scored = [
+            item for item in scored
+            if not item["anchor_conflict"] and not item["identity_conflict"]
+        ]
         if not scored:
             return None
         scored.sort(
@@ -377,6 +381,23 @@ class MemoryProcessor:
             and isinstance(record["payload"].get("text"), str)
         }
         source_anchors.discard(None)
+        claimed = self._declared_entity_ids(event.references)
+        source_signatures = [
+            self._declared_entity_ids(record.get("references") or [])
+            for record in source_events
+        ]
+        # These are explicitly stated (not verified) identities. Use a
+        # mismatch only to avoid merging unrelated raw source histories.
+        # A missing claim is neutral; an intersecting multi-subject claim
+        # is NOT enough to establish that two episodes are the same.
+        identity_conflict = bool(
+            claimed and any(
+                previous and previous != claimed
+                for previous in source_signatures
+            )
+        )
+        if identity_conflict:
+            reasons.append("entity_claim_conflict:block_association")
         # Do not extend an already mixed/legacy Memory using a single
         # matching label: only a pure matching source group is strong.
         anchor_conflict = bool(
@@ -432,6 +453,7 @@ class MemoryProcessor:
             "large_time_gap": large_time_gap,
             "anchor_match": anchor_match,
             "anchor_conflict": anchor_conflict,
+            "identity_conflict": identity_conflict,
         }
 
     def _source_events(self, memory_id, event_index):
@@ -458,24 +480,34 @@ class MemoryProcessor:
             if relation["target_kind"] == "entity"
         }
 
-    def _event_entity_ids(self, event):
-        entity_ids = []
-        seen = set()
+    @staticmethod
+    def _declared_entity_ids(references):
+        """Typed refs are claims, not evidence of verified object identity."""
+        return frozenset(
+            reference["id"]
+            for reference in references
+            if reference["kind"] == "entity"
+        )
 
-        for reference in event.references:
-            if reference["kind"] != "entity":
-                continue
-            entity_id = reference["id"]
-            if entity_id in seen:
-                continue
-            if self.link_store.get_entity(entity_id) is None:
+    def _event_entity_ids(self, event):
+        # Fail closed on unknown/inactive IDs. Even a known active ID does
+        # not authorize an about assertion: Event.references carries no
+        # scoped proof or authority token. Keep the raw Event intact so a
+        # separate explicit review/authorization path can reconsider it.
+        for entity_id in self._declared_entity_ids(event.references):
+            entity = self.link_store.get_entity(entity_id)
+            if entity is None:
                 raise ValueError(
                     f"Unknown entity reference: {entity_id}"
                 )
-            seen.add(entity_id)
-            entity_ids.append(entity_id)
-
-        return entity_ids
+            if entity["status"] != "active":
+                raise ValueError(
+                    f"Inactive entity reference: {entity_id}"
+                )
+        # No automatic verified Entity assignments can be constructed from
+        # this legacy Event schema. Do not publish an about relation or
+        # score a candidate by a self-asserted Entity ID.
+        return []
 
     def _create_memory_tx(self, connection, event, text):
         public_id = f"{MEMORY_ID_PREFIX}{uuid4()}"
