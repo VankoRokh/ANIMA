@@ -106,7 +106,6 @@ def test_h0_n2_inactive_entity_reference_is_not_published_as_current(tmp_path):
 
 
 # N3: direct base API must not materialize confirmed Knowledge without evidence.
-@pytest.mark.xfail(strict=True, raises=AssertionError, reason="R1-S1 N3: direct confirmed writer")
 def test_h0_n3_unbacked_confirmed_knowledge_is_rejected(tmp_path):
     store = MemoryStore(tmp_path / "memory.db")
     links = LinkStore(store)
