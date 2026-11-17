@@ -688,6 +688,13 @@ class KnowledgeLayer:
                 relation_type="contradicts",
                 at=challenged_at,
             )
+            # R5: a challenge changes the epistemic state of already
+            # confirmed Knowledge. Its contradiction must therefore have
+            # the same canonical Raw authority as confirm/reject/supersede.
+            # No standalone/unbound or missing-Raw bypass is permitted.
+            self.memory_store.require_knowledge_raw_sources(
+                connection, [contradiction_memory_id],
+            )
             contradiction, _ = self._insert_relation(
                 connection,
                 source_kind="memory",
