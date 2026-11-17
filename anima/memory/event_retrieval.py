@@ -295,6 +295,14 @@ class EventRetrieval:
                     # Existing per-row digests are the trust anchor for
                     # an index created before prefix_digest was introduced.
                     prefix_hasher = self._cached_prefix_hasher(cursor, stat)
+                    if prefix_hasher is not None and cursor:
+                        # Another index writer may have replaced the SQLite
+                        # checkpoint while the source file stayed unchanged.
+                        if (
+                            state["prefix_digest"] is None
+                            or prefix_hasher.hexdigest() != state["prefix_digest"]
+                        ):
+                            prefix_hasher = None
                     if prefix_hasher is None:
                         if cursor and state["prefix_digest"] is None:
                             self._verify_indexed_prefix(stream, conn, cursor)
