@@ -1,5 +1,6 @@
 import re
 import sqlite3
+from datetime import datetime, timezone
 
 from anima.memory.link_store import (
     KNOWLEDGE_ID_PREFIX,
@@ -124,6 +125,9 @@ class RetrievalEngine:
                 "Retrieval requires query, object_ids, entity filter or structured filter"
             )
 
+        # One wall-clock snapshot for the complete request: a relation
+        # cannot change eligibility midway through entity/graph expansion.
+        relation_active_at = datetime.now(timezone.utc).isoformat()
         candidates = {}
         stats = {
             "exact": 0,
@@ -189,6 +193,7 @@ class RetrievalEngine:
                 entity["id"],
                 direction="incoming",
                 relation_types={"about"},
+                active_at=relation_active_at,
             )
             for relation in relations:
                 kind = relation["source_kind"]
@@ -246,6 +251,7 @@ class RetrievalEngine:
                     kind,
                     public_id,
                     direction="both",
+                    active_at=relation_active_at,
                 )
                 for relation in relations:
                     neighbor = self._relation_neighbor(
