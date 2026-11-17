@@ -192,6 +192,10 @@ class EventProcessingCoordinator:
         # Fail closed before adopting or replaying any work. A finalized
         # SQLite ledger entry must not silently outlive its raw evidence.
         self._require_finalized_raw_events(set(events))
+        # F-03: an old/corrupted database may already have lost a Memory
+        # projection while retaining done. Never reinterpret that state as
+        # successful recovery or silently replay finalized side effects.
+        self._require_finalized_memory_sources()
         adopted = self._bootstrap_missing(events)
 
         with self.memory_store.transaction() as connection:
@@ -265,6 +269,40 @@ class EventProcessingCoordinator:
             )
             raise ValueError(
                 "Missing finalized raw event(s) for "
+                f"{self.processor_name} {self.processor_version}: "
+                f"{sample}{remainder}; recovery refused"
+            )
+
+    def _require_finalized_memory_sources(self):
+        """Reject any finalized done Event without durable Memory projection.
+
+        This is a read-only recovery preflight. In historical damaged DBs
+        repair/replay requires a separately specified operator migration;
+        downgrading done or silently re-processing is not permitted.
+        Skipped Events intentionally have no Memory and are excluded.
+        """
+        with self.memory_store.transaction() as connection:
+            rows = connection.execute(
+                """
+                SELECT ep.event_id FROM event_processing AS ep
+                WHERE ep.processor = ? AND ep.processor_version = ?
+                  AND ep.status = 'done'
+                  AND NOT EXISTS (
+                    SELECT 1 FROM memory_sources AS ms
+                    WHERE ms.event_id = ep.event_id
+                  )
+                ORDER BY ep.event_id
+                """,
+                (self.processor_name, self.processor_version),
+            ).fetchall()
+        if rows:
+            ids = [row["event_id"] for row in rows]
+            sample = ", ".join(ids[:3])
+            remainder = (
+                f" (+{len(ids) - 3} more)" if len(ids) > 3 else ""
+            )
+            raise ValueError(
+                "Finalized Event processing missing Memory source(s) for "
                 f"{self.processor_name} {self.processor_version}: "
                 f"{sample}{remainder}; recovery refused"
             )
@@ -391,10 +429,15 @@ class EventProcessingCoordinator:
                 (event.event_id,),
             ).fetchone()
 
+        if row is None:
+            raise ValueError(
+                "Finalized Event processing missing Memory source for "
+                f"{event.event_id}; replay refused"
+            )
         return self.memory_processor._result(
             event,
             action="already_done",
-            memory_id=None if row is None else row["memory_id"],
+            memory_id=row["memory_id"],
             reasons=["event_processing:already_done"],
         )
 
