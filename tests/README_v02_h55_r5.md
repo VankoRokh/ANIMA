@@ -1,0 +1,70 @@
+# ANIMA v0.2 — H5.5 R5 / F-02: обязательная Raw authority для standalone Knowledge
+
+**Статус:** реализация и тесты подготовлены, **пока не запускались**.  
+**Ветка:** `work/v02-h55-r5-raw-authority-enforcement`; основа — принятый R4.5 `da70253491b8e6a941cd0f35b67783de353ae700`.  
+**R4.5:** владелец сообщил полную регрессию `2044 passed` / 89,61 с.  
+**Исходный H5.5 аудит:** `28e8438f8408e85b52e237eaedcf024354a4522a` (`audit/v02-h5-rc-candidate`), вердикт **BLOCKED**. Нельзя считать исходные 2044 теста независимым подтверждением устранения всех рисков.
+
+## Цель и граница
+
+В R2 `build_core()` привязывал `MemoryStore` к `events.jsonl`, а `KnowledgeLayer.confirm/reject/supersede` требовали все declared Raw Events; политика сохранялась в `schema_meta`. Однако `MemoryStore(tmp_path / "memory.db")`, открытый **без** EventLog и без существующей политики, возвращал `False` из `require_knowledge_raw_sources()`; `KnowledgeLayer` **игнорировал этот результат**. Поэтому самостоятельный публичный Python API мог публиковать `confirmed/rejected` Knowledge без первичных событий — первоначальная F-02 оставалась возможной вне Core-bound окружения.
+
+**R5 делает fail-closed состояние обязательным для всех терминальных Knowledge-переходов** через официальный `KnowledgeLayer`: без зарегистрированного canonical Raw EventLog метод `require_knowledge_raw_sources` выдаёт `ValueError("Knowledge Raw provenance is unbound: ...")`, а не `False`. Нельзя подтвердить Knowledge на основании одного факта существования Memory.
+
+## Что меняется
+
+- **Один production-модуль:** `anima/memory/memory_store.py`. Если в `schema_meta` отсутствует `knowledge_raw_provenance_policy`, терминальный переход `confirm/reject/supersede` отказывается. Если metadata неизвестно или некорректно, прежний R2 fail-closed сохраняется. Если политика присутствует, все source Event IDs проверяются физическим `EventLog.load_events()`.
+- `KnowledgeLayer` **не получает** новый флаг обхода в тестах и production. `MemoryStore.bind_event_log(EventLog(<sibling>/events.jsonl))` остаётся явной штатной операцией для подготовки standalone к подтверждению. Привязка проверяет канонический путь, сохраняется в БД и **сама по себе не удостоверяет** старые `confirmed` либо целостность источников. Конкретные Raw ID проверяются именно при переходе.
+- Стандартное создание Memory, `provisional` Knowledge, чтение `get/describe/history`, диагностика, создание резервной копии, Raw и ledger остаются доступными **без принудительной миграции**. Старые `confirmed` не переводятся в `provisional`, и исторические данные не исправляются.
+- `MemoryStore.SCHEMA_VERSION=1`, `EventProcessingCoordinator.PROCESSOR_VERSION=1.0`, `release_v01.PROTOCOL`, SQL schema, SQLite backup, Knowledge API parameters, Recovery и Raw EventLog не изменяются. Новых источников authority, LLM-решений и семантической аттестации текста Memory это не добавляет.
+- Строгое доказательство остается **экзистенциальным**: все объявленные ID соответствуют валидным LF-терминированным Raw Events на момент проверки. Семантика Memory, доверенность автора и кросс-файловая атомарность при некооперативных writers не доказаны. Прямой SQL вне официальных API остаётся за границей.
+
+## Совместимость старых тестов
+
+Четыре существующих файла ранее симулировали полноценное Knowledge подтверждение над standalone-хранилищем без привязанного Raw:
+
+- `tests/test_knowledge.py` — EventLog уже существовал: его теперь передают в `MemoryStore(..., event_log=event_log)`.
+- `tests/test_knowledge_evidence.py` — аналогично, используется готовый Raw.
+- `tests/test_v02_h2_1_confirmed_knowledge.py` и `tests/test_v02_h2_2_evidence.py` — добавлены **реальные синтетические Event** в canonical `events.jsonl` перед созданием соответствующих Memory, включая строгие отрицательные тесты legacy evidence.
+
+Все файлы используют только `pytest tmp_path`; никакого тестового bypass, `PYTEST_CURRENT_TEST` проверки или `.get(..., False)` не вводится.
+
+## Новые негативные и позитивные тесты
+
+Файл `tests/test_v02_h55_r5_standalone_raw_authority.py`: **8 pytest cases**:
+
+1. Unbound `confirm(K)` отказывает, оставляет `provisional`, History/Memory/Raw/метаданные неизменными.
+2. Unbound `confirm(K, source_memory_id=M2)` откатывает даже предварительно вставленную Relation.
+3. `MemoryStore`, повторно открытый из unbound DB, не обходит защиту.
+4. `bind_event_log` без самих Raw Events не разрешает подтверждение. После появления физического Raw с точным ID подтверждение успешно; политика сохраняется.
+5–6. У ранее `challenged` Knowledge после удаления policy в **исключительно тестовой** SQLite unbound `reject()` и `supersede()` отказывают до изменений.
+7. Standalone unbound позволяет `provisional`, `get/describe/history`; никакой автоматической записи Raw policy.
+8. Composed `build_core()` по-прежнему подтверждает Knowledge с настоящим Raw.
+
+**Расчёт:** `2052 passed` (2044 + 8), **не результат запуска**. Существующая полная регрессия может выявить другие исторические фикстуры, которым потребуется реальный Raw; **не устранять ошибки отключением fail-closed**.
+
+### Команды
+
+```bash
+git status --short
+git rev-parse HEAD
+
+PYTHONPATH="$PWD" .venv/bin/python -m pytest -q -rx \
+  tests/test_v02_h55_r5_standalone_raw_authority.py \
+  tests/test_v02_h55_r2_raw_provenance.py \
+  tests/test_knowledge.py \
+  tests/test_knowledge_evidence.py \
+  tests/test_v02_h2_1_confirmed_knowledge.py \
+  tests/test_v02_h2_2_evidence.py \
+  tests/test_v02_h55_r4_5_wal_scope.py
+
+PYTHONPATH="$PWD" .venv/bin/python -m pytest -q
+```
+
+**Критерий приёмки:** все 8 новых сценариев PASS, полная регрессия PASS, терминальные переходы невозможны на unbound DB, отказ не изменяет SQLite/History/Raw. Новая привязка без соответствующего Raw не обходит guard, а корректный Raw позволяет подтверждение. Старые `provisional` и исторический read-only доступ не блокируются.
+
+## После R5 — не объявлять RC автоматически
+
+- Независимый повтор H5.5 на **новом зафиксированном SHA**, включающий прогоны на Python 3.12.14 и 3.14.4, сбойные сценарии, физическое SQLite WAL/SHM backup и недоверенные публичные API.
+- Не подменять реальную legacy-проверку тестовыми фикстурами: оператор выбирает согласованную офлайновую копию, H5.4b выдаёт `NO_ISSUES_DETECTED/REVIEW_REQUIRED/BLOCKED`; никакого автоматического исправления подтверждённого Knowledge.
+- Portability Pi/aarch64, эксплуатационные SLO и решения об области RC остаются отдельными gate.
