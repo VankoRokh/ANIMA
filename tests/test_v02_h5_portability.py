@@ -6,6 +6,7 @@ inject interpreter subprocess responses to exercise failure reporting.
 
 import json
 import sys
+import venv
 
 from labs import v02_h5_portability as portability
 
@@ -157,3 +158,43 @@ def test_h5_1_local_probe_returns_json_without_mutating_repo():
     assert isinstance(details["fts5"], bool)
     assert isinstance(details["json1"], bool)
     assert isinstance(details["pytest_available"], bool)
+
+
+def test_h5_1_virtualenv_launch_does_not_resolve_python_symlink(tmp_path, monkeypatch):
+    """A symlinked Python may have a different sys.prefix and installed libs."""
+    bin_dir = tmp_path / "venv" / "bin"
+    bin_dir.mkdir(parents=True)
+    entrypoint = bin_dir / "python"
+    entrypoint.symlink_to(sys.executable)
+
+    def fake_run(command, **_kwargs):
+        assert command[0] == str(entrypoint)
+        assert "-c" in command
+        return {
+            "returncode": 0,
+            "stdout": json.dumps(profile(pytest=False)),
+            "stderr": "",
+            "error": None,
+        }
+
+    monkeypatch.setattr(portability, "_run", fake_run)
+    result = portability.inspect_interpreter(str(entrypoint))
+    assert result["status"] == "NOT_TESTED"
+    assert result["resolved"] == str(entrypoint)
+    assert result["reason"] == "pytest not installed for this interpreter"
+
+
+def test_h5_1_real_virtualenv_probe_preserves_environment_prefix(tmp_path):
+    """Integration test: exercise CPython's real venv path discovery."""
+    venv_dir = tmp_path / "isolated-venv"
+    venv.create(venv_dir, with_pip=False, symlinks=True)
+    executable = venv_dir / "bin" / "python"
+    assert executable.exists()
+
+    # Do not install dependencies or invoke focused pytest. Probe must
+    # identify the virtual environment even if it lacks pytest.
+    result = portability.inspect_interpreter(str(executable))
+    assert result["status"] == "NOT_TESTED"
+    assert result["probe"]["sys_prefix"] == str(venv_dir)
+    assert result["probe"]["sys_base_prefix"] != str(venv_dir)
+    assert result["resolved"] == str(executable)
