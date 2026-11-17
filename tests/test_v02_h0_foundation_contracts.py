@@ -139,7 +139,6 @@ def test_h0_n4_delete_memory_rejects_or_invalidates_live_support(tmp_path):
 
 
 # N5: expired relation should not be returned as a current entity match.
-@pytest.mark.xfail(strict=True, raises=AssertionError, reason="R1-S1 N5: expired about included")
 def test_h0_n5_expired_relation_is_not_current_retrieval(tmp_path):
     store, _log, links, _processor = _stack(tmp_path)
     memory = _memory(store, 501, "A historical thermal condition", timestamp=YEAR_2020)
