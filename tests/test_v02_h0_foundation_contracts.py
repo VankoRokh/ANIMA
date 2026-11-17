@@ -215,7 +215,6 @@ def test_h0_n8_merged_fts_candidates_do_not_hide_open_memory(tmp_path):
 
 
 # N9: a finalized but missing raw source must not appear as healthy/complete.
-@pytest.mark.xfail(strict=True, raises=AssertionError, reason="R1-S1 N9: finalized raw missing")
 def test_h0_n9_missing_finalized_raw_is_not_silent_after_reopen(tmp_path):
     with open_release(tmp_path) as instance:
         report = instance.handle({"op": "report", "text": "h0n9marker unique incident"})
