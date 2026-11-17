@@ -214,7 +214,12 @@ def test_fault_after_memory_effects_rolls_back_then_retries_once(tmp_path):
         direction="outgoing",
         relation_types={"about"},
     )
-    assert [relation["target_id"] for relation in about] == [ENTITY_1]
+    # Recovery must not accidentally promote unverified Event.references.
+    assert about == []
+    raw = next(
+        row for row in log.load_events() if row["id"] == event.event_id
+    )
+    assert raw["references"] == [{"kind": "entity", "id": ENTITY_1}]
 
 
 def test_recovery_retries_stale_processing_record(tmp_path):
