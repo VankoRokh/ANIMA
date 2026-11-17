@@ -69,6 +69,22 @@ class ContextBuilder:
         )
 
         candidates = retrieval_response["results"]
+        retrieval_stats = retrieval_response["stats"]
+        # R4.4/F-07: a bounded Retrieval seed can be incomplete even when
+        # every *returned* candidate fits the Context budget. Keep its
+        # upstream coverage distinct from Context's own budget omissions.
+        # No synthetic completeness: absence of either flag is a Retrieval
+        # contract violation rather than permission to mark the result full.
+        retrieval_coverage = {
+            "fts_truncated": retrieval_stats["fts_truncated"],
+            "filters_truncated": retrieval_stats["filters_truncated"],
+            "top_k_truncated": (
+                retrieval_stats["candidates"] > len(candidates)
+            ),
+        }
+        retrieval_coverage["complete"] = not any(
+            retrieval_coverage.values()
+        )
         knowledge_candidates = [
             item for item in candidates if item["kind"] == "knowledge"
         ]
@@ -86,7 +102,11 @@ class ContextBuilder:
             "knowledge": [],
             "memories": [],
             "events": [],
-            "truncated": False,
+            "retrieval_coverage": retrieval_coverage,
+            # Aggregate incomplete signal for consumers that only inspect
+            # "truncated"; selection_stats.omitted_budget still identifies
+            # Context-local omissions separately.
+            "truncated": not retrieval_coverage["complete"],
             "selection_stats": {
                 "retrieval_candidates": retrieval_response["stats"][
                     "candidates"
@@ -105,9 +125,6 @@ class ContextBuilder:
                 "omitted_budget": 0,
             },
         }
-
-        if retrieval_response["stats"]["candidates"] > len(candidates):
-            bundle["truncated"] = True
 
         for candidate in self._selection_order(candidates):
             kind = candidate["kind"]
@@ -317,5 +334,9 @@ class ContextBuilder:
             f"knowledge={stats['selected_knowledge']} "
             f"memories={stats['selected_memories']} "
             f"events={stats['selected_events']} "
+            f"retrieval_complete={str(bundle['retrieval_coverage']['complete']).lower()} "
+            f"retrieval_fts_truncated={str(bundle['retrieval_coverage']['fts_truncated']).lower()} "
+            f"retrieval_filters_truncated={str(bundle['retrieval_coverage']['filters_truncated']).lower()} "
+            f"retrieval_top_k_truncated={str(bundle['retrieval_coverage']['top_k_truncated']).lower()} "
             f"truncated={str(bundle['truncated']).lower()}"
         )
