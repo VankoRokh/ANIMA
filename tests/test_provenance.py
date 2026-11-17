@@ -2,6 +2,7 @@ import pytest
 
 from anima.core.event_bus import Event
 from anima.memory.event_log import EventLog
+from anima.memory.knowledge import KnowledgeLayer
 from anima.memory.link_store import LinkStore
 from anima.memory.memory_store import MemoryStore
 from anima.memory.provenance import ProvenanceResolver
@@ -88,7 +89,7 @@ def test_relations_validate_direction_and_provenance(tmp_path):
     links.create_knowledge(
         domain="project",
         statement="SQLite is the Stage 1 baseline.",
-        status="confirmed",
+        status="provisional",
         created_at=CREATED_AT,
         public_id=KNOWLEDGE_1,
     )
@@ -117,6 +118,11 @@ def test_relations_validate_direction_and_provenance(tmp_path):
         target_kind="knowledge",
         target_id=KNOWLEDGE_1,
         created_at=CREATED_AT,
+    )
+
+    # Confirm through the evidence-aware lifecycle, not the raw writer.
+    KnowledgeLayer(memory_store=memory_store).confirm(
+        KNOWLEDGE_1, confirmed_at=CREATED_AT
     )
 
     incoming = links.relations_for(
