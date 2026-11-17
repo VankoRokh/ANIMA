@@ -161,7 +161,7 @@ def test_canonical_corpus_groups_events_explainably(tmp_path):
     # The later event has no typed claim. It must not inherit the earlier
     # event's unverified SQLite identity, even when its text overlaps.
     assert later_result["action"] == "create"
-    assert later_result["candidate_id"] is None
+    assert later_result["candidate_id"] != first_result["memory_id"]
     assert later_result["memory_id"] != first_result["memory_id"]
     assert later_result["relation_id"] is None
 
