@@ -1,6 +1,6 @@
 # ANIMA v0.2 — H5.5 R2 / Raw Provenance (F-02)
 
-**Статус:** Core-bound R2 принят владельцем после адресных `58 passed` за 1,48 с и полной регрессии `1987 passed` за 87,60 с. Это не независимое подтверждение защиты standalone/unbound MemoryStore. F-02 глобально ещё не закрыт.  
+**Исторический статус R2:** Core-bound принят владельцем: адресные `58 passed` / 1,48 с, полный `1987 passed` / 87,60 с. Отсутствие обязательного Raw binding у standalone выявлено как открытая граница. **Её отдельно закрывает кандидат [R5](README_v02_h55_r5.md)**, ожидающий испытаний. Исходный контракт R2 и его независимые ограничения ниже сохранены без задним числом изменённого результата.  
 **Frozen H5.5 audit:** `28e8438f8408e85b52e237eaedcf024354a4522a`.  
 **Исходный R1:** `work/v02-h55-evidence-remediation` @ `73aba4ad4b143a50f1bb5ab1c70c7ea950a30b4b`; R1 подтвердил владелец: `44 passed` (0,92 с), полная регрессия `1975 passed` (86,13 с).
 
@@ -54,4 +54,4 @@ PYTHONPATH="$PWD" .venv/bin/python -m pytest -q -rx \
 PYTHONPATH="$PWD" .venv/bin/python -m pytest -q
 ```
 
-**Критерий принятия:** все существующие H0–H5/R1 PASS; отказ F-02 на composed Core; только полный Raw обеспечивает подтверждение; состояние Knowledge, links, History, Raw и ledger не меняется после отказа. Вердикт `R2 CORE-BOUND GATE PASS` допустим после тестов, но `GLOBAL F-02 CLOSED` и `v0.2 RC READY` пока недопустимы.
+**Исторический критерий принятия R2:** все существующие H0–H5/R1 PASS; отказ F-02 на composed Core; только полный Raw обеспечивает подтверждение; состояние Knowledge, links, History, Raw и ledger не меняется после отказа. **R2 был принят только как CORE-BOUND.** В R5 убран silent unbound bypass для `confirm/reject/supersede`; до его тестирования и независимого review не писать `GLOBAL F-02 CLOSED` или `v0.2 RC READY`.
