@@ -7,9 +7,11 @@ from uuid import UUID, uuid4
 
 
 SCHEMA_VERSION = 1
-# R2: an instance-level, persistent opt-in for verifying Knowledge sources
-# against the canonical Raw EventLog. Kept in schema_meta without a table
-# migration; standalone legacy/unit-test MemoryStore remains unbound.
+# R5: persist the canonical Raw EventLog authority once bound. All
+# terminal Knowledge writes require this binding; standalone/unbound stores
+# remain readable and may create provisional records, but cannot publish
+# terminal Knowledge without verified Raw. Kept in schema_meta without
+# changing the table schema.
 RAW_PROVENANCE_META_KEY = "knowledge_raw_provenance_policy"
 RAW_PROVENANCE_META_VALUE = "canonical_events_jsonl_v1"
 MEMORY_TYPES = {"episodic", "procedural"}
@@ -386,8 +388,9 @@ class MemoryStore:
         Raw *existence*, not that Memory text faithfully represents Raw.
         Cross-file atomicity against uncooperative writers is not claimed.
 
-        An unbound legacy store is intentionally compatibility-only; it
-        does not provide the v0.2 Core provenance guarantee.
+        R5: an unbound standalone/legacy store is readable but cannot
+        finalize Knowledge without a canonical Raw binding. No silent
+        transition to verified, no test-only bypass or auto migration.
         """
         from anima.memory.event_log import EventLog
 
@@ -396,7 +399,10 @@ class MemoryStore:
             (RAW_PROVENANCE_META_KEY,),
         ).fetchone()
         if policy is None:
-            return False
+            raise ValueError(
+                "Knowledge Raw provenance is unbound: "
+                "bind the canonical EventLog before terminal transition"
+            )
         if policy["value"] != RAW_PROVENANCE_META_VALUE:
             raise ValueError("Unsupported Raw provenance policy")
 
