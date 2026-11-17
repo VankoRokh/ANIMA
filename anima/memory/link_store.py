@@ -90,6 +90,20 @@ def _validate_public_id(public_id, prefix, label):
         raise ValueError(f"{label} must be a {prefix}UUIDv4")
 
 
+def _relation_active_at(relation, when):
+    """A relation is active within [created_at, valid_until).
+
+    Timestamps are offset-aware and compared as instants, not lexical ISO
+    strings. No end timestamp means the relation is open-ended.
+    """
+    instant = datetime.fromisoformat(when)
+    started = datetime.fromisoformat(relation["created_at"])
+    if instant < started:
+        return False
+    ended = relation["valid_until"]
+    return ended is None or instant < datetime.fromisoformat(ended)
+
+
 def _clean_name(value, label):
     if not isinstance(value, str) or not value.strip():
         raise ValueError(f"{label} must be a non-empty string")
@@ -598,8 +612,14 @@ class LinkStore:
         *,
         direction="both",
         relation_types=None,
+        active_at=None,
     ):
         self._require_object(object_kind, object_id)
+
+        # Omitted active_at intentionally preserves historical relation
+        # inspection for provenance and audits; retrieval passes a snapshot.
+        if active_at is not None:
+            _validate_timestamp(active_at, "Relation active_at")
 
         if direction not in {"incoming", "outgoing", "both"}:
             raise ValueError(
@@ -634,7 +654,13 @@ class LinkStore:
         with self.memory_store.transaction() as connection:
             rows = connection.execute(sql, values).fetchall()
 
-        return [self._row_to_relation(row) for row in rows]
+        result = [self._row_to_relation(row) for row in rows]
+        if active_at is not None:
+            result = [
+                relation for relation in result
+                if _relation_active_at(relation, active_at)
+            ]
+        return result
 
     def _validate_relation_rule(
         self,
