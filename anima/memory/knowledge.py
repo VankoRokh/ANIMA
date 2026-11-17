@@ -560,11 +560,16 @@ class KnowledgeLayer:
                     "Challenged knowledge requires new supporting evidence"
                 )
 
-            self._require_effective_memory_evidence(
+            supporting_sources = self._require_effective_memory_evidence(
                 connection,
                 knowledge_id=knowledge_id,
                 relation_type="supports",
                 at=confirmed_at,
+            )
+            # R2: a CLOSED Memory with a declared event ID is not
+            # sufficient proof that an authoritative Raw Event exists.
+            self.memory_store.require_knowledge_raw_sources(
+                connection, supporting_sources,
             )
 
             previous = knowledge["status"]
@@ -725,11 +730,14 @@ class KnowledgeLayer:
                     reject_duplicate=False,
                 )
 
-            self._require_effective_memory_evidence(
+            contradicting_sources = self._require_effective_memory_evidence(
                 connection,
                 knowledge_id=knowledge_id,
                 relation_type="contradicts",
                 at=rejected_at,
+            )
+            self.memory_store.require_knowledge_raw_sources(
+                connection, contradicting_sources,
             )
 
             connection.execute(
@@ -803,6 +811,11 @@ class KnowledgeLayer:
                 superseded_at,
                 source["updated_at"],
                 "Knowledge superseded_at",
+            )
+            # Supersede writes a new confirmed Knowledge without invoking
+            # the ordinary confirm transition: enforce the same Raw policy.
+            self.memory_store.require_knowledge_raw_sources(
+                connection, [source_memory_id],
             )
             existing = connection.execute(
                 "SELECT public_id FROM knowledge WHERE public_id = ?",
