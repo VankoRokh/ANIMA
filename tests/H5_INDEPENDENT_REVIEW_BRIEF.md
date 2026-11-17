@@ -2,9 +2,9 @@
 
 **Тип работы:** независимая техническая проверка состояния Foundation Hardening без права изменять GitHub.  
 **Репозиторий:** `VankoRokh/ANIMA`.  
-**Рабочая ветка:** `work/v02-h5-performance-diagnostics` (H5.0–H5.2 приняты в оговорённых пределах; H5.3 первичные измерения получены; H5.3b — расширенная диагностика, не испытана).  
+**Рабочая ветка:** `work/v02-h5-performance-entity-query` (H5.0–H5.2 приняты в оговорённых пределах; H5.3/3b измерения получены от владельца; H5.3c — экспериментальная микрооптимизация, ожидает независимого воспроизведения).  
 **Snapshot:** reviewer обязан зафиксировать **фактический** `git rev-parse HEAD` перед началом. Не подменять snapshot именем ветки.  
-**База:** после H4 владелец сообщил `1903 passed` / 86,95 с, quality probe 4 pairs: false merges 0, false splits 1; после H5.0 — `1911 passed` / 87,92 с; после H5.1 — `1921 passed` / 88,08 с, адресный suite 65 PASS на Python 3.14.4 (SQLite 3.46.1, x86_64), Python 3.12 `NOT_TESTED`. Владелец также сообщил по H5.2: адресные `38 passed` / 2,32 с, полная регрессия `1928 passed` / 87,62 с. Эти результаты **reported by owner**, не считать независимым воспроизведением. H5.3 владелец сообщил `1936 passed` / 88,66 с, benchmark 160/640 Events: process p95 7,8302/21,3727 ms, memory_count 1/1; throughput 175,447/75,423 events/s. H5.3b на момент фиксации ТЗ не испытан. Эти измерения — reported by owner; эксплуатационный SLO не утверждён.
+**База:** после H4 владелец сообщил `1903 passed` / 86,95 с, quality probe 4 pairs: false merges 0, false splits 1; после H5.0 — `1911 passed` / 87,92 с; после H5.1 — `1921 passed` / 88,08 с, адресный suite 65 PASS на Python 3.14.4 (SQLite 3.46.1, x86_64), Python 3.12 `NOT_TESTED`. Владелец также сообщил по H5.2: адресные `38 passed` / 2,32 с, полная регрессия `1928 passed` / 87,62 с. Эти результаты **reported by owner**, не считать независимым воспроизведением. H5.3 владелец сообщил `1936 passed` / 88,66 с, benchmark 160/640 Events: process p95 7,8302/21,3727 ms, memory_count 1/1; throughput 175,447/75,423 events/s. H5.3b по отчёту владельца: `1944 passed` / 88,23 с; 12 независимых измерений (160/640 × 1/8 streams × 3), при 640/8 Memory association p95 median 26,531 мс, process p95 median 36,7278 мс, throughput median 43,691 событий/с, Raw scans/event median 2. H5.3c, исключающий бесполезный SQLite Entity query при пустых authorized IDs, пока не испытан. Эти измерения — reported by owner; эксплуатационный SLO не утверждён.
 
 ## Роль
 
@@ -18,7 +18,7 @@
 
 1. Независимый `ANIMA R1-S1 Structural Memory Audit` от 17.11.2026 (N1–N9), результаты M-T2/M-T2B/M-T2C и утверждённые контрактные цели. **Если первичные отчёты не находятся в доступном репозитории, запросить их как отдельные вложения и пометить непроверяемые тезисы как reported, а не воспроизведённые.**
 2. `ANIMA_v0.2_Foundation_Hardening_Plan.md`, особенно INV-E1/E2/E3/K1/K2/R1/Q1/A1/M1 и H2.3/H5.
-3. Тесты `tests/test_v02_h0_foundation_contracts.py` (9 обычных PASS на H4), `test_v02_h1_*`, `test_v02_h2_*`, `test_v02_h3_*`, `test_v02_h4_*`, `test_v02_h5_legacy_diagnostic.py`, `test_v02_h5_portability.py`, `test_v02_h5_2_fault_recovery.py`, `test_v02_h5_3_performance.py`, `labs/v02_h5_portability.py`, `labs/v02_h5_performance.py`, `labs/v02_h5_scaling_diagnostics.py`, `tests/test_v02_h5_3_scaling_diagnostics.py`.
+3. Тесты `tests/test_v02_h0_foundation_contracts.py` (9 обычных PASS на H4), `test_v02_h1_*`, `test_v02_h2_*`, `test_v02_h3_*`, `test_v02_h4_*`, `test_v02_h5_legacy_diagnostic.py`, `test_v02_h5_portability.py`, `test_v02_h5_2_fault_recovery.py`, `test_v02_h5_3_performance.py`, `labs/v02_h5_portability.py`, `labs/v02_h5_performance.py`, `labs/v02_h5_scaling_diagnostics.py`, `tests/test_v02_h5_3_scaling_diagnostics.py`, `tests/test_v02_h5_3_entity_query_short_circuit.py`.
 4. `anima/memory/{event_log,event_processing,event_retrieval,memory_store,knowledge,link_store,retrieval,processor,provenance,context_builder}.py`, `anima/release_v01.py`, `labs/v02_h5_legacy_diagnostic.py`.
 
 ## Проверочные вопросы высокого риска
@@ -57,3 +57,7 @@
 7. Рекомендация по очередности устранения проблем, **без непосредственных изменений репозитория**.
 
 **Не выдавать готовность v0.2 RC по одному удачному pytest.** Если найдён P0 по целостности Raw, восстановлению или доверенности Evidence, вынести `BLOCKED` и приложить детерминированный репродуктор.
+
+## Дополнительный H5.3c review gate
+
+Прежде чем рекомендовать дальнейшие оптимизации, сравнить `_score_candidate` до/после по полному N1–N9, H4, C1/C3/C4/C5, 160/640 × 1/8 groups × 3, а не только по одномоментной скорости. Защитить semantics при `entity_ids=[]` и явно непустых authorised IDs. Проверить, что `_require_raw_event`, сырой `EventLog`, Recovery и проверка индекса не менялись. При ухудшении корректности или заметном росте false splits возвращать `BLOCKED` независимо от ускорения.
