@@ -48,6 +48,14 @@ SCHEMA = "anima.v02.h5.snapshot/0.1"
 MANIFEST = "h5_snapshot_manifest.json"
 LOCK = ".anima-v01.lock"
 DERIVED = {"event_index.db"}
+REQUIRED = {
+    "release_profile.json", "identity.json", "state.json",
+    "events.jsonl", "memory.db", "internal_state.db", "core_state.db",
+}
+REQUIRED_SANDBOX = {
+    "sandbox_world/virtual_door.db", "core_work.db",
+    "tasks.db", "execution.db",
+}
 IGNORED_SUFFIXES = ("-wal", "-shm", "-journal")
 
 
@@ -131,6 +139,17 @@ def _stopped_release(source):
             fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
 
 
+def _require_release_files(paths, capability):
+    required = set(REQUIRED)
+    if capability == "sandbox_door":
+        required.update(REQUIRED_SANDBOX)
+    missing = sorted(required - set(paths))
+    if missing:
+        raise ValueError(
+            "Snapshot missing release state file(s): " + ", ".join(missing)
+        )
+
+
 def _read_only_sqlite_backup(source, destination):
     uri = "file:" + quote(str(source.resolve()), safe="/") + "?mode=ro"
     with sqlite3.connect(uri, uri=True) as original:
@@ -175,8 +194,7 @@ def create_snapshot(source, destination):
         files = _inventory(source, skip_transients=True)
         if MANIFEST in files:
             raise ValueError("Snapshot manifest name is reserved")
-        if "release_profile.json" not in files or "memory.db" not in files:
-            raise ValueError("Release profile or Memory database missing")
+        _require_release_files(files, profile["capability"])
         # Reserve the output only after validating source/lock. If a copy
         # fails, the partial folder has NO manifest and cannot be restored.
         destination.mkdir(mode=0o700)
@@ -249,6 +267,7 @@ def verify_snapshot(snapshot):
         expected[rel] = entry
     if set(files) != set(expected) | {MANIFEST}:
         raise ValueError("Snapshot file set does not match manifest")
+    _require_release_files(expected, data["release_capability"])
     for rel, entry in expected.items():
         current = files[rel]
         if (
