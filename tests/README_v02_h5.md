@@ -1,8 +1,8 @@
 # ANIMA v0.2 — H5 / Integration, Legacy Data & Release Candidate Gates
 
-**Статус H5:** H5.0/H5.2 приняты; H5.1 подтверждён на x86_64 / Python 3.14.4 (Python 3.12 NOT_TESTED); H5.3c принят после полной регрессии владельца `1947 passed` за 93,68 с. H5.4a — пакет миграции/backup/rollback подготовлен к проверке; H5/RC не принят.  
+**Статус H5:** H5.0/H5.2 приняты; H5.1 подтверждён на x86_64 / Python 3.14.4 (Python 3.12 NOT_TESTED); H5.3c принят (`1947 passed`); H5.4a принят (`1959 passed`). H5.4b — read-only контракт совместимости и негативные тесты ожидают исполнения. H5/RC не принят.  
 **База для работ:** H4 `work/v02-h4-identity-guard`, принятый владельцем после `1903 passed` за 86,95 с, без XFAIL. Quality probe: 4 синтетические пары; 0 false merges, 1 false split; precision 1.0, recall 0.5 (эти числа не переносить на реальные данные).  
-**Ветка H5.0:** `work/v02-h5-readonly-release-gates`. **Рабочая ветка H5.1:** `work/v02-h5-portability-profile`. **Рабочая ветка H5.2:** `work/v02-h5-fault-recovery`. **Рабочая ветка H5.3:** `work/v02-h5-performance-profile`. **H5.3b:** `work/v02-h5-performance-diagnostics`. **H5.3c:** `work/v02-h5-performance-entity-query`. **H5.4a:** `work/v02-h5-backup-rollback`.
+**Ветка H5.0:** `work/v02-h5-readonly-release-gates`. **Рабочая ветка H5.1:** `work/v02-h5-portability-profile`. **Рабочая ветка H5.2:** `work/v02-h5-fault-recovery`. **Рабочая ветка H5.3:** `work/v02-h5-performance-profile`. **H5.3b:** `work/v02-h5-performance-diagnostics`. **H5.3c:** `work/v02-h5-performance-entity-query`. **H5.4a:** `work/v02-h5-backup-rollback`. **H5.4b:** `work/v02-h5-compatibility-contract`.
 
 ## Позиция перед RC
 
@@ -338,30 +338,26 @@ PYTHONPATH="$PWD" .venv/bin/python -m labs.v02_h5_scaling_diagnostics \
 
 **Решение по H5.3c:** владелец сообщил полную регрессию `1947 passed` за 93,68 с; микрооптимизация принята в оговорённой синтетической области. Два полных Raw сканирования и вопросы общего performance SLO остаются. Более глубокая оптимизация Raw/association без отдельного подтверждения безопасности не выполняется.
 
-## H5.4 — Migration, compatibility & rollback (H5.4a кандидат)
+## H5.4 — Migration, compatibility & rollback (H5.4a принят; H5.4b кандидат)
 
-**Детальный протокол, ограничения и испытания:** [README_v02_h5_4.md](README_v02_h5_4.md).
+**Подробное ТЗ:** [README_v02_h5_4.md](README_v02_h5_4.md).
 
-Ветка `work/v02-h5-backup-rollback`: `labs/v02_h5_snapshot.py` создаёт проверяемую **offline** копию остановленного `release_v01` экземпляра, проверяет SHA-256 manifest и восстанавливает **только в новый каталог**. SQLite копируется `sqlite3.backup()`, исходный Raw сохраняется побайтово, `event_index.db` в архиве остаётся, но при восстановлении **не активируется** (новый индекс строится из Raw из-за dev/inode привязки старого). Ни production-схемы, ни версии обработчика, ни пользовательские записи не изменяются.
+**H5.4a подтверждён владельцем:** адресные `35 passed` / 2,57 с, полная регрессия `1959 passed` / 89,24 с. Snapshot, SHA-256 manifest, restore в новый каталог, legacy index rebuild, sandbox state и отрицательные проверки пройдены на синтетических экземплярах. Backup/restore настоящего пользовательского экземпляра, физическая долговечность и некооперативные писатели не испытаны.
 
-`tests/test_v02_h5_4_snapshot_restore.py` — **12 новых тестов**: identity/Raw IDs, sandbox effect, активный writer lock, отказ от overwrite, повреждённая копия, symlink/path traversal, неполное состояние, torn исходный Raw, additive legacy index, legacy `confirmed` без автоматического ремонта.
-
-**Расчётный результат полного pytest: `1959 passed`** (1947 + 12). Это **не** исполненный результат.
+**H5.4b** реализован в `work/v02-h5-compatibility-contract` без изменения production. В `labs/v02_h5_compatibility.py` — read-only аудит ledger и старых `about`; в `tests/test_v02_h5_4_compatibility.py` — 8 проверок. Версия `PROCESSOR_VERSION="1.0"` трактуется как namespace идемпотентности; повысить её без отдельной миграции — риск повторного проигрывания `done`. Старые `about` без авторизационного доказательства помещаются в категорию **REVIEW_REQUIRED**, не удаляются и не считаются автоматически ложными. Несоответствие Raw и ledger — **BLOCKED**.
 
 ```bash
-git status --short
-git rev-parse HEAD
-
 PYTHONPATH="$PWD" .venv/bin/python -m pytest -q -rx \
+  tests/test_v02_h5_4_compatibility.py \
   tests/test_v02_h5_4_snapshot_restore.py \
-  tests/test_v02_h5_legacy_diagnostic.py \
-  tests/test_v02_h1_3_prefix_digest.py \
-  tests/test_release_v01.py
+  tests/test_v02_h5_legacy_diagnostic.py
 
 PYTHONPATH="$PWD" .venv/bin/python -m pytest -q
 ```
 
-**Открытый H5.4b release blocker:** `PROCESSOR_VERSION="1.0"` уже применён к старым `done`, но H4 изменил новые ассоциации; исходные записи не должны быть переобработаны без согласованного migration contract. Публичный протокол `release_v01` и schema Memory не изменять автоматически. Реальные legacy `about` требуют отдельного review и не могут быть признаны доказанными без authority provenance.
+Ожидаемый, но **ещё не полученный** полный результат: `1967 passed` (1959 + 8).
+
+**Открытый RC вопрос:** реальная legacy DB пока не обследовалась. Без полномочий источников старых `about` нельзя признать их достоверными или автоматически пересобрать. Python 3.12 остаётся `NOT_TESTED`. Не маркировать v0.2 как RC при одном green pytest.
 
 ## H5.5 — Independent review & RC (TODO)
 
