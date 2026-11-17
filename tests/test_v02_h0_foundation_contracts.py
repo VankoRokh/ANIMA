@@ -160,7 +160,6 @@ def test_h0_n5_expired_relation_is_not_current_retrieval(tmp_path):
 
 
 # N6: mutating middle of an indexed prefix then appending must not yield complete.
-@pytest.mark.xfail(strict=True, raises=AssertionError, reason="R1-S1 N6: middle-prefix mutation hidden")
 def test_h0_n6_middle_of_indexed_eventlog_is_not_silently_trusted(tmp_path):
     store, log, _links, _processor = _stack(tmp_path)
     for i in range(32):
