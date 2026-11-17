@@ -1,6 +1,6 @@
 # ANIMA v0.2 — H5.5 remediation / Evidence Lifecycle
 
-**Статус:** R1 (F-01) принят: `1975 passed`. R2 (F-02) Core-bound принят по отчёту владельца: адресные `58 passed` / 1,48 с и полный `1987 passed` / 87,60 с (standalone/unbound остаётся открытым). R3 (F-04) реализован, ожидает испытаний; R4 не начат. v0.2 RC **BLOCKED**.
+**Статус:** R1/F-01 принят (`1975 passed`), R2/F-02 Core-bound принят (`1987 passed`; standalone/unbound остаётся открытым), R3/F-04 принят владельцем (адресные `68 passed` / 1,51 с и полный `1999 passed` / 88,71 с). R4.1/F-03 подготовлен, **не испытан**; F-05–F-08 не устранены. v0.2 RC **BLOCKED**.
 
 ## Источник и ревизия
 
@@ -64,20 +64,35 @@ PYTHONPATH="$PWD" .venv/bin/python -m pytest -q
 
 **Оставшееся ограничение:** отдельно созданные `MemoryStore` без Core Raw binding сохраняют legacy режим, не обеспечивающий проверку Raw. Это не глобальное устранение F-02 для любого Python API. Перед окончательной приёмкой H5.5 необходимо решить, поддерживать ли такой режим вне тестов или сделать строгую привязку обязательной во всех экземплярах.
 
-## R3 / F-04 — Evidence Consistency (кандидат)
+## R3 / F-04 — Evidence Consistency (принят владельцем)
 
 **Полный контракт и проверки:** [README_v02_h55_r3.md](README_v02_h55_r3.md).
 
 Ветка `work/v02-h55-evidence-consistency` основана на принятом R2; frozen audit SHA не менялся. `LinkStore.create_relation()` атомарно запрещает пересекающиеся по времени противоположные `Memory → Knowledge:supports/contradicts` для одной и той же Memory. В `labs/v02_h5_legacy_diagnostic.py` добавлен finding `conflicting_active_knowledge_evidence` для офлайновых повреждённых legacy данных; он переводит H5.4b compatibility в `BLOCKED`. Существующие тесты H2.2, намеренно моделировавшие повреждённую Relation через публичный API, теперь вставляют её прямым SQL **строго в `pytest tmp_path`**, чтобы сохранить проверку отрицательного legacy случая.
 
-Добавлены **12 тестов** `tests/test_v02_h55_r3_evidence_consistency.py`. Расчётно **`1999 passed`** (1987 + 12), **ещё не исполнено**. F-06 (асимметрия future contradictions в `KnowledgeLayer.confirm`) не входит в R3, как и глобальная версия Raw binding для standalone.
+Добавлены **12 тестов** `tests/test_v02_h55_r3_evidence_consistency.py`. **Подтверждено владельцем:** адресные `68 passed` / 1,51 с, полный pytest `1999 passed` / 88,71 с. F-06 (асимметрия future contradictions в `KnowledgeLayer.confirm`) не входит в R3, как и глобальная версия Raw binding для standalone.
+
+## R4.1 / F-03 — Finalized Projection Retention (кандидат)
+
+**Подробный контракт, точный независимый сценарий и команды:** [README_v02_h55_r4_1.md](README_v02_h55_r4_1.md).
+
+В ветке `work/v02-h55-r4-projection-retention` после принятого R3 внесены минимальные изменения:
+
+- `MemoryStore.delete_memory()` под `BEGIN IMMEDIATE` запрещает удалять Memory, если любое связанное `memory_sources.event_id` имеет `event_processing.processor='memory_processor'` со статусом `done` (включая старые версии ledger).
+- `EventProcessingCoordinator.recover()` отказывает в восстановлении, если уже имеется `done` без связанных `memory_sources`; проверка проводится **до** `_bootstrap_missing`.
+- `EventProcessingCoordinator._replay_result()` отказывает в ложном `already_done` с `memory_id=None`; никакие старые `done` автоматически не перерабатываются.
+- `skipped` не требует Memory; standalone/unfinalized Memory остаётся удаляемой, если нет других ссылок.
+
+Добавлено **8 новых тестов** `tests/test_v02_h55_r4_1_projection_retention.py`, в том числе первичный сценарий `projection_delete` из аудиторского архива. Полная регрессия **расчётно `2007 passed` (1999 + 8)** — **пока не запускалась**.
+
+**Граница R4.1:** штатные API и выявление уже повреждённых `done`; не решает direct SQL и не вводит протокол tombstones/repair. Старые повреждённые экземпляры требуют отдельной офлайновой диагностики и решения оператора.
 
 ## Оставшиеся блокеры
 
 R2 / F-02 — Core-bound пройден по регрессии владельца; unbound standalone API остаётся отдельной границей, указанной выше.
 
-R3 / F-04 — writer и offline diagnostic подготовлены; требуется адресная и полная регрессия нового SHA.
+R3 / F-04 — runtime writer и offline diagnostic прошли регрессию владельца; требуется независимый повторный аудит нового snapshot.
 
-R4 / F-03,F-05,F-06,F-07,F-08 — processing-result tombstones, temporal merge/confirm, метаданные неполного Context, WAL/SHM snapshot contract.
+R4 — F-03 защищён кандидатом R4.1; F-05/F-06/F-07/F-08 остаются. Не выполнять молчаливую повторную проекцию `done` или автоправку legacy-данных.
 
 После устранения подтверждённых дефектов — новый фиксированный SHA и независимый аудит. Текущий v0.2 RC не принят.
