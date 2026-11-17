@@ -1,8 +1,8 @@
 # ANIMA v0.2 — H5 / Integration, Legacy Data & Release Candidate Gates
 
-**Статус H5:** H5.0/H5.2 приняты; H5.1 подтверждён на x86_64 / Python 3.14.4 (Python 3.12 NOT_TESTED); H5.3b подтверждён владельцем (1944 PASS). H5.3c — A/B benchmark представлен владельцем, существенный выигрыш на 8 Memory, **полная регрессия после изменения пока не предоставлена**. Эксплуатационный performance gate и H5/RC не приняты.  
+**Статус H5:** H5.0/H5.2 приняты; H5.1 подтверждён на x86_64 / Python 3.14.4 (Python 3.12 NOT_TESTED); H5.3c принят после полной регрессии владельца `1947 passed` за 93,68 с. H5.4a — пакет миграции/backup/rollback подготовлен к проверке; H5/RC не принят.  
 **База для работ:** H4 `work/v02-h4-identity-guard`, принятый владельцем после `1903 passed` за 86,95 с, без XFAIL. Quality probe: 4 синтетические пары; 0 false merges, 1 false split; precision 1.0, recall 0.5 (эти числа не переносить на реальные данные).  
-**Ветка H5.0:** `work/v02-h5-readonly-release-gates`. **Рабочая ветка H5.1:** `work/v02-h5-portability-profile`. **Рабочая ветка H5.2:** `work/v02-h5-fault-recovery`. **Рабочая ветка H5.3:** `work/v02-h5-performance-profile`. **H5.3b:** `work/v02-h5-performance-diagnostics`. **H5.3c:** `work/v02-h5-performance-entity-query`.
+**Ветка H5.0:** `work/v02-h5-readonly-release-gates`. **Рабочая ветка H5.1:** `work/v02-h5-portability-profile`. **Рабочая ветка H5.2:** `work/v02-h5-fault-recovery`. **Рабочая ветка H5.3:** `work/v02-h5-performance-profile`. **H5.3b:** `work/v02-h5-performance-diagnostics`. **H5.3c:** `work/v02-h5-performance-entity-query`. **H5.4a:** `work/v02-h5-backup-rollback`.
 
 ## Позиция перед RC
 
@@ -336,16 +336,32 @@ PYTHONPATH="$PWD" .venv/bin/python -m labs.v02_h5_scaling_diagnostics \
 
 **Корректность:** все 12 новых запусков показали ноль межгрупповых слияний и дополнительных фрагментов Memory, `raw_scans_total=2 × event_count`, то же распределение `create/update`, что у baseline. Это свидетельство **синтетического** соответствия, не замена H0–H4, M-T2C или полного pytest. Профиль `MEASURED_NO_RELEASE_SLO`, SLO для релиза не утверждался.
 
-**Предварительное решение:** оставить H5.3c кандидатом для дальнейшей проверки; сохранить оптимизацию после положительного `1947 passed` (или устранить найденную регрессию). Более глубокая оптимизация Raw/association без отдельного подтверждения безопасности не выполняется.
+**Решение по H5.3c:** владелец сообщил полную регрессию `1947 passed` за 93,68 с; микрооптимизация принята в оговорённой синтетической области. Два полных Raw сканирования и вопросы общего performance SLO остаются. Более глубокая оптимизация Raw/association без отдельного подтверждения безопасности не выполняется.
 
-## H5.4 — Migration, compatibility & rollback (TODO)
+## H5.4 — Migration, compatibility & rollback (H5.4a кандидат)
 
-- Бэкап всех файлов и manifest hash; пробное восстановление в **новый каталог**.
-- Старый индекс без `prefix_digest/indexed_count` → additive миграция на копии с проверкой старых row hashes; повторное открытие и повтор миграции должны быть безопасны.
-- Сверка `memory.db` и Raw до/после, в том числе отслеживание legacy orphan/confirmed без support. Автоматически удалять или объявлять их восстановленными **запрещено**.
-- Особый контракт: `EventProcessingCoordinator.PROCESSOR_VERSION == "1.0"` при изменённом H4-поведении. Уточнить, является ли это допустимым условием compatibility (старые done не перерабатываются) или требуется versioned projection/договор с миграцией; **не менять версию наугад**.
-- `anima.release_v01` и `PROTOCOL=anima.release.v0_1/0.1` — действующий интерфейс; название внутренней ветки v0.2 не даёт права считать protocol автоматически обновлённым.
-- Для schema migrations с невозможным downgrade — явно указать восстановление из backup.
+**Детальный протокол, ограничения и испытания:** [README_v02_h5_4.md](README_v02_h5_4.md).
+
+Ветка `work/v02-h5-backup-rollback`: `labs/v02_h5_snapshot.py` создаёт проверяемую **offline** копию остановленного `release_v01` экземпляра, проверяет SHA-256 manifest и восстанавливает **только в новый каталог**. SQLite копируется `sqlite3.backup()`, исходный Raw сохраняется побайтово, `event_index.db` в архиве остаётся, но при восстановлении **не активируется** (новый индекс строится из Raw из-за dev/inode привязки старого). Ни production-схемы, ни версии обработчика, ни пользовательские записи не изменяются.
+
+`tests/test_v02_h5_4_snapshot_restore.py` — **11 новых тестов**: identity/Raw IDs, sandbox effect, активный writer lock, отказ от overwrite, повреждённая копия, symlink/path traversal, неполное состояние, additive legacy index, legacy `confirmed` без автоматического ремонта.
+
+**Расчётный результат полного pytest: `1958 passed`** (1947 + 11). Это **не** исполненный результат.
+
+```bash
+git status --short
+git rev-parse HEAD
+
+PYTHONPATH="$PWD" .venv/bin/python -m pytest -q -rx \
+  tests/test_v02_h5_4_snapshot_restore.py \
+  tests/test_v02_h5_legacy_diagnostic.py \
+  tests/test_v02_h1_3_prefix_digest.py \
+  tests/test_release_v01.py
+
+PYTHONPATH="$PWD" .venv/bin/python -m pytest -q
+```
+
+**Открытый H5.4b release blocker:** `PROCESSOR_VERSION="1.0"` уже применён к старым `done`, но H4 изменил новые ассоциации; исходные записи не должны быть переобработаны без согласованного migration contract. Публичный протокол `release_v01` и schema Memory не изменять автоматически. Реальные legacy `about` требуют отдельного review и не могут быть признаны доказанными без authority provenance.
 
 ## H5.5 — Independent review & RC (TODO)
 
