@@ -641,7 +641,18 @@ class MemoryStore:
                 """,
                 (public_id, public_id),
             ).fetchone()
-            if related or legacy_source or history_reference:
+            legacy_entity = connection.execute(
+                "SELECT 1 FROM memory_entities WHERE memory_id = ? LIMIT 1",
+                (public_id,),
+            ).fetchone()
+            merged_target = connection.execute(
+                "SELECT 1 FROM memories WHERE merged_into = ? LIMIT 1",
+                (public_id,),
+            ).fetchone()
+            if (
+                related or legacy_source or history_reference
+                or legacy_entity or merged_target
+            ):
                 raise ValueError(
                     "Cannot delete Memory with evidence, relations or "
                     f"history dependencies: {public_id}"
