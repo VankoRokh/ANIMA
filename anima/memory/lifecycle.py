@@ -234,43 +234,108 @@ class MemoryLifecycle:
                     (target_id, event_id),
                 )
 
-            target_entities = {
-                row["target_id"]
+            # R4.2/F-05: merging historical episodes must not backdate
+            # attribution. For every source "about" relation, the derived
+            # target relation is active only from the LATER of the original
+            # start and merge time; retain the original expiry and
+            # source_memory_id (provenance). Expired source relations stay
+            # on the original Memory and are not transferred.
+            #
+            # Check interval coverage against pre-existing target links,
+            # including finite/future ones: valid_until IS NULL alone does
+            # not imply "currently active". The entire operation remains
+            # under the same BEGIN IMMEDIATE writer transaction.
+            merge_instant = self._parsed_time(merged_at)
+            target_relations = [
+                dict(row)
                 for row in connection.execute(
                     """
-                    SELECT target_id FROM relations
+                    SELECT target_id, created_at, valid_until
+                    FROM relations
                     WHERE source_kind = 'memory'
                       AND source_id = ?
                       AND relation_type = 'about'
                       AND target_kind = 'entity'
-                      AND valid_until IS NULL
                     ORDER BY row_id
                     """,
                     (target_id,),
                 ).fetchall()
-            }
-            source_entities = [
-                row["target_id"]
-                for row in connection.execute(
-                    """
-                    SELECT target_id FROM relations
-                    WHERE source_kind = 'memory'
-                      AND source_id = ?
-                      AND relation_type = 'about'
-                      AND target_kind = 'entity'
-                      AND valid_until IS NULL
-                    ORDER BY row_id
-                    """,
-                    (source_id,),
-                ).fetchall()
             ]
-            added_entities = [
-                entity_id
-                for entity_id in source_entities
-                if entity_id not in target_entities
-            ]
+            source_relations = connection.execute(
+                """
+                SELECT public_id, target_id, created_at, valid_until,
+                       source_memory_id
+                FROM relations
+                WHERE source_kind = 'memory'
+                  AND source_id = ?
+                  AND relation_type = 'about'
+                  AND target_kind = 'entity'
+                ORDER BY row_id
+                """,
+                (source_id,),
+            ).fetchall()
+            added_entities = []
+            for relation in source_relations:
+                source_start = self._parsed_time(relation["created_at"])
+                source_end = (
+                    None if relation["valid_until"] is None
+                    else self._parsed_time(relation["valid_until"])
+                )
+                if source_end is not None and source_end <= source_start:
+                    raise ValueError(
+                        "Cannot merge invalid source about relation interval: "
+                        f"{relation['public_id']}"
+                    )
+                new_start = max(source_start, merge_instant)
+                if source_end is not None and source_end <= new_start:
+                    # Already expired at the merge; don't resurrect it.
+                    continue
 
-            for entity_id in added_entities:
+                entity_id = relation["target_id"]
+                already_covered = False
+                for existing in target_relations:
+                    if existing["target_id"] != entity_id:
+                        continue
+                    existing_start = self._parsed_time(existing["created_at"])
+                    existing_end = (
+                        None if existing["valid_until"] is None
+                        else self._parsed_time(existing["valid_until"])
+                    )
+                    if (
+                        existing_end is not None
+                        and existing_end <= existing_start
+                    ):
+                        raise ValueError(
+                            "Cannot merge with invalid target about relation"
+                        )
+                    if (
+                        existing_start <= new_start
+                        and (
+                            existing_end is None
+                            or (
+                                source_end is not None
+                                and existing_end >= source_end
+                            )
+                        )
+                    ):
+                        already_covered = True
+                        break
+                if already_covered:
+                    continue
+
+                # Preserve the provenance of the *original* attribution.
+                # Do not rewrite it as a claim originating from target.
+                provenance_id = relation["source_memory_id"]
+                if connection.execute(
+                    "SELECT 1 FROM memories WHERE public_id = ?",
+                    (provenance_id,),
+                ).fetchone() is None:
+                    raise ValueError(
+                        "Cannot merge about relation with missing provenance: "
+                        f"{relation['public_id']}"
+                    )
+                derived_start = new_start.isoformat()
+                derived_end = relation["valid_until"]
                 connection.execute(
                     """
                     INSERT INTO relations(
@@ -283,16 +348,26 @@ class MemoryLifecycle:
                         created_at,
                         valid_until,
                         source_memory_id
-                    ) VALUES (?, 'memory', ?, 'about', 'entity', ?, ?, NULL, ?)
+                    ) VALUES (?, 'memory', ?, 'about', 'entity', ?, ?, ?, ?)
                     """,
                     (
                         f"rel_{uuid4()}",
                         target_id,
                         entity_id,
-                        merged_at,
-                        target_id,
+                        derived_start,
+                        derived_end,
+                        provenance_id,
                     ),
                 )
+                target_relations.append(
+                    {
+                        "target_id": entity_id,
+                        "created_at": derived_start,
+                        "valid_until": derived_end,
+                    }
+                )
+                if entity_id not in added_entities:
+                    added_entities.append(entity_id)
 
             connection.execute(
                 """
