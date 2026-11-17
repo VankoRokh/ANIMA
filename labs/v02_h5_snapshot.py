@@ -38,7 +38,7 @@ import os
 import shutil
 import sqlite3
 import stat
-from contextlib import contextmanager
+from contextlib import closing, contextmanager
 from pathlib import Path
 from urllib.parse import quote
 
@@ -152,13 +152,14 @@ def _require_release_files(paths, capability):
 
 def _read_only_sqlite_backup(source, destination):
     uri = "file:" + quote(str(source.resolve()), safe="/") + "?mode=ro"
-    with sqlite3.connect(uri, uri=True) as original:
+    with closing(sqlite3.connect(uri, uri=True)) as original:
         original.execute("PRAGMA query_only=ON")
         row = original.execute("PRAGMA quick_check(1)").fetchone()
         if row is None or row[0] != "ok":
             raise ValueError("SQLite source quick_check failed: " + str(source))
-        with sqlite3.connect(destination) as target:
+        with closing(sqlite3.connect(destination)) as target:
             original.backup(target)
+            target.commit()
     destination.chmod(0o600)
 
 
