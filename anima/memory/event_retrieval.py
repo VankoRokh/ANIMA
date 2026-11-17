@@ -231,11 +231,16 @@ class EventRetrieval:
                             stat.st_ctime_ns != state["ctime_ns"]
                         ):
                             raise ValueError("EventLog modified in place: rebuild required")
-                        if stat.st_size > cursor:
+                        if stat.st_size > cursor and (
+                            stat.st_mtime_ns != state["mtime_ns"]
+                            or stat.st_ctime_ns != state["ctime_ns"]
+                        ):
                             # Head/tail anchors cannot detect same-length
                             # mutations in the middle of the indexed prefix.
-                            # Verify existing per-Event digests before appending
-                            # any new index rows or advancing the cursor.
+                            # Recheck all prior Event digests when the physical
+                            # source changed since the last indexed batch.
+                            # An unchanged source needs no repeated full scan
+                            # while a large backlog is indexed in chunks.
                             self._verify_indexed_prefix(stream, conn, cursor)
                     source_size = stat.st_size
                     stream.seek(cursor)
