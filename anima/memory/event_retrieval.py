@@ -82,6 +82,53 @@ class EventRetrieval:
         return sha256(head).hexdigest(), sha256(tail).hexdigest()
 
     @staticmethod
+    def _verify_indexed_prefix(stream, conn, cursor):
+        """Verify all previously indexed Event bytes before extending an index.
+
+        The existing SQLite locators and SHA-256 digests are authoritative for
+        the previously accepted prefix. Read one source line and one index row
+        at a time; do not materialize the entire journal in RAM. Blank lines
+        have no index rows, but any new nonblank line is detected.
+        """
+        indexed = conn.execute(
+            """
+            SELECT event_id, raw_offset, raw_length, raw_digest
+            FROM indexed_events ORDER BY rowid
+            """
+        )
+        expected = indexed.fetchone()
+        stream.seek(0)
+
+        while stream.tell() < cursor:
+            offset = stream.tell()
+            raw = stream.readline(min(MAX_LINE + 1, cursor - offset))
+            if not raw or len(raw) > MAX_LINE or not raw.endswith(b"\n"):
+                raise ValueError(
+                    "Indexed EventLog prefix has an invalid record boundary "
+                    f"at byte {offset}: rebuild required"
+                )
+            if not raw.strip():
+                # Empty JSONL spacer lines were never indexed. A changed
+                # spacer containing a real Event fails the check below.
+                continue
+            if (
+                expected is None
+                or expected["raw_offset"] != offset
+                or expected["raw_length"] != len(raw)
+                or expected["raw_digest"] != sha256(raw).hexdigest()
+            ):
+                raise ValueError(
+                    "Indexed EventLog prefix changed at byte "
+                    f"{offset}: rebuild required"
+                )
+            expected = indexed.fetchone()
+
+        if stream.tell() != cursor or expected is not None:
+            raise ValueError(
+                "Indexed EventLog prefix locator mismatch: rebuild required"
+            )
+
+    @staticmethod
     def _content(record):
         payload = record["payload"]
         if payload is None:
@@ -152,7 +199,7 @@ class EventRetrieval:
         """Index a bounded complete prefix; commit rows and cursor atomically.
 
         A torn trailing JSONL line is deliberately left pending. If source
-        identity, indexed prefix anchors or size regress, require rebuild().
+        identity, indexed prefix locators/digests or size regress, require rebuild().
         """
         self._limits(max_events, max_bytes)
         path = self.event_log.log_file
@@ -184,6 +231,12 @@ class EventRetrieval:
                             stat.st_ctime_ns != state["ctime_ns"]
                         ):
                             raise ValueError("EventLog modified in place: rebuild required")
+                        if stat.st_size > cursor:
+                            # Head/tail anchors cannot detect same-length
+                            # mutations in the middle of the indexed prefix.
+                            # Verify existing per-Event digests before appending
+                            # any new index rows or advancing the cursor.
+                            self._verify_indexed_prefix(stream, conn, cursor)
                     source_size = stat.st_size
                     stream.seek(cursor)
                     processed_bytes = 0
