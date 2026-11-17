@@ -118,7 +118,6 @@ def test_h0_n3_unbacked_confirmed_knowledge_is_rejected(tmp_path):
 
 
 # N4: removing a supporting Memory must not leave live orphan evidence.
-@pytest.mark.xfail(strict=True, raises=AssertionError, reason="R1-S1 N4: orphan evidence")
 def test_h0_n4_delete_memory_rejects_or_invalidates_live_support(tmp_path):
     store, _log, links, _processor = _stack(tmp_path)
     memory = _memory(store, 401, "Evidence for a provisional hypothesis")
