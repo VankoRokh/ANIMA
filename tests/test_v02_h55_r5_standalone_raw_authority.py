@@ -59,7 +59,7 @@ def unbound(tmp_path):
 def _real_event(n):
     return Event(
         "conversation.user",
-        {"text": f"h55r5 distinct canonical Raw source {n}"},
+        {"text": f"h55r5group{n:04d}: isolated source observation {n}"},
         source="user", session_id="session_00000001",
         timestamp=T0, event_id=uid("ev_", n),
     )
@@ -217,10 +217,10 @@ def test_h55_r5_read_only_and_provisional_legacy_usage_remains_supported(
 
 
 def test_h55_r5_composed_core_still_publishes_with_real_raw(tmp_path):
-    core, layer, claim, _ = _core_challenged(tmp_path)
+    core, layer, claim, sources = _core_challenged(tmp_path)
     new_fact = layer.create_candidate(
         domain="user", statement="h55r5 separate properly verified",
-        source_memory_id=_[2], created_at=T2,
+        source_memory_id=sources[2], created_at=T2,
     )["knowledge"]["id"]
     assert layer.confirm(new_fact, confirmed_at=T3)[
         "knowledge"
