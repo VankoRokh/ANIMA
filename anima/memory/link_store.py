@@ -481,7 +481,29 @@ class LinkStore:
         if valid_until is not None:
             _validate_timestamp(valid_until, "Relation valid_until")
 
-        with self.memory_store.transaction() as connection:
+        # Recheck references under the same SQLite writer lock used by
+        # MemoryStore.delete_memory(). Preliminary public-ID validation above
+        # is not enough if another writer deletes the source meanwhile.
+        with self.memory_store.transaction(immediate=True) as connection:
+            tables = {
+                "memory": "memories",
+                "knowledge": "knowledge",
+                "entity": "entities",
+            }
+            for kind, object_id in (
+                (source_kind, source_id),
+                (target_kind, target_id),
+                ("memory", source_memory_id),
+            ):
+                exists = connection.execute(
+                    f"SELECT 1 FROM {tables[kind]} "
+                    "WHERE public_id = ?",
+                    (object_id,),
+                ).fetchone()
+                if exists is None:
+                    raise ValueError(
+                        f"Unknown {kind}: {object_id}"
+                    )
             if valid_until is None:
                 duplicate = connection.execute(
                     """
