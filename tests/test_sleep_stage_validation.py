@@ -35,7 +35,7 @@ def _text_fixture(tmp_path):
     )
     event_log.write(event)
 
-    memory_store = MemoryStore(tmp_path / "memory.db")
+    memory_store = MemoryStore(tmp_path / "memory.db", event_log=event_log)
     closed_memory = memory_store.create_memory(
         memory_type="episodic",
         domain="project",
