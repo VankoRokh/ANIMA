@@ -78,6 +78,31 @@ def test_h1_3_digest_survives_reopen_and_append(tmp_path):
     check_digest(log, restarted)
 
 
+def test_h1_3_legacy_index_schema_is_migrated_without_rebuild(tmp_path):
+    log, index = make_stack(tmp_path)
+    fill(log, n=20)
+    index.sync()
+    # Reconstruct the previous index-state schema without the two v0.2
+    # optimization fields. Index and Event bytes themselves stay intact.
+    with sqlite3.connect(index.database_file) as conn:
+        if sqlite3.sqlite_version_info < (3, 35, 0):
+            pytest.skip("SQLite DROP COLUMN requires >=3.35")
+        conn.execute("ALTER TABLE event_index_state DROP COLUMN indexed_count")
+        conn.execute("ALTER TABLE event_index_state DROP COLUMN prefix_digest")
+    legacy = EventRetrieval(log, index.database_file)
+    with sqlite3.connect(legacy.database_file) as conn:
+        column_names = {
+            row[1] for row in conn.execute(
+                "PRAGMA table_info(event_index_state)"
+            )
+        }
+    assert {"prefix_digest", "indexed_count"} <= column_names
+    assert state(legacy)[1:] == (None, None)
+    log.write(ev(21))
+    assert legacy.sync()["status"] == "complete"
+    check_digest(log, legacy)
+
+
 def test_h1_3_migrating_null_digest_first_rechecks_each_old_row(tmp_path):
     log, index = make_stack(tmp_path)
     fill(log, n=20)
@@ -107,7 +132,7 @@ def test_h1_3_migrating_null_digest_rejects_historical_edit(tmp_path):
     assert raw.count(b"digestmarker event 0010") == 1
     log.log_file.write_bytes(
         raw.replace(b"digestmarker event 0010",
-                    b"changedmarker event 0010", 1)
+                    b"editedmarker event 0010", 1)
     )
     log.write(ev(21))
     with pytest.raises(ValueError, match="Indexed EventLog prefix changed"):
@@ -124,7 +149,7 @@ def test_h1_3_digest_detects_middle_edit_before_new_checkpoint(tmp_path):
     assert raw.count(b"digestmarker event 0010") == 1
     log.log_file.write_bytes(
         raw.replace(b"digestmarker event 0010",
-                    b"changedmarker event 0010", 1)
+                    b"editedmarker event 0010", 1)
     )
     log.write(ev(21))
     with pytest.raises(ValueError, match="Indexed EventLog prefix changed"):
