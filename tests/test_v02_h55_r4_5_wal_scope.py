@@ -93,7 +93,8 @@ def test_h55_r45_committed_wal_backup_is_logical_not_forensic(
 
     before = _fingerprint(source)
     assert database + "-wal" in before
-    assert database + "-shm" in before
+    # Some SQLite builds do not leave a physical -shm after an abrupt exit;
+    # absence is valid and does not strengthen byte-immutability guarantees.
     created = create_snapshot(source, snapshot)
     after = _fingerprint(source)
 
