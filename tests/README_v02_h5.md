@@ -1,8 +1,8 @@
 # ANIMA v0.2 — H5 / Integration, Legacy Data & Release Candidate Gates
 
-**Статус H5:** H5.0–H5.4b независимо воспроизведены (`1967 passed` на Python 3.14.4 и 3.12.14), однако H5.5 имеет вердикт **BLOCKED** из-за F-01/F-02/F-04 P1. R1/F-01 принят владельцем (`1975 passed`); R2/F-02 Core-bound реализация ожидает испытаний, unbound API требует отдельного решения. ANIMA v0.2 RC не принят.  
+**Статус H5:** H5.0–H5.4b независимо воспроизведены (`1967 passed` на Python 3.14.4 и 3.12.14). H5.5 вынес **BLOCKED** по F-01/F-02/F-04 P1. R1/F-01 принят владельцем (`1975 passed`); R2/F-02 Core-bound принят владельцем (`1987 passed`), unbound API остаётся за пределами Raw guarantee. R3/F-04 реализован, пока не испытан. ANIMA v0.2 RC не принят.  
 **База для работ:** H4 `work/v02-h4-identity-guard`, принятый владельцем после `1903 passed` за 86,95 с, без XFAIL. Quality probe: 4 синтетические пары; 0 false merges, 1 false split; precision 1.0, recall 0.5 (эти числа не переносить на реальные данные).  
-**Ветка H5.0:** `work/v02-h5-readonly-release-gates`. **Рабочая ветка H5.1:** `work/v02-h5-portability-profile`. **Рабочая ветка H5.2:** `work/v02-h5-fault-recovery`. **Рабочая ветка H5.3:** `work/v02-h5-performance-profile`. **H5.3b:** `work/v02-h5-performance-diagnostics`. **H5.3c:** `work/v02-h5-performance-entity-query`. **H5.4a:** `work/v02-h5-backup-rollback`. **H5.4b:** `work/v02-h5-compatibility-contract`. **Frozen H5.5 audit:** `audit/v02-h5-rc-candidate` @ `28e8438f8408e85b52e237eaedcf024354a4522a`. **R1 remediation:** `work/v02-h55-evidence-remediation`. **R2 Core-bound:** `work/v02-h55-raw-provenance`.
+**Ветка H5.0:** `work/v02-h5-readonly-release-gates`. **Рабочая ветка H5.1:** `work/v02-h5-portability-profile`. **Рабочая ветка H5.2:** `work/v02-h5-fault-recovery`. **Рабочая ветка H5.3:** `work/v02-h5-performance-profile`. **H5.3b:** `work/v02-h5-performance-diagnostics`. **H5.3c:** `work/v02-h5-performance-entity-query`. **H5.4a:** `work/v02-h5-backup-rollback`. **H5.4b:** `work/v02-h5-compatibility-contract`. **Frozen H5.5 audit:** `audit/v02-h5-rc-candidate` @ `28e8438f8408e85b52e237eaedcf024354a4522a`. **R1 remediation:** `work/v02-h55-evidence-remediation`. **R2 Core-bound:** `work/v02-h55-raw-provenance`. **R3 F-04:** `work/v02-h55-evidence-consistency`.
 
 ## Позиция перед RC
 
@@ -357,7 +357,7 @@ PYTHONPATH="$PWD" .venv/bin/python -m pytest -q
 
 **Фактически воспроизведено:** `1967 passed` на Python 3.14.4 и 3.12.14 в независимом H5.5; наличие F-04 подтверждает недостаточность исходного набора тестов для общей непротиворечивости Evidence.
 
-**Открытый RC вопрос:** реальная legacy DB пока не обследовалась. Без полномочий источников старых `about` нельзя признать их достоверными или автоматически пересобрать. Python 3.12 остаётся `NOT_TESTED`. Не маркировать v0.2 как RC при одном green pytest.
+**Открытый RC вопрос:** реальная legacy DB пока не обследовалась. Без полномочий источников старых `about` нельзя признать их достоверными или автоматически пересобрать. Python 3.12.14 подтверждён в H5.5 на Linux x86_64 (`1967 passed`), но новый R1–R3 на 3.12 независимо не проверялся. Не маркировать v0.2 как RC при одном green pytest.
 
 ## H5.5 — Независимый аудит: BLOCKED, корректирующий цикл открыт
 
@@ -365,7 +365,7 @@ PYTHONPATH="$PWD" .venv/bin/python -m pytest -q
 
 **Вердикт RC — BLOCKED:** P1 F-01 (мутирование подтверждённой Memory через merge/update), F-02 (Knowledge confirmation без обязательного Raw), F-04 (противоположные active supports/contradicts не обнаруживаются H5 diagnostic). P2: F-03/F-05/F-06/F-07/F-08. Данные реальных экземпляров, Pi/aarch64 и измеримый эксплуатационный SLO не проверены. Никакие из исходных 1967 тестов не служат доказательством отсутствия этих дефектов.
 
-**План и текущее исправление:** [README_v02_h55_remediation.md](README_v02_h55_remediation.md). R2/F-02 см. [README_v02_h55_r2.md](README_v02_h55_r2.md). R1/F-01 закрывает только переходы `confirm → merge/update` через штатные API, сохраняя исходную ревизию и Knowledge/Raw/History. R1 подтверждён владельцем: **1975 passed** / 86,13 с. R2 добавляет 12 тестов, расчёт **1987 passed**, пока не исполнялся. R2 гарантирует проверку Raw для Core-bound Knowledge, но не автоматически для legacy unbound MemoryStore; глобальное закрытие F-02 требует независимого review. R3/F-04 и R4/P2 ещё не реализованы.
+**План и текущее исправление:** [README_v02_h55_remediation.md](README_v02_h55_remediation.md). R2/F-02: [README_v02_h55_r2.md](README_v02_h55_r2.md). R3/F-04: [README_v02_h55_r3.md](README_v02_h55_r3.md). R1 принят владельцем (1975 PASS), R2 Core-bound принят владельцем (1987 PASS). R3 добавляет временную проверку противоположных Evidence в LinkStore и finding в офлайновой диагностике; **12 новых тестов ещё не выполнялись**, расчёт полной регрессии **1999 passed**. Raw binding unbound standalone остаётся открытой границей; R4/P2 не начат.
 
 **H5.4b historical note:** предыдущий раздел был написан до независимого аудита; `1967 passed` теперь воспроизведены на двух версиях Python. Заявление об отсутствии ошибок Evidence/Knowledge по этим тестам было опровергнуто новыми межкомпонентными сценариями.
 
