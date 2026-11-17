@@ -170,6 +170,11 @@ def audit_snapshot(memory_db, events_jsonl=None, *, at=None):
         counts["knowledge"] = len(knowledge)
 
         supports = set()
+        # R3 / F-04: historical relations may coexist, but two opposite
+        # polarities active for the SAME Memory and Knowledge at the SAME
+        # instant violate the Evidence contract. Count each pair only once.
+        active_polarities = defaultdict(set)
+        conflicting_pairs = set()
         relation_count = 0
         for row in conn.execute(
             "SELECT public_id, source_kind, source_id, relation_type, "
@@ -214,6 +219,24 @@ def audit_snapshot(memory_db, events_jsonl=None, *, at=None):
                 row["relation_type"] not in {"supports", "contradicts"}
             ) or target_kind != "knowledge":
                 continue
+
+            # Compare only current [start, end) intervals. A former
+            # contradiction that expired before this instant is not an
+            # active self-contradiction and must not yield false positives.
+            if source_kind == "memory" and source_id == provenance_id:
+                pair = (source_id, target_id)
+                polarity = row["relation_type"]
+                opposite = (
+                    "contradicts" if polarity == "supports"
+                    else "supports"
+                )
+                if (
+                    opposite in active_polarities[pair]
+                    and pair not in conflicting_pairs
+                ):
+                    issue("conflicting_active_knowledge_evidence", rel_id)
+                    conflicting_pairs.add(pair)
+                active_polarities[pair].add(polarity)
 
             valid = (
                 source_kind == "memory"
