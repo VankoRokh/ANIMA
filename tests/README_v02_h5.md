@@ -1,8 +1,8 @@
 # ANIMA v0.2 — H5 / Integration, Legacy Data & Release Candidate Gates
 
-**Статус H5:** H5.0/H5.2 приняты; H5.1 подтверждён на x86_64 / Python 3.14.4 (Python 3.12 NOT_TESTED); H5.3c принят (`1947 passed`); H5.4a принят (`1959 passed`). H5.4b — read-only контракт совместимости и негативные тесты ожидают исполнения. H5/RC не принят.  
+**Статус H5:** H5.0–H5.4b прошли полную регрессию владельца (`1967 passed`) и независимую регрессию аудитора на Python 3.14.4 и 3.12.14 (`1967 passed` на каждой версии). **H5.5 независимый вердикт BLOCKED**: F-01/F-02/F-04 P1. Исправление R1/F-01 в отдельной ветке реализовано, ещё не испытано. ANIMA v0.2 RC не принят.  
 **База для работ:** H4 `work/v02-h4-identity-guard`, принятый владельцем после `1903 passed` за 86,95 с, без XFAIL. Quality probe: 4 синтетические пары; 0 false merges, 1 false split; precision 1.0, recall 0.5 (эти числа не переносить на реальные данные).  
-**Ветка H5.0:** `work/v02-h5-readonly-release-gates`. **Рабочая ветка H5.1:** `work/v02-h5-portability-profile`. **Рабочая ветка H5.2:** `work/v02-h5-fault-recovery`. **Рабочая ветка H5.3:** `work/v02-h5-performance-profile`. **H5.3b:** `work/v02-h5-performance-diagnostics`. **H5.3c:** `work/v02-h5-performance-entity-query`. **H5.4a:** `work/v02-h5-backup-rollback`. **H5.4b:** `work/v02-h5-compatibility-contract`.
+**Ветка H5.0:** `work/v02-h5-readonly-release-gates`. **Рабочая ветка H5.1:** `work/v02-h5-portability-profile`. **Рабочая ветка H5.2:** `work/v02-h5-fault-recovery`. **Рабочая ветка H5.3:** `work/v02-h5-performance-profile`. **H5.3b:** `work/v02-h5-performance-diagnostics`. **H5.3c:** `work/v02-h5-performance-entity-query`. **H5.4a:** `work/v02-h5-backup-rollback`. **H5.4b:** `work/v02-h5-compatibility-contract`. **Frozen H5.5 audit:** `audit/v02-h5-rc-candidate` @ `28e8438f8408e85b52e237eaedcf024354a4522a`. **R1 remediation:** `work/v02-h55-evidence-remediation`.
 
 ## Позиция перед RC
 
@@ -359,8 +359,15 @@ PYTHONPATH="$PWD" .venv/bin/python -m pytest -q
 
 **Открытый RC вопрос:** реальная legacy DB пока не обследовалась. Без полномочий источников старых `about` нельзя признать их достоверными или автоматически пересобрать. Python 3.12 остаётся `NOT_TESTED`. Не маркировать v0.2 как RC при одном green pytest.
 
-## H5.5 — Independent review & RC (TODO)
+## H5.5 — Независимый аудит: BLOCKED, корректирующий цикл открыт
 
-Нужен внешний по отношению к автору изменений review snapshot с воспроизведением отрицательных и аварийных тестов, особенно N1/N2 authority, H2.3 legacy, H1.3 cache/DB checkpoints, performance O(N), аварийные переходы. Пакет для reviewer — `tests/H5_INDEPENDENT_REVIEW_BRIEF.md`.
+**Frozen code:** `28e8438f8408e85b52e237eaedcf024354a4522a` (`audit/v02-h5-rc-candidate`). Независимый H5.5 source/reproduction: **1967 PASS** на CPython 3.14.4 и **1967 PASS** на CPython 3.12.14, плюс восемь отдельно воспроизведённых контрпримеров. Raw EventLog, Recovery, индекс, sandbox-effect на проверенных сценариях выдержали дополнительные испытания.
 
-**Граница этапа:** H5.0 — только наблюдение на копиях, H5 целиком не принят. Пока нет H5.1–H5.5, запрещено маркировать v0.2 `RC` или `stable` даже при зелёном pytest.
+**Вердикт RC — BLOCKED:** P1 F-01 (мутирование подтверждённой Memory через merge/update), F-02 (Knowledge confirmation без обязательного Raw), F-04 (противоположные active supports/contradicts не обнаруживаются H5 diagnostic). P2: F-03/F-05/F-06/F-07/F-08. Данные реальных экземпляров, Pi/aarch64 и измеримый эксплуатационный SLO не проверены. Никакие из исходных 1967 тестов не служат доказательством отсутствия этих дефектов.
+
+**План и текущее исправление:** [README_v02_h55_remediation.md](README_v02_h55_remediation.md). R1/F-01 закрывает только переходы `confirm → merge/update` через штатные API, сохраняя исходную ревизию и Knowledge/Raw/History. Новые тесты пока **не выполнены**; расчёт `1975 passed`. R2/F-02, R3/F-04, R4/P2 — после отдельной проверки.
+
+**H5.4b historical note:** предыдущий раздел был написан до независимого аудита; `1967 passed` теперь воспроизведены на двух версиях Python. Заявление об отсутствии ошибок Evidence/Knowledge по этим тестам было опровергнуто новыми межкомпонентными сценариями.
+
+**RC не объявлять** до устранения P1, независимого повторного проверки нового SHA и явной политики оставшихся границ.
+
