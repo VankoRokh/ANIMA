@@ -43,6 +43,10 @@ R7.0–R7.3 изменяли `knowledge.py`, `link_store.py`, `processor.py`,
   forged graph, не удаляя raw Relation;
 - H56-05 + H56-01: damaged dormant Evidence отказывает при попытке
   `challenged → confirmed`, не меняя Knowledge/History/Relations/Raw;
+- Raw Provenance + H56-01: если удалить физический Raw Event нового
+  источника только в disposable fixture, reconfirm отказывает
+  и откатывает relation/status/history; система не принимает одного
+  факта существования `memory_sources` за физическое свидетельство;
 - H56-04 + Knowledge: на копии существующей DB с History неизвестная
   версия schema отвергается без изменений SHA-256; текущая БД открывается;
 - R6.4 + R7: after commit/reopen `recover()`/done replay не
