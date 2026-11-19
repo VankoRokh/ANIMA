@@ -301,9 +301,9 @@ class KnowledgeLayer:
             """,
             (memory_id, memory_id, knowledge_id),
         ).fetchall()
-        # This method is called after a possible insertion. Exclude the
-        # current newly-created relation by timestamp+ID check instead of
-        # mistakenly rejecting it as its own historical antecedent.
+        # A Relation inserted for this transition starts strictly after
+        # challenged_at. Only supports that existed by the challenge
+        # instant are disqualifying old evidence.
         if any(
             datetime.fromisoformat(row["created_at"])
             <= datetime.fromisoformat(challenged_at)
