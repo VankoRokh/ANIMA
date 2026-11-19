@@ -123,6 +123,27 @@ def test_r70_old_support_cannot_reconfirm_challenged(tmp_path):
     assert state(core, layer, k) == before
 
 
+def test_r70_h5601_default_clock_does_not_accept_2099_support(tmp_path):
+    core, layer, k, _a, _b, c, _future = prepared_challenged(
+        tmp_path, future_relation=True,
+    )
+    before = state(core, layer, k)
+    with pytest.raises(ValueError, match="effective|new supporting evidence"):
+        layer.confirm(k, source_memory_id=c)
+    assert state(core, layer, k) == before
+
+
+def test_r70_expired_contradiction_does_not_reopen_silently(tmp_path):
+    core, layer, k, _a, b, _c = case(tmp_path)
+    finite = edge(core, b, k, "contradicts", T4, T5)
+    layer.confirm(k, confirmed_at=T3)
+    before = state(core, layer, k)
+    with pytest.raises(ValueError, match="not effective"):
+        layer.challenge(k, b, challenged_at=T6)
+    assert state(core, layer, k) == before
+    assert finite["valid_until"] == T5
+
+
 def test_r70_new_closed_raw_source_reconfirms_and_is_in_history(tmp_path):
     core, layer, k, a, _b, c, _ = prepared_challenged(tmp_path)
     before_count = len(relations(core, k))
