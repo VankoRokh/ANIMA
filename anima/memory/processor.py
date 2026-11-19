@@ -212,6 +212,7 @@ class MemoryProcessor:
             candidate["memory"],
             event,
             text,
+            candidate["source_event_ids"],
         )
         self._link_entities_tx(
             connection,
@@ -464,6 +465,12 @@ class MemoryProcessor:
             "anchor_match": anchor_match,
             "anchor_conflict": anchor_conflict,
             "identity_conflict": identity_conflict,
+            # The exact source set used for anchor, identity, session and
+            # time-gap scoring. This snapshot must survive until the
+            # serialized writer preflight; Memory row equality alone is
+            # insufficient when merge adds source IDs without changing
+            # content or updated_at (H56-06).
+            "source_event_ids": tuple(record["id"] for record in source_events),
         }
 
     def _source_events(self, memory_id, event_index):
@@ -549,7 +556,9 @@ class MemoryProcessor:
         ).fetchone()
         return self.memory_store._row_to_memory(row)
 
-    def _update_memory_tx(self, connection, memory, event, text):
+    def _update_memory_tx(
+        self, connection, memory, event, text, selected_source_event_ids,
+    ):
         # R6.2 / NEW-03: the candidate was scored outside this write
         # transaction. Do not trust its status/content after another writer
         # may have closed, merged or confirmed its Knowledge dependencies.
@@ -574,6 +583,27 @@ class MemoryProcessor:
             raise ValueError(
                 "Stale MemoryProcessor candidate: Memory changed before "
                 "update: " + memory["id"]
+            )
+
+        # R7.1 / H56-06: MemoryLifecycle.merge() may add sources while
+        # leaving the target Memory row byte-for-byte unchanged (same text
+        # and updated_at). Source identities affect the original candidate's
+        # anchor, entity-claim conflict, session and time-gap score. Check
+        # precisely the source IDs used during scoring, inside this same
+        # writer transaction, before the composer or any side effects.
+        current_source_event_ids = tuple(
+            row["event_id"] for row in connection.execute(
+                """
+                SELECT event_id FROM memory_sources
+                WHERE memory_id = ? ORDER BY event_id
+                """,
+                (memory["id"],),
+            ).fetchall()
+        )
+        if current_source_event_ids != selected_source_event_ids:
+            raise ValueError(
+                "Stale MemoryProcessor candidate: source graph changed "
+                "before update: " + memory["id"]
             )
 
         # Same invariant as MemoryStore.update_memory() / lifecycle.merge().
