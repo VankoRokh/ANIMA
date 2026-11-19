@@ -156,7 +156,11 @@ class MemoryProcessor:
         if connection is not None:
             return operation(connection)
 
-        with self.memory_store.transaction() as active:
+        # Direct process_event() must use the same SQLite writer boundary
+        # as the Coordinator and Knowledge lifecycle. Candidate selection
+        # happens before this lock, so a stale selected Memory is rechecked
+        # in _update_memory_tx() before any UPDATE or source insertion.
+        with self.memory_store.transaction(immediate=True) as active:
             return operation(active)
 
     def _apply_create(
@@ -546,8 +550,40 @@ class MemoryProcessor:
         return self.memory_store._row_to_memory(row)
 
     def _update_memory_tx(self, connection, memory, event, text):
+        # R6.2 / NEW-03: the candidate was scored outside this write
+        # transaction. Do not trust its status/content after another writer
+        # may have closed, merged or confirmed its Knowledge dependencies.
+        # Reject the stale selection rather than silently rewriting a
+        # published Evidence source or dropping another update.
+        row = connection.execute(
+            "SELECT * FROM memories WHERE public_id = ?",
+            (memory["id"],),
+        ).fetchone()
+        if row is None:
+            raise ValueError(
+                "Stale MemoryProcessor candidate: Memory no longer exists: "
+                + memory["id"]
+            )
+        current = self.memory_store._row_to_memory(row)
+        if (
+            current["status"] != "open"
+            or current["type"] != "episodic"
+            or current["domain"] != "user"
+            or current != memory
+        ):
+            raise ValueError(
+                "Stale MemoryProcessor candidate: Memory changed before "
+                "update: " + memory["id"]
+            )
+
+        # Same invariant as MemoryStore.update_memory() / lifecycle.merge().
+        # Check with the writer lock held, including for callers supplying
+        # their own SQLite connection (e.g. EventProcessingCoordinator).
+        self.memory_store._require_no_confirmed_knowledge_dependencies(
+            connection, memory["id"],
+        )
         composition = self.composer.compose_update(
-            memory["content"],
+            current["content"],
             text,
         )
         connection.execute(
