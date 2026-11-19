@@ -454,6 +454,30 @@ class KnowledgeLayer:
         ).fetchone()
         return cls._relation_row_to_dict(row), True
 
+    @staticmethod
+    def _require_valid_evidence_intervals(connection, knowledge_id):
+        """Preflight the complete Evidence graph before temporal comparisons.
+
+        R8.2 / H57-03: an inactive legacy Relation may contain an offset-naive
+        start. _active_relation() and _require_effective_memory_evidence()
+        compare datetimes before the terminal Raw publication guard runs.
+        Reject malformed active, expired AND future intervals uniformly as
+        ValueError, within the same SQLite transaction and before mutation.
+        """
+        rows = connection.execute(
+            """
+            SELECT created_at, valid_until FROM relations
+            WHERE target_kind = 'knowledge' AND target_id = ?
+              AND relation_type IN ('supports', 'contradicts')
+            ORDER BY row_id
+            """,
+            (knowledge_id,),
+        ).fetchall()
+        for row in rows:
+            _validate_evidence_interval(
+                row["created_at"], row["valid_until"],
+            )
+
     @classmethod
     def _require_effective_memory_evidence(
         cls, connection, *, knowledge_id, relation_type, at,
@@ -758,6 +782,9 @@ class KnowledgeLayer:
                 "Knowledge confirmed_at",
             )
 
+            # Reject malformed dormant Evidence before any comparison,
+            # duplicate lookup, or creation of a new support Relation.
+            self._require_valid_evidence_intervals(connection, knowledge_id)
             added_support = None
             if source_memory_id is not None:
                 memory = self._require_memory(
@@ -874,6 +901,7 @@ class KnowledgeLayer:
                 memory["updated_at"],
                 "Knowledge challenged_at",
             )
+            self._require_valid_evidence_intervals(connection, knowledge_id)
             self._require_no_opposite_evidence(
                 connection,
                 memory_id=contradiction_memory_id,
@@ -945,6 +973,7 @@ class KnowledgeLayer:
                 "Knowledge rejected_at",
             )
 
+            self._require_valid_evidence_intervals(connection, knowledge_id)
             added = None
             if contradiction_memory_id is not None:
                 memory = self._require_memory(
@@ -1054,6 +1083,7 @@ class KnowledgeLayer:
                 source["updated_at"],
                 "Knowledge superseded_at",
             )
+            self._require_valid_evidence_intervals(connection, knowledge_id)
             # Supersede writes a new confirmed Knowledge without invoking
             # the ordinary confirm transition: enforce the same Raw policy.
             self._require_published_evidence_raw_sources(
