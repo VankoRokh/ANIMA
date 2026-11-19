@@ -226,6 +226,11 @@ class LinkStore:
                 "Confirmed Knowledge requires evidence; "
                 "use KnowledgeLayer.confirm()"
             )
+        if status != "provisional":
+            raise ValueError(
+                "Non-provisional Knowledge requires a lifecycle transition "
+                "with evidence and history; use KnowledgeLayer"
+            )
 
         public_id = public_id or f"{KNOWLEDGE_ID_PREFIX}{uuid4()}"
         created_at = created_at or _now()
@@ -593,6 +598,26 @@ class LinkStore:
                             "the same knowledge in overlapping intervals: "
                             f"{existing['public_id']}"
                         )
+
+            # R6.1: the generic relation writer may stage exploratory
+            # Evidence on provisional Knowledge, but cannot silently change
+            # the evidence graph of a published/lifecycle-managed claim.
+            # Check under the same BEGIN IMMEDIATE writer transaction as
+            # the INSERT; the earlier object existence checks are not enough.
+            # KnowledgeLayer owns all subsequent evidence/status transitions.
+            if (
+                target_kind == "knowledge"
+                and relation_type in {"supports", "contradicts"}
+            ):
+                target = connection.execute(
+                    "SELECT status FROM knowledge WHERE public_id = ?",
+                    (target_id,),
+                ).fetchone()
+                if target["status"] != "provisional":
+                    raise ValueError(
+                        "Published Knowledge evidence cannot be modified "
+                        "through LinkStore; use KnowledgeLayer lifecycle"
+                    )
 
             if valid_until is None:
                 duplicate = connection.execute(
