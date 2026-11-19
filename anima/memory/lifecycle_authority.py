@@ -64,6 +64,7 @@ def is_authorized_supersession(connection, relation):
         or relation["target_kind"] != "knowledge"
         or relation["source_id"] == relation["target_id"]
         or not relation["source_memory_id"]
+        or relation["valid_until"] is not None
     ):
         return False
 
