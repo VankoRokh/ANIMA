@@ -1,7 +1,7 @@
 # ANIMA v0.2 RC1 — карточка независимой приёмки
 
 **Дата решения владельца:** 19 ноября 2026 года.  
-**Решение:** принять заключение H5.8 и разрешить оформление **Release Candidate** v0.2 в [ограниченном контракте](contract.md). Это не объявление окончательной stable-версии. Аннотированный Git tag опубликован отдельно; GitHub Release пока не опубликован.
+**Решение:** принять заключение H5.8 и разрешить оформление **Release Candidate** v0.2 в [ограниченном контракте](contract.md). Это не объявление окончательной stable-версии. Аннотированный Git tag и GitHub Pre-release опубликованы; статус [GitHub Release](https://github.com/VankoRokh/ANIMA/releases/tag/v0.2.0-rc.1): `prerelease=true`, `draft=false`.
 
 ## 1. Неизменяемая цель
 
@@ -17,7 +17,7 @@
 | Документы версии | Постприёмочная редакция в отдельной ветке; не входят в target tree |
 | Итого по H5.8 | **PASS / APPROVE_RC** в ограниченном профиле |
 
-GitHub Git ref проверен: аннотированный `v0.2.0-rc.1` указывает на Git tag object `02c4b2e1fe9c956e21ff4ccbb54217905b95f641`, который указывает на проверенный commit `1364e62634669ef553df0b2f2d7a1159d404383f`. GitHub **Release пока отсутствует**; публикацию prerelease подтвердить отдельно. Этот документ и subsequent docs commits не входят в tag tree.
+GitHub Git ref проверен: аннотированный `v0.2.0-rc.1` указывает на Git tag object `02c4b2e1fe9c956e21ff4ccbb54217905b95f641`, который указывает на проверенный commit `1364e62634669ef553df0b2f2d7a1159d404383f`. GitHub **Pre-release опубликован** 19 ноября 2026 года в 20:13:06 UTC (20 ноября в 00:13:06 по Тбилиси), [проверенный URL](https://github.com/VankoRokh/ANIMA/releases/tag/v0.2.0-rc.1). Этот документ и subsequent docs commits не входят в tag tree.
 
 ## 2. История владельческой проверки
 
