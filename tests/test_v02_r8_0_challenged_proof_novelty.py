@@ -156,9 +156,16 @@ def test_r80_old_support_still_rejected_and_rolled_back(tmp_path, at):
     assert layer.get(k)["status"] == "challenged"
 
 
-def test_r80_preexisting_staged_support_at_challenge_instant_is_old(tmp_path):
+@pytest.mark.parametrize(
+    "staged_start",
+    [T4, "2020-01-01T04:04:00+04:00"],
+    ids=["same_offset", "equivalent_offset"],
+)
+def test_r80_preexisting_staged_support_at_challenge_instant_is_old(
+    tmp_path, staged_start,
+):
     core, layer, k, a, b, c, staged = challenged(
-        tmp_path, staged_start=T4,
+        tmp_path, staged_start=staged_start,
     )
     assert staged is not None
     before = state(core, layer, k)
