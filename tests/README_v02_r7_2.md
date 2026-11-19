@@ -32,6 +32,7 @@
    `is_authorized_supersession(connection, relation)` (в
    `anima/memory/lifecycle_authority.py`) проверяет:
    - `knowledge → knowledge`, `relation_type=supersedes`,
+     `valid_until=NULL` (каноническая бессрочная lifecycle-связь),
      существование обоих Knowledge и сохранённый статус old=`superseded`,
      new не `provisional`;
    - существование `source_memory_id` и хотя бы одной записи
@@ -79,6 +80,8 @@
 - корректный `confirm → challenge → KnowledgeLayer.supersede` создаёт
   согласованные old/new statuses, обе History и видимые lifecycle поля;
 - корректный авторитетный `supersedes` остаётся доступным как neighbor;
+- обычный generic `related_to` по-прежнему доступен; конечная,
+  неканоническая legacy `supersedes` скрывается reader и блокируется audit;
 - удаление любой стороны History через прямой SQL только в временной БД
   скрывает Relation из lifecycle reader, и диагностический gate её выявляет.
 
