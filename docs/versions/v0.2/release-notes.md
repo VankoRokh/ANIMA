@@ -4,7 +4,7 @@
 **Дата допуска владельцем:** 19 ноября 2026 года.  
 **Проверенный commit:** `1364e62634669ef553df0b2f2d7a1159d404383f`.  
 **Audit:** H5.8 **PASS / APPROVE_RC** в ограниченном профиле.  
-**Официальный Git tag:** аннотированный `v0.2.0-rc.1` **опубликован и проверен**; GitHub Release **ещё не опубликован**. Документационная ветка не заменяет tag.  
+**Официальный Git tag:** аннотированный `v0.2.0-rc.1` **опубликован и проверен**; GitHub Pre-release **опубликован** и доступен [по тегу](https://github.com/VankoRokh/ANIMA/releases/tag/v0.2.0-rc.1). Документационная ветка не заменяет tag.  
 **Тип выпуска:** prerelease / Release Candidate, **не stable v0.2**.
 
 ## Кратко
@@ -66,9 +66,9 @@ RC1 адресован разработчикам и исследователя�
 - Решение владельца 19.11.2026: **допустить SHA `1364e626...` к статусу RC**.
 - Релизная ветка `release/v0.2.0-rc.1` должна быть **идентична** проверенному SHA.
 - Аннотированный Git tag `v0.2.0-rc.1` **указывает на этот SHA** (проверено через GitHub Git API). Запрещён `--force`.
-- GitHub Release должен быть создан **по существующему тегу** с флагом **Pre-release**, без включения другого commit.
+- GitHub Release **опубликован по существующему тегу** с флагом **Pre-release** (`prerelease=true`, `draft=false`); исходный код не изменён.
 - Постприёмочные docs могут жить на отдельной ветке и обновлять навигацию; они **не меняют tree тега**.
-- Git tag уже подтверждён GitHub; **GitHub prerelease пока не создан**. После ручной публикации проверить его metadata и статус `Pre-release`.
+- Git tag и [GitHub Pre-release](https://github.com/VankoRokh/ANIMA/releases/tag/v0.2.0-rc.1) подтверждены через GitHub API.
 - После публикации RC допускается новый отдельный этап исследований: Evidence source identity/O58-01, канонический текст/O58-02, метапамять и работа с новыми когнитивными модулями — без обратной записи в RC.
 
 Полный [контракт](contract.md), [карточка приёмки](acceptance.md), исторический [H5.8 audit brief](https://github.com/VankoRokh/ANIMA/blob/work/v02-h58-independent-audit-prep/docs/TESTING/ANIMA_v0_2_H5_8_Independent_Reaudit_Brief.md).
