@@ -1,4 +1,5 @@
 import json
+import math
 
 
 CONSUMER_POLICIES = {
@@ -73,6 +74,10 @@ class ContextBuilder:
         candidates = retrieval_response.get("results")
         if not isinstance(candidates, list):
             raise ValueError("Context Retrieval results must be a list")
+        # R8.1 / H57-02: a retrieved item must be representable before
+        # coverage can claim completeness. An unknown kind must not vanish
+        # in _selection_order(), silently becoming "complete empty context".
+        self._validate_retrieval_candidates(candidates)
         # Metadata supplied by a custom Retrieval adapter is untrusted.
         # None/missing flags or contradictory counters never certify full
         # coverage. Distinguish unknown (None) from verified false and true.
@@ -151,6 +156,53 @@ class ContextBuilder:
 
         self._trace_bundle(bundle)
         return bundle
+
+    @staticmethod
+    def _validate_retrieval_candidates(candidates):
+        """Fail closed on malformed adapter items before context selection.
+
+        ContextBuilder can represent only Knowledge and Memory candidates.
+        Validate the fields it actually reads, including ID consistency;
+        neither a complete-looking adapter stat nor a budget can authorize
+        silently discarding a result. Additional record metadata is allowed.
+        """
+        for index, item in enumerate(candidates):
+            label = f"Context Retrieval candidate {index}"
+            if not isinstance(item, dict):
+                raise ValueError(f"{label} must be a dict")
+            kind = item.get("kind")
+            if type(kind) is not str or kind not in {"knowledge", "memory"}:
+                raise ValueError(
+                    f"{label} kind must be knowledge or memory"
+                )
+            candidate_id = item.get("id")
+            record = item.get("record")
+            if not isinstance(candidate_id, str) or not candidate_id.strip():
+                raise ValueError(f"{label} id must be a non-empty string")
+            if not isinstance(record, dict):
+                raise ValueError(f"{label} record must be a dict")
+            if record.get("id") != candidate_id:
+                raise ValueError(f"{label} record id must match candidate id")
+            text_key = "statement" if kind == "knowledge" else "content"
+            if not isinstance(record.get(text_key), str):
+                raise ValueError(f"{label} record {text_key} must be text")
+            score = item.get("score")
+            if (
+                isinstance(score, bool)
+                or not isinstance(score, (int, float))
+                or not math.isfinite(score)
+            ):
+                raise ValueError(f"{label} score must be finite numeric")
+            reasons = item.get("reasons")
+            if (
+                not isinstance(reasons, list)
+                or any(
+                    not isinstance(reason, str)
+                    or not reason
+                    for reason in reasons
+                )
+            ):
+                raise ValueError(f"{label} reasons must be a list of strings")
 
     @staticmethod
     def _assess_retrieval_coverage(stats, candidates, requested_top_k):
