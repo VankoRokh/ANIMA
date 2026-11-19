@@ -190,7 +190,7 @@ class ContextBuilder:
             if (
                 isinstance(score, bool)
                 or not isinstance(score, (int, float))
-                or not math.isfinite(score)
+                or (isinstance(score, float) and not math.isfinite(score))
             ):
                 raise ValueError(f"{label} score must be finite numeric")
             reasons = item.get("reasons")
