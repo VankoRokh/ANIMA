@@ -126,6 +126,20 @@ def test_r72_h5603_generic_writer_refuses_forged_supersedes_atomically(tmp_path)
     assert layer.describe(newer)["supersedes"] == []
 
 
+def test_r72_generic_nonlifecycle_relation_still_available(tmp_path):
+    core, layer, old, newer, a, b, c = base(tmp_path)
+    relation = core.link_store.create_relation(
+        source_kind="knowledge", source_id=newer,
+        relation_type="related_to",
+        target_kind="knowledge", target_id=old,
+        source_memory_id=c, created_at=T4,
+    )
+    assert relation["type"] == "related_to"
+    assert relation["source_id"] == newer
+    assert relation["target_id"] == old
+    assert layer.describe(old)["superseded_by"] == []
+
+
 def test_r72_h5603_generic_writer_refuses_even_with_real_raw_source(tmp_path):
     core, layer, old, newer, a, b, c = base(tmp_path)
     assert core.memory_store.source_events(c) == [uid("ev_", 7203)]
@@ -272,6 +286,28 @@ def test_r72_legacy_missing_half_of_lifecycle_history_is_not_authority(
 
     assert layer.describe(old)["superseded_by"] == []
     assert layer.describe(new_id)["supersedes"] == []
+    report = audit_snapshot(core.memory_store.database_file, core.event_log.log_file)
+    assert edge_id in report["findings"]["unauthorized_lifecycle_supersedes"]["ids"]
+
+
+def test_r72_legacy_finite_supersedes_is_not_authority(tmp_path):
+    core, layer, old, newer, a, b, c = base(tmp_path)
+    layer.challenge(old, b, challenged_at=T4)
+    result = layer.supersede(
+        old, statement="Measured supersession with evidence C",
+        source_memory_id=c, superseded_at=T5,
+        public_id=uid("kn_", 7204),
+    )
+    edge_id = result["supersedes_relation"]["id"]
+    assert layer.describe(old)["superseded_by"] == [uid("kn_", 7204)]
+    with core.memory_store.transaction(immediate=True) as conn:
+        conn.execute(
+            "UPDATE relations SET valid_until=? WHERE public_id=?",
+            ("2099-01-01T00:00:00+00:00", edge_id),
+        )
+    # A finite expiry is not the lifecycle Relation created by supersede.
+    # The forensic graph still preserves its current historical row.
+    assert layer.describe(old)["superseded_by"] == []
     report = audit_snapshot(core.memory_store.database_file, core.event_log.log_file)
     assert edge_id in report["findings"]["unauthorized_lifecycle_supersedes"]["ids"]
 
