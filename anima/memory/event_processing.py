@@ -273,23 +273,51 @@ class EventProcessingCoordinator:
                 f"{sample}{remainder}; recovery refused"
             )
 
-    def _require_finalized_memory_sources(self):
-        """Reject any finalized done Event without durable Memory projection.
+    @staticmethod
+    def _durable_memory_sources(connection, event_id):
+        """Resolve an Event's *existing* Memory owners, never orphan IDs.
 
-        This is a read-only recovery preflight. In historical damaged DBs
-        repair/replay requires a separately specified operator migration;
-        downgrading done or silently re-processing is not permitted.
-        Skipped Events intentionally have no Memory and are excluded.
+        A historically damaged database may retain memory_sources rows after
+        its Memory owner was deleted with SQLite foreign keys disabled. A
+        dangling mapping is not a recoverable projection. Refuse even when
+        another valid owner exists, rather than silently hiding corruption.
+        """
+        rows = connection.execute(
+            """
+            SELECT ms.memory_id, m.public_id AS owner_id
+            FROM memory_sources AS ms
+            LEFT JOIN memories AS m ON m.public_id = ms.memory_id
+            WHERE ms.event_id = ?
+            ORDER BY ms.rowid
+            """,
+            (event_id,),
+        ).fetchall()
+        orphaned = [row["memory_id"] for row in rows if row["owner_id"] is None]
+        if orphaned:
+            raise ValueError(
+                "Memory source owner missing for Event "
+                f"{event_id}: {', '.join(orphaned[:3])}; recovery/replay refused"
+            )
+        return [row["memory_id"] for row in rows]
+
+    def _require_finalized_memory_sources(self):
+        """Reject finalized done Events without existing Memory owners.
+
+        This is a read-only recovery preflight. Both absent mapping rows
+        and present-but-orphaned mappings are corruption. Skipped Events
+        intentionally need no Memory. No replay, repair or ledger changes.
         """
         with self.memory_store.transaction() as connection:
             rows = connection.execute(
                 """
-                SELECT ep.event_id FROM event_processing AS ep
+                SELECT DISTINCT ep.event_id
+                FROM event_processing AS ep
+                LEFT JOIN memory_sources AS ms ON ms.event_id = ep.event_id
+                LEFT JOIN memories AS m ON m.public_id = ms.memory_id
                 WHERE ep.processor = ? AND ep.processor_version = ?
                   AND ep.status = 'done'
-                  AND NOT EXISTS (
-                    SELECT 1 FROM memory_sources AS ms
-                    WHERE ms.event_id = ep.event_id
+                  AND (
+                    ms.memory_id IS NULL OR m.public_id IS NULL
                   )
                 ORDER BY ep.event_id
                 """,
@@ -302,7 +330,7 @@ class EventProcessingCoordinator:
                 f" (+{len(ids) - 3} more)" if len(ids) > 3 else ""
             )
             raise ValueError(
-                "Finalized Event processing missing Memory source(s) for "
+                "Finalized Event processing missing Memory source owner(s) for "
                 f"{self.processor_name} {self.processor_version}: "
                 f"{sample}{remainder}; recovery refused"
             )
@@ -341,18 +369,12 @@ class EventProcessingCoordinator:
                 if event_id in existing:
                     continue
 
-                source = connection.execute(
-                    """
-                    SELECT memory_id FROM memory_sources
-                    WHERE event_id = ?
-                    ORDER BY rowid
-                    LIMIT 1
-                    """,
-                    (event_id,),
-                ).fetchone()
+                # R6.4: legacy adoption is finalization, not a license
+                # to adopt an orphan mapping after a damaged SQL deletion.
+                sources = self._durable_memory_sources(connection, event_id)
                 selected, _, _ = self.memory_processor._select(event)
 
-                if source is not None:
+                if sources:
                     status = "done"
                     finished_at = now
                 elif not selected:
@@ -419,17 +441,11 @@ class EventProcessingCoordinator:
             )
 
         with self.memory_store.transaction() as connection:
-            row = connection.execute(
-                """
-                SELECT memory_id FROM memory_sources
-                WHERE event_id = ?
-                ORDER BY rowid
-                LIMIT 1
-                """,
-                (event.event_id,),
-            ).fetchone()
+            sources = self._durable_memory_sources(
+                connection, event.event_id,
+            )
 
-        if row is None:
+        if not sources:
             raise ValueError(
                 "Finalized Event processing missing Memory source for "
                 f"{event.event_id}; replay refused"
@@ -437,7 +453,7 @@ class EventProcessingCoordinator:
         return self.memory_processor._result(
             event,
             action="already_done",
-            memory_id=row["memory_id"],
+            memory_id=sources[0],
             reasons=["event_processing:already_done"],
         )
 
