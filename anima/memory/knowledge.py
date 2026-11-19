@@ -226,6 +226,29 @@ class KnowledgeLayer:
         if current is not None:
             return current, False
 
+        # A known finite source whose interval has ended must not be
+        # restarted as an infinite edge just by naming the same Memory.
+        # The same applies to an as-yet-future source, even when a second
+        # unrelated active Evidence row could satisfy an aggregate check.
+        # Reasserting temporal Evidence requires a separately specified
+        # revision/interval writer, not an implicit lifecycle mutation.
+        prior = connection.execute(
+            """
+            SELECT public_id FROM relations
+            WHERE source_kind = 'memory' AND source_id = ?
+              AND source_memory_id = ?
+              AND target_kind = 'knowledge' AND target_id = ?
+              AND relation_type = ?
+            LIMIT 1
+            """,
+            (memory_id, memory_id, knowledge_id, relation_type),
+        ).fetchone()
+        if prior is not None:
+            raise ValueError(
+                "Selected Knowledge evidence is not effective "
+                f"at transition time: {prior['public_id']}"
+            )
+
         relation, created = cls._insert_relation(
             connection,
             source_kind="memory",
