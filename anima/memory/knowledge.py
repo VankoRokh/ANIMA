@@ -2,6 +2,7 @@ import json
 from datetime import datetime, timezone
 from uuid import uuid4
 
+from anima.memory.lifecycle_authority import is_authorized_supersession
 from anima.memory.link_store import (
     KNOWLEDGE_ID_PREFIX,
     RELATION_ID_PREFIX,
@@ -1174,13 +1175,32 @@ class KnowledgeLayer:
                 (knowledge_id,),
             ).fetchall()
 
+            # H56-03: raw graph edges alone are not proof of a Knowledge
+            # lifecycle transition. Only supersedes edges backed by both
+            # saved histories and the terminal old status are published
+            # in describe() as authoritative superseded_by/supersedes.
+            authorized_supersedes = {
+                row["public_id"]
+                for row in (*incoming, *outgoing)
+                if row["relation_type"] == "supersedes"
+                and is_authorized_supersession(connection, row)
+            }
+
         incoming_relations = [
             self._relation_row_to_dict(row) for row in incoming
             if _relation_active_at(row, as_of)
+            and (
+                row["relation_type"] != "supersedes"
+                or row["public_id"] in authorized_supersedes
+            )
         ]
         outgoing_relations = [
             self._relation_row_to_dict(row) for row in outgoing
             if _relation_active_at(row, as_of)
+            and (
+                row["relation_type"] != "supersedes"
+                or row["public_id"] in authorized_supersedes
+            )
         ]
 
         supporting = [
