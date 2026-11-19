@@ -84,7 +84,11 @@ class MemoryLifecycle:
         closed_at = closed_at or self._now()
         _validate_timestamp(closed_at, "Memory closed_at")
 
-        with self.memory_store.transaction() as connection:
+        # Close is a writer operation. Claim the writer lock before
+        # inspecting OPEN status so an in-flight direct MemoryProcessor
+        # update cannot deadlock a deferred read->write upgrade or race the
+        # transition used by Knowledge confirmation (R6.2 / NEW-03).
+        with self.memory_store.transaction(immediate=True) as connection:
             row = connection.execute(
                 "SELECT * FROM memories WHERE public_id = ?",
                 (memory_id,),
