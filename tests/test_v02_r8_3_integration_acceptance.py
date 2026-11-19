@@ -3,6 +3,7 @@
 No production changes. Every SQL corruption is on a new pytest tmp_path,
 and all canonical Raw records belong to the disposable synthetic Core.
 """
+import json
 from uuid import UUID
 
 import pytest
@@ -352,6 +353,47 @@ def test_r83_reopen_recovers_ledger_without_replaying_confirmed_proof(tmp_path):
     ) == before_history
     assert reopened.memory_store.source_events(memory_id) == before_sources
     assert reopened.event_log.log_file.read_bytes() == before_raw
+
+
+def test_r83_missing_physical_raw_blocks_proof_and_deep_context_until_repaired(
+    tmp_path,
+):
+    core, layer, k, a, b, _ = challenged(tmp_path)
+    new, event = fresh_after_challenge(core)
+    original_raw = core.event_log.log_file.read_bytes()
+    surviving = [
+        line for line in original_raw.splitlines(keepends=True)
+        if json.loads(line)["id"] != event.event_id
+    ]
+    assert len(surviving) == len(original_raw.splitlines()) - 1
+
+    # Simulate loss of the actual Raw witness only in this temporary JSONL.
+    core.event_log.log_file.write_bytes(b"".join(surviving))
+    before = snapshot(core)
+    with pytest.raises(ValueError, match="missing source Event"):
+        layer.confirm(k, source_memory_id=new, confirmed_at=T4)
+    assert snapshot(core) == before
+    assert layer.get(k)["status"] == "challenged"
+    assert support(core, k, new) == []
+
+    # The adapter payload is structurally correct, yet DEEP's provenance
+    # resolver must not silently invent the physically missing source.
+    with pytest.raises(ValueError, match="Missing source event"):
+        builder(
+            core, valid_candidates(core, layer, k, new),
+        ).build("r83", consumer="DEEP", max_items=10, max_chars=2000)
+    assert snapshot(core) == before
+
+    # Explicit restore of synthetic original Raw; no product auto-repair.
+    core.event_log.log_file.write_bytes(original_raw)
+    layer.confirm(k, source_memory_id=new, confirmed_at=T4)
+    accepted = builder(
+        core, valid_candidates(core, layer, k, new),
+    ).build("r83", consumer="DEEP", max_items=10, max_chars=2000)
+    assert event.event_id in {
+        record["record"]["id"] for record in accepted["events"]
+    }
+    assert accepted["retrieval_coverage"]["complete"] is True
 
 
 def test_r83_old_proof_stays_old_after_rechallenging_reconfirmed_knowledge(
