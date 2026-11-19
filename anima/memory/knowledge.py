@@ -173,6 +173,36 @@ class KnowledgeLayer:
         ).fetchone()
 
     @classmethod
+    def _active_relation(
+        cls, connection, *, source_kind, source_id, relation_type,
+        target_kind, target_id, source_memory_id, at,
+    ):
+        """Find an existing Relation effective at a transition instant.
+
+        An open-ended-only duplicate lookup is insufficient: legitimate
+        finite [start, end) support must be reused without minting a new
+        infinite support that overlaps a future contradiction (NEW-04).
+        """
+        rows = connection.execute(
+            """
+            SELECT * FROM relations
+            WHERE source_kind = ? AND source_id = ?
+              AND relation_type = ?
+              AND target_kind = ? AND target_id = ?
+              AND source_memory_id = ?
+            ORDER BY row_id
+            """,
+            (
+                source_kind, source_id, relation_type,
+                target_kind, target_id, source_memory_id,
+            ),
+        ).fetchall()
+        for row in rows:
+            if _relation_active_at(row, at):
+                return cls._relation_row_to_dict(row)
+        return None
+
+    @classmethod
     def _require_no_opposite_evidence(
         cls,
         connection,
@@ -623,23 +653,7 @@ class KnowledgeLayer:
                     relation_type="supports",
                     at=confirmed_at,
                 )
-                if (
-                    knowledge["status"] == "challenged"
-                    and self._relation_exists(
-                        connection,
-                        source_kind="memory",
-                        source_id=source_memory_id,
-                        relation_type="supports",
-                        target_kind="knowledge",
-                        target_id=knowledge_id,
-                        source_memory_id=source_memory_id,
-                    )
-                    is not None
-                ):
-                    raise ValueError(
-                        "Challenged knowledge requires new supporting evidence"
-                    )
-                added_support, _ = self._insert_relation(
+                active_support = self._active_relation(
                     connection,
                     source_kind="memory",
                     source_id=source_memory_id,
@@ -647,9 +661,33 @@ class KnowledgeLayer:
                     target_kind="knowledge",
                     target_id=knowledge_id,
                     source_memory_id=source_memory_id,
-                    created_at=confirmed_at,
-                    reject_duplicate=False,
+                    at=confirmed_at,
                 )
+                if (
+                    knowledge["status"] == "challenged"
+                    and active_support is not None
+                ):
+                    raise ValueError(
+                        "Challenged knowledge requires new supporting evidence"
+                    )
+                if active_support is not None:
+                    # Finite and open-ended active support are equally
+                    # effective at confirmed_at. Reusing the existing row
+                    # preserves its valid_until and never crosses the
+                    # half-open boundary into a future contradiction.
+                    added_support = active_support
+                else:
+                    added_support, _ = self._insert_relation(
+                        connection,
+                        source_kind="memory",
+                        source_id=source_memory_id,
+                        relation_type="supports",
+                        target_kind="knowledge",
+                        target_id=knowledge_id,
+                        source_memory_id=source_memory_id,
+                        created_at=confirmed_at,
+                        reject_duplicate=False,
+                    )
             elif knowledge["status"] == "challenged":
                 raise ValueError(
                     "Challenged knowledge requires new supporting evidence"
