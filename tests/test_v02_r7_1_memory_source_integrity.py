@@ -178,6 +178,39 @@ def test_r71_supplied_writer_connection_checks_captured_source_ids(tmp_path):
     assert core.event_processing.get(incoming.event_id) is None
 
 
+@pytest.mark.parametrize(
+    "route", ["create_related", "candidate_bearing_create"],
+)
+def test_r71_all_candidate_based_writes_reject_stale_graph(tmp_path, route):
+    core, target, source, incoming, _first, _other = stack(tmp_path)
+    chosen = dict(scored_candidate(core, incoming, target))
+    if route == "create_related":
+        # A medium association creates a related Memory and persists an
+        # edge to the scored candidate; its source graph must be fresh.
+        chosen["score"] = 4
+    else:
+        # A low-signal candidate leads to standalone creation, but the
+        # returned association explanation must not certify stale input.
+        chosen["score"] = 1
+        chosen["fts_score"] = 0
+        chosen["entity_overlap"] = 0
+        chosen["anchor_match"] = False
+
+    merge_without_row_change(core, source, target)
+    before = {
+        "memories": core.memory_store.list_memories(),
+        "sources": core.memory_store.source_events(target),
+        "raw": core.event_log.log_file.read_bytes(),
+    }
+    stale = processor(core, frozen=chosen)
+    with pytest.raises(ValueError, match="source graph changed"):
+        stale.process_event(incoming)
+
+    assert core.memory_store.list_memories() == before["memories"]
+    assert core.memory_store.source_events(target) == before["sources"]
+    assert core.event_log.log_file.read_bytes() == before["raw"]
+
+
 def test_r71_control_no_source_change_preserves_normal_update(tmp_path):
     core, target, source, incoming, first, other = stack(tmp_path)
     chosen = scored_candidate(core, incoming, target)
