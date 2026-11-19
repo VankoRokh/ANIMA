@@ -196,14 +196,19 @@ def state(core, layer, kn):
 
 
 @pytest.mark.parametrize("end", [T7, T8, "2020-01-01T00:07:00"])
-def test_r73_h5605_confirm_rejects_corrupted_dormant_support(tmp_path, end):
+@pytest.mark.parametrize("explicit", [False, True], ids=["implicit", "explicit"])
+def test_r73_h5605_confirm_rejects_corrupted_dormant_support(
+    tmp_path, end, explicit,
+):
     core, layer, kn, a, b, c, d = stack(tmp_path)
     bad = future_support(core, kn, c)
     mutate_interval(core, bad["id"], end)
     before = state(core, layer, kn)
 
     with pytest.raises(ValueError, match="Knowledge evidence|interval|UTC offset"):
-        layer.confirm(kn, confirmed_at=T3)
+        layer.confirm(
+            kn, confirmed_at=T3, **({"source_memory_id": a} if explicit else {}),
+        )
 
     assert state(core, layer, kn) == before
     assert layer.get(kn)["status"] == "provisional"
@@ -216,6 +221,19 @@ def test_r73_h5605_confirm_rejects_corrupted_dormant_support(tmp_path, end):
         if end.endswith("00:07:00") else "invalid_relation_interval"
     )
     assert bad["id"] in report["findings"][finding_name]["ids"]
+
+
+@pytest.mark.parametrize("end", [T7, T8, "2020-01-01T00:09:00"])
+def test_r73_public_evidence_writer_refuses_invalid_intervals(tmp_path, end):
+    core, layer, kn, a, b, c, d = stack(tmp_path)
+    before = state(core, layer, kn)
+    with pytest.raises(ValueError, match="Knowledge evidence|UTC offset"):
+        core.link_store.create_relation(
+            source_kind="memory", source_id=c,
+            relation_type="supports", target_kind="knowledge", target_id=kn,
+            created_at=T8, valid_until=end,
+        )
+    assert state(core, layer, kn) == before
 
 
 @pytest.mark.parametrize("transition", ["challenge", "reject", "supersede"])
