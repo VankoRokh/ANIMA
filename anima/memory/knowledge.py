@@ -402,6 +402,47 @@ class KnowledgeLayer:
             )
         return valid_sources
 
+    def _require_published_evidence_raw_sources(
+        self, connection, knowledge_id, *, additional_memory_ids=(),
+    ):
+        """Validate *every* evidence dependency before publishing Knowledge.
+
+        Checking only the supports used for the current transition is not
+        enough: an unbacked contradiction or future-dated support can be
+        staged on a provisional claim and then survive confirmation. Every
+        attached supports/contradicts Relation must have a real CLOSED Memory
+        source, matching provenance, and canonical Raw Events.
+
+        The complete Raw scan happens once per transition under its SQLite
+        transaction. This does not claim cross-file atomicity against an
+        uncooperative Raw writer.
+        """
+        rows = connection.execute(
+            """
+            SELECT public_id, source_kind, source_id, source_memory_id
+            FROM relations
+            WHERE target_kind = 'knowledge' AND target_id = ?
+              AND relation_type IN ('supports', 'contradicts')
+            ORDER BY row_id
+            """,
+            (knowledge_id,),
+        ).fetchall()
+        sources = list(additional_memory_ids)
+        for relation in rows:
+            source_id = relation["source_memory_id"]
+            if (
+                relation["source_kind"] != "memory"
+                or relation["source_id"] != source_id
+                or not source_id
+            ):
+                raise ValueError(
+                    "Invalid published Knowledge evidence source: "
+                    + relation["public_id"]
+                )
+            self._require_memory(connection, source_id, closed=True)
+            sources.append(source_id)
+        self.memory_store.require_knowledge_raw_sources(connection, sources)
+
     def create_candidate(
         self,
         *,
@@ -615,8 +656,8 @@ class KnowledgeLayer:
             )
             # R2: a CLOSED Memory with a declared event ID is not
             # sufficient proof that an authoritative Raw Event exists.
-            self.memory_store.require_knowledge_raw_sources(
-                connection, supporting_sources,
+            self._require_published_evidence_raw_sources(
+                connection, knowledge_id,
             )
 
             previous = knowledge["status"]
@@ -692,9 +733,6 @@ class KnowledgeLayer:
             # confirmed Knowledge. Its contradiction must therefore have
             # the same canonical Raw authority as confirm/reject/supersede.
             # No standalone/unbound or missing-Raw bypass is permitted.
-            self.memory_store.require_knowledge_raw_sources(
-                connection, [contradiction_memory_id],
-            )
             contradiction, _ = self._insert_relation(
                 connection,
                 source_kind="memory",
@@ -704,6 +742,9 @@ class KnowledgeLayer:
                 target_id=knowledge_id,
                 source_memory_id=contradiction_memory_id,
                 created_at=challenged_at,
+            )
+            self._require_published_evidence_raw_sources(
+                connection, knowledge_id,
             )
             connection.execute(
                 """
@@ -792,8 +833,8 @@ class KnowledgeLayer:
                 relation_type="contradicts",
                 at=rejected_at,
             )
-            self.memory_store.require_knowledge_raw_sources(
-                connection, contradicting_sources,
+            self._require_published_evidence_raw_sources(
+                connection, knowledge_id,
             )
 
             connection.execute(
@@ -870,8 +911,9 @@ class KnowledgeLayer:
             )
             # Supersede writes a new confirmed Knowledge without invoking
             # the ordinary confirm transition: enforce the same Raw policy.
-            self.memory_store.require_knowledge_raw_sources(
-                connection, [source_memory_id],
+            self._require_published_evidence_raw_sources(
+                connection, knowledge_id,
+                additional_memory_ids=[source_memory_id],
             )
             existing = connection.execute(
                 "SELECT public_id FROM knowledge WHERE public_id = ?",
