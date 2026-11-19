@@ -78,9 +78,20 @@ def test_h3_2_explicit_merged_fts_retrieval_remains_possible(tmp_path):
 
 
 def test_h3_2_knowledge_terminal_decoys_do_not_hide_provisional(tmp_path):
-    _store, links, retrieval = stack(tmp_path)
-    for i in range(FTS_SEED_LIMIT):
-        knowledge(links, 300 + i, status="rejected")
+    store, links, retrieval = stack(tmp_path)
+    # This is a read-path eligibility test, not a Knowledge lifecycle test.
+    # Materialize archived status-only legacy decoys through SQL ONLY in
+    # pytest's disposable database: the public writer must refuse them.
+    decoy_ids = [
+        knowledge(links, 300 + i, status="provisional")["id"]
+        for i in range(FTS_SEED_LIMIT)
+    ]
+    with store.transaction(immediate=True) as conn:
+        for decoy_id in decoy_ids:
+            conn.execute(
+                "UPDATE knowledge SET status='rejected' WHERE public_id=?",
+                (decoy_id,),
+            )
     candidate = knowledge(links, 400, status="provisional")
     response = retrieval.retrieve(
         "retrievalmarker", kinds=("knowledge",), relation_hops=0,
