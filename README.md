@@ -16,7 +16,7 @@ ANIMA — исследовательский проект модульного �
 
 ## Новый кандидат: ANIMA v0.2 RC1
 
-**19 ноября 2026 года владелец допустил ANIMA v0.2 RC1 в ограниченном детерминированном профиле Memory/Knowledge/Context.** Основание — независимый H5.8 **PASS / APPROVE_RC**, **2315** тестов full pytest, исходные H57-01–03 **FIXED_VERIFIED**. Кодовый snapshot: `1364e62634669ef553df0b2f2d7a1159d404383f`; целевой prerelease tag — `v0.2.0-rc.1` (тег опубликован и проверен; GitHub prerelease пока не создан).
+**19 ноября 2026 года владелец допустил ANIMA v0.2 RC1 в ограниченном детерминированном профиле Memory/Knowledge/Context.** Основание — независимый H5.8 **PASS / APPROVE_RC**, **2315** тестов full pytest, исходные H57-01–03 **FIXED_VERIFIED**. Кодовый snapshot: `1364e62634669ef553df0b2f2d7a1159d404383f`; опубликованный GitHub Pre-release — [`v0.2.0-rc.1`](https://github.com/VankoRokh/ANIMA/releases/tag/v0.2.0-rc.1) (тег указывает на проверенный SHA).
 
 [Контракт v0.2 RC1](docs/versions/v0.2/contract.md) · [Карточка приёмки H5.8](docs/versions/v0.2/acceptance.md) · [Release notes](docs/versions/v0.2/release-notes.md).
 
