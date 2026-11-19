@@ -12,7 +12,8 @@
 
 ## Исправление и контракт
 
-- При `connection=None` прямой `MemoryProcessor.process_event()` теперь применяет результат через `transaction(immediate=True)`, в одной writer-границе с `MemoryStore.update_memory()`, `MemoryLifecycle` и `KnowledgeLayer`.
+- При `connection=None` прямой `MemoryProcessor.process_event()` теперь применяет результат через `transaction(immediate=True)` и согласует его с писателями `MemoryStore`/`KnowledgeLayer`.
+- `MemoryLifecycle.close()` теперь также начинает с `BEGIN IMMEDIATE` **до** чтения статуса, чтобы не возникал deferred read→write lock upgrade в середине параллельного processor update. Это необходимо для стабильного порядка `update → close → confirm` и обратной последовательности.
 - `_update_memory_tx()` **внутри транзакции** заново читает Memory, сверяет полную выбранную запись и требует статус `open`, тип `episodic`, домен `user`. Устаревшая, удалённая, закрытая или изменённая Memory вызывает fail-closed `ValueError` **до** composer, UPDATE, INSERT в `memory_sources` и Entity relations.
 - Тот же SQL writer вызывает `MemoryStore._require_no_confirmed_knowledge_dependencies()` под lock непосредственно перед composer/UPDATE. Он защищает и прямой путь, и уже существующий путь `connection=...` от Coordinator; не вводится новый независимый предикат.
 - При stale selection применяется **отказ**, а не неявная повторная ассоциация/создание другой Memory: повтор выбора и retry остаются обязанностью вызывающего orchestration слоя. Это предотвращает скрытое изменение количества Memory и эффектов при гонке.
@@ -25,9 +26,10 @@
 1. Положительная прямая update-последовательность без гонки.
 2. Детерминированный interleaving: pause после выбора OPEN; вторым потоком `close → create_candidate → confirm`; resume; отказ без изменения Memory, Sources, Knowledge/History/Raw.
 3. Lost-update: pause после выбора; другой writer меняет ещё OPEN Memory; resume; отказ без затирки первой записи.
-4. Legacy-копия с подтверждённым Knowledge и искусственно SQL-открытой Memory: прямой и `connection=` пути отвергают update по R1 dependency guard. Прямой SQL применяется только в `pytest tmp_path` для отрицательного legacy состояния.
+4. Pause-only composer из первоначального аудита: после входа в compositor прямой processor удерживает writer lock, поэтому конкурентный `MemoryLifecycle.close()` завершается только после update; последующий confirm связывается с окончательным содержимым Memory.
+5. Legacy-копия с подтверждённым Knowledge и искусственно SQL-открытой Memory: прямой и `connection=` пути отвергают update по R1 dependency guard. Прямой SQL применяется только в `pytest tmp_path` для отрицательного legacy состояния.
 
-`pytest` параметризует четвёртую проверку, ожидаемо собирая **5** test cases.
+`pytest` параметризует пятую проверку, ожидаемо собирая **6** test cases.
 
 ## Ограничения
 
