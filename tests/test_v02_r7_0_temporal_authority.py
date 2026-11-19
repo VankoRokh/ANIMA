@@ -218,20 +218,34 @@ def test_r70_finite_contradiction_offset_aware_reuse(tmp_path):
 
 
 def test_r70_initial_confirm_retains_finite_support_without_extension(tmp_path):
-    core, layer, k, a, b, _c = case(tmp_path)
-    with core.memory_store.transaction(immediate=True) as conn:
-        support = conn.execute(
-            "SELECT public_id FROM relations WHERE source_id=? "
-            "AND target_id=? AND relation_type='supports'",
-            (a, k),
-        ).fetchone()
-        conn.execute(
-            "UPDATE relations SET valid_until=? WHERE public_id=?",
-            (T8, support["public_id"]),
-        )
-    # This SQL is only used to represent an otherwise valid finite initial
-    # evidence relation; no public mutation is available for an existing row.
+    core = build_core(tmp_path)
+    a = source(core, 1730)
+    k = core.link_store.create_knowledge(
+        domain="user", statement="R7.0 finite support",
+        created_at=T2, public_id=uid("kn_", 1730),
+    )["id"]
+    finite = edge(core, a, k, "supports", T2, T8)
+    layer = KnowledgeLayer(memory_store=core.memory_store)
     before = relations(core, k)
     layer.confirm(k, source_memory_id=a, confirmed_at=T5)
     assert relations(core, k) == before
-    assert layer.history(k)[-1]["changes"]["support_relation"] == support["public_id"]
+    assert layer.history(k)[-1]["changes"]["support_relation"] == finite["id"]
+
+
+def test_r70_old_expired_source_cannot_be_reasserted_to_clear_challenge(tmp_path):
+    core = build_core(tmp_path)
+    a, b = source(core, 1731), source(core, 1732)
+    k = core.link_store.create_knowledge(
+        domain="user", statement="R7.0 source version is immutable",
+        created_at=T2, public_id=uid("kn_", 1731),
+    )["id"]
+    edge(core, a, k, "supports", T2, T5)
+    layer = KnowledgeLayer(memory_store=core.memory_store)
+    layer.confirm(k, confirmed_at=T3)
+    layer.challenge(k, b, challenged_at=T4)
+    before = state(core, layer, k)
+    # The same source A was already used to support K. Starting another
+    # identical support at T6 is not new independent evidence.
+    with pytest.raises(ValueError, match="new supporting evidence"):
+        layer.confirm(k, source_memory_id=a, confirmed_at=T6)
+    assert state(core, layer, k) == before
