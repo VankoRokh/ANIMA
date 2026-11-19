@@ -6,6 +6,7 @@ No migration, auto-repair, branch mutation or release side effects.
 """
 
 import hashlib
+import json
 import sqlite3
 from uuid import UUID
 
@@ -273,6 +274,31 @@ def test_r74_corrupted_dormant_evidence_blocks_reconfirmation_atomically(tmp_pat
         at=T6,
     )
     assert future["id"] in report["findings"]["invalid_relation_interval"]["ids"]
+
+
+def test_r74_missing_raw_prevents_new_proof_and_rolls_back(tmp_path):
+    core, layer, claim, a, b, c, d = fixture(tmp_path)
+    layer.confirm(claim, confirmed_at=T3)
+    layer.challenge(claim, b, challenged_at=T5)
+
+    # Deliberate corruption of a disposable synthetic JSONL copy only.
+    raw = core.event_log.log_file.read_bytes().splitlines(keepends=True)
+    without_d = [
+        line for line in raw
+        if json.loads(line)["id"] != uid("ev_", 7404)
+    ]
+    assert len(without_d) + 1 == len(raw)
+    core.event_log.log_file.write_bytes(b"".join(without_d))
+    before = snapshot(core, layer, claim)
+
+    with pytest.raises(ValueError, match="missing source Event"):
+        layer.confirm(claim, source_memory_id=d, confirmed_at=T6)
+    assert snapshot(core, layer, claim) == before
+    assert layer.get(claim)["status"] == "challenged"
+    assert not any(
+        rel["type"] == "supports" and rel["source_memory_id"] == d
+        for rel in all_relations(core, claim)
+    )
 
 
 def test_r74_supported_storage_reopens_but_future_schema_copy_is_unchanged(tmp_path):
