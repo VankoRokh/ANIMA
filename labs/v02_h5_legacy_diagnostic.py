@@ -169,6 +169,15 @@ def audit_snapshot(memory_db, events_jsonl=None, *, at=None):
         counts["memories"] = len(memories)
         counts["knowledge"] = len(knowledge)
 
+        # Build provenance coverage once. Missing source rows must be
+        # detected, not just missing IDs among rows that happen to exist.
+        source_rows = conn.execute(
+            "SELECT memory_id, event_id FROM memory_sources"
+        ).fetchall()
+        source_events = defaultdict(set)
+        for source_row in source_rows:
+            source_events[source_row["memory_id"]].add(source_row["event_id"])
+
         supports = set()
         # R3 / F-04: historical relations may coexist, but two opposite
         # polarities active for the SAME Memory and Knowledge at the SAME
@@ -201,6 +210,25 @@ def audit_snapshot(memory_db, events_jsonl=None, *, at=None):
                 issue("orphan_relation_target", rel_id)
             if provenance_id not in memories:
                 issue("orphan_relation_provenance", rel_id)
+
+            # R6.1: lifecycle-managed Knowledge may never have an unbacked
+            # Evidence edge, whether currently active, expired or future.
+            # Validate the same physical source preconditions as publication.
+            if (
+                target_kind == "knowledge"
+                and knowledge.get(target_id) in {
+                    "confirmed", "challenged", "rejected", "superseded"
+                }
+                and row["relation_type"] in {"supports", "contradicts"}
+            ):
+                if (
+                    source_kind != "memory"
+                    or source_id != provenance_id
+                    or memories.get(provenance_id) != "closed"
+                ):
+                    issue("invalid_published_knowledge_evidence", rel_id)
+                if not source_events.get(provenance_id):
+                    issue("published_evidence_without_raw_sources", rel_id)
 
             try:
                 started = _instant(row["created_at"])
@@ -250,21 +278,30 @@ def audit_snapshot(memory_db, events_jsonl=None, *, at=None):
 
         counts["relations"] = relation_count
 
-        # Historical import may contain confirmed rows that predate H2.1.
-        confirmation_history = {
-            row["object_id"]
-            for row in conn.execute(
-                "SELECT object_id FROM history WHERE object_kind='knowledge' "
-                "AND operation IN ('confirm', 'create_superseding')"
-            )
+        # A terminal/epistemic Knowledge status must have a corresponding
+        # lifecycle history record. Direct status-only inserts must fail the
+        # offline gate as well as the public writer.
+        history_ops = defaultdict(set)
+        for row in conn.execute(
+            "SELECT object_id, operation FROM history "
+            "WHERE object_kind='knowledge'"
+        ):
+            history_ops[row["object_id"]].add(row["operation"])
+        required_history = {
+            "confirmed": {"confirm", "create_superseding"},
+            "challenged": {"challenge"},
+            "rejected": {"reject"},
+            "superseded": {"supersede"},
         }
         for kn_id, status in knowledge.items():
-            if status != "confirmed":
-                continue
-            if kn_id not in supports:
-                issue("confirmed_without_live_closed_support", kn_id)
-            if kn_id not in confirmation_history:
-                issue("confirmed_without_confirmation_history", kn_id)
+            required = required_history.get(status)
+            if required is not None and not (required & history_ops[kn_id]):
+                issue("knowledge_status_without_lifecycle_history", kn_id)
+            if status == "confirmed":
+                if kn_id not in supports:
+                    issue("confirmed_without_live_closed_support", kn_id)
+                if not (required_history["confirmed"] & history_ops[kn_id]):
+                    issue("confirmed_without_confirmation_history", kn_id)
 
         for row in conn.execute(
             "SELECT public_id, merged_into FROM memories "
@@ -273,9 +310,7 @@ def audit_snapshot(memory_db, events_jsonl=None, *, at=None):
             if row["merged_into"] not in memories:
                 issue("orphan_memory_merge_target", row["public_id"])
 
-        for row in conn.execute(
-            "SELECT memory_id, event_id FROM memory_sources"
-        ):
+        for row in source_rows:
             if row["memory_id"] not in memories:
                 issue("orphan_memory_source_owner", row["memory_id"])
             if raw_ids is not None and row["event_id"] not in raw_ids:
