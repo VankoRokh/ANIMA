@@ -25,6 +25,7 @@ from pathlib import Path
 from urllib.parse import quote
 
 from anima.core.event_bus import Event
+from anima.memory.lifecycle_authority import is_authorized_supersession
 
 REQUIRED = {
     "schema_meta", "memories", "memory_sources", "knowledge",
@@ -222,6 +223,16 @@ def audit_snapshot(memory_db, events_jsonl=None, *, at=None):
                 continue
             if ended is not None and ended <= started:
                 issue("invalid_relation_interval", rel_id)
+
+            # R7.2 / H56-03: the generic graph may contain historically
+            # forged supersedes edges, including valid-looking Relations
+            # from provisional Knowledge without a supersede transition.
+            # Reuse the same read-only authority predicate as describe().
+            if (
+                row["relation_type"] == "supersedes"
+                and not is_authorized_supersession(conn, row)
+            ):
+                issue("unauthorized_lifecycle_supersedes", rel_id)
 
             active = started <= now and (ended is None or now < ended)
 
