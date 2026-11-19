@@ -203,6 +203,94 @@ class KnowledgeLayer:
         return None
 
     @classmethod
+    def _effective_or_create_evidence(
+        cls, connection, *, memory_id, knowledge_id, relation_type, at,
+    ):
+        """Return evidence actually effective at 'at', never a future duplicate.
+
+        R7.0 uses the same finite/open-ended relation contract in confirm,
+        challenge and reject. A pre-staged future permanent Relation may
+        match the internal duplicate lookup but cannot certify the present.
+        In that case raise before any lifecycle status/history is committed.
+        """
+        current = cls._active_relation(
+            connection,
+            source_kind="memory",
+            source_id=memory_id,
+            relation_type=relation_type,
+            target_kind="knowledge",
+            target_id=knowledge_id,
+            source_memory_id=memory_id,
+            at=at,
+        )
+        if current is not None:
+            return current, False
+
+        relation, created = cls._insert_relation(
+            connection,
+            source_kind="memory",
+            source_id=memory_id,
+            relation_type=relation_type,
+            target_kind="knowledge",
+            target_id=knowledge_id,
+            source_memory_id=memory_id,
+            created_at=at,
+            reject_duplicate=False,
+        )
+        if not _relation_active_at(relation, at):
+            raise ValueError(
+                "Selected Knowledge evidence is not effective "
+                f"at transition time: {relation['id']}"
+            )
+        return relation, created
+
+    @staticmethod
+    def _require_challenged_support_novelty(
+        connection, *, knowledge_id, memory_id, challenged_at, relation,
+        created,
+    ):
+        """A staged witness must start strictly after the latest challenge.
+
+        A source already used before the challenge is not new just because
+        it can be represented by another Relation starting later. There is
+        no versioned evidence identity yet; new Raw-backed Memory is needed.
+        """
+        if not _relation_active_at(relation, challenged_at) and (
+            datetime.fromisoformat(relation["created_at"])
+            > datetime.fromisoformat(challenged_at)
+        ):
+            newly_effective = True
+        else:
+            newly_effective = False
+
+        if not created and not newly_effective:
+            raise ValueError(
+                "Challenged knowledge requires new supporting evidence"
+            )
+
+        old_source = connection.execute(
+            """
+            SELECT created_at FROM relations
+            WHERE source_kind = 'memory' AND source_id = ?
+              AND source_memory_id = ?
+              AND target_kind = 'knowledge' AND target_id = ?
+              AND relation_type = 'supports'
+            """,
+            (memory_id, memory_id, knowledge_id),
+        ).fetchall()
+        # This method is called after a possible insertion. Exclude the
+        # current newly-created relation by timestamp+ID check instead of
+        # mistakenly rejecting it as its own historical antecedent.
+        if any(
+            datetime.fromisoformat(row["created_at"])
+            <= datetime.fromisoformat(challenged_at)
+            for row in old_source
+        ):
+            raise ValueError(
+                "Challenged knowledge requires new supporting evidence"
+            )
+
+    @classmethod
     def _require_no_opposite_evidence(
         cls,
         connection,
@@ -653,40 +741,23 @@ class KnowledgeLayer:
                     relation_type="supports",
                     at=confirmed_at,
                 )
-                active_support = self._active_relation(
-                    connection,
-                    source_kind="memory",
-                    source_id=source_memory_id,
-                    relation_type="supports",
-                    target_kind="knowledge",
-                    target_id=knowledge_id,
-                    source_memory_id=source_memory_id,
-                    at=confirmed_at,
-                )
-                if (
-                    knowledge["status"] == "challenged"
-                    and active_support is not None
-                ):
-                    raise ValueError(
-                        "Challenged knowledge requires new supporting evidence"
-                    )
-                if active_support is not None:
-                    # Finite and open-ended active support are equally
-                    # effective at confirmed_at. Reusing the existing row
-                    # preserves its valid_until and never crosses the
-                    # half-open boundary into a future contradiction.
-                    added_support = active_support
-                else:
-                    added_support, _ = self._insert_relation(
+                added_support, created = (
+                    self._effective_or_create_evidence(
                         connection,
-                        source_kind="memory",
-                        source_id=source_memory_id,
+                        memory_id=source_memory_id,
+                        knowledge_id=knowledge_id,
                         relation_type="supports",
-                        target_kind="knowledge",
-                        target_id=knowledge_id,
-                        source_memory_id=source_memory_id,
-                        created_at=confirmed_at,
-                        reject_duplicate=False,
+                        at=confirmed_at,
+                    )
+                )
+                if knowledge["status"] == "challenged":
+                    self._require_challenged_support_novelty(
+                        connection,
+                        knowledge_id=knowledge_id,
+                        memory_id=source_memory_id,
+                        challenged_at=knowledge["updated_at"],
+                        relation=added_support,
+                        created=created,
                     )
             elif knowledge["status"] == "challenged":
                 raise ValueError(
@@ -778,15 +849,12 @@ class KnowledgeLayer:
             # confirmed Knowledge. Its contradiction must therefore have
             # the same canonical Raw authority as confirm/reject/supersede.
             # No standalone/unbound or missing-Raw bypass is permitted.
-            contradiction, _ = self._insert_relation(
+            contradiction, _ = self._effective_or_create_evidence(
                 connection,
-                source_kind="memory",
-                source_id=contradiction_memory_id,
+                memory_id=contradiction_memory_id,
+                knowledge_id=knowledge_id,
                 relation_type="contradicts",
-                target_kind="knowledge",
-                target_id=knowledge_id,
-                source_memory_id=contradiction_memory_id,
-                created_at=challenged_at,
+                at=challenged_at,
             )
             self._require_published_evidence_raw_sources(
                 connection, knowledge_id, at=challenged_at,
@@ -860,16 +928,12 @@ class KnowledgeLayer:
                     relation_type="contradicts",
                     at=rejected_at,
                 )
-                added, _ = self._insert_relation(
+                added, _ = self._effective_or_create_evidence(
                     connection,
-                    source_kind="memory",
-                    source_id=contradiction_memory_id,
+                    memory_id=contradiction_memory_id,
+                    knowledge_id=knowledge_id,
                     relation_type="contradicts",
-                    target_kind="knowledge",
-                    target_id=knowledge_id,
-                    source_memory_id=contradiction_memory_id,
-                    created_at=rejected_at,
-                    reject_duplicate=False,
+                    at=rejected_at,
                 )
 
             contradicting_sources = self._require_effective_memory_evidence(
