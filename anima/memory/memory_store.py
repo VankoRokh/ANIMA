@@ -455,6 +455,28 @@ class MemoryStore:
         connection.execute("PRAGMA foreign_keys = ON")
         return connection
 
+    def _require_supported_existing_schema(self, connection):
+        """Validate version metadata before any schema-writing statement.
+
+        Missing schema_meta/version remains an explicitly supported legacy
+        bootstrap input. An *existing* unknown version is never migrated
+        or modified through constructor side effects.
+        """
+        schema_table = connection.execute(
+            "SELECT 1 FROM sqlite_master "
+            "WHERE type = 'table' AND name = 'schema_meta'"
+        ).fetchone()
+        if schema_table is None:
+            return
+        row = connection.execute(
+            "SELECT value FROM schema_meta WHERE key = 'schema_version'"
+        ).fetchone()
+        if row is not None and row["value"] != str(SCHEMA_VERSION):
+            raise ValueError(
+                "Unsupported memory database schema in "
+                f"{self.database_file}"
+            )
+
     def _initialize(self):
         # R7.3 / H56-04: a database with a future/unknown schema must not
         # acquire *any* DDL side effects merely because it was opened.
@@ -462,24 +484,21 @@ class MemoryStore:
         # BEGIN IMMEDIATE lock. sqlite3.executescript() is not suitable:
         # it implicitly COMMITs a pending transaction before executing DDL.
         try:
+            if self.database_file.is_file():
+                # Existing DBs are screened before opening a writable
+                # connection. Do not take a write lock on an already-known
+                # unsupported version. URI escaping handles spaces and ?.
+                uri = self.database_file.resolve().as_uri() + "?mode=ro"
+                with closing(sqlite3.connect(uri, uri=True)) as readonly:
+                    readonly.row_factory = sqlite3.Row
+                    readonly.execute("PRAGMA query_only = ON")
+                    self._require_supported_existing_schema(readonly)
+
             with self.transaction(immediate=True) as connection:
-                schema_table = connection.execute(
-                    "SELECT 1 FROM sqlite_master "
-                    "WHERE type = 'table' AND name = 'schema_meta'"
-                ).fetchone()
-                if schema_table is not None:
-                    row = connection.execute(
-                        "SELECT value FROM schema_meta "
-                        "WHERE key = 'schema_version'"
-                    ).fetchone()
-                    if (
-                        row is not None
-                        and row["value"] != str(SCHEMA_VERSION)
-                    ):
-                        raise ValueError(
-                            "Unsupported memory database schema in "
-                            f"{self.database_file}"
-                        )
+                # Recheck under the actual writer lock: a concurrent
+                # cooperative schema writer cannot invalidate the preflight
+                # between read-only inspection and transactional bootstrap.
+                self._require_supported_existing_schema(connection)
 
                 # sqlite3.complete_statement recognizes BEGIN/END inside
                 # FTS triggers. Each full DDL statement is executed with
