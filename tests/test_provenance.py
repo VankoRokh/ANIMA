@@ -172,6 +172,7 @@ def test_provenance_resolves_knowledge_entity_and_relation_to_events(tmp_path):
     memory_store = MemoryStore(database)
     links = LinkStore(memory_store)
     event_log = EventLog(event_file)
+    memory_store.bind_event_log(event_log)
     provenance = ProvenanceResolver(
         memory_store,
         links,
@@ -194,12 +195,19 @@ def test_provenance_resolves_knowledge_entity_and_relation_to_events(tmp_path):
         "A later test found a SQLite limitation.",
     )
 
-    links.create_knowledge(
+    # Create a genuinely challenged Knowledge through its lifecycle.
+    # Direct status-only insertion is no longer a valid public API.
+    layer = KnowledgeLayer(memory_store=memory_store)
+    layer.create_candidate(
         domain="project",
         statement="SQLite is the Stage 1 baseline.",
-        status="challenged",
+        source_memory_id=MEMORY_1,
         created_at=CREATED_AT,
         public_id=KNOWLEDGE_1,
+    )
+    layer.confirm(KNOWLEDGE_1, confirmed_at=CREATED_AT)
+    layer.challenge(
+        KNOWLEDGE_1, MEMORY_2, challenged_at=CREATED_AT,
     )
     links.create_entity(
         entity_type="technology",
@@ -208,22 +216,11 @@ def test_provenance_resolves_knowledge_entity_and_relation_to_events(tmp_path):
         public_id=ENTITY_1,
     )
 
-    support = links.create_relation(
-        source_kind="memory",
-        source_id=MEMORY_1,
-        relation_type="supports",
-        target_kind="knowledge",
-        target_id=KNOWLEDGE_1,
-        created_at=CREATED_AT,
+    evidence = links.relations_for(
+        "knowledge", KNOWLEDGE_1, direction="incoming",
     )
-    contradiction = links.create_relation(
-        source_kind="memory",
-        source_id=MEMORY_2,
-        relation_type="contradicts",
-        target_kind="knowledge",
-        target_id=KNOWLEDGE_1,
-        created_at=CREATED_AT,
-    )
+    support = next(row for row in evidence if row["type"] == "supports")
+    contradiction = next(row for row in evidence if row["type"] == "contradicts")
     about_memory = links.create_relation(
         source_kind="memory",
         source_id=MEMORY_1,
