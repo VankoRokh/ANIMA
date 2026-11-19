@@ -90,6 +90,21 @@ def _validate_public_id(public_id, prefix, label):
         raise ValueError(f"{label} must be a {prefix}UUIDv4")
 
 
+def _validate_evidence_interval(created_at, valid_until):
+    """Require a well-formed, offset-aware, nonempty Evidence window.
+
+    Validate *every* attached supports/contradicts row before publication,
+    even when it is inactive at the current transition instant. A future
+    inverted legacy interval must not silently pass as dormant evidence.
+    """
+    _validate_timestamp(created_at, "Knowledge evidence created_at")
+    if valid_until is None:
+        return
+    _validate_timestamp(valid_until, "Knowledge evidence valid_until")
+    if datetime.fromisoformat(valid_until) <= datetime.fromisoformat(created_at):
+        raise ValueError("Invalid Knowledge evidence relation interval")
+
+
 def _relation_active_at(relation, when):
     """A relation is active within [created_at, valid_until).
 
@@ -569,14 +584,7 @@ class LinkStore:
                 and target_kind == "knowledge"
                 and relation_type in {"supports", "contradicts"}
             ):
-                if (
-                    valid_until is not None
-                    and datetime.fromisoformat(valid_until)
-                    <= datetime.fromisoformat(created_at)
-                ):
-                    raise ValueError(
-                        "Invalid Knowledge evidence relation interval"
-                    )
+                _validate_evidence_interval(created_at, valid_until)
                 opposite = (
                     "contradicts" if relation_type == "supports"
                     else "supports"
