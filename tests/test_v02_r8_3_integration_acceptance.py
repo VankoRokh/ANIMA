@@ -103,7 +103,7 @@ def challenged(root, *, future=False):
 
 
 def snapshot(core):
-    tables = ("knowledge", "relations", "history", "memory_sources")
+    tables = ("memories", "knowledge", "relations", "history", "memory_sources", "event_processing")
     with core.memory_store.transaction() as connection:
         value = {
             name: [
