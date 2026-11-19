@@ -456,25 +456,61 @@ class MemoryStore:
         return connection
 
     def _initialize(self):
+        # R7.3 / H56-04: a database with a future/unknown schema must not
+        # acquire *any* DDL side effects merely because it was opened.
+        # Keep the version preflight and the schema bootstrap under one
+        # BEGIN IMMEDIATE lock. sqlite3.executescript() is not suitable:
+        # it implicitly COMMITs a pending transaction before executing DDL.
         try:
-            with closing(self._connect()) as connection, connection:
-                connection.executescript(SCHEMA_SQL)
+            with self.transaction(immediate=True) as connection:
+                schema_table = connection.execute(
+                    "SELECT 1 FROM sqlite_master "
+                    "WHERE type = 'table' AND name = 'schema_meta'"
+                ).fetchone()
+                if schema_table is not None:
+                    row = connection.execute(
+                        "SELECT value FROM schema_meta "
+                        "WHERE key = 'schema_version'"
+                    ).fetchone()
+                    if (
+                        row is not None
+                        and row["value"] != str(SCHEMA_VERSION)
+                    ):
+                        raise ValueError(
+                            "Unsupported memory database schema in "
+                            f"{self.database_file}"
+                        )
+
+                # sqlite3.complete_statement recognizes BEGIN/END inside
+                # FTS triggers. Each full DDL statement is executed with
+                # execute(), preserving transactional rollback on failure.
+                statement = ""
+                for line in SCHEMA_SQL.splitlines(keepends=True):
+                    statement += line
+                    if sqlite3.complete_statement(statement):
+                        connection.execute(statement)
+                        statement = ""
+                if statement.strip():
+                    raise ValueError("Incomplete memory schema SQL")
+
                 connection.execute(
-                    "INSERT OR IGNORE INTO schema_meta(key, value) VALUES('schema_version', ?)",
+                    "INSERT OR IGNORE INTO schema_meta(key, value) "
+                    "VALUES('schema_version', ?)",
                     (str(SCHEMA_VERSION),),
                 )
                 row = connection.execute(
-                    "SELECT value FROM schema_meta WHERE key = 'schema_version'"
+                    "SELECT value FROM schema_meta "
+                    "WHERE key = 'schema_version'"
                 ).fetchone()
+                if row is None or row["value"] != str(SCHEMA_VERSION):
+                    raise ValueError(
+                        "Unsupported memory database schema in "
+                        f"{self.database_file}"
+                    )
         except sqlite3.DatabaseError as error:
             raise ValueError(
                 f"Cannot initialize memory database {self.database_file}: {error}"
             ) from error
-
-        if row is None or row["value"] != str(SCHEMA_VERSION):
-            raise ValueError(
-                f"Unsupported memory database schema in {self.database_file}"
-            )
 
     @contextmanager
     def transaction(self, *, immediate=False):
