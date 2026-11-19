@@ -172,6 +172,8 @@ class MemoryProcessor:
         *,
         candidate,
     ):
+        if candidate is not None:
+            self._require_fresh_candidate_tx(connection, candidate)
         memory = self._create_memory_tx(connection, event, text)
         self._link_entities_tx(
             connection,
@@ -209,10 +211,9 @@ class MemoryProcessor:
     ):
         memory = self._update_memory_tx(
             connection,
-            candidate["memory"],
+            candidate,
             event,
             text,
-            candidate["source_event_ids"],
         )
         self._link_entities_tx(
             connection,
@@ -237,6 +238,7 @@ class MemoryProcessor:
         entity_ids,
         candidate,
     ):
+        self._require_fresh_candidate_tx(connection, candidate)
         memory = self._create_memory_tx(connection, event, text)
         self._link_entities_tx(
             connection,
@@ -556,14 +558,16 @@ class MemoryProcessor:
         ).fetchone()
         return self.memory_store._row_to_memory(row)
 
-    def _update_memory_tx(
-        self, connection, memory, event, text, selected_source_event_ids,
-    ):
-        # R6.2 / NEW-03: the candidate was scored outside this write
-        # transaction. Do not trust its status/content after another writer
-        # may have closed, merged or confirmed its Knowledge dependencies.
-        # Reject the stale selection rather than silently rewriting a
-        # published Evidence source or dropping another update.
+    def _require_fresh_candidate_tx(self, connection, candidate):
+        """Reject stale scored inputs before any SQLite mutation.
+
+        R6.2 checked the selected Memory row; R7.1 additionally checks the
+        exact Event source IDs used for association scoring. A merge can
+        change the latter without changing any Memory row field.
+        Runs under the caller's serialized writer transaction, covering
+        update, related creation and candidate-bearing create operations.
+        """
+        memory = candidate["memory"]
         row = connection.execute(
             "SELECT * FROM memories WHERE public_id = ?",
             (memory["id"],),
@@ -585,13 +589,7 @@ class MemoryProcessor:
                 "update: " + memory["id"]
             )
 
-        # R7.1 / H56-06: MemoryLifecycle.merge() may add sources while
-        # leaving the target Memory row byte-for-byte unchanged (same text
-        # and updated_at). Source identities affect the original candidate's
-        # anchor, entity-claim conflict, session and time-gap score. Check
-        # precisely the source IDs used during scoring, inside this same
-        # writer transaction, before the composer or any side effects.
-        current_source_event_ids = tuple(
+        source_event_ids = tuple(
             row["event_id"] for row in connection.execute(
                 """
                 SELECT event_id FROM memory_sources
@@ -600,11 +598,16 @@ class MemoryProcessor:
                 (memory["id"],),
             ).fetchall()
         )
-        if current_source_event_ids != selected_source_event_ids:
+        if source_event_ids != candidate["source_event_ids"]:
             raise ValueError(
                 "Stale MemoryProcessor candidate: source graph changed "
                 "before update: " + memory["id"]
             )
+        return current
+
+    def _update_memory_tx(self, connection, candidate, event, text):
+        memory = candidate["memory"]
+        current = self._require_fresh_candidate_tx(connection, candidate)
 
         # Same invariant as MemoryStore.update_memory() / lifecycle.merge().
         # Check with the writer lock held, including for callers supplying
