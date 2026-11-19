@@ -10,6 +10,7 @@ from anima.memory.link_store import (
     _validate_timestamp,
     _relation_active_at,
     _evidence_intervals_overlap,
+    _validate_evidence_interval,
 )
 from anima.memory.memory_store import (
     MEMORY_DOMAINS,
@@ -572,6 +573,13 @@ class KnowledgeLayer:
         ).fetchall()
         sources = list(additional_memory_ids)
         for relation in rows:
+            # R7.3 / H56-05: full-graph integrity is a prerequisite for
+            # *any* terminal Knowledge publication. Do not skip future or
+            # expired Relations: even dormant invalid intervals are stored
+            # dependencies of this published claim.
+            _validate_evidence_interval(
+                relation["created_at"], relation["valid_until"],
+            )
             source_id = relation["source_memory_id"]
             if (
                 relation["source_kind"] != "memory"
