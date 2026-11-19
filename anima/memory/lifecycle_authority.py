@@ -81,6 +81,19 @@ def is_authorized_supersession(connection, relation):
     ):
         return False
 
+    # A stored history pointer does not make a missing evidence owner real.
+    # This is a cheap structural guard, not a re-read of the entire Raw log.
+    owner = connection.execute(
+        "SELECT 1 FROM memories WHERE public_id = ?",
+        (relation["source_memory_id"],),
+    ).fetchone()
+    source_event = connection.execute(
+        "SELECT 1 FROM memory_sources WHERE memory_id = ? LIMIT 1",
+        (relation["source_memory_id"],),
+    ).fetchone()
+    if owner is None or source_event is None:
+        return False
+
     old_history = _has_lifecycle_history(
         connection,
         knowledge_id=relation["target_id"],
