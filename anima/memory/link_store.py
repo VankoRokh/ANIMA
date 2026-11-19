@@ -503,6 +503,14 @@ class LinkStore:
             relation_type,
             target_kind,
         )
+        # R7.2 / H56-03: supersedes is an authoritative lifecycle edge,
+        # not an exploratory graph assertion. Only KnowledgeLayer.supersede
+        # may create it, atomically with old/new statuses, History and Raw
+        # checks. There is no generic caller-selectable authority bypass.
+        if relation_type == "supersedes":
+            raise ValueError(
+                "Lifecycle supersedes requires KnowledgeLayer.supersede()"
+            )
         self._require_object(source_kind, source_id)
         self._require_object(target_kind, target_id)
 
