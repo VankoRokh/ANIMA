@@ -295,7 +295,7 @@ class KnowledgeLayer:
 
         old_source = connection.execute(
             """
-            SELECT created_at FROM relations
+            SELECT public_id, created_at FROM relations
             WHERE source_kind = 'memory' AND source_id = ?
               AND source_memory_id = ?
               AND target_kind = 'knowledge' AND target_id = ?
@@ -303,11 +303,15 @@ class KnowledgeLayer:
             """,
             (memory_id, memory_id, knowledge_id),
         ).fetchall()
-        # A Relation inserted for this transition starts strictly after
-        # challenged_at. Only supports that existed by the challenge
-        # instant are disqualifying old evidence.
+        # R8.0 / H57-01: this transaction may have just INSERTed the
+        # genuine new support at the exact same second as the challenge.
+        # Its own row is not prior evidence. Exclude *only* that ID when
+        # created=True; every pre-existing relation remains subject to
+        # <= challenged_at, including same-instant staged old supports.
+        # Comparing coarse timestamps alone cannot establish insertion order.
         if any(
-            datetime.fromisoformat(row["created_at"])
+            (not created or row["public_id"] != relation["id"])
+            and datetime.fromisoformat(row["created_at"])
             <= datetime.fromisoformat(challenged_at)
             for row in old_source
         ):
