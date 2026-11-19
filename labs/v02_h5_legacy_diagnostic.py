@@ -211,25 +211,6 @@ def audit_snapshot(memory_db, events_jsonl=None, *, at=None):
             if provenance_id not in memories:
                 issue("orphan_relation_provenance", rel_id)
 
-            # R6.1: lifecycle-managed Knowledge may never have an unbacked
-            # Evidence edge, whether currently active, expired or future.
-            # Validate the same physical source preconditions as publication.
-            if (
-                target_kind == "knowledge"
-                and knowledge.get(target_id) in {
-                    "confirmed", "challenged", "rejected", "superseded"
-                }
-                and row["relation_type"] in {"supports", "contradicts"}
-            ):
-                if (
-                    source_kind != "memory"
-                    or source_id != provenance_id
-                    or memories.get(provenance_id) != "closed"
-                ):
-                    issue("invalid_published_knowledge_evidence", rel_id)
-                if not source_events.get(provenance_id):
-                    issue("published_evidence_without_raw_sources", rel_id)
-
             try:
                 started = _instant(row["created_at"])
                 ended = (
@@ -243,6 +224,28 @@ def audit_snapshot(memory_db, events_jsonl=None, *, at=None):
                 issue("invalid_relation_interval", rel_id)
 
             active = started <= now and (ended is None or now < ended)
+
+            # R6.1: every evidence edge on lifecycle-managed Knowledge
+            # needs an existing Memory owner and nonempty Raw-source rows.
+            # Only currently active evidence must be CLOSED; historical and
+            # future records retain the R3 half-open interval semantics.
+            if (
+                target_kind == "knowledge"
+                and knowledge.get(target_id) in {
+                    "confirmed", "challenged", "rejected", "superseded"
+                }
+                and row["relation_type"] in {"supports", "contradicts"}
+            ):
+                if (
+                    source_kind != "memory"
+                    or source_id != provenance_id
+                    or provenance_id not in memories
+                    or (active and memories.get(provenance_id) != "closed")
+                ):
+                    issue("invalid_published_knowledge_evidence", rel_id)
+                if not source_events.get(provenance_id):
+                    issue("published_evidence_without_raw_sources", rel_id)
+
             if not active or (
                 row["relation_type"] not in {"supports", "contradicts"}
             ) or target_kind != "knowledge":
