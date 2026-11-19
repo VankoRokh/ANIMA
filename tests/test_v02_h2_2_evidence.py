@@ -228,8 +228,20 @@ def test_h2_2_orphan_contradiction_cannot_reject_knowledge(tmp_path):
             "UPDATE knowledge SET status = 'challenged' WHERE public_id = ?",
             (fact["id"],),
         )
-    relation(links, source, fact, kind="contradicts")
+    # Legacy fixture: the generic public writer is now forbidden from
+    # changing Evidence on challenged Knowledge (R6.1). Model the old
+    # inconsistent state with SQL only inside pytest's disposable database.
     with store.transaction() as conn:
+        conn.execute(
+            """
+            INSERT INTO relations(
+                public_id, source_kind, source_id, relation_type,
+                target_kind, target_id, created_at, valid_until,
+                source_memory_id
+            ) VALUES (?, 'memory', ?, 'contradicts', 'knowledge', ?, ?, NULL, ?)
+            """,
+            (f"rel_{uuid4()}", source["id"], fact["id"], T1, source["id"]),
+        )
         conn.execute(
             "DELETE FROM memories WHERE public_id = ?", (source["id"],)
         )
