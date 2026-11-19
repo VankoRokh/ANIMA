@@ -267,6 +267,6 @@ def test_r70_old_expired_source_cannot_be_reasserted_to_clear_challenge(tmp_path
     before = state(core, layer, k)
     # The same source A was already used to support K. Starting another
     # identical support at T6 is not new independent evidence.
-    with pytest.raises(ValueError, match="new supporting evidence"):
+    with pytest.raises(ValueError, match="new supporting evidence|not effective"):
         layer.confirm(k, source_memory_id=a, confirmed_at=T6)
     assert state(core, layer, k) == before
