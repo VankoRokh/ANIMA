@@ -68,22 +68,18 @@ class ContextBuilder:
             **retrieval_options,
         )
 
-        candidates = retrieval_response["results"]
-        retrieval_stats = retrieval_response["stats"]
-        # R4.4/F-07: a bounded Retrieval seed can be incomplete even when
-        # every *returned* candidate fits the Context budget. Keep its
-        # upstream coverage distinct from Context's own budget omissions.
-        # No synthetic completeness: absence of either flag is a Retrieval
-        # contract violation rather than permission to mark the result full.
-        retrieval_coverage = {
-            "fts_truncated": retrieval_stats["fts_truncated"],
-            "filters_truncated": retrieval_stats["filters_truncated"],
-            "top_k_truncated": (
-                retrieval_stats["candidates"] > len(candidates)
-            ),
-        }
-        retrieval_coverage["complete"] = not any(
-            retrieval_coverage.values()
+        if not isinstance(retrieval_response, dict):
+            raise ValueError("Context Retrieval response must be a dict")
+        candidates = retrieval_response.get("results")
+        if not isinstance(candidates, list):
+            raise ValueError("Context Retrieval results must be a list")
+        # Metadata supplied by a custom Retrieval adapter is untrusted.
+        # None/missing flags or contradictory counters never certify full
+        # coverage. Distinguish unknown (None) from verified false and true.
+        retrieval_coverage, retrieval_candidates = (
+            self._assess_retrieval_coverage(
+                retrieval_response.get("stats"), candidates, seed_top_k,
+            )
         )
         knowledge_candidates = [
             item for item in candidates if item["kind"] == "knowledge"
@@ -108,12 +104,10 @@ class ContextBuilder:
             # Context-local omissions separately.
             "truncated": not retrieval_coverage["complete"],
             "selection_stats": {
-                "retrieval_candidates": retrieval_response["stats"][
-                    "candidates"
-                ],
-                "retrieval_returned": retrieval_response["stats"][
-                    "returned"
-                ],
+                "retrieval_candidates": retrieval_candidates,
+                # Count the records actually received, not an untrusted
+                # adapter's incompatible 'returned' number.
+                "retrieval_returned": len(candidates),
                 "knowledge_considered": len(knowledge_candidates),
                 "memories_considered": len(memory_candidates),
                 "events_considered": 0,
@@ -157,6 +151,45 @@ class ContextBuilder:
 
         self._trace_bundle(bundle)
         return bundle
+
+    @staticmethod
+    def _assess_retrieval_coverage(stats, candidates, requested_top_k):
+        """Return verified tri-state coverage without trusting adapter stats.
+
+        False means explicitly known not truncated, True means definitely
+        truncated, and None means the adapter did not prove either state.
+        An unknown dimension makes complete=False; no unseen data is
+        silently claimed absent. Native RetrievalEngine keeps its original
+        four-field coverage schema and boolean values.
+        """
+        if not isinstance(stats, dict):
+            stats = {}
+
+        def flag(name):
+            value = stats.get(name)
+            return value if type(value) is bool else None
+
+        reported_candidates = stats.get("candidates")
+        reported_returned = stats.get("returned")
+        count_ok = (
+            type(reported_candidates) is int
+            and type(reported_returned) is int
+            and 0 <= reported_returned <= reported_candidates
+            and reported_returned == len(candidates)
+            and reported_returned <= requested_top_k
+        )
+        coverage = {
+            "fts_truncated": flag("fts_truncated"),
+            "filters_truncated": flag("filters_truncated"),
+            "top_k_truncated": (
+                reported_candidates > reported_returned
+                if count_ok else None
+            ),
+        }
+        coverage["complete"] = all(
+            value is False for value in coverage.values()
+        )
+        return coverage, (reported_candidates if count_ok else None)
 
     @staticmethod
     def _validate_consumer(consumer):
