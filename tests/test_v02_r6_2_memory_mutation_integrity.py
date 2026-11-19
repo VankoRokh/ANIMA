@@ -12,6 +12,7 @@ import pytest
 
 from anima.core.event_bus import Event
 from anima.memory.event_log import EventLog
+from anima.memory.composer import RuleBasedComposer
 from anima.memory.knowledge import KnowledgeLayer
 from anima.memory.lifecycle import MemoryLifecycle
 from anima.memory.link_store import LinkStore
@@ -184,6 +185,86 @@ def test_r6_2_raced_open_memory_update_prevents_lost_update(tmp_path):
     assert store.get_memory(memory_id) == updated
     assert store.source_events(memory_id) == before_sources
     assert uid("ev_", 812) not in store.source_events(memory_id)
+
+
+def test_r6_2_pause_in_composer_cannot_race_close_past_writer_lock(
+    tmp_path,
+):
+    """The original audit's pause-only composer interleaving is serialized."""
+    store, log, links, memory_id, event = fixture(tmp_path)
+    entered, resume = ThreadEvent(), ThreadEvent()
+    close_started, close_finished = ThreadEvent(), ThreadEvent()
+    base_composer = RuleBasedComposer()
+
+    class PauseOnlyComposer:
+        def compose_create(self, text):
+            return base_composer.compose_create(text)
+
+        def compose_update(self, previous_content, text):
+            entered.set()
+            if not resume.wait(10):
+                raise AssertionError("R6.2 composer scheduling timed out")
+            return base_composer.compose_update(previous_content, text)
+
+    processor = MemoryProcessor(
+        memory_store=store, event_log=log, link_store=links,
+        composer=PauseOnlyComposer(),
+    )
+    outcome = {}
+    close_outcome = {}
+
+    def update():
+        try:
+            outcome["result"] = processor.process_event(event)
+        except Exception as error:
+            outcome["error"] = error
+
+    def close():
+        close_started.set()
+        try:
+            close_outcome["result"] = MemoryLifecycle(
+                memory_store=store
+            ).close(memory_id, closed_at="2020-01-01T00:05:00+00:00")
+        except Exception as error:
+            close_outcome["error"] = error
+        finally:
+            close_finished.set()
+
+    update_thread = Thread(target=update, daemon=True)
+    close_thread = Thread(target=close, daemon=True)
+    update_thread.start()
+    try:
+        assert entered.wait(10), "Processor did not reach compose_update"
+        close_thread.start()
+        assert close_started.wait(10)
+        # The direct processor already holds BEGIN IMMEDIATE here:
+        # competing lifecycle.close cannot commit until composer resumes.
+        assert not close_finished.wait(0.1)
+    finally:
+        resume.set()
+
+    update_thread.join(10)
+    close_thread.join(10)
+    assert not update_thread.is_alive()
+    assert not close_thread.is_alive()
+    assert "error" not in outcome, outcome.get("error")
+    assert "error" not in close_outcome, close_outcome.get("error")
+    assert outcome["result"]["action"] == "update"
+    assert store.get_memory(memory_id)["status"] == "closed"
+    assert "pressure changed" in store.get_memory(memory_id)["content"]
+    assert store.source_events(memory_id) == [uid("ev_", 811), uid("ev_", 812)]
+
+    # A Knowledge confirmation after both serialized writes sees the final
+    # updated Memory; the prior defect changed an already confirmed source.
+    layer = KnowledgeLayer(memory_store=store)
+    claim = layer.create_candidate(
+        domain="user",
+        statement="Pressure changed in the latest measurement",
+        source_memory_id=memory_id,
+        created_at="2020-01-01T00:06:00+00:00",
+    )["knowledge"]["id"]
+    layer.confirm(claim, confirmed_at="2020-01-01T00:07:00+00:00")
+    assert layer.get(claim)["status"] == "confirmed"
 
 
 @pytest.mark.parametrize("supplied_connection", [False, True])
