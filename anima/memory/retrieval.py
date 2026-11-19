@@ -2,6 +2,7 @@ import re
 import sqlite3
 from datetime import datetime, timezone
 
+from anima.memory.lifecycle_authority import is_authorized_supersession
 from anima.memory.link_store import (
     KNOWLEDGE_ID_PREFIX,
     KNOWLEDGE_STATUSES,
@@ -263,6 +264,23 @@ class RetrievalEngine:
                     active_at=relation_active_at,
                 )
                 for relation in relations:
+                    if relation["type"] == "supersedes":
+                        # R7.2: graph traversal must not award Knowledge
+                        # a neighbor or a relation score from a forged
+                        # lifecycle edge in an older/corrupt database.
+                        # Raw LinkStore.relations_for remains inspectable.
+                        with self.memory_store.transaction() as connection:
+                            stored = connection.execute(
+                                "SELECT * FROM relations WHERE public_id = ?",
+                                (relation["id"],),
+                            ).fetchone()
+                            if (
+                                stored is None
+                                or not is_authorized_supersession(
+                                    connection, stored,
+                                )
+                            ):
+                                continue
                     neighbor = self._relation_neighbor(
                         relation,
                         kind,
