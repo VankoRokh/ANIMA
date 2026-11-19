@@ -75,8 +75,17 @@ def test_r63_finite_support_reused_without_creating_overlap(tmp_path, explicit):
     kwargs = {"source_memory_id": source} if explicit else {}
     result = layer.confirm(claim, confirmed_at=T3, **kwargs)
     assert result["knowledge"]["status"] == "confirmed"
-    assert result["supporting_sources"] == [source]
-    assert result["contradicting_sources"] == []
+    # KnowledgeLayer.describe() deliberately projects Relations at the
+    # current wall-clock time, not at historical confirmed_at. Inspect
+    # effective evidence at the transition instant via LinkStore.
+    active_at_confirmation = core.link_store.relations_for(
+        "knowledge", claim, direction="incoming", active_at=T3,
+    )
+    assert [row["source_memory_id"] for row in active_at_confirmation
+            if row["type"] == "supports"] == [source]
+    assert not any(
+        row["type"] == "contradicts" for row in active_at_confirmation
+    )
     assert core.link_store.relations_for(
         "knowledge", claim, direction="incoming",
     ) == before_relations
