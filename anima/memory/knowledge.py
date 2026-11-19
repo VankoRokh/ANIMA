@@ -403,7 +403,7 @@ class KnowledgeLayer:
         return valid_sources
 
     def _require_published_evidence_raw_sources(
-        self, connection, knowledge_id, *, additional_memory_ids=(),
+        self, connection, knowledge_id, *, at, additional_memory_ids=(),
     ):
         """Validate *every* evidence dependency before publishing Knowledge.
 
@@ -419,7 +419,8 @@ class KnowledgeLayer:
         """
         rows = connection.execute(
             """
-            SELECT public_id, source_kind, source_id, source_memory_id
+            SELECT public_id, source_kind, source_id, source_memory_id,
+                   created_at, valid_until
             FROM relations
             WHERE target_kind = 'knowledge' AND target_id = ?
               AND relation_type IN ('supports', 'contradicts')
@@ -439,7 +440,13 @@ class KnowledgeLayer:
                     "Invalid published Knowledge evidence source: "
                     + relation["public_id"]
                 )
-            self._require_memory(connection, source_id, closed=True)
+            # Historical and future Evidence must have a real owner and
+            # Raw provenance, but only an *active* witness must be CLOSED at
+            # this transition instant. Preserve half-open interval semantics.
+            self._require_memory(
+                connection, source_id,
+                closed=_relation_active_at(relation, at),
+            )
             sources.append(source_id)
         self.memory_store.require_knowledge_raw_sources(connection, sources)
 
@@ -657,7 +664,7 @@ class KnowledgeLayer:
             # R2: a CLOSED Memory with a declared event ID is not
             # sufficient proof that an authoritative Raw Event exists.
             self._require_published_evidence_raw_sources(
-                connection, knowledge_id,
+                connection, knowledge_id, at=confirmed_at,
             )
 
             previous = knowledge["status"]
@@ -744,7 +751,7 @@ class KnowledgeLayer:
                 created_at=challenged_at,
             )
             self._require_published_evidence_raw_sources(
-                connection, knowledge_id,
+                connection, knowledge_id, at=challenged_at,
             )
             connection.execute(
                 """
@@ -834,7 +841,7 @@ class KnowledgeLayer:
                 at=rejected_at,
             )
             self._require_published_evidence_raw_sources(
-                connection, knowledge_id,
+                connection, knowledge_id, at=rejected_at,
             )
 
             connection.execute(
@@ -912,7 +919,7 @@ class KnowledgeLayer:
             # Supersede writes a new confirmed Knowledge without invoking
             # the ordinary confirm transition: enforce the same Raw policy.
             self._require_published_evidence_raw_sources(
-                connection, knowledge_id,
+                connection, knowledge_id, at=superseded_at,
                 additional_memory_ids=[source_memory_id],
             )
             existing = connection.execute(
