@@ -165,7 +165,10 @@ def test_exact_id_can_retrieve_terminal_history(tmp_path):
 
     response = retrieval.retrieve(K_OLD, top_k=3)
 
-    assert ids(response) == [K_OLD, K_CURRENT]
+    # Real lifecycle adds legitimate Memory evidence neighbors to the
+    # superseded claim. Exact-ID priority and the supersedes hop must
+    # remain first; an additional 1-hop Memory result is permitted.
+    assert ids(response)[:2] == [K_OLD, K_CURRENT]
     assert response["results"][0]["record"]["status"] == "superseded"
     assert "exact_id:+100" in response["results"][0]["reasons"]
     assert any(
