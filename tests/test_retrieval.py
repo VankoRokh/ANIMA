@@ -88,19 +88,25 @@ def build_corpus(tmp_path):
         source_event_id=EV_4,
     )
 
-    links.create_knowledge(
-        domain="project",
-        statement="SQLite WAL mode is required for concurrent writes.",
-        status="provisional",
-        created_at=T3,
-        public_id=K_CURRENT,
-    )
-    links.create_knowledge(
+    # Publish the same corpus through the real Knowledge lifecycle.
+    # The old superseded/rejected rows are no longer minted directly by
+    # the storage writer. Keep source/target IDs and statuses unchanged.
+    layer = KnowledgeLayer(memory_store=store)
+    layer.create_candidate(
         domain="project",
         statement="Default SQLite mode is sufficient for concurrent writes.",
-        status="superseded",
+        source_memory_id=M_SQLITE,
         created_at=T1,
         public_id=K_OLD,
+    )
+    layer.confirm(K_OLD, confirmed_at=T1)
+    layer.challenge(K_OLD, M_PROBE, challenged_at=T2)
+    layer.supersede(
+        K_OLD,
+        statement="SQLite WAL mode is required for concurrent writes.",
+        source_memory_id=M_PROBE,
+        superseded_at=T3,
+        public_id=K_CURRENT,
     )
     links.create_knowledge(
         domain="project",
@@ -109,13 +115,16 @@ def build_corpus(tmp_path):
         created_at=T2,
         public_id=K_PROVISIONAL,
     )
-    links.create_knowledge(
+    layer.create_candidate(
         domain="project",
         statement="SQLite cannot be used locally.",
-        status="rejected",
+        source_memory_id=M_SQLITE,
         created_at=T2,
         public_id=K_REJECTED,
     )
+    layer.confirm(K_REJECTED, confirmed_at=T2)
+    layer.challenge(K_REJECTED, M_PROBE, challenged_at=T2)
+    layer.reject(K_REJECTED, rejected_at=T2)
 
     links.create_entity(
         entity_type="technology",
@@ -141,29 +150,6 @@ def build_corpus(tmp_path):
         source_memory_id=M_SQLITE,
         created_at=T3,
     )
-    links.create_relation(
-        source_kind="memory",
-        source_id=M_PROBE,
-        relation_type="supports",
-        target_kind="knowledge",
-        target_id=K_CURRENT,
-        created_at=T3,
-    )
-    # Confirm through the evidence-aware lifecycle, not the raw writer.
-    KnowledgeLayer(memory_store=store).confirm(
-        K_CURRENT, confirmed_at=T3
-    )
-
-    links.create_relation(
-        source_kind="knowledge",
-        source_id=K_CURRENT,
-        relation_type="supersedes",
-        target_kind="knowledge",
-        target_id=K_OLD,
-        source_memory_id=M_SQLITE,
-        created_at=T3,
-    )
-
     return store, links, RetrievalEngine(
         memory_store=store,
         link_store=links,
