@@ -25,6 +25,7 @@
 | VAL / Godot, P5/P6, M0–M6-B2 | Изолированные и live проверки; M6-B2 10/10 CI и 10/10 отдельный ноутбучный JSON; не весь Stage 8 или релиз | [Виртуальная среда и интеграции](virtual-world.md) |
 | ANIMA v0.2 / Continuous Lifecycle | Research / Proposed: эксперимент E0–E6, вне релизных контрактов | [План эксперимента](continuous-lifecycle-v02.md) |
 | E1.1 / World DTOs | Implemented / Lab-only / PARTIAL: типизированные world contracts и локальные unit tests; интеграция с Godot не проверена | [Граница контрактов E1.1](e1-world-contracts-v02.md) |
+| E1.2 / LifecycleWorld | Implemented / Lab-only / PARTIAL: две комнаты, два обхода, локальная видимость; Godot live gate ещё не выполнен | [Первый мир E1.2](e1-lifecycle-world-v02.md) |
 | Core P0–P6 и аудит B1–B4 | Исправления и независимые ограничения; исторический путь реализации | [История Core](../history/core-v0.1.md) |
 | Pi, FAST/DEEP/SLEEP, perception, метапамять | Отдельные пробы и будущие варианты; не навязаны Foundation | [Аппаратные и дальнейшие направления](future-directions.md) |
 
