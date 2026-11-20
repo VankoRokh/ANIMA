@@ -1,0 +1,65 @@
+{
+  "schema": "anima.lifecycle.world_scenario/0.1",
+  "world_version": "lifecycle-grid/0.1",
+  "width": 14,
+  "height": 11,
+  "actor_start": [
+    3,
+    5
+  ],
+  "item": {
+    "ref": "lab.item.crate",
+    "at": [
+      4,
+      5
+    ]
+  },
+  "delivery": {
+    "ref": "lab.zone.delivery",
+    "at": [
+      10,
+      5
+    ]
+  },
+  "partition": {
+    "x": 6,
+    "open_y": [
+      2,
+      5,
+      8
+    ]
+  },
+  "shortcut_blocker": [
+    6,
+    5
+  ],
+  "landmark": {
+    "ref": "lab.landmark.right",
+    "at": [
+      7,
+      5
+    ]
+  },
+  "seeded_obstacles": [
+    [
+      2,
+      2
+    ],
+    [
+      11,
+      2
+    ],
+    [
+      2,
+      8
+    ],
+    [
+      11,
+      8
+    ]
+  ],
+  "sensor": {
+    "kind": "line_of_sight",
+    "radius": 3
+  }
+}
