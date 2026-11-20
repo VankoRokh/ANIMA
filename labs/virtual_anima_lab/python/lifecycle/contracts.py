@@ -18,8 +18,8 @@ ACTION_SCHEMA = "anima.lifecycle.world_action/0.1"
 RECEIPT_SCHEMA = "anima.lifecycle.world_receipt/0.1"
 OPERATION_STATUS_SCHEMA = "anima.lifecycle.world_operation_status/0.1"
 _MAX_CLOCK = 2**63 - 1
-_REF = re.compile(r"[A-Za-z][A-Za-z0-9._:/-]{0,127}\\Z")
-_WORLD_ID = re.compile(r"[a-f0-9]{32}\\Z")
+_REF = re.compile(r"[A-Za-z][A-Za-z0-9._:/-]{0,127}\Z")
+_WORLD_ID = re.compile(r"[a-f0-9]{32}\Z")
 
 
 class WorldContractError(ValueError):
