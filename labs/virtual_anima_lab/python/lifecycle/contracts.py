@@ -127,11 +127,14 @@ def _validate_action(data: Any) -> None:
     _check(data["schema"] == ACTION_SCHEMA, "action schema mismatch")
     _world_identity(data, revision_field="expected_revision")
     _ref(data["operation_id"], "operation_id")
-    _check(type(data["observation_id"]) is str
-           and data["observation_id"].startswith(f"worldobs:{data['world_instance_id']}:{data['epoch']}:")
-           and data["observation_id"].rsplit(":", 1)[-1].isdigit()
-           and int(data["observation_id"].rsplit(":", 1)[-1]) > 0,
+    expected_prefix = f"worldobs:{data['world_instance_id']}:{data['epoch']}:"
+    obs_id = data["observation_id"]
+    _check(type(obs_id) is str and obs_id.startswith(expected_prefix),
            "action must reference observation in its world epoch")
+    seq = obs_id[len(expected_prefix):]
+    _check(1 <= len(seq) <= 19 and seq.isascii() and seq.isdecimal()
+           and seq[0] != "0" and int(seq) <= _MAX_CLOCK,
+           "action observation ID has invalid sample sequence")
     action = data["action_type"]
     _check(type(action) is str and action in ("world.move", "world.pick", "world.drop"),
            "action is not an allowed world capability")
