@@ -86,7 +86,7 @@ func _initialize() -> void:
 	if not reset["ok"] or reset["epoch"] != 2:
 		_finish(world, false, "reset epoch was not updated")
 		return
-	var before := _call(world, 10, "operator", "inspect")["data"]
+	var before: Dictionary = _call(world, 10, "operator", "inspect")["data"]
 	var changed := _call(world, 11, "operator", "set_obstacle", {
 		"at": {"x": 4, "y": 4}, "blocked": true,
 	})
@@ -98,7 +98,7 @@ func _initialize() -> void:
 		_finish(world, false, "new obstacle not reflected in observation")
 		return
 	var again := _call(world, 13, "operator", "reset")
-	var after := _call(world, 14, "operator", "inspect")["data"]
+	var after: Dictionary = _call(world, 14, "operator", "inspect")["data"]
 	if not again["ok"] or after["revision"] != 0:
 		_finish(world, false, "reset did not clear revision")
 		return
