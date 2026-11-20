@@ -351,7 +351,8 @@ func _process(_delta: float) -> void:
 			_peer.disconnect_from_host()
 			_peer = null
 			return
-		_buffer += (reply[1] as PackedByteArray).get_string_from_utf8()
+		var bytes: PackedByteArray = reply[1]
+		_buffer += bytes.get_string_from_utf8()
 	if _buffer.to_utf8_buffer().size() > MAX_LINE_BYTES:
 		_peer.disconnect_from_host()
 		_peer = null
