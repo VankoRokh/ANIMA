@@ -95,6 +95,8 @@ def test_invalid_observations_fail_closed(change):
     lambda a: a.update(observation_id="worldobs:" + "b" * 32 + ":1:1"),
     lambda a: a.update(expected_revision=1.0),
     lambda a: a.update(operation_id=""),
+    lambda a: a.update(observation_id=f"worldobs:{WORLD}:1:" + "9" * 600),
+    lambda a: a.update(observation_id=f"worldobs:{WORLD}:1:²"),
     lambda a: a["arguments"].update(direction="UP"),
 ])
 def test_invalid_actions_fail_closed(change):
