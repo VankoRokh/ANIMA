@@ -122,3 +122,24 @@ python -m labs.virtual_anima_lab.python.m2_integrated_gate \
 ```
 
 Runner сам создаёт/останавливает три headless-инстанса на временных loopback портах, использует только одноразовые данные и не затрагивает рабочую ANIMA. Не использовать этот тест с сетевым адресом, физическими исполнительными устройствами и приватными данными. Используется `os._exit`, **не** физическое отключение питания или реальный `SIGKILL`. Успех приёмки M2 не означает автономного планирования на основе памяти.
+
+
+## E1.2 — отдельный LifecycleWorld (эксперимент v0.2)
+
+**Статус:** лабораторная сцена и тесты добавлены; Godot live-gate ещё не подтверждён. Не является заменой P5/P6 Main, не управляет Core и не выполняет действия от имени ANIMA.
+
+```bash
+GODOT_BIN="$HOME/.local/opt/godot/Godot_v4.7.2-stable_linux.x86_64"
+
+# Из корня репозитория; все P5/P6 останутся на Main.tscn:
+"$GODOT_BIN" --headless --path labs/virtual_anima_lab/godot --script res://LifecycleWorldTest.gd
+python -m labs.virtual_anima_lab.python.lifecycle.world_smoke --godot "$GODOT_BIN" --seed 7
+
+# Наглядная отдельная сцена (по умолчанию порт 46029):
+"$GODOT_BIN" --path labs/virtual_anima_lab/godot res://LifecycleWorld.tscn -- \
+  --lifecycle-port 46029 --lifecycle-seed 7
+```
+
+Agent через `val.bridge/0.2` сейчас может только `hello` и `observe`. Текст маршрута, полная карта, инспекция и управление препятствиями агенту не доступны. Операторские fixture-команды существуют только для изолированного тестового стенда и не аутентифицируют процесс. Реальное `world.move/pick/drop`, admission, effect proof и операции восстановления относятся к E1.3–E1.4.
+
+Дизайн, геометрия и статус проверок: [E1.2](../../docs/RESEARCH/e1-lifecycle-world-v02.md).
