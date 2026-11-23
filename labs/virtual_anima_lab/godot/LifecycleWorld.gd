@@ -902,7 +902,10 @@ func _refresh_debug_panel() -> void:
 			int(event.get("event_seq", -1)), String(event.get("actor", "?")),
 			String(event.get("event", "?"))
 		])
-	_debug_panel.text = "\n".join(lines)
+	var display_text := ""
+	for line in lines:
+		display_text += line + "\n"
+	_debug_panel.text = display_text
 
 
 func _refresh_status() -> void:
