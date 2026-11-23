@@ -157,6 +157,33 @@ def capabilities(binary: str, seed: int, logdir: Path) -> dict:
     return results
 
 
+def role_spoof_probe(binary: str, seed: int, logdir: Path) -> dict:
+    """Record the deliberate trust limitation; not a production security PASS.
+
+    A client that can choose its own 'operator' role can inspect hidden world
+    truth. E2 must deny raw socket/role control to FAST and untrusted clients.
+    """
+    with RunningWorld(
+        binary, seed, [], logdir / "role-spoof-probe.log",
+    ) as world:
+        client = world.client
+        assert client is not None
+        rejected(client, "FORBIDDEN", "inspect")
+        client.role = "operator"
+        designer_truth = client.call("inspect")["data"]
+        require(designer_truth["seed"] == seed and
+                len(designer_truth["walls"]) > 0,
+                "operator-mode probe returned no world truth")
+        client.role = "agent"
+        rejected(client, "FORBIDDEN", "inspect")
+    return {
+        "raw_local_role_impersonation_possible": True,
+        "operator_truth_exposed_after_role_change": True,
+        "eligible_for_untrusted_agent_or_physical_actuator": False,
+        "assessment": "TRUST_GAP_KNOWN_LAB_ONLY",
+    }
+
+
 def discard_response_without_reading(port: int, a: WorldAction) -> None:
     """Real TCP send followed by deliberate application-side response discard.
 
@@ -433,6 +460,7 @@ def main() -> int:
             tmp = Path(directory)
             tmp.mkdir(parents=True, exist_ok=True)
             mode_checks = capabilities(godot, 7, tmp)
+            trust_probe = role_spoof_probe(godot, 7, tmp)
             traces = [
                 complete_route(godot, seed, route, tmp)
                 for seed in (7, 8) for route in ("top", "bottom")
@@ -443,6 +471,7 @@ def main() -> int:
             "schema": "anima.e1min.independent_lab_audit/0.1",
             "status": "E1_MIN_INDEPENDENT_LIVE_PASS",
             "capability_profiles": mode_checks,
+            "trust_probe": trust_probe,
             "routes": traces,
             "process_restart": restarts,
             "capacity_blackbox": capacity,
