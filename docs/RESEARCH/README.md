@@ -31,6 +31,7 @@
 | E1-min / Independent Acceptance | **PASS_LAB_RESTRICTED:** 5/5 CI, 4 black-box маршрута, 256 операций; доверенный operator порт и persistency **не доказаны**. Только lab, не release/E2 approval | [Вердикт и доказательства](e1-min-acceptance-report-v02.md) · [ТЗ](e1-min-acceptance-brief-v02.md) |
 | E2.1 / Core-owned guarded gateway | **PASS_LAB_APP_BOUNDARY:** Core-bound read-only observation, guarded bearer roles, pinning и raw TCP spoof denial; **не** OS sandbox / Raw / Stage6 execution | [Вердикт и доказательства](e2-1-acceptance-report-v02.md) · [Контракт](e2-core-world-boundary-v02.md) |
 | E2.2 / Raw capture and provenance | **PASS_LAB_RAW_POINTER:** atomic complete WorldObservation + Core digest event, crash replay; **не** self-contained Core Raw / Context / FAST / Knowledge | [Вердикт и доказательства](e2-2-acceptance-report-v02.md) · [Контракт](e2-raw-provenance-v02.md) |
+| E2.3–E3 / Cognitive initiative and world perception | **Design / направление согласовано, не реализовано:** LLM инициирует типизированные cognition steps, Core допускает, Godot — лабораторный стенд, а не цель; сравнение deterministic/stub/FAST | [Контракт и границы](e2-cognitive-initiative-v02.md) |
 | Core P0–P6 и аудит B1–B4 | Исправления и независимые ограничения; исторический путь реализации | [История Core](../history/core-v0.1.md) |
 | Pi, FAST/DEEP/SLEEP, perception, метапамять | Отдельные пробы и будущие варианты; не навязаны Foundation | [Аппаратные и дальнейшие направления](future-directions.md) |
 
