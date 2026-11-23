@@ -189,7 +189,7 @@ bash scripts/run_e14_live_gate.sh "$GODOT_BIN"
  
 ## E2.1 — Core-bound read-only gateway и guarded bearer mode
 
-**Исследовательский кандидат, не release.** Обычные E1.2–E1.4 опции сохранены, включая прежние self-declared роли. Новый opt-in `--lifecycle-guarded` использует **три разные** сильные ключевые строки (observer, executor, operator) из переменных окружения процесса Godot. Ключи *не* являются параметрами CLI или данными `hello`. `role=operator` без operator credential отвергается даже при прямом TCP-подключении. Ключ observer не разрешает `act` и `operation_status`, а executor не разрешает `observe`. Для теста ключи генерируются одноразово.
+**Validated Lab / E2.1 PASS_LAB_APP_BOUNDARY** ([CI 45170677368](https://github.com/VankoRokh/ANIMA/actions/runs/45170677368), 2380 pytest PASS на Python 3.12–3.14 и Godot, E1-min regression PASS). Не release и не E2 full. Обычные E1.2–E1.4 опции сохранены, включая прежние self-declared роли. Новый opt-in `--lifecycle-guarded` использует **три разные** сильные ключевые строки (observer, executor, operator) из переменных окружения процесса Godot. Ключи *не* являются параметрами CLI или данными `hello`. `role=operator` без operator credential отвергается даже при прямом TCP-подключении. Ключ observer не разрешает `act` и `operation_status`, а executor не разрешает `observe`. Для теста ключи генерируются одноразово.
 
 `labs/virtual_anima_lab/python/lifecycle/core_gateway.py` привязан к зарегистрированному `CoreAssembly` и создаёт только типизированные `WorldObservation`; он сохраняет `world_instance_id/epoch/sample_seq/revision/tick` в отдельной SQLite, отклоняет смену мира и откат часов. Он не является вторым исполнителем и не подключает FAST/Raw/Goal.
 
