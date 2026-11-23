@@ -120,6 +120,19 @@ def sequential(binary: str, seed: int, root: Path) -> dict:
         view = None
         for index, heading in enumerate(headings):
             view = observer.observe().as_dict()
+            require(view["source_ref"] == "lab.sensor.anima.vision", "sensor source mislabeled")
+            if index == 0:
+                require(any(row["range_milli_cells"] > 3000 for row in view["readings"]),
+                        "view was artificially restricted to the former three-cell radius")
+                legacy = {
+                    "schema": "anima.lifecycle.world_action/0.1",
+                    "world_instance_id": view["world_instance_id"], "epoch": view["epoch"],
+                    "expected_revision": view["revision"], "observation_id": view["sample_id"],
+                    "operation_id": "legacy_compass_move", "action_type": "world.move",
+                    "arguments": {"direction": "N"},
+                }
+                with LabClient(port, role="agent", protocol=PROTOCOL_V2) as executor:
+                    denied(executor, "act", keys[1], "INVALID_ACTION", action=legacy)
             require("self_position" not in view and "seed" not in view and
                     "heading" not in view and "walls" not in view, "absolute view state leaked")
             expected = oracle(truth, heading)
