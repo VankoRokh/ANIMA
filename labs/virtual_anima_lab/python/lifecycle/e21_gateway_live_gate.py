@@ -9,12 +9,14 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
+import secrets
 import subprocess
 import tempfile
 from pathlib import Path
 
 from anima.core.assembly import build_core
-from labs.virtual_anima_lab.python.lab_client import LabClient, PROTOCOL_V2
+from labs.virtual_anima_lab.python.lab_client import LabClient, LabRejected, PROTOCOL_V2
 from .core_gateway import (
     SOURCE_REF, CoreBoundObservationGateway, WorldBoundaryError,
     lifecycle_source_registration,
@@ -35,15 +37,19 @@ def core(root: Path):
     )
 
 
-def start(binary: str, port: int, seed: int, log: Path):
+def start(binary: str, port: int, seed: int, log: Path, keys: tuple[str, str, str]):
     output = log.open("w", encoding="utf-8")
     process = subprocess.Popen(
         [binary, "--headless", "--path", str(PROJECT),
          "res://LifecycleWorld.tscn", "--",
          "--lifecycle-port", str(port),
          "--lifecycle-seed", str(seed),
-         "--lifecycle-effects", "--lifecycle-ledger"],
+         "--lifecycle-effects", "--lifecycle-ledger", "--lifecycle-guarded"],
         cwd=PROJECT, stdout=output, stderr=subprocess.STDOUT,
+        env={**os.environ,
+             "ANIMA_LIFECYCLE_OBSERVER_KEY": keys[0],
+             "ANIMA_LIFECYCLE_EXECUTOR_KEY": keys[1],
+             "ANIMA_LIFECYCLE_OPERATOR_KEY": keys[2]},
     )
     return process, output
 
@@ -62,13 +68,61 @@ def finish(process, output):
 def run_once(binary: str, seed: int, evidence: Path) -> dict:
     port = _port()
     data_dir = evidence / f"instance-{seed}"
+    keys = tuple(secrets.token_urlsafe(32) for _ in range(3))
+    observer_key, executor_key, operator_key = keys
     assembly = core(data_dir)
-    adapter = CoreBoundObservationGateway(assembly, port=port)
-    process, log_output = start(binary, port, seed, evidence / f"godot-{seed}.log")
+    adapter = CoreBoundObservationGateway(
+        assembly, port=port, observer_key=observer_key,
+    )
+    process, log_output = start(
+        binary, port, seed, evidence / f"godot-{seed}.log", keys,
+    )
     old_world_id = None
     try:
         first_client = _wait(process, port)
         first_client.close()
+        # Direct loopback role spoof is rejected in guarded mode.
+        with LabClient(port, role="operator", protocol=PROTOCOL_V2) as attacker:
+            for credentials in ({}, {"auth": observer_key}, {"auth": executor_key}):
+                try:
+                    attacker.call("inspect", **credentials)
+                except LabRejected as exc:
+                    require(exc.error == "UNAUTHORIZED",
+                            "operator spoof was not rejected by Godot itself")
+                else:
+                    raise AssertionError("raw socket obtained operator world truth")
+            truth = attacker.call("inspect", auth=operator_key)["data"]
+            require(truth["seed"] == seed, "trusted operator could not inspect")
+        with LabClient(port, role="agent", protocol=PROTOCOL_V2) as raw:
+            try:
+                raw.call("observe")
+            except LabRejected as exc:
+                require(exc.error == "UNAUTHORIZED",
+                        "anonymous world observation was accepted")
+            else:
+                raise AssertionError("unauthenticated observe accepted")
+            observer_hello = raw.call("hello", auth=observer_key)["data"]
+            require(observer_hello["capabilities"] == ["observe"] and
+                    observer_hello["auth_mode"] == "guarded" and
+                    "seed" not in observer_hello,
+                    "observer credential improperly grants extra capabilities")
+            try:
+                raw.call("act", auth=observer_key, action={})
+            except LabRejected as exc:
+                require(exc.error == "FORBIDDEN",
+                        "read-only key gained execution authority")
+            else:
+                raise AssertionError("observer key issued act")
+            executor_hello = raw.call("hello", auth=executor_key)["data"]
+            require(executor_hello["capabilities"] == ["act", "operation_status"],
+                    "executor was given observation or operator rights")
+            try:
+                raw.call("observe", auth=executor_key)
+            except LabRejected as exc:
+                require(exc.error == "FORBIDDEN",
+                        "executor key gained observation rights")
+            else:
+                raise AssertionError("executor read sensor directly")
         first = adapter.observe()
         a = first.as_dict()
         old_world_id = a["world_instance_id"]
@@ -84,7 +138,7 @@ def run_once(binary: str, seed: int, evidence: Path) -> dict:
         # Trusted Core identity, same storage, new process object: binding
         # must survive Core-side reopen with the *same* Godot still running.
         reopened = core(data_dir)
-        adapter = CoreBoundObservationGateway(reopened, port=port)
+        adapter = CoreBoundObservationGateway(reopened, port=port, observer_key=observer_key)
         require(adapter.binding_snapshot()["world_instance_id"] == old_world_id,
                 "Core reopen discarded the world identity")
         third = adapter.observe().as_dict()
@@ -102,6 +156,7 @@ def run_once(binary: str, seed: int, evidence: Path) -> dict:
         with LabClient(port, role="operator", protocol=PROTOCOL_V2) as operator:
             changed = operator.call(
                 "set_obstacle", at={"x": 4, "y": 4}, blocked=True,
+                auth=operator_key,
             )
             require(changed["data"]["changed"], "fixture operator did not mutate world")
         post_change = adapter.observe().as_dict()
@@ -112,7 +167,7 @@ def run_once(binary: str, seed: int, evidence: Path) -> dict:
 
         # Reset revokes the entire binding, even when process ID is unchanged.
         with LabClient(port, role="operator", protocol=PROTOCOL_V2) as operator:
-            reset = operator.call("reset")["data"]
+            reset = operator.call("reset", auth=operator_key)["data"]
         require(reset["epoch"] == a["epoch"] + 1, "reset did not increment epoch")
         before_reject = adapter.binding_snapshot()
         try:
@@ -130,15 +185,15 @@ def run_once(binary: str, seed: int, evidence: Path) -> dict:
     # New Godot process and new port, same Core storage. No auto-rebind.
     next_port = _port()
     next_process, next_output = start(
-        binary, next_port, seed, evidence / f"godot-{seed}-restarted.log",
+        binary, next_port, seed, evidence / f"godot-{seed}-restarted.log", keys,
     )
     try:
         client = _wait(next_process, next_port)
-        newer_id = client.call("hello")["data"]["world_instance_id"]
+        newer_id = client.call("hello", auth=observer_key)["data"]["world_instance_id"]
         client.close()
         require(newer_id != old_world_id, "fresh world process reused incarnation")
         reopened = core(data_dir)
-        adapter = CoreBoundObservationGateway(reopened, port=next_port)
+        adapter = CoreBoundObservationGateway(reopened, port=next_port, observer_key=observer_key)
         before = adapter.binding_snapshot()
         try:
             adapter.observe()
@@ -159,8 +214,10 @@ def run_once(binary: str, seed: int, evidence: Path) -> dict:
         "core_raw_events_written": 0,
         "world_effects_issued_by_gateway": 0,
         "core_execution_registered": False,
-        "role_authenticated": False,
-        "raw_socket_isolated_from_untrusted_OS_process": False,
+        "role_bearer_guard_enabled": True,
+        "operator_spoof_rejected_by_server": True,
+        "observer_credential_can_execute": False,
+        "os_process_and_secret_isolation_verified": False,
     }
 
 
