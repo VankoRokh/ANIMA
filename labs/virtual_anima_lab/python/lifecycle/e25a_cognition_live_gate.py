@@ -48,7 +48,7 @@ def case(binary: str, seed: int, root: Path):
          "res://LifecycleWorld.tscn", "--",
          "--lifecycle-port", str(port), "--lifecycle-seed", str(seed),
          "--lifecycle-guarded", "--lifecycle-effects", "--lifecycle-ledger",
-         "--lifecycle-egocentric"],
+         "--lifecycle-egocentric", "--lifecycle-debug-ui"],
         cwd=PROJECT, stdout=logfile, stderr=subprocess.STDOUT,
         env={**os.environ,
              "ANIMA_LIFECYCLE_OBSERVER_KEY": keys[0],
