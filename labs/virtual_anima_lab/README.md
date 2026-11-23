@@ -107,6 +107,27 @@ PYTHON_BIN=~/Projects/ANIMA/.venv/bin/python bash scripts/run_visual_decision_la
 
 **CI:** `bash scripts/run_visual_decision_gate.sh "$GODOT_BIN"` (headless Godot + реальный Core + API STEP/RUN + регрессия E1.2–E2.5a). Формальная приёмка/ограничения: [E2.5b research report](../../docs/RESEARCH/e2-5b-visual-decision-lab-acceptance-v02.md).
 
+## E2.5c — Core Stage2/Stage6 spatial actions (opt-in)
+
+Новая экспериментальная команда использует **настоящие** `GoalStore`, `TaskStore`, `ExecutionStore`, `ExecutionAction`, `VerificationSpec` и `SandboxExecutor` для поворотов и шагов. В отличие от базового E2.5b, Stage6 подготавливает и исполняет `world.turn/step`, а завершение Task допускается только после сопоставления Stage6 receipt, Godot readback и следующего Core-backed Raw.
+
+```bash
+cd ~/Projects/ANIMA
+git fetch origin work/v02-e25c-core-spatial-execution
+git worktree add --detach ../ANIMA-visual-stage6 origin/work/v02-e25c-core-spatial-execution
+cd ~/Projects/ANIMA-visual-stage6
+
+PYTHON_BIN=~/Projects/ANIMA/.venv/bin/python bash scripts/run_visual_stage6_lab.sh
+# или с другим seed:
+PYTHON_BIN=~/Projects/ANIMA/.venv/bin/python bash scripts/run_visual_stage6_lab.sh --seed 8
+```
+
+Закрыть прежний Godot перед запуском. В GUI ожидается `Admission: CORE_STAGE2_TASK_STAGE6`, `Core Goal: active` при старте; нажать **STEP** (повернуться) и **RUN** (выбрать приближающий шаг и завершить Stage2 Goal). Лабораторные Raw и Stage6 DB находятся в отдельной временной директории, путь печатается в терминале. Пауза действует между шагами, не прерывает атомарный сетевой эффект.
+
+**Строгая граница:** `CoreDoorExecution` и `CoreGoalDecision` всё ещё ориентированы на свои исходные контракты; E2.5c — новый типизированный gateway к существующим Stage2/Stage6 владельцам lifecycle, **не** универсальный автономный планировщик. FAST пока выключена. Допуск отказоустойчив, но cross-DB E4, независимый физический sensor proof, полноценный recovery после перезапуска и same-UID security остаются открыты.
+
+Для проверки: `bash scripts/run_stage6_visual_gate.sh "$GODOT_BIN"`. [Отчёт E2.5c](../../docs/RESEARCH/e2-5c-stage6-spatial-acceptance-v02.md).
+
 ## Проверки
 
 Из корня репозитория при закрытом окне Lab:
