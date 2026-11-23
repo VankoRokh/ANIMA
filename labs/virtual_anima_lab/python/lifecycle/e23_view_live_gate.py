@@ -39,7 +39,7 @@ def cell(raw):
     return int(raw["x"]), int(raw["y"])
 
 
-def oracle(truth: dict, facing: tuple[int, int]) -> set[tuple[str, int, int]]:
+def oracle(truth: dict, facing: tuple[int, int]) -> dict[tuple[str, int, int], tuple[int, int]]:
     """Independent designer-truth oracle; never feed these cells to the actor."""
     actor = cell(truth["actor"])
     walls = {cell(c) for c in truth["walls"]}
@@ -72,11 +72,13 @@ def oracle(truth: dict, facing: tuple[int, int]) -> set[tuple[str, int, int]]:
         return (round(math.degrees(math.atan2(right, fwd)) * 1000),
                 round(math.hypot(dx, dy) * 1000))
 
-    result = set()
+    result = {}
     for category, position in entities:
         descriptor = in_view(position)
         if descriptor is not None:
-            result.add((category, *descriptor))
+            signature = (category, *descriptor)
+            require(signature not in result, "duplicate oracle signature")
+            result[signature] = position
     return result
 
 
@@ -125,12 +127,13 @@ def sequential(binary: str, seed: int, root: Path) -> dict:
                 (row["category"], row["bearing_mdeg"], row["range_milli_cells"])
                 for row in view["readings"]
             }
-            require(actual == expected,
+            require(actual == set(expected),
                     f"view geometry/occlusion differs from oracle seed={seed} heading={heading}: {actual ^ expected}")
             for row in view["readings"]:
                 require("cell" not in row and "x" not in row and "y" not in row and
                         "lab.wall." not in row["entity_ref"], "coordinate leak in reading")
-                key = (row["category"], row["bearing_mdeg"], row["range_milli_cells"])
+                signature = (row["category"], row["bearing_mdeg"], row["range_milli_cells"])
+                key = (row["category"], expected[signature])
                 if key in opaque_ids:
                     require(opaque_ids[key] == row["entity_ref"], "opaque ID changed across turn")
                 opaque_ids[key] = row["entity_ref"]
