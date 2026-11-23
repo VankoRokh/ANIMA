@@ -288,23 +288,31 @@ class VisualDecisionSession:
                 # Explicit LAB-only admission: admissible kinds/directions are
                 # constrained by EgocentricAction. Core event provenance is
                 # checked by E24 before signing decision; NOT native Stage6.
-                proof = self.memory.raw_evidence(view["sample_id"])
+                self.memory.raw_evidence(view["sample_id"])
+                context_digest = _sha(self.memory.context_for_cognition(
+                    memory_enabled=self.memory_enabled
+                ))
                 with closing(self.memory._connect()) as db:
-                    raw = db.execute(
-                        "SELECT core_event_id FROM e24_raw WHERE sample_id=?",
-                        (view["sample_id"],),
-                    ).fetchone()
-                    if raw is None or not raw["core_event_id"]:
-                        raise VisualRunnerError("unproven source event")
-                    db.execute(
-                        "INSERT INTO visual_decisions(sequence,pre_sample_id,"
-                        "source_event_id,memory_context_sha256,proposal_json,"
-                        "admission,reason) VALUES(?,?,?,?,?,?,?)",
-                        (self.sequence, view["sample_id"], raw["core_event_id"],
-                         _sha(self.memory.context_for_cognition(
-                             memory_enabled=self.memory_enabled
-                         )), action.canonical_json, "LAB_ADMITTED", choice.reason),
-                    )
+                    db.execute("BEGIN IMMEDIATE")
+                    try:
+                        raw = db.execute(
+                            "SELECT core_event_id FROM e24_raw WHERE sample_id=?",
+                            (view["sample_id"],),
+                        ).fetchone()
+                        if raw is None or not raw["core_event_id"]:
+                            raise VisualRunnerError("unproven source event")
+                        db.execute(
+                            "INSERT INTO visual_decisions(sequence,pre_sample_id,"
+                            "source_event_id,memory_context_sha256,proposal_json,"
+                            "admission,reason) VALUES(?,?,?,?,?,?,?)",
+                            (self.sequence, view["sample_id"], raw["core_event_id"],
+                             context_digest, action.canonical_json,
+                             "LAB_ADMITTED", choice.reason),
+                        )
+                        db.commit()  # Durable admission BEFORE world effect.
+                    except BaseException:
+                        db.rollback()
+                        raise
                 self._event("ADMIT", "LAB_ADMITTED (not Stage6)",
                             evidence=raw["core_event_id"])
                 with LabClient(self.world_port, role="agent",
@@ -326,13 +334,22 @@ class VisualDecisionSession:
                 if not trans or trans[-1]["operation_id"] != operation:
                     raise VisualRunnerError("new Raw does not verify world transition")
                 with closing(self.memory._connect()) as db:
-                    db.execute(
-                        "UPDATE visual_decisions SET receipt_json=?,"
-                        "after_sample_id=?,outcome=? WHERE sequence=?",
-                        (_json(confirmed), observed.sample_id,
-                         "VERIFIED_EFFECT" if receipt["effect_applied"]
-                         else "VERIFIED_BLOCKED", self.sequence),
-                    )
+                    db.execute("BEGIN IMMEDIATE")
+                    try:
+                        updated = db.execute(
+                            "UPDATE visual_decisions SET receipt_json=?,"
+                            "after_sample_id=?,outcome=? "
+                            "WHERE sequence=? AND outcome IS NULL",
+                            (_json(confirmed), observed.sample_id,
+                             "VERIFIED_EFFECT" if receipt["effect_applied"]
+                             else "VERIFIED_BLOCKED", self.sequence),
+                        )
+                        if updated.rowcount != 1:
+                            raise VisualRunnerError("missing or already finalized decision")
+                        db.commit()  # Durable verified outcome AFTER new Core Raw.
+                    except BaseException:
+                        db.rollback()
+                        raise
                 self.last_outcome = {
                     "status": "VERIFIED_EFFECT" if receipt["effect_applied"] else "VERIFIED_BLOCKED",
                     "operation_id": operation, "after_sample_id": observed.sample_id,
