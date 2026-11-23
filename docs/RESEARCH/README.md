@@ -23,10 +23,11 @@
 | Memory Encoding E1–E4 | E1 shadow PASS; E2/E3 — отдельные лабораторные границы; E4 authority/crash/scale только в изолированной лаборатории, production **NO-GO** | [Кодирование и отзыв](memory-encoding.md) |
 | Stage 7 / Semantic Boundary | Frozen read-only `classify_relation/0.1`; deterministic baseline PASS, model residual Inconclusive | [Семантика](semantics.md) |
 | VAL / Godot, P5/P6, M0–M6-B2 | Изолированные и live проверки; M6-B2 10/10 CI и 10/10 отдельный ноутбучный JSON; не весь Stage 8 или релиз | [Виртуальная среда и интеграции](virtual-world.md) |
-| ANIMA v0.2 / Continuous Lifecycle | Research / Proposed: эксперимент E0–E6, вне релизных контрактов | [План эксперимента](continuous-lifecycle-v02.md) |
-| E1.1 / World DTOs | Implemented / Lab-only / PARTIAL: типизированные world contracts и локальные unit tests; интеграция с Godot не проверена | [Граница контрактов E1.1](e1-world-contracts-v02.md) |
-| E1.2 / LifecycleWorld | **Validated Lab / E1.2 PASS** (Godot 4.7.2, Python 3.12–3.14, P5/P6, M2); **E1-min ещё не принят**, агентские эффекты отложены до E1.3/E1.4 | [Первый мир и доказательства E1.2](e1-lifecycle-world-v02.md) |
-| E1.3 / Virtual effects & readback | **Validated Lab / E1.3 PASS:** opt-in `world.move/pick/drop`, свежий sensor proof; E1.4 ledger/recovery и E1-min ещё не приняты | [Действия мира E1.3](e1-world-effects-v02.md) |
+| ANIMA v0.2 / Continuous Lifecycle | **Research / Active:** E0 выявил пробелы, E1.2–E1.4 проверены в лаборатории; E1-min и E2 не приняты, это не функции релиза | [Исторический план эксперимента](continuous-lifecycle-v02.md) |
+| E1.1 / World DTOs | **Validated Lab / в составе E1.2–E1.4**: типизированные world contracts, отрицательные unit и real-Godot наблюдения/действия, без доказательства аутентификации | [Граница контрактов E1.1](e1-world-contracts-v02.md) |
+| E1.2 / LifecycleWorld | **Validated Lab / E1.2 PASS**: observe-only по умолчанию; реальный Godot 4.7.2, P5/P6, M2; действия включаются только в E1.3/E1.4 opt-in режимах | [Первый мир и доказательства E1.2](e1-lifecycle-world-v02.md) |
+| E1.3 / Virtual effects & readback | **Validated Lab / E1.3 PASS:** opt-in `world.move/pick/drop`, свежий sensor proof; журнал операций добавляется отдельно в E1.4 | [Действия мира E1.3](e1-world-effects-v02.md) |
+| E1.4 / Operation Ledger | **Validated Lab / E1.4 PASS:** opt-in 256-record journal, replay/status/conflict, fail-closed `UNKNOWN`; **E1-min и E2 ещё не приняты** | [Журнал и доказательства E1.4](e1-operation-ledger-v02.md) |
 | Core P0–P6 и аудит B1–B4 | Исправления и независимые ограничения; исторический путь реализации | [История Core](../history/core-v0.1.md) |
 | Pi, FAST/DEEP/SLEEP, perception, метапамять | Отдельные пробы и будущие варианты; не навязаны Foundation | [Аппаратные и дальнейшие направления](future-directions.md) |
 

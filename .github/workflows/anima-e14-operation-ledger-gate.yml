@@ -1,0 +1,80 @@
+name: ANIMA v0.2 E1.4 Operation Ledger and Reconciliation
+
+on:
+  push:
+    branches:
+      - work/v02-e14-operation-ledger
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: anima-e14-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  e14-offline:
+    name: Python ${{ matrix.python-version }} / E1.4 and full regression
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ['3.12', '3.13', '3.14']
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v6
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Install test dependencies
+        run: python -m pip install -r requirements-dev.txt
+      - name: E1.1–E1.4 contract, proof, reconciliation
+        run: |
+          python -m pytest -q -p no:cacheprovider \
+            tests/test_lifecycle_world_contracts.py \
+            tests/test_lifecycle_scenario.py \
+            tests/test_lifecycle_world_verification.py \
+            tests/test_lifecycle_world_recovery.py
+      - name: Documentation and syntax
+        run: bash scripts/check.sh
+      - name: Full Python regression
+        run: python -m pytest -q -p no:cacheprovider
+
+  e14-godot:
+    name: Real Godot 4.7.2 / E1.4 + prior live gates
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.14'
+      - name: Install test dependencies
+        run: python -m pip install -r requirements-dev.txt
+      - name: Install verified official Godot 4.7.2
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/godot"
+          curl --fail --location --retry 3 --retry-delay 2 \
+            --output "$RUNNER_TEMP/godot/godot.zip" \
+            https://github.com/godotengine/godot-builds/releases/download/4.7.2-stable/Godot_v4.7.2-stable_linux.x86_64.zip
+          echo "cadd3204e728a35d3f13adb7fd0d7902636b79f6b95c40c265eb73b6c35329e4  $RUNNER_TEMP/godot/godot.zip" | sha256sum -c -
+          unzip -q "$RUNNER_TEMP/godot/godot.zip" -d "$RUNNER_TEMP/godot"
+          chmod +x "$RUNNER_TEMP/godot/Godot_v4.7.2-stable_linux.x86_64"
+          echo "GODOT_BIN=$RUNNER_TEMP/godot/Godot_v4.7.2-stable_linux.x86_64" >> "$GITHUB_ENV"
+      - name: Native/world E1.2, E1.3, E1.4, P5/P6, M2 and recovery
+        env:
+          E14_REPORT_DIR: ${{ runner.temp }}/anima-e14-evidence
+        run: bash scripts/run_e14_live_gate.sh
+      - name: Preserve raw logs and reports even on failure
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: anima-e14-godot-4-7-2-evidence
+          path: ${{ runner.temp }}/anima-e14-evidence/
+          if-no-files-found: warn
+          retention-days: 14
