@@ -43,6 +43,10 @@ func _initialize() -> void:
 	world._seed = 7
 	world._effects_enabled = true
 	world._reset_world()
+	# Independent geometry parity: the JSON oracle does not execute Godot wall construction.
+	if world._blocked(Vector2i(6, 2)) or world._blocked(Vector2i(6, 8)) or not world._blocked(Vector2i(6, 5)):
+		_finish(world, false, "Godot passage topology disagrees with seeded fixture")
+		return
 	var hello := _call(world, 1, "agent", "hello")
 	if not hello["ok"] or hello["data"]["capabilities"] != ["observe", "act"]:
 		_finish(world, false, "opt-in capability not visible")
