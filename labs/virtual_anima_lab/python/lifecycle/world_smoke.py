@@ -67,7 +67,7 @@ def _one_run(binary: str, seed: int, log: Path) -> dict:
         proc = subprocess.Popen(
             [binary, "--headless", "--path", str(PROJECT),
              "res://LifecycleWorld.tscn", "--",
-             "--lifecycle-port", str(port), "--lifecycle-seed", str(seed)],
+             "--lifecycle-port", str(port), "--lifecycle-seed", str(seed), "--lifecycle-debug-ui"],
             cwd=PROJECT, stdout=output, stderr=subprocess.STDOUT,
         )
         client = None
