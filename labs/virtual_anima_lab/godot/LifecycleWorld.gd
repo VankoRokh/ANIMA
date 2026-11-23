@@ -7,6 +7,7 @@ const PROTOCOL := "val.bridge/0.2"
 const OBSERVATION_SCHEMA := "anima.lifecycle.world_observation/0.1"
 const ACTION_SCHEMA := "anima.lifecycle.world_action/0.1"
 const RECEIPT_SCHEMA := "anima.lifecycle.world_receipt/0.1"
+const OPERATION_STATUS_SCHEMA := "anima.lifecycle.world_operation_status/0.1"
 const WORLD_VERSION := "lifecycle-grid/0.1"
 const WIDTH := 14
 const HEIGHT := 11
@@ -15,6 +16,7 @@ const SENSE_RADIUS := 3
 const MAX_LINE_BYTES := 8192
 const MAX_DYNAMIC_OBSTACLES := 8
 const MAX_E13_OPERATIONS := 256
+const MAX_E14_LEDGER_ENTRIES := 256
 
 var _server: TCPServer = TCPServer.new()
 var _peer: StreamPeerTCP = null
@@ -22,8 +24,10 @@ var _buffer := ""
 var _port := 46029
 var _seed := 7
 var _effects_enabled := false
-# E1.3 fail-closed duplicate guard only: no replay/status/recovery contract yet.
-var _used_operations: Dictionary = {}
+# E1.4 is a separate opt-in; default E1.2 and E1.3 contracts stay unchanged.
+var _ledger_enabled := false
+var _used_operations: Dictionary = {}  # E1.3 legacy: reject duplicates, no replay
+var _operation_ledger: Dictionary = {}  # E1.4: in-memory, bounded, epoch scoped
 var _item_owner := ""
 var _world_instance_id := Crypto.new().generate_random_bytes(16).hex_encode()
 var _epoch := 0
@@ -73,7 +77,13 @@ func _parse_args() -> void:
 			index += 1
 		elif args[index] == "--lifecycle-effects":
 			_effects_enabled = true
+		elif args[index] == "--lifecycle-ledger":
+			_ledger_enabled = true
 		index += 1
+	if _ledger_enabled and not _effects_enabled:
+		push_error("Lifecycle World: ledger requires --lifecycle-effects")
+		get_tree().quit(2)
+		return
 	if _port < 1024 or _port > 65535 or _seed < 0 or _seed > 2147483647:
 		push_error("Lifecycle World: invalid port/seed")
 		get_tree().quit(2)
@@ -118,6 +128,9 @@ func _reset_world() -> void:
 		push_error("Lifecycle World: wrong fixture dimensions")
 		return
 	_epoch += 1
+	# A new epoch is a new operation namespace. Old-epoch receipts are unavailable.
+	_used_operations.clear()
+	_operation_ledger.clear()
 	_revision = 0
 	_tick = 0
 	_last_sample.clear()
@@ -275,6 +288,43 @@ func _valid_e13_action(req: Dictionary) -> bool:
 	return false
 
 
+# Canonical identity: explicit ordered scalar tuple, independent of JSON key order.
+# A digest identifies the exact intended action including epoch, revision and sample.
+func _action_digest(action: Dictionary) -> String:
+	var argument: String = ""
+	if action["action_type"] == "world.move":
+		argument = action["arguments"]["direction"]
+	else:
+		argument = action["arguments"]["item_ref"]
+	return JSON.stringify([
+		action["schema"], action["world_instance_id"], int(action["epoch"]),
+		int(action["expected_revision"]), action["observation_id"],
+		action["operation_id"], action["action_type"], argument,
+	]).sha256_text()
+
+
+func _operation_status(req: Dictionary, request_id: int) -> Dictionary:
+	if req.size() != 7 or not _valid_ref(req.get("operation_id")):
+		return _reply(request_id, false, {}, "INVALID_LOOKUP")
+	if typeof(req.get("world_instance_id")) != TYPE_STRING or not _valid_uint(req.get("epoch")):
+		return _reply(request_id, false, {}, "INVALID_LOOKUP")
+	var world_id: String = req["world_instance_id"]
+	var matcher := RegEx.create_from_string("^[a-f0-9]{32}$")
+	if matcher.search(world_id) == null or int(req["epoch"]) < 1:
+		return _reply(request_id, false, {}, "INVALID_LOOKUP")
+	var operation_id: String = req["operation_id"]
+	var data := {
+		"schema": OPERATION_STATUS_SCHEMA,
+		"world_instance_id": world_id, "epoch": int(req["epoch"]),
+		"operation_id": operation_id, "status": "UNKNOWN", "receipt": null,
+	}
+	# UNKNOWN means absent from *this living ledger*; it never proves no effect.
+	if world_id == _world_instance_id and int(req["epoch"]) == _epoch and _operation_ledger.has(operation_id):
+		data["status"] = "RECORDED"
+		data["receipt"] = _operation_ledger[operation_id]["receipt"].duplicate(true)
+	return _reply(request_id, true, data)
+
+
 func _act(req: Dictionary, request_id: int) -> Dictionary:
 	if not _valid_e13_action(req):
 		return _reply(request_id, false, {}, "INVALID_ACTION")
@@ -284,19 +334,32 @@ func _act(req: Dictionary, request_id: int) -> Dictionary:
 	if int(action["epoch"]) != _epoch:
 		return _reply(request_id, false, {}, "EPOCH_CHANGED")
 	var operation_id: String = action["operation_id"]
-	# Even a blocked operation consumes its identifier. E1.4 will add a bounded,
-	# queryable ledger, payload conflict detection and reconciliation.
-	if _used_operations.has(operation_id):
-		return _reply(request_id, false, {}, "OPERATION_REUSED")
-	if _used_operations.size() >= MAX_E13_OPERATIONS:
-		return _reply(request_id, false, {}, "OPERATION_CAPACITY")
+	if _ledger_enabled:
+		var digest: String = _action_digest(action)
+		if _operation_ledger.has(operation_id):
+			var saved: Dictionary = _operation_ledger[operation_id]
+			if digest != saved["digest"]:
+				return _reply(request_id, false, {}, "OPERATION_CONFLICT")
+			# No tick, revision, event or state mutation on replay.
+			var replayed: Dictionary = saved["receipt"].duplicate(true)
+			replayed["replayed"] = true
+			return _reply(request_id, true, replayed)
+		if _operation_ledger.size() >= MAX_E14_LEDGER_ENTRIES:
+			return _reply(request_id, false, {}, "OPERATION_CAPACITY")
+	else:
+		# E1.3 behavior frozen: reject duplicates, do not silently start replaying.
+		if _used_operations.has(operation_id):
+			return _reply(request_id, false, {}, "OPERATION_REUSED")
+		if _used_operations.size() >= MAX_E13_OPERATIONS:
+			return _reply(request_id, false, {}, "OPERATION_CAPACITY")
 	if int(action["expected_revision"]) != _revision:
 		return _reply(request_id, false, {}, "STALE_REVISION")
 	if _last_sample.is_empty() or action["observation_id"] != _last_sample.get("sample_id"):
 		return _reply(request_id, false, {}, "STALE_SAMPLE")
 	if int(action["expected_revision"]) != int(_last_sample.get("revision", -1)):
 		return _reply(request_id, false, {}, "STALE_SAMPLE")
-	_used_operations[operation_id] = true
+	if not _ledger_enabled:
+		_used_operations[operation_id] = true
 	var kind: String = action["action_type"]
 	var args: Dictionary = action["arguments"]
 	var applied := false
@@ -354,6 +417,8 @@ func _act(req: Dictionary, request_id: int) -> Dictionary:
 		"revision": _revision, "tick": _tick,
 		"event_id": "lifecycle_evt:%d" % _event_seq, "replayed": false,
 	}
+	if _ledger_enabled:
+		_operation_ledger[operation_id] = {"digest": digest, "receipt": receipt.duplicate(true)}
 	return _reply(request_id, true, receipt)
 
 
@@ -444,6 +509,8 @@ func _request(line: String) -> Dictionary:
 		var caps: Array[String] = ["observe"]
 		if _effects_enabled:
 			caps.append("act")
+		if _ledger_enabled:
+			caps.append("operation_status")
 		var greeting := {
 			"ready": true, "world_version": WORLD_VERSION,
 			"world_instance_id": _world_instance_id, "epoch": _epoch,
@@ -457,6 +524,8 @@ func _request(line: String) -> Dictionary:
 			return _reply(request_id, true, _observation())
 		if op == "act" and _effects_enabled:
 			return _act(req, request_id)
+		if op == "operation_status" and _ledger_enabled:
+			return _operation_status(req, request_id)
 		return _reply(request_id, false, {}, "FORBIDDEN")
 	if op == "act":
 		return _reply(request_id, false, {}, "FORBIDDEN")
