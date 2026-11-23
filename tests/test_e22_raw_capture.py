@@ -109,7 +109,7 @@ def capture_rows(gateway):
 
 
 def core_events(core):
-    return [core.core_events.ingress.get_event(x["event_id"])
+    return [core.core_events.ingress.get_event(x["id"])
             for x in core.event_log.load_events()
             if x["id"].startswith("ev_")]
 
@@ -256,10 +256,9 @@ def test_core_identity_collision_does_not_overwrite_captured_receipt(tmp_path):
         db.commit()
     finally:
         db.close()
-    # Already-linked records are not re-admitted on recover; reading the
-    # capture itself validates its SHA, while the Core event link is separately
-    # verified by the normal observe_and_record completion path.
-    assert service.capture_snapshot(result.observation.sample_id).as_dict() == result.observation.as_dict()
+    # A forged event-id pointer must never pass as a recovered sensor record.
+    with pytest.raises(RawCaptureError, match="Core event"):
+        service.capture_snapshot(result.observation.sample_id)
     assert row["snapshot_sha256"] == result.raw_digest
 
 
