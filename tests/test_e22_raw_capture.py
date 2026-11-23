@@ -177,6 +177,10 @@ def test_crash_cut_recovers_idempotently_across_core_reopen(tmp_path, cut):
         assert rows[0]["event_id"]
         assert len(core.core_events.ingress.pending_event_ids(limit=10)) == 1
 
+    # Public Raw read must NOT promote pending/undispatched evidence.
+    with pytest.raises(RawCaptureError, match="pending|not yet dispatched"):
+        service.capture_snapshot(sensor_data()["sample_id"])
+
     # Simulates a completely new Core service instance with no Godot calls.
     fresh_service, fresh_gateway, fresh_core, new_fake = bundle(
         tmp_path, samples=[], root=root,
@@ -211,6 +215,8 @@ def test_dispatch_crash_after_eventlog_append_does_not_duplicate_raw(tmp_path):
     assert row["event_id"] is not None
     assert core.core_events.ingress.dispatch_receipt(row["event_id"]) is None
     assert len(core.core_events.ingress.pending_event_ids(limit=10)) == 1
+    with pytest.raises(RawCaptureError, match="not yet dispatched"):
+        service.capture_snapshot(row["sample_id"])
 
     recovered_service, recovered_gateway, reopened, no_world = bundle(
         tmp_path, root=root, samples=[],
