@@ -1,6 +1,7 @@
 # ANIMA v0.2 — E2.1: Core-owned observation gateway и разграничение Godot-ролей
 
-**Статус:** `Research / E2.1 candidate`, до финального CI — **не принят**.  
+**Статус:** **`Validated Lab / E2.1 PASS_LAB_APP_BOUNDARY`** — только app-level guarded observation, не E2 full, Stage6 execution или production security.  
+**Проверенный кодовый snapshot:** `fe1cf645e186d7dd520a50cd23e636ba45c67de5`; [CI 45170677368](https://github.com/VankoRokh/ANIMA/actions/runs/45170677368) — 4/4 PASS. [Подробный вердикт](e2-1-acceptance-report-v02.md).  
 **Основа:** [E1-min independent acceptance](e1-min-acceptance-report-v02.md), `bbdbe3a7429ac3002a832c356c9dedac697c2c79`, `PASS_LAB_RESTRICTED`.  
 **Ветка:** `work/v02-e21-core-owned-world-gateway`. Изменения только в исследовательском контуре `labs/`, tests, CI и документации; release `v0.2.0-rc.1` не затрагивается.  
 **Архитектурный инвариант:** единственная система принятия решений/допуска действий — существующий Core/Stage6. Новый `RecoverableAgentLoop`, независимый GoalStore/TaskStore или второй executor не создаются.
