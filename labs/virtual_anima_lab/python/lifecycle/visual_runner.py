@@ -406,11 +406,27 @@ class VisualDecisionSession:
                     else "VERIFIED_BLOCKED"
                 )
                 if prepared is not None:
-                    # E24 readback + fresh Core Raw confirmed an action; the
-                    # Task is now completed in Stage6's canonical TaskStore.
-                    self.core_gateway.finish_verified(
-                        prepared, verified=True, outcome=outcome,
+                    with closing(self.memory._connect()) as db:
+                        after_row = db.execute(
+                            "SELECT core_event_id,raw_json FROM e24_raw "
+                            "WHERE sample_id=?", (observed.sample_id,),
+                        ).fetchone()
+                    if after_row is None or after_row["core_event_id"] != observed.core_event_id:
+                        raise VisualRunnerError("missing new Core-linked Raw for verification")
+                    post_proof = SpatialSourceProof(
+                        sample_id=observed.sample_id,
+                        raw_json=after_row["raw_json"],
+                        core_event_id=after_row["core_event_id"],
                     )
+                    corroborated = self.core_gateway.finish_verified(
+                        prepared,
+                        before_proof=proof,
+                        after_proof=post_proof,
+                        receipt=stage6_receipt,
+                        readback=confirmed,
+                    )
+                    if corroborated != outcome:
+                        raise VisualRunnerError("Core Stage6 result differs from lab verifier")
                 else:
                     with closing(self.memory._connect()) as db:
                         db.execute("BEGIN IMMEDIATE")
