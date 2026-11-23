@@ -21,7 +21,7 @@ def sample():
         "epoch": 1, "revision": 0, "tick": 0,
         "sample_seq": 1, "sample_id": f"worldobs:{W}:1:1",
         "observer_ref": "lab.actor.anima",
-        "source_ref": "lab.sensor.anima.proximity",
+        "source_ref": "lab.sensor.anima.vision",
         "coverage": {"kind": "view_cone", "fov_degrees": 90,
                      "range_limit": "none", "occlusion": "opaque_grid_cells"},
         "readings": [{
