@@ -30,6 +30,7 @@
 | E1.4 / Operation Ledger | **Validated Lab / E1.4 PASS:** opt-in 256-record journal, replay/status/conflict, fail-closed `UNKNOWN`; **E1-min и E2 ещё не приняты** | [Журнал и доказательства E1.4](e1-operation-ledger-v02.md) |
 | E1-min / Independent Acceptance | **PASS_LAB_RESTRICTED:** 5/5 CI, 4 black-box маршрута, 256 операций; доверенный operator порт и persistency **не доказаны**. Только lab, не release/E2 approval | [Вердикт и доказательства](e1-min-acceptance-report-v02.md) · [ТЗ](e1-min-acceptance-brief-v02.md) |
 | E2.1 / Core-owned guarded gateway | **PASS_LAB_APP_BOUNDARY:** Core-bound read-only observation, guarded bearer roles, pinning и raw TCP spoof denial; **не** OS sandbox / Raw / Stage6 execution | [Вердикт и доказательства](e2-1-acceptance-report-v02.md) · [Контракт](e2-core-world-boundary-v02.md) |
+| E2.2 / Raw capture and provenance | **Research / Candidate:** atomic full-snapshot capture + Core Raw pointer and crash recovery, not full self-contained Core Raw/FAST/Knowledge | [Контракт и критерии E2.2](e2-raw-provenance-v02.md) |
 | Core P0–P6 и аудит B1–B4 | Исправления и независимые ограничения; исторический путь реализации | [История Core](../history/core-v0.1.md) |
 | Pi, FAST/DEEP/SLEEP, perception, метапамять | Отдельные пробы и будущие варианты; не навязаны Foundation | [Аппаратные и дальнейшие направления](future-directions.md) |
 
