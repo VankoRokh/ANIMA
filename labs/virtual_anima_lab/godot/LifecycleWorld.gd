@@ -32,6 +32,7 @@ var _effects_enabled := false
 var _ledger_enabled := false
 var _guarded := false
 var _egocentric := false
+var _debug_ui_enabled := false # Human-only. Never enters agent DTO or Core context.
 var _configuration_ok := true
 # Distinct ephemeral secrets from the trusted harness environment, not argv or hello.
 var _observer_key := ""
@@ -59,6 +60,7 @@ var _scenario: Dictionary = {}
 var _history: Array[Dictionary] = []
 var _last_sample: Dictionary = {}
 var _status: Label = null
+var _debug_panel: Label = null
 
 
 func _ready() -> void:
@@ -72,6 +74,8 @@ func _ready() -> void:
 	_status.add_theme_font_size_override("font_size", 16)
 	add_child(_status)
 	_refresh_status()
+	if _debug_ui_enabled:
+		_build_debug_panel()
 	var listen_error := _server.listen(_port, "127.0.0.1")
 	if listen_error != OK:
 		push_error("Lifecycle World: cannot bind loopback port %d" % _port)
@@ -101,6 +105,8 @@ func _parse_args() -> void:
 			_guarded = true
 		elif args[index] == "--lifecycle-egocentric":
 			_egocentric = true
+		elif args[index] == "--lifecycle-debug-ui":
+			_debug_ui_enabled = true
 		index += 1
 	if _guarded:
 		_observer_key = OS.get_environment("ANIMA_LIFECYCLE_OBSERVER_KEY")
@@ -388,6 +394,7 @@ func _observation_view() -> Dictionary:
 		"readings": readings,
 	}
 	_last_sample = sample.duplicate(true)
+	_refresh_status()
 	return sample
 
 
@@ -792,6 +799,108 @@ func _process(_delta: float) -> void:
 		processed += 1
 
 
+
+# E2.x human-facing debug UI, deliberately NOT a source of ANIMA knowledge.
+# This pane is operator truth + presentation-only previews. Sensor and cognition
+# values below are populated ONLY from real captured samples / authenticated
+# external telemetry; never fabricate a "thinking" Core from world truth.
+func _build_debug_panel() -> void:
+	var side := ColorRect.new()
+	side.position = Vector2(WIDTH * CELL + 6, 4)
+	side.size = Vector2(282, HEIGHT * CELL - 8)
+	side.color = Color(0.09, 0.12, 0.16, 1.0)
+	add_child(side)
+	_debug_panel = Label.new()
+	_debug_panel.position = Vector2(WIDTH * CELL + 16, 13)
+	_debug_panel.size = Vector2(264, HEIGHT * CELL - 20)
+	_debug_panel.add_theme_font_size_override("font_size", 13)
+	_debug_panel.add_theme_color_override("font_color", Color(0.89, 0.93, 0.97))
+	_debug_panel.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	add_child(_debug_panel)
+	_refresh_debug_panel()
+
+
+func _facing_word() -> String:
+	if _facing == Vector2i(0, -1):
+		return "N"
+	if _facing == Vector2i(1, 0):
+		return "E"
+	if _facing == Vector2i(0, 1):
+		return "S"
+	return "W"
+
+
+func _friendly_entity(ref: String) -> String:
+	if ref.begins_with("lab.item."):
+		return "crate / item"
+	if ref.begins_with("lab.zone."):
+		return "delivery / zone"
+	if ref.begins_with("lab.landmark."):
+		return "landmark"
+	if ref.begins_with("lab.obstacle."):
+		return "obstacle"
+	if ref.begins_with("lab.surface.") or ref.begins_with("lab.wall."):
+		return "wall / surface"
+	return "other entity"
+
+
+func _refresh_debug_panel() -> void:
+	if _debug_panel == null:
+		return
+	var mode := "E2.3 VIEW CONE 90deg" if _egocentric else "E1.2 RANGE 3 (360deg)"
+	var lines: Array[String] = [
+		"VISUAL ANIMA LAB  /  DEBUG",
+		"OPERATOR PANEL - NOT AGENT INPUT",
+		"--------------------------------",
+		"WORLD TRUTH  (operator only)",
+		"seed=%d  epoch=%d  revision=%d" % [_seed, _epoch, _revision],
+		"tick=%d  actions=%d" % [_tick, _event_seq],
+		"ANIMA cell: (%d, %d)  facing: %s" % [_anima.x, _anima.y, _facing_word()],
+		"crate cell: (%d, %d)" % [_item.x, _item.y],
+		"owner: %s" % ["none" if _item_owner == "" else "ANIMA"],
+		"",
+		"MAP LEGEND",
+		"green: ANIMA   yellow: crate",
+		"blue: delivery   purple: marker",
+		"red: blocker   ochre: obstacle",
+		"gray: walls   cyan: sensor preview",
+		"",
+		"AGENT SENSOR  (recorded only)",
+		mode,
+	]
+	if _last_sample.is_empty():
+		lines.append("No observation requested yet.")
+	else:
+		var data: Dictionary = _last_sample
+		var readings: Array = data.get("readings", [])
+		lines.append("sample=%d  visible records=%d" % [int(data.get("sample_seq", -1)), readings.size()])
+		var shown := 0
+		for reading in readings:
+			if shown >= 5:
+				break
+			if typeof(reading) != TYPE_DICTIONARY:
+				continue
+			var ref := String(reading.get("entity_ref", reading.get("subject_ref", "")))
+			lines.append("- " + _friendly_entity(ref))
+			shown += 1
+		if readings.size() > shown:
+			lines.append("... +%d more readings" % [readings.size() - shown])
+	lines.append("")
+	lines.append("CORE / MEMORY / COGNITION")
+	lines.append("Telemetry: NOT CONNECTED")
+	lines.append("Decision trace: UNAVAILABLE")
+	lines.append("FAST/DEEP: NOT CONNECTED")
+	lines.append("")
+	lines.append("RECENT WORLD EVENTS")
+	for i in range(maxi(0, _history.size() - 3), _history.size()):
+		var event: Dictionary = _history[i]
+		lines.append("#%d %s: %s" % [
+			int(event.get("event_seq", -1)), String(event.get("actor", "?")),
+			String(event.get("event", "?"))
+		])
+	_debug_panel.text = "\n".join(lines)
+
+
 func _refresh_status() -> void:
 	if _status != null:
 		if _guarded:
@@ -799,6 +908,7 @@ func _refresh_status() -> void:
 		else:
 			var mode := "E1.3 TEST EFFECTS" if _effects_enabled else "E1.2 OBSERVE-ONLY"
 			_status.text = "ANIMA / %s  |  seed=%d  epoch=%d  revision=%d\nLaboratory-only; no Core authority" % [mode, _seed, _epoch, _revision]
+	_refresh_debug_panel()
 
 
 func _draw() -> void:
@@ -814,6 +924,20 @@ func _draw() -> void:
 			elif p in _obstacles:
 				color = Color(0.61, 0.45, 0.18)
 			draw_rect(Rect2(Vector2(x * CELL + 1, y * CELL + 1), Vector2(CELL - 2, CELL - 2)), color, true)
+	# Visual-only diagnostic coverage. It is NOT a recorded sensor event and
+	# must never be passed to the observer, Core, Memory, FAST or DEEP.
+	if _debug_ui_enabled:
+		for x in range(1, WIDTH - 1):
+			for y in range(1, HEIGHT - 1):
+				var point := Vector2i(x, y)
+				if point == _anima or _blocked(point):
+					continue
+				var exposed := _view_visible(point) if _egocentric else _visible(point)
+				if exposed:
+					draw_rect(
+						Rect2(Vector2(x * CELL + 3, y * CELL + 3), Vector2(CELL - 6, CELL - 6)),
+						Color(0.10, 0.78, 0.85, 0.17), true
+					)
 	for item in [
 		{"at": _delivery, "color": Color(0.20, 0.62, 0.72)},
 		{"at": _landmark, "color": Color(0.67, 0.46, 0.80)},
@@ -822,3 +946,8 @@ func _draw() -> void:
 	]:
 		var at: Vector2i = item["at"]
 		draw_circle(Vector2(float(at.x * CELL + CELL / 2), float(at.y * CELL + CELL / 2)), float(CELL) * 0.30, item["color"])
+	if _debug_ui_enabled:
+		var center := Vector2(float(_anima.x * CELL + CELL / 2), float(_anima.y * CELL + CELL / 2))
+		var ahead := center + Vector2(float(_facing.x), float(_facing.y)) * float(CELL) * 0.43
+		draw_line(center, ahead, Color(1.0, 1.0, 1.0, 0.95), 3.0)
+		draw_circle(ahead, 3.5, Color(1.0, 1.0, 1.0, 0.95))
