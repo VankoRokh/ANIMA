@@ -32,7 +32,13 @@ from typing import Any
 from urllib.parse import urlsplit
 
 from anima.core.assembly import build_core
+from anima.core.spatial_action_gate import CoreSpatialActionGateway, SpatialSourceProof
+from anima.execution.store import ExecutionStore
+from anima.internal_state.goal_progress import (
+    GoalObservation, GoalObservationKind, VerificationKind,
+)
 from labs.virtual_anima_lab.python.lab_client import LabClient, PROTOCOL_V2
+from .stage6_world import stage6_godot_executor, VERSION as SPATIAL_STAGE6_VERSION
 from .e24_working_memory import (
     E24WorkingMemory, SOURCE, SUBJECT, PREDICATE,
     vision_source_registration, vision_digest_rule,
@@ -162,7 +168,9 @@ class VisualDecisionSession:
     """One-actor step engine. All external actions live in this trusted object."""
 
     def __init__(self, *, memory: E24WorkingMemory, pose: E24PoseTrail,
-                 world_port: int, executor_key: str, max_steps: int = MAX_STEPS):
+                 world_port: int, executor_key: str, max_steps: int = MAX_STEPS,
+                 core_gateway: CoreSpatialActionGateway | None = None,
+                 core_goal_id: str | None = None):
         if type(memory) is not E24WorkingMemory or type(pose) is not E24PoseTrail:
             raise TypeError("visual engine requires verified E24 Core and pose")
         if type(world_port) is not int or not 1024 <= world_port <= 65535:
@@ -171,6 +179,12 @@ class VisualDecisionSession:
             raise ValueError("invalid executor capability")
         if type(max_steps) is not int or not 1 <= max_steps <= MAX_STEPS:
             raise ValueError("bounded max_steps 1..32")
+        if (core_gateway is None) != (core_goal_id is None):
+            raise ValueError("Core spatial gateway and Goal ID must be supplied together")
+        if core_gateway is not None and core_gateway.core is not memory._core:
+            raise ValueError("Core gateway must use exact source-backed memory instance")
+        self.core_gateway = core_gateway
+        self.core_goal_id = core_goal_id
         self.memory = memory
         self.pose = pose
         self.world_port = world_port
@@ -224,7 +238,16 @@ class VisualDecisionSession:
                     "runner_connected": True,
                     "mode": "DETERMINISTIC",
                     "model_connected": False,
-                    "action_admission": "LAB_ONLY_NOT_STAGE6",
+                    "action_admission": (
+                        "CORE_STAGE2_TASK_STAGE6"
+                        if self.core_gateway is not None
+                        else "LAB_ONLY_NOT_STAGE6"
+                    ),
+                    "core_goal_id": self.core_goal_id,
+                    "core_goal_status": (
+                        self.core_gateway.goals.get_goal(self.core_goal_id)["status"]
+                        if self.core_gateway is not None else None
+                    ),
                     "goal": "observe_crate_then_verified_approach_step",
                     "goal_status": self.goal_status,
                     "run_enabled": self.run_enabled,
@@ -274,7 +297,35 @@ class VisualDecisionSession:
                     "source_sample_id": view["sample_id"],
                 }
                 self._event("DECIDE", f"{choice.kind}({choice.direction}): {choice.reason}")
-                operation = f"visual_step_{self.sequence}"
+                proof = None
+                prepared = None
+                if self.core_gateway is not None:
+                    # Agent-only sealed Raw is independently validated against
+                    # the actual forward-dispatched CoreIngress digest event.
+                    with closing(self.memory._connect()) as db:
+                        row = db.execute(
+                            "SELECT core_event_id,raw_json FROM e24_raw "
+                            "WHERE sample_id=?", (view["sample_id"],),
+                        ).fetchone()
+                    if row is None or not row["core_event_id"]:
+                        raise VisualRunnerError("missing canonical Core source pointer")
+                    self.memory.raw_evidence(view["sample_id"])
+                    proof = SpatialSourceProof(
+                        sample_id=view["sample_id"], raw_json=row["raw_json"],
+                        core_event_id=row["core_event_id"],
+                    )
+                    prepared = self.core_gateway.prepare(
+                        goal_id=self.core_goal_id, proof=proof,
+                        tool_kind=choice.kind, direction=choice.direction,
+                        reason=choice.reason,
+                    )
+                    operation = prepared.operation_id
+                    self._event(
+                        "ADMIT", "Core Stage2 Task + Stage6 PREPARED",
+                        evidence=row["core_event_id"],
+                    )
+                else:
+                    operation = f"visual_step_{self.sequence}"
                 action = EgocentricAction({
                     "schema": VIEW_ACTION_SCHEMA,
                     "world_instance_id": view["world_instance_id"],
@@ -285,41 +336,58 @@ class VisualDecisionSession:
                     "action_type": choice.kind,
                     "arguments": {"direction": choice.direction},
                 })
-                # Explicit LAB-only admission: admissible kinds/directions are
-                # constrained by EgocentricAction. Core event provenance is
-                # checked by E24 before signing decision; NOT native Stage6.
-                self.memory.raw_evidence(view["sample_id"])
-                context_digest = _sha(self.memory.context_for_cognition(
-                    memory_enabled=self.memory_enabled
-                ))
-                with closing(self.memory._connect()) as db:
-                    db.execute("BEGIN IMMEDIATE")
-                    try:
-                        raw = db.execute(
-                            "SELECT core_event_id FROM e24_raw WHERE sample_id=?",
-                            (view["sample_id"],),
-                        ).fetchone()
-                        if raw is None or not raw["core_event_id"]:
-                            raise VisualRunnerError("unproven source event")
-                        db.execute(
-                            "INSERT INTO visual_decisions(sequence,pre_sample_id,"
-                            "source_event_id,memory_context_sha256,proposal_json,"
-                            "admission,reason) VALUES(?,?,?,?,?,?,?)",
-                            (self.sequence, view["sample_id"], raw["core_event_id"],
-                             context_digest, action.canonical_json,
-                             "LAB_ADMITTED", choice.reason),
+                if prepared is not None:
+                    self.core_gateway.before_effect(prepared, proof=proof)
+                    stage6_receipt = self.core_gateway.execute_once(
+                        prepared, proof=proof,
+                    )
+                    if stage6_receipt.status != "succeeded":
+                        raise VisualRunnerError(
+                            "Stage6 executor did not return successful tool receipt"
                         )
-                        db.commit()  # Durable admission BEFORE world effect.
-                    except BaseException:
-                        db.rollback()
-                        raise
-                self._event("ADMIT", "LAB_ADMITTED (not Stage6)",
-                            evidence=raw["core_event_id"])
-                with LabClient(self.world_port, role="agent",
-                               protocol=PROTOCOL_V2) as client:
-                    receipt = client.call(
-                        "act", auth=self.executor_key, action=action.as_dict()
-                    )["data"]
+                    receipt = stage6_receipt.to_dict()["output"]
+                    if receipt is None or receipt["operation_id"] != operation:
+                        raise VisualRunnerError("Stage6 tool returned wrong operation ID")
+                    self._event(
+                        "EXECUTE", "Stage6 keyed SandboxExecutor dispatched " + choice.kind,
+                    )
+                else:
+                    # E2.5b frozen deterministic comparison baseline: LAB only.
+                    self.memory.raw_evidence(view["sample_id"])
+                    context_digest = _sha(self.memory.context_for_cognition(
+                        memory_enabled=self.memory_enabled
+                    ))
+                    with closing(self.memory._connect()) as db:
+                        db.execute("BEGIN IMMEDIATE")
+                        try:
+                            raw = db.execute(
+                                "SELECT core_event_id FROM e24_raw WHERE sample_id=?",
+                                (view["sample_id"],),
+                            ).fetchone()
+                            if raw is None or not raw["core_event_id"]:
+                                raise VisualRunnerError("unproven source event")
+                            db.execute(
+                                "INSERT INTO visual_decisions(sequence,pre_sample_id,"
+                                "source_event_id,memory_context_sha256,proposal_json,"
+                                "admission,reason) VALUES(?,?,?,?,?,?,?)",
+                                (self.sequence, view["sample_id"], raw["core_event_id"],
+                                 context_digest, action.canonical_json,
+                                 "LAB_ADMITTED", choice.reason),
+                            )
+                            db.commit()
+                        except BaseException:
+                            db.rollback()
+                            raise
+                    self._event(
+                        "ADMIT", "LAB_ADMITTED (not Stage6)",
+                        evidence=raw["core_event_id"],
+                    )
+                    with LabClient(
+                        self.world_port, role="agent", protocol=PROTOCOL_V2,
+                    ) as client:
+                        receipt = client.call(
+                            "act", auth=self.executor_key, action=action.as_dict(),
+                        )["data"]
                 # Independently read back the exact action from the world ledger.
                 confirmed = self.pose.record_verified_external_action(action)
                 if (confirmed["operation_id"] != receipt["operation_id"]
@@ -333,23 +401,51 @@ class VisualDecisionSession:
                 trans = trail["verified_transitions"]
                 if not trans or trans[-1]["operation_id"] != operation:
                     raise VisualRunnerError("new Raw does not verify world transition")
-                with closing(self.memory._connect()) as db:
-                    db.execute("BEGIN IMMEDIATE")
-                    try:
-                        updated = db.execute(
-                            "UPDATE visual_decisions SET receipt_json=?,"
-                            "after_sample_id=?,outcome=? "
-                            "WHERE sequence=? AND outcome IS NULL",
-                            (_json(confirmed), observed.sample_id,
-                             "VERIFIED_EFFECT" if receipt["effect_applied"]
-                             else "VERIFIED_BLOCKED", self.sequence),
-                        )
-                        if updated.rowcount != 1:
-                            raise VisualRunnerError("missing or already finalized decision")
-                        db.commit()  # Durable verified outcome AFTER new Core Raw.
-                    except BaseException:
-                        db.rollback()
-                        raise
+                outcome = (
+                    "VERIFIED_EFFECT" if receipt["effect_applied"]
+                    else "VERIFIED_BLOCKED"
+                )
+                if prepared is not None:
+                    with closing(self.memory._connect()) as db:
+                        after_row = db.execute(
+                            "SELECT core_event_id,raw_json FROM e24_raw "
+                            "WHERE sample_id=?", (observed.sample_id,),
+                        ).fetchone()
+                    if after_row is None or after_row["core_event_id"] != observed.core_event_id:
+                        raise VisualRunnerError("missing new Core-linked Raw for verification")
+                    post_proof = SpatialSourceProof(
+                        sample_id=observed.sample_id,
+                        raw_json=after_row["raw_json"],
+                        core_event_id=after_row["core_event_id"],
+                    )
+                    corroborated = self.core_gateway.finish_verified(
+                        prepared,
+                        before_proof=proof,
+                        after_proof=post_proof,
+                        receipt=stage6_receipt,
+                        readback=confirmed,
+                    )
+                    if corroborated != outcome:
+                        raise VisualRunnerError("Core Stage6 result differs from lab verifier")
+                else:
+                    with closing(self.memory._connect()) as db:
+                        db.execute("BEGIN IMMEDIATE")
+                        try:
+                            updated = db.execute(
+                                "UPDATE visual_decisions SET receipt_json=?,"
+                                "after_sample_id=?,outcome=? "
+                                "WHERE sequence=? AND outcome IS NULL",
+                                (_json(confirmed), observed.sample_id,
+                                 outcome, self.sequence),
+                            )
+                            if updated.rowcount != 1:
+                                raise VisualRunnerError(
+                                    "missing or already finalized decision"
+                                )
+                            db.commit()
+                        except BaseException:
+                            db.rollback()
+                            raise
                 self.last_outcome = {
                     "status": "VERIFIED_EFFECT" if receipt["effect_applied"] else "VERIFIED_BLOCKED",
                     "operation_id": operation, "after_sample_id": observed.sample_id,
@@ -360,9 +456,27 @@ class VisualDecisionSession:
                 if (receipt["effect_applied"] and choice.approach_finishes
                         and choice.kind == "world.step"
                         and choice.basis == "current_raw"):
+                    if self.core_gateway is not None:
+                        # Report bounded experimental success via Stage2
+                        # GoalProgress, with Core source and Stage6 candidate.
+                        self.memory._core.internal_state.observe_goal(
+                            GoalObservation(
+                                goal_id=self.core_goal_id,
+                                kind=GoalObservationKind.SUCCESS,
+                                source_id=observed.core_event_id,
+                                reason="Observed crate and completed a verified aligned step",
+                                verification=VerificationKind.CONFIRMED_RESULT,
+                                candidate_id=prepared.action.candidate_id,
+                                criterion_satisfied=True,
+                            )
+                        )
                     self.goal_status = "COMPLETED_LAB_CONDITION"
                     self.run_enabled = False
-                    self._event("GOAL", "Observed crate; verified approach step completed")
+                    self._event(
+                        "GOAL", "Stage2 verified approach criterion complete"
+                        if self.core_gateway is not None
+                        else "Observed crate; verified approach step completed",
+                    )
             except Exception as exc:
                 self.goal_status = "BLOCKED_UNVERIFIED"
                 self.run_enabled = False
@@ -477,7 +591,8 @@ class VisualControlService:
 
 
 def launch(*, godot: str, seed: int, headless: bool,
-           report_dir: Path | None = None, step_interval: float = 1.2):
+           report_dir: Path | None = None, step_interval: float = 1.2,
+           core_stage6: bool = False):
     root = report_dir or Path(tempfile.mkdtemp(prefix="anima-visual-runner-"))
     root.mkdir(parents=True, exist_ok=True)
     world_port, control_port = _port(), _port()
@@ -519,9 +634,38 @@ def launch(*, godot: str, seed: int, headless: bool,
             instance, E23ObserverPort(port=world_port, observer_key=observer_key),
         )
         pose = E24PoseTrail(memory, port=world_port, executor_key=executor_key)
+        gateway = None
+        goal_id = None
+        if core_stage6:
+            goal = instance.internal_state.create_goal(
+                source="lab.visual",
+                source_id="e25c:" + instance.identity.get()["instance_id"],
+                priority=1.0,
+                description="Observe the crate and take one confirmed aligned step",
+                success_criterion="Sensor-visible crate followed by a verified forward step",
+                reason="Human-selected bounded visual research experiment",
+            )
+            goal_id = goal["id"]
+            stage6_store = ExecutionStore(instance.data_dir / "execution.db")
+            registry, executor = stage6_godot_executor(
+                root=instance.data_dir, store=stage6_store,
+                port=world_port, executor_key=executor_key,
+            )
+            gateway = CoreSpatialActionGateway(
+                core=instance, store=stage6_store,
+                registry=registry, executor=executor,
+                allowed_capabilities={
+                    "world.turn": ("world.turn", SPATIAL_STAGE6_VERSION),
+                    "world.step": ("world.step", SPATIAL_STAGE6_VERSION),
+                },
+                source_ref=SOURCE,
+                producer_ref="lab.world.lifecycle.egocentric_adapter",
+                subject_ref=SUBJECT, predicate_ref=PREDICATE,
+            )
         session = VisualDecisionSession(
             memory=memory, pose=pose,
             world_port=world_port, executor_key=executor_key,
+            core_gateway=gateway, core_goal_id=goal_id,
         )
         service = VisualControlService(
             session, port=control_port, token=control_key, interval=step_interval,
@@ -529,7 +673,12 @@ def launch(*, godot: str, seed: int, headless: bool,
         service.start()
         print("ANIMA_VISUAL_RUNNER_READY", flush=True)
         print(f"Godot world: {world_port}, diagnostics/control: {control_port}", flush=True)
-        print("Mode: deterministic / LAB_ADMISSION / Core-backed Raw", flush=True)
+        print(
+            "Mode: deterministic / "
+            + ("Core Stage2 Task + Stage6 Executor" if core_stage6 else "LAB_ADMISSION")
+            + " / Core-backed Raw",
+            flush=True,
+        )
         print(f"Evidence directory: {root}", flush=True)
         print("Use STEP/RUN/PAUSE in Godot; Ctrl+C exits.", flush=True)
         return session, service, process, logfile
@@ -560,6 +709,10 @@ def main():
     parser.add_argument("--godot", default=os.environ.get("GODOT_BIN"))
     parser.add_argument("--seed", type=int, default=7)
     parser.add_argument("--headless", action="store_true")
+    parser.add_argument(
+        "--core-stage6", action="store_true",
+        help="Opt in to exact Core-owned Goal/Task/Stage6 spatial admission",
+    )
     parser.add_argument("--report-dir", type=Path)
     parser.add_argument("--step-interval", type=float, default=1.2)
     args = parser.parse_args()
@@ -572,6 +725,7 @@ def main():
     session, service, proc, logfile = launch(
         godot=godot, seed=args.seed, headless=args.headless,
         report_dir=args.report_dir, step_interval=args.step_interval,
+        core_stage6=args.core_stage6,
     )
     try:
         while proc.poll() is None:

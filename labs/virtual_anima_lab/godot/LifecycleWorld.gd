@@ -938,14 +938,18 @@ func _refresh_debug_panel() -> void:
 	elif _visual_state.is_empty():
 		lines.append("Telemetry: " + _visual_error)
 	else:
-		lines.append("Source: CORE RAW + LAB POLICY")
+		lines.append("Source: CORE-BACKED RAW")
 		lines.append("Goal: " + String(_visual_state.get("goal", "?")))
 		lines.append("Status: " + String(_visual_state.get("goal_status", "?")))
 		lines.append("Mode: DETERMINISTIC / FAST OFF")
 		lines.append("Step: %d / %d" % [
 			int(_visual_state.get("steps", 0)), int(_visual_state.get("max_steps", 0))])
 		lines.append("Memory: " + ("ON" if _visual_state.get("memory_enabled") else "OFF"))
-		lines.append("Admission: LAB_ONLY, NOT Stage6")
+		lines.append("Admission: " + String(_visual_state.get(
+			"action_admission", "UNKNOWN"
+		)))
+		if _visual_state.get("core_goal_id") != null:
+			lines.append("Core Goal: " + String(_visual_state.get("core_goal_status", "?")))
 		lines.append("Agent view (real Core Raw):")
 		var current: Array = _visual_state.get("agent_view", [])
 		if current.is_empty():
