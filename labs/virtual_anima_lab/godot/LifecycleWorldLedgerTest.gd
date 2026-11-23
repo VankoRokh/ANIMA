@@ -58,9 +58,9 @@ func _initialize() -> void:
 	if not _expect(first["ok"] and receipt["status"] == "APPLIED" and receipt["replayed"] == false, "first effect"):
 		_finish(world, false)
 		return
-	var seq := world._event_seq
-	var tick := world._tick
-	var rev := world._revision
+	var seq: int = int(world._event_seq)
+	var tick: int = int(world._tick)
+	var rev: int = int(world._revision)
 	var pos: Vector2i = world._anima
 	# Different JSON key insertion order is still the same canonical action.
 	var shuffled: Dictionary = {
@@ -111,7 +111,7 @@ func _initialize() -> void:
 	if not _expect(no_effect["ok"] and no_effect["data"]["status"] == "BLOCKED" and not no_effect["data"]["effect_applied"], "blocked receipt absent"):
 		_finish(world, false)
 		return
-	var before_replay_tick := world._tick
+	var before_replay_tick: int = int(world._tick)
 	var blocked_replay := _call(world, 11, "agent", "act", {"action": blocked})
 	if not _expect(blocked_replay["ok"] and blocked_replay["data"]["replayed"] and blocked_replay["data"]["status"] == "BLOCKED" and world._tick == before_replay_tick, "blocked action retried"):
 		_finish(world, false)
@@ -139,7 +139,7 @@ func _initialize() -> void:
 		_finish(world, false)
 		return
 	# New epoch must not reveal or replay pre-reset records.
-	var old_epoch := world._epoch
+	var old_epoch: int = int(world._epoch)
 	world._reset_world()
 	if not _expect(world._epoch == old_epoch + 1 and world._operation_ledger.is_empty(), "epoch reset did not clear scoped ledger"):
 		_finish(world, false)
