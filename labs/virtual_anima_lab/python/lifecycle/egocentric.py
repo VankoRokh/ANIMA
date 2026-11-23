@@ -10,7 +10,7 @@ import re
 from typing import Any
 
 from labs.virtual_anima_lab.python.lab_client import LabClient, PROTOCOL_V2
-from .contracts import WorldContractError, _SealedDTO, _check, _int, _object, _ref, _world_identity
+from .contracts import _SealedDTO, _check, _int, _object, _ref
 
 VIEW_SCHEMA = "anima.lifecycle.egocentric_observation/0.1"
 VIEW_ACTION_SCHEMA = "anima.lifecycle.egocentric_action/0.1"
@@ -37,7 +37,7 @@ def _validate_view(value: Any) -> None:
            f"worldobs:{data['world_instance_id']}:{data['epoch']}:{data['sample_seq']}",
            "view sample identity")
     _check(data["observer_ref"] == "lab.actor.anima" and
-           data["source_ref"] == "lab.sensor.anima.proximity", "view source binding")
+           data["source_ref"] == "lab.sensor.anima.vision", "view source binding")
     cov = _object(data["coverage"],
                   {"kind", "fov_degrees", "range_limit", "occlusion"}, "coverage")
     _check(cov == {"kind": "view_cone", "fov_degrees": _FOV,
@@ -127,6 +127,8 @@ class E23ObserverPort:
         self._world: str | None = None
         self._epoch: int | None = None
         self._last_sample = 0
+        self._last_revision = 0
+        self._last_tick = 0
 
     def observe(self) -> EgocentricView:
         with LabClient(self.port, role="agent", protocol=PROTOCOL_V2) as client:
@@ -145,8 +147,11 @@ class E23ObserverPort:
         _check((item["world_instance_id"], item["epoch"]) ==
                (hello["world_instance_id"], hello["epoch"]), "view/hello mismatch")
         _check(item["sample_seq"] > self._last_sample, "view sample cursor not monotonic")
+        _check(item["revision"] >= self._last_revision, "view revision regressed")
+        _check(item["tick"] >= self._last_tick, "view logical tick regressed")
         self._world, self._epoch = item["world_instance_id"], item["epoch"]
         self._last_sample = item["sample_seq"]
+        self._last_revision, self._last_tick = item["revision"], item["tick"]
         return view
 
 
