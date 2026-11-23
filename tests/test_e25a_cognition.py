@@ -184,6 +184,39 @@ def test_decision_trace_fails_closed_on_tampered_context(tmp_path, monkeypatch):
         coord.decision_records("turn_trace")
 
 
+def test_tampered_outcome_is_not_accepted_as_decision_record(tmp_path, monkeypatch):
+    mem = memory(tmp_path, monkeypatch)
+    coord = E25LabCognitiveCoordinator(mem)
+    coord.run_turn(TwoStepEvidenceStub(), turn_id="turn_outcome")
+    with sqlite3.connect(mem._file) as db:
+        db.execute(
+            "UPDATE e25_cognitive_trace SET outcome_json='{}' "
+            "WHERE turn_id='turn_outcome'",
+        )
+    with pytest.raises(E25CognitionError, match="result was modified"):
+        coord.decision_records("turn_outcome")
+
+
+def test_sensor_change_during_adapter_proposal_rejected(tmp_path, monkeypatch):
+    mem = memory(tmp_path, monkeypatch)
+    coord = E25LabCognitiveCoordinator(mem)
+    class RacingAdapter:
+        def propose(self, context, outcomes, *, turn_id, step_index):
+            monkeypatch.setattr(
+                E23ObserverPort, "observe", lambda _: view(4, visible=True),
+            )
+            mem.observe_and_record()
+            return prop(context, turn_id, "retrieve_memory",
+                        {"query": "crate", "top_k": 1})
+    result = coord.run_turn(RacingAdapter(), turn_id="turn_race")
+    assert result["status"] == "REJECTED"
+    assert result["outcomes"][0]["reason_code"] == "STALE_CONTEXT"
+    record = coord.decision_records("turn_race")[0]
+    assert record["admission"] == "REJECTED"
+    assert record["proposal"] is None
+    assert len(mem._core.event_log.load_events()) == 4
+
+
 def test_adapter_failure_recorded_without_effects(tmp_path, monkeypatch):
     mem = memory(tmp_path, monkeypatch)
     coord = E25LabCognitiveCoordinator(mem)
