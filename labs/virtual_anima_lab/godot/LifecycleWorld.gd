@@ -810,13 +810,17 @@ func _build_debug_panel() -> void:
 	side.size = Vector2(282, HEIGHT * CELL - 8)
 	side.color = Color(0.09, 0.12, 0.16, 1.0)
 	add_child(side)
+	var scroll := ScrollContainer.new()
+	scroll.position = Vector2(WIDTH * CELL + 15, 11)
+	scroll.size = Vector2(263, HEIGHT * CELL - 20)
+	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	add_child(scroll)
 	_debug_panel = Label.new()
-	_debug_panel.position = Vector2(WIDTH * CELL + 16, 13)
-	_debug_panel.size = Vector2(264, HEIGHT * CELL - 20)
-	_debug_panel.add_theme_font_size_override("font_size", 13)
+	_debug_panel.custom_minimum_size = Vector2(251, 0)
+	_debug_panel.add_theme_font_size_override("font_size", 12)
 	_debug_panel.add_theme_color_override("font_color", Color(0.89, 0.93, 0.97))
 	_debug_panel.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	add_child(_debug_panel)
+	scroll.add_child(_debug_panel)
 	_refresh_debug_panel()
 
 
