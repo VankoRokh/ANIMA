@@ -114,6 +114,7 @@ def test_query_only_uses_operation_status_no_implicit_action_replay():
     assert client.calls == [("operation_status", {
         "world_instance_id": WORLD, "epoch": 1,
         "operation_id": "op.e14.1",
+        "action": action().as_dict(),
     })]
 
 
