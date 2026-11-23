@@ -49,6 +49,8 @@ run() {
 run e12-unit "$PYTHON_BIN" -m pytest -q -p no:cacheprovider tests/test_lifecycle_world_contracts.py tests/test_lifecycle_scenario.py
 run project-check bash scripts/check.sh
 run full-pytest "$PYTHON_BIN" -m pytest -q -p no:cacheprovider
+# Godot asset import creates an untracked .godot cache; run clean-tree release tests first.
+run e12-godot-import timeout 100s "$GODOT_BIN" --headless --path labs/virtual_anima_lab/godot --editor --import
 run e12-native "$GODOT_BIN" --headless --path labs/virtual_anima_lab/godot --script res://LifecycleWorldTest.gd
 grep -q 'LIFECYCLE_E1_2_NATIVE_PASS' "$OUT/e12-native.log"
 for seed in 7 8; do
