@@ -97,6 +97,7 @@ def test_memory_retrieves_prior_object_without_claiming_absence(tmp_path, monkey
     assert remembered["lab.item.crate"]["current_observation"] == "not_observed"
     assert remembered["lab.item.crate"]["current_relative_geometry_verified"] is False
     assert remembered["lab.item.crate"]["last_seen_sample"] == records[1].sample_id
+    assert remembered["lab.item.crate"]["last_seen_properties"]["owner"]["status"] == "absent"
     assert any(
         edge["kind"] == "co_observed" and edge["evidence_count"] == 1
         for edge in memory["relations"]
@@ -186,6 +187,19 @@ def test_tampered_derived_proof_or_binding_fails_closed(tmp_path, monkeypatch):
     db_mutate(tmp_path, "UPDATE e24_binding SET core_id='other'")
     with pytest.raises(E24MemoryError):
         E24WorkingMemory(core(tmp_path), observer()).recover()
+
+
+@pytest.mark.parametrize("table,mutation", [
+    ("e24_mentions", "UPDATE e24_mentions SET range_milli_cells=99999"),
+    ("e24_co_seen", "DELETE FROM e24_co_seen"),
+])
+def test_materialized_memory_cannot_forge_facts(tmp_path, monkeypatch, table, mutation):
+    fake_sensing(monkeypatch, [sample(1, item=True)])
+    service = E24WorkingMemory(core(tmp_path), observer())
+    service.observe_and_record()
+    db_mutate(tmp_path, mutation)
+    with pytest.raises(E24MemoryError, match="materialized world memory"):
+        service.world_model()
 
 
 def test_unfinished_raw_never_reaches_public_memory(tmp_path, monkeypatch):
