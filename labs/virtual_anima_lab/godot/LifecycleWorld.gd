@@ -703,7 +703,10 @@ func _request(line: String) -> Dictionary:
 		req.erase("auth")
 	if op == "hello" and req.size() == 4:
 		# The observer sees only observe, even if this world has effects.
-		var caps: Array[String] = ["observe_view"] if _egocentric else ["observe"]
+		var caps: Array[String] = ["observe"]
+		if _egocentric:
+			caps.clear()
+			caps.append("observe_view")
 		if _guarded:
 			if authority == "operator":
 				caps = ["inspect", "reset", "set_obstacle"]
