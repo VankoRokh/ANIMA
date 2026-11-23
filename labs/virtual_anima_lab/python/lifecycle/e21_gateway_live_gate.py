@@ -65,6 +65,40 @@ def finish(process, output):
     output.close()
 
 
+def negative_bootstrap(binary: str, evidence: Path) -> dict:
+    """A guarded listener must not start with absent/weak/reused credentials."""
+    cases = {
+        "missing": ("", "", ""),
+        "same": ("s" * 43, "s" * 43, "o" * 43),
+        "weak": ("x" * 12, "e" * 43, "o" * 43),
+    }
+    for label, keys in cases.items():
+        port = _port()
+        env = {
+            **os.environ,
+            "ANIMA_LIFECYCLE_OBSERVER_KEY": keys[0],
+            "ANIMA_LIFECYCLE_EXECUTOR_KEY": keys[1],
+            "ANIMA_LIFECYCLE_OPERATOR_KEY": keys[2],
+        }
+        logfile = evidence / f"bootstrap-{label}.log"
+        with logfile.open("w", encoding="utf-8") as output:
+            completed = subprocess.run(
+                [binary, "--headless", "--path", str(PROJECT),
+                 "res://LifecycleWorld.tscn", "--",
+                 "--lifecycle-port", str(port),
+                 "--lifecycle-seed", "7",
+                 "--lifecycle-effects", "--lifecycle-ledger",
+                 "--lifecycle-guarded"],
+                cwd=PROJECT, stdout=output, stderr=subprocess.STDOUT,
+                env=env, timeout=10, check=False,
+            )
+        require(completed.returncode != 0,
+                f"guarded {label} config started without valid credentials")
+        require("ANIMA_LIFECYCLE_WORLD_READY" not in logfile.read_text(encoding="utf-8"),
+                f"guarded {label} config opened a listener before failing")
+    return {"missing": "REJECTED", "reused": "REJECTED", "weak": "REJECTED"}
+
+
 def run_once(binary: str, seed: int, evidence: Path) -> dict:
     port = _port()
     data_dir = evidence / f"instance-{seed}"
@@ -181,6 +215,11 @@ def run_once(binary: str, seed: int, evidence: Path) -> dict:
                 "failed reset admission modified Core binding")
     finally:
         finish(process, log_output)
+    guarded_log = (evidence / f"godot-{seed}.log").read_text(encoding="utf-8")
+    require(not any(key in guarded_log for key in keys),
+            "guarded world accidentally logged a bearer capability")
+    require(f"seed={seed}" not in guarded_log,
+            "guarded mode published the scenario seed in stdout")
 
     # New Godot process and new port, same Core storage. No auto-rebind.
     next_port = _port()
@@ -231,14 +270,17 @@ def main(argv: list[str] | None = None) -> int:
         if args.evidence_dir:
             root = Path(args.evidence_dir)
             root.mkdir(parents=True, exist_ok=True)
+            bootstrap = negative_bootstrap(binary, root)
             trials = [run_once(binary, seed, root) for seed in (7, 8)]
         else:
             with tempfile.TemporaryDirectory(prefix="anima-e21-trust-") as tmp:
+                bootstrap = negative_bootstrap(binary, Path(tmp))
                 trials = [run_once(binary, seed, Path(tmp)) for seed in (7, 8)]
         print(json.dumps({
             "schema": "anima.e2_1.core_world_boundary_gate/0.1",
             "status": "E2_1_READ_ONLY_GATE_PASS",
             "trials": trials,
+            "invalid_guarded_bootstrap": bootstrap,
             "scope": "CORE_BOUND_OBSERVE_ONLY",
             "stage6_execution_admitted": False,
             "model_used": False,
