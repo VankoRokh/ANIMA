@@ -36,10 +36,12 @@ jobs:
           BASE=3a922429aa00e439495346c140048e484c867cb4
           git merge-base --is-ancestor "$BASE" HEAD
           git diff --name-only "$BASE"..HEAD | tee /tmp/e1min-changes.txt
-          if grep -Ev '^(./github/workflows/anima-e1min-independent-acceptance.yml|docs/RESEARCH/(README.md|e1-min-acceptance-brief-v02.md|e1-min-acceptance-report-v02.md)|tests/e1_min_independent_live_audit.py)$' /tmp/e1min-changes.txt; then
-            echo 'E1_MIN_BLOCKED: audited source was changed' >&2
-            exit 2
-          fi
+          while IFS= read -r changed_path; do
+            case "$changed_path" in
+              .github/workflows/anima-e1min-independent-acceptance.yml|docs/RESEARCH/README.md|docs/RESEARCH/e1-min-acceptance-brief-v02.md|docs/RESEARCH/e1-min-acceptance-report-v02.md|tests/e1_min_independent_live_audit.py) ;;
+              *) echo "E1_MIN_BLOCKED: unexpected path $changed_path" >&2; exit 2 ;;
+            esac
+          done < /tmp/e1min-changes.txt
       - name: Install test dependencies
         run: python -m pip install -r requirements-dev.txt
       - name: E1.1–E1.4 existing contract/negative checks
@@ -90,7 +92,7 @@ jobs:
             python --version
             "$GODOT_BIN" --headless --version
           } | tee "$RUNNER_TEMP/anima-e1min-independent/environment.txt"
-          python tests/e1_min_independent_live_audit.py \
+          PYTHONPATH="$GITHUB_WORKSPACE" python tests/e1_min_independent_live_audit.py \
             --godot "$GODOT_BIN" \
             --evidence-dir "$RUNNER_TEMP/anima-e1min-independent/blackbox" \
             2>&1 | tee "$RUNNER_TEMP/anima-e1min-independent/blackbox-summary.log"
