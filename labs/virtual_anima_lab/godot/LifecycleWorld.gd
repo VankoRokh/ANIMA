@@ -33,6 +33,10 @@ var _ledger_enabled := false
 var _guarded := false
 var _egocentric := false
 var _debug_ui_enabled := false # Human-only. Never enters agent DTO or Core context.
+var _visual_control_port := 0
+var _visual_control_token := ""
+var _visual_state: Dictionary = {}
+var _visual_error := "Controller offline"
 var _configuration_ok := true
 # Distinct ephemeral secrets from the trusted harness environment, not argv or hello.
 var _observer_key := ""
@@ -76,6 +80,12 @@ func _ready() -> void:
 	_refresh_status()
 	if _debug_ui_enabled:
 		_build_debug_panel()
+	if _visual_control_port > 0:
+		var visual_script: Script = load("res://VisualControlHUD.gd")
+		var visual: Control = visual_script.new()
+		visual.position = Vector2(WIDTH * CELL + 7, HEIGHT * CELL + 6)
+		visual.configure(_visual_control_port, _visual_control_token)
+		add_child(visual)
 	var listen_error := _server.listen(_port, "127.0.0.1")
 	if listen_error != OK:
 		push_error("Lifecycle World: cannot bind loopback port %d" % _port)
@@ -107,6 +117,9 @@ func _parse_args() -> void:
 			_egocentric = true
 		elif args[index] == "--lifecycle-debug-ui":
 			_debug_ui_enabled = true
+		elif args[index] == "--lifecycle-visual-control-port" and index + 1 < args.size():
+			_visual_control_port = int(args[index + 1])
+			index += 1
 		index += 1
 	if _guarded:
 		_observer_key = OS.get_environment("ANIMA_LIFECYCLE_OBSERVER_KEY")
@@ -127,6 +140,19 @@ func _parse_args() -> void:
 		push_error("Lifecycle World: egocentric sensor requires guarded role separation")
 		get_tree().quit(2)
 		return
+	if _visual_control_port != 0:
+		_visual_control_token = OS.get_environment("ANIMA_VISUAL_CONTROL_KEY")
+		var control_pattern := RegEx.create_from_string("^[A-Za-z0-9_-]{32,128}$")
+		if (not _guarded or not _egocentric or not _effects_enabled
+				or not _ledger_enabled or not _debug_ui_enabled
+				or _visual_control_port < 1024 or _visual_control_port > 65535
+				or _visual_control_port == _port
+				or control_pattern.search(_visual_control_token) == null
+				or _visual_control_token in [_observer_key, _executor_key, _operator_key]):
+			_configuration_ok = false
+			push_error("Lifecycle World: visual control requires a separate secured loopback endpoint")
+			get_tree().quit(2)
+			return
 	if _ledger_enabled and not _effects_enabled:
 		_configuration_ok = false
 		push_error("Lifecycle World: ledger requires --lifecycle-effects")
@@ -848,6 +874,20 @@ func _friendly_entity(ref: String) -> String:
 	return "other entity"
 
 
+# E2.5b telemetry only from authenticated Python runner. World truth above
+# stays operator-only, is never serialized to the runner or agent.
+func _visual_runner_update(state: Dictionary) -> void:
+	_visual_state = state.duplicate(true)
+	_visual_error = ""
+	_refresh_debug_panel()
+
+
+func _visual_runner_error(message: String) -> void:
+	_visual_state.clear()
+	_visual_error = message
+	_refresh_debug_panel()
+
+
 func _refresh_debug_panel() -> void:
 	if _debug_panel == null:
 		return
@@ -891,9 +931,51 @@ func _refresh_debug_panel() -> void:
 			lines.append("... +%d more readings" % [readings.size() - shown])
 	lines.append("")
 	lines.append("CORE / MEMORY / COGNITION")
-	lines.append("Telemetry: NOT CONNECTED")
-	lines.append("Decision trace: UNAVAILABLE")
-	lines.append("FAST/DEEP: NOT CONNECTED")
+	if _visual_control_port == 0:
+		lines.append("Telemetry: NOT CONNECTED")
+		lines.append("Decision trace: UNAVAILABLE")
+		lines.append("FAST/DEEP: NOT CONNECTED")
+	elif _visual_state.is_empty():
+		lines.append("Telemetry: " + _visual_error)
+	else:
+		lines.append("Source: CORE RAW + LAB POLICY")
+		lines.append("Goal: " + String(_visual_state.get("goal", "?")))
+		lines.append("Status: " + String(_visual_state.get("goal_status", "?")))
+		lines.append("Mode: DETERMINISTIC / FAST OFF")
+		lines.append("Step: %d / %d" % [
+			int(_visual_state.get("steps", 0)), int(_visual_state.get("max_steps", 0))])
+		lines.append("Memory: " + ("ON" if _visual_state.get("memory_enabled") else "OFF"))
+		lines.append("Admission: LAB_ONLY, NOT Stage6")
+		lines.append("Agent view (real Core Raw):")
+		var current: Array = _visual_state.get("agent_view", [])
+		if current.is_empty():
+			lines.append("  No target/obstacle visible")
+		for item in current:
+			lines.append("  " + _friendly_entity(String(item.get("entity_ref", "")))
+				+ "  %dmdeg / %dmcell" % [
+					int(item.get("bearing_mdeg", 0)), int(item.get("range_milli_cells", 0))])
+		lines.append("Working Memory (Core-backed):")
+		var remembered: Array = _visual_state.get("memory", [])
+		if remembered.is_empty():
+			lines.append("  No recalled target")
+		for entry in remembered:
+			lines.append("  " + _friendly_entity(String(entry.get("entity_ref", "")))
+				+ ": " + String(entry.get("status", "?")))
+		var last_choice: Variant = _visual_state.get("last_choice")
+		if typeof(last_choice) == TYPE_DICTIONARY:
+			lines.append("Decision: " + String(last_choice.get("operation", "?")))
+				+ "(" + String(last_choice.get("direction", "?")) + ")")
+			lines.append("Reason: " + String(last_choice.get("reason_code", "?")))
+		var last_outcome: Variant = _visual_state.get("last_outcome")
+		if typeof(last_outcome) == TYPE_DICTIONARY:
+			lines.append("Verification: " + String(last_outcome.get("status", "?")))
+		lines.append("DECISION TRACE (verified/lab)")
+		var trace: Array = _visual_state.get("trace", [])
+		for event in trace:
+			lines.append("  " + String(event.get("stage", "?"))
+				+ ": " + String(event.get("text", "?")))
+		if _visual_state.get("error") != null:
+			lines.append("ERROR: " + String(_visual_state.get("error")))
 	lines.append("")
 	lines.append("RECENT WORLD EVENTS")
 	for i in range(maxi(0, _history.size() - 3), _history.size()):
