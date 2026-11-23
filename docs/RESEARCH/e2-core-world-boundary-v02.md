@@ -1,7 +1,7 @@
 # ANIMA v0.2 — E2.1: Core-owned observation gateway и разграничение Godot-ролей
 
 **Статус:** **`Validated Lab / E2.1 PASS_LAB_APP_BOUNDARY`** — только app-level guarded observation, не E2 full, Stage6 execution или production security.  
-**Проверенный кодовый snapshot:** `fe1cf645e186d7dd520a50cd23e636ba45c67de5`; [CI 45170677368](https://github.com/VankoRokh/ANIMA/actions/runs/45170677368) — 4/4 PASS. [Подробный вердикт](e2-1-acceptance-report-v02.md).  
+**Проверенный кодовый snapshot:** `3e4ea3b93cb093e6c9be45ca926a488c9adf176f`; [CI 45171807284](https://github.com/VankoRokh/ANIMA/actions/runs/45171807284) — 4/4 PASS. [Подробный вердикт](e2-1-acceptance-report-v02.md).  
 **Основа:** [E1-min independent acceptance](e1-min-acceptance-report-v02.md), `bbdbe3a7429ac3002a832c356c9dedac697c2c79`, `PASS_LAB_RESTRICTED`.  
 **Ветка:** `work/v02-e21-core-owned-world-gateway`. Изменения только в исследовательском контуре `labs/`, tests, CI и документации; release `v0.2.0-rc.1` не затрагивается.  
 **Архитектурный инвариант:** единственная система принятия решений/допуска действий — существующий Core/Stage6. Новый `RecoverableAgentLoop`, независимый GoalStore/TaskStore или второй executor не создаются.
@@ -22,7 +22,7 @@
 | `ANIMA_LIFECYCLE_EXECUTOR_KEY` | `hello` с `act/operation_status`, `act`, `operation_status` | **Не выдаётся** gateway, FAST или E2.1. Зарезервирован для будущего Stage6 binding |
 | `ANIMA_LIFECYCLE_OPERATOR_KEY` | `inspect/reset/set_obstacle`, операторский hello | Только отдельный доверенный test harness |
 
-Ключи должны быть разными, от 32 до 128 символов `[A-Za-z0-9_-]`. В случае неполной конфигурации защищённый мир обязан отказать при запуске. Каждый запрос защищённого мира несёт отдельное поле `auth`, которое **удаляется перед валидацией WorldAction / записью event log / формированием receipt**. Запрос без ключа и `role=operator` с ключом наблюдателя/исполнителя возвращают `UNAUTHORIZED`; попытка `act` с ключом наблюдателя — `FORBIDDEN`. `hello` наблюдателя не раскрывает ни seed, ни hidden map, ни другие capabilities. Сообщение запуска и UI в guarded mode не публикуют seed.
+В guarded режиме исполнение запрещено без включённого operation ledger; при защищённом запуске без effects ключ исполнителя не объявляет никаких исполнительных capabilities. Ключи должны быть разными, от 32 до 128 символов `[A-Za-z0-9_-]`. В случае неполной конфигурации защищённый мир обязан отказать при запуске. Каждый запрос защищённого мира несёт отдельное поле `auth`, которое **удаляется перед валидацией WorldAction / записью event log / формированием receipt**. Запрос без ключа и `role=operator` с ключом наблюдателя/исполнителя возвращают `UNAUTHORIZED`; попытка `act` с ключом наблюдателя — `FORBIDDEN`. `hello` наблюдателя не раскрывает ни seed, ни hidden map, ни другие capabilities. Сообщение запуска и UI в guarded mode не публикуют seed.
 
 **Важная граница:** это разделение возможностей на уровне приложения, **не** изоляция недоверенного процесса на уровне ОС. Bearer secrets передаются через локальный TCP без TLS и хранятся в процессе. Код с тем же UID и доступом к `/proc`, environment или к Python introspection может обойти Python gateway и извлечь ключи. Настоящая изоляция недоверенного FAST-процесса требует отдельного sandbox/UID/network namespace или иного непроницаемого broker. E2.1 не объявляет эту проблему полностью устранённой. Незащищённый legacy-режим остаётся пригодным **только** для прежних лабораторных тестов, не для подключения новой автономии.
 
