@@ -141,7 +141,7 @@ def sequential(binary: str, seed: int, root: Path) -> dict:
                 for row in view["readings"]
             }
             require(actual == set(expected),
-                    f"view geometry/occlusion differs from oracle seed={seed} heading={heading}: {actual ^ expected}")
+                    f"view geometry/occlusion differs from oracle seed={seed} heading={heading}: {actual ^ set(expected)}")
             for row in view["readings"]:
                 require("cell" not in row and "x" not in row and "y" not in row and
                         "lab.wall." not in row["entity_ref"], "coordinate leak in reading")
