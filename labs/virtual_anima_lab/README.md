@@ -70,6 +70,43 @@ ANIMA_LAB_PORT=46030 ANIMA_LAB_SEED=8 bash scripts/run_visual_lab_debug.sh
 
 Визуальный интерфейс с живым списком `DecisionRecord`, предложениями FAST, состоянием Goal/Task, pause/step и изменением памяти **ещё не реализован**. Его источником должен стать отдельный проверенный канал телеметрии Python/Core с явной маркировкой `observation / hypothesis / confirmed`, а не данные панели Godot.
 
+## E2.5b Visual Decision Runner — настоящий STEP/RUN эксперимент
+
+**Не запускай обычный `LifecycleWorld.tscn` вручную для этого этапа:** без Python-контура он по-прежнему будет только статической комнатой. Новый Runner поднимает Godot GUI, disposable CoreAssembly, E2.4a Raw/Memory, E2.4b viewpoint-trail, отдельный read-only канал телеметрии и аутентифицированные кнопки управления в одном запуске:
+
+```bash
+cd ~/Projects/ANIMA
+git fetch origin work/v02-visual-decision-runner
+git worktree add --detach ../ANIMA-visual-decisions origin/work/v02-visual-decision-runner
+cd ~/Projects/ANIMA-visual-decisions
+bash scripts/run_visual_decision_lab.sh
+
+# Другая воспроизводимая сцена:
+bash scripts/run_visual_decision_lab.sh --seed 8 --step-interval 2
+
+# Если нужен интерпретатор из существующего venv:
+PYTHON_BIN=~/Projects/ANIMA/.venv/bin/python bash scripts/run_visual_decision_lab.sh
+```
+
+Закрой прежние окна LifecycleWorld перед запуском. `GODOT_BIN` указывает на локальный Godot 4.7.2 (по умолчанию `~/.local/opt/godot/Godot_v4.7.2-stable_linux.x86_64`). После `ANIMA_VISUAL_RUNNER_READY` используй кнопки в правой нижней части окна:
+
+| Кнопка | Фактическое поведение |
+| --- | --- |
+| **STEP** | Один полный проход: новое агентское наблюдение (если нужно), выбор действия детерминированной политикой, durable lab admission, Godot effect, readback и новый Core-backed Raw |
+| **RUN** | Повторение ограниченных STEP с задержкой до выполнения экспериментальной цели или лимита |
+| **PAUSE** | Запрет следующего шага; уже исполняемый шаг закончит атомарный переход и сохранит его исход |
+| **TOGGLE MEMORY** | Включает/выключает исторический доступ для **следующего** решения; не изменяет Raw и не двигает объект |
+
+Первая задача намеренно простая: **увидеть ящик, затем выполнить один подтверждённый шаг в его направлении**. На seed 7 после STEP ANIMA должна повернуться к ящику, после RUN/следующего STEP сделать forward step и остановиться с `COMPLETED_LAB_CONDITION`. Чтобы начать новый сеанс, закрой Godot и снова выполни команду запуска. Текущий `STEP` не даёт полностью остановленного/возобновлённого «мышления»: он выполняет один ограниченный action cycle.
+
+На операторской панели содержится **состояние мира для человека**, ниже — живой **Core-backed агентский сенсор**, рабочая память, `last_choice/reason`, лабораторный допуск, verified result и последние записи trace. Истинные координаты Godot через телеметрию Runner в ANIMA не передаются. Синий preview и операторская карта никогда не считаются агентским Raw.
+
+**Правило честной интерпретации:** `mode=DETERMINISTIC`, `FAST/DEEP: NOT CONNECTED`, `action_admission=LAB_ONLY_NOT_STAGE6`. Это не production Core Goal/Task/Execution и не «интеллектуальное поведение LLM». В данном этапе реальный Core фиксирует сенсорные события и их доказательства, но решения и допуск мировых действий реализованы отдельной лабораторной политикой. Независимая верификация физических целей и полноценный crash recovery впереди.
+
+**Логи:** Python печатает путь временной директории `/tmp/anima-visual-runner-...`, где остаются `core/core_state.db`, `e24_working_memory.db`, `visual_decisions` и `godot-visual.log`. Профиль ANIMA в домашнем каталоге не изменяется.
+
+**CI:** `bash scripts/run_visual_decision_gate.sh "$GODOT_BIN"` (headless Godot + реальный Core + API STEP/RUN + регрессия E1.2–E2.5a). Формальная приёмка/ограничения: [E2.5b research report](../../docs/RESEARCH/e2-5b-visual-decision-lab-acceptance-v02.md).
+
 ## Проверки
 
 Из корня репозитория при закрытом окне Lab:
