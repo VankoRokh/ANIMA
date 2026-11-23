@@ -140,7 +140,7 @@ python -m labs.virtual_anima_lab.python.lifecycle.world_smoke --godot "$GODOT_BI
   --lifecycle-port 46029 --lifecycle-seed 7
 ```
 
-Agent через `val.bridge/0.2` сейчас может только `hello` и `observe`. Текст маршрута, полная карта, инспекция и управление препятствиями агенту не доступны. Операторские fixture-команды существуют только для изолированного тестового стенда и не аутентифицируют процесс. Реальное `world.move/pick/drop`, admission, effect proof и операции восстановления относятся к E1.3–E1.4.
+В **режиме E1.2** agent через `val.bridge/0.2` может только `hello` и `observe`. Текст маршрута, полная карта, инспекция и управление препятствиями агенту недоступны. Операторские fixture-команды существуют только для изолированного стенда и не аутентифицируют процесс. Более поздние E1.3/E1.4 эффекты и status доступны исключительно при явном opt-in.
 
 Дизайн, геометрия и статус проверок: [E1.2](../../docs/RESEARCH/e1-lifecycle-world-v02.md).
 
@@ -161,6 +161,28 @@ bash scripts/run_e13_live_gate.sh "$GODOT_BIN"
 
 Блокирующий receipt не доказывает движение; `verify_world_effect` требует свежий `WorldObservation` и согласованные world/epoch/revision/operation/sample. `delivery_verified=true` относится только к реальному `drop` в наблюдаемой зоне доставки. Старые native/Godot тесты остаются неизменными; после обнаруженного расхождения координат новая нативная проверка дополнительно фиксирует реальную проходимость `(6,2)` и `(6,8)`.
 
-**Граница E1.4:** `operation_id` не может повторно исполниться в текущем процессе, но операция **не** имеет queryable ledger/status, replay и durable recovery. Повтор после потерянного ответа запрещён. `role` по-прежнему самообъявленная роль и не является аутентификацией. Нельзя переносить этот порт на физические устройства или считать его production authority.
+**Граница режима E1.3:** без дополнительного `--lifecycle-ledger` повторный `operation_id` только отклоняется; `operation_status` и replay здесь не доступны. E1.4 вводит отдельный **in-process** ledger без долговременного восстановления. В обоих режимах `role` самообъявленная и не является аутентификацией; к физическим устройствам порт подключать нельзя.
 
 Подробности, команды и доказательства: [E1.3](../../docs/RESEARCH/e1-world-effects-v02.md).
+
+## E1.4 — opt-in operation ledger / idempotent replay
+
+**Статус:** `Validated Lab / E1.4 PASS` на кодовом snapshot `c896ba9f3a1b610cfcddb8b58ac8a33299f71f1f`. В [CI](https://github.com/VankoRokh/ANIMA/actions/runs/45164124776): 2356 Python PASS на 3.12–3.14, Godot 4.7.2, E1.2/E1.3/P5/P6/M2 regressions PASS, native bounded ledger, live reconnect seed 7/8 ×2.
+
+```bash
+GODOT_BIN="$HOME/.local/opt/godot/Godot_v4.7.2-stable_linux.x86_64"
+
+# Изолированный E1.4 мир; без флагов E1.2/E1.3 не получают ledger:
+"$GODOT_BIN" --path labs/virtual_anima_lab/godot res://LifecycleWorld.tscn -- \
+  --lifecycle-port 46029 --lifecycle-seed 7 \
+  --lifecycle-effects --lifecycle-ledger
+
+# Полная воспроизводимая лабораторная приёмка и архив логов:
+bash scripts/run_e14_live_gate.sh "$GODOT_BIN"
+```
+
+Клиент использует typed `WorldAction` и `WorldOperationStatus`; status-запрос содержит **исходный полный action**. Повтор идентичного ID/payload возвращает исходный receipt с `replayed=true` без повторного эффекта. Другой payload даёт `OPERATION_CONFLICT`. Журнал ограничен **256 записями**; при переполнении новые действия отклоняются, но старые доступны. `UNKNOWN` **не разрешает повтор**. Даже `RECORDED` требует отдельного `WorldObservation` и проверки proof.
+
+**Не реализовано:** запись ledger на диск или восстановление после перезапуска Godot, аутентификация локальных клиентов, автоматическое действие Core/FAST, долговременное хранение опыта. Полная E1-min приёмка и E2 отдельно.
+
+Дизайн, негативные проверки и точные evidence: [E1.4](../../docs/RESEARCH/e1-operation-ledger-v02.md).
