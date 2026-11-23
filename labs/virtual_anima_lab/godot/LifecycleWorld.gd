@@ -963,8 +963,10 @@ func _refresh_debug_panel() -> void:
 				+ ": " + String(entry.get("status", "?")))
 		var last_choice: Variant = _visual_state.get("last_choice")
 		if typeof(last_choice) == TYPE_DICTIONARY:
-			lines.append("Decision: " + String(last_choice.get("operation", "?")))
-				+ "(" + String(last_choice.get("direction", "?")) + ")")
+			lines.append("Decision: %s(%s)" % [
+				String(last_choice.get("operation", "?")),
+				String(last_choice.get("direction", "?"))
+			])
 			lines.append("Reason: " + String(last_choice.get("reason_code", "?")))
 		var last_outcome: Variant = _visual_state.get("last_outcome")
 		if typeof(last_outcome) == TYPE_DICTIONARY:
