@@ -310,7 +310,7 @@ func _view_visible(point: Vector2i) -> bool:
 	var delta := point - _anima
 	if delta == Vector2i.ZERO:
 		return false
-	var forward := delta.dot(_facing)
+	var forward: int = delta.x * _facing.x + delta.y * _facing.y
 	var right := delta.x * (-_facing.y) + delta.y * _facing.x
 	if forward <= 0:
 		return false
@@ -341,7 +341,7 @@ func _opaque_ref(point: Vector2i, category: String) -> String:
 
 func _view_reading(ref: String, category: String, point: Vector2i, properties: Dictionary = {}) -> Dictionary:
 	var delta := point - _anima
-	var forward := delta.dot(_facing)
+	var forward: int = delta.x * _facing.x + delta.y * _facing.y
 	var right := delta.x * (-_facing.y) + delta.y * _facing.x
 	return {
 		"entity_ref": ref, "category": category,
