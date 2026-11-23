@@ -24,6 +24,7 @@ func _status(world: Node, request_id: int, action: Dictionary) -> Dictionary:
 	return _call(world, request_id, "agent", "operation_status", {
 		"world_instance_id": action["world_instance_id"],
 		"epoch": action["epoch"], "operation_id": action["operation_id"],
+		"action": action,
 	})
 
 
@@ -81,6 +82,18 @@ func _initialize() -> void:
 	conflict["arguments"] = {"direction": "W"}
 	var denied := _call(world, 5, "agent", "act", {"action": conflict})
 	if not _expect(not denied["ok"] and denied["error"] == "OPERATION_CONFLICT", "same id / changed payload not rejected"):
+		_finish(world, false)
+		return
+	var conflict_lookup := _status(world, 50, conflict)
+	if not _expect(not conflict_lookup["ok"] and conflict_lookup["error"] == "OPERATION_CONFLICT", "status request accepted conflicting payload"):
+		_finish(world, false)
+		return
+	var bad_lookup := _call(world, 51, "agent", "operation_status", {
+		"world_instance_id": move["world_instance_id"], "epoch": move["epoch"],
+		"operation_id": move["operation_id"],
+		"action": _action(obs, "e14.native.move", "N"),
+	})
+	if not _expect(not bad_lookup["ok"] and bad_lookup["error"] == "OPERATION_CONFLICT", "lookup does not bind original observation"):
 		_finish(world, false)
 		return
 	var found := _status(world, 6, move)
