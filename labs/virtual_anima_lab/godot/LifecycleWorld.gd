@@ -6,6 +6,9 @@ extends Node2D
 
 const PROTOCOL := "val.bridge/0.2"
 const OBSERVATION_SCHEMA := "anima.lifecycle.world_observation/0.1"
+const VIEW_SCHEMA := "anima.lifecycle.egocentric_observation/0.1"
+const VIEW_ACTION_SCHEMA := "anima.lifecycle.egocentric_action/0.1"
+const VIEW_FOV_DEGREES := 90
 const ACTION_SCHEMA := "anima.lifecycle.world_action/0.1"
 const RECEIPT_SCHEMA := "anima.lifecycle.world_receipt/0.1"
 const OPERATION_STATUS_SCHEMA := "anima.lifecycle.world_operation_status/0.1"
@@ -28,6 +31,7 @@ var _effects_enabled := false
 # E1.4 is a separate opt-in; default E1.2 and E1.3 contracts stay unchanged.
 var _ledger_enabled := false
 var _guarded := false
+var _egocentric := false
 var _configuration_ok := true
 # Distinct ephemeral secrets from the trusted harness environment, not argv or hello.
 var _observer_key := ""
@@ -46,6 +50,8 @@ var _walls: Array[Vector2i] = []
 var _obstacles: Array[Vector2i] = []
 var _shortcut := Vector2i.ZERO
 var _anima := Vector2i.ZERO
+var _facing := Vector2i(0, -1)
+var _opaque_refs: Dictionary = {}
 var _item := Vector2i.ZERO
 var _delivery := Vector2i.ZERO
 var _landmark := Vector2i.ZERO
@@ -93,6 +99,8 @@ func _parse_args() -> void:
 			_ledger_enabled = true
 		elif args[index] == "--lifecycle-guarded":
 			_guarded = true
+		elif args[index] == "--lifecycle-egocentric":
+			_egocentric = true
 		index += 1
 	if _guarded:
 		_observer_key = OS.get_environment("ANIMA_LIFECYCLE_OBSERVER_KEY")
@@ -108,6 +116,11 @@ func _parse_args() -> void:
 			push_error("Lifecycle World: guarded mode requires three distinct strong keys")
 			get_tree().quit(2)
 			return
+	if _egocentric and not _guarded:
+		_configuration_ok = false
+		push_error("Lifecycle World: egocentric sensor requires guarded role separation")
+		get_tree().quit(2)
+		return
 	if _ledger_enabled and not _effects_enabled:
 		_configuration_ok = false
 		push_error("Lifecycle World: ledger requires --lifecycle-effects")
@@ -170,6 +183,8 @@ func _reset_world() -> void:
 	_tick = 0
 	_last_sample.clear()
 	_history.clear()
+	_facing = Vector2i(0, -1)
+	_opaque_refs.clear()
 	_walls.clear()
 	_obstacles.clear()
 	var partition: Dictionary = _scenario["partition"]
@@ -285,6 +300,94 @@ func _observation() -> Dictionary:
 	}
 	_last_sample = sample.duplicate(true)
 	_refresh_status()
+	return sample
+
+
+
+# E2.3 directed actor-relative sensor: never call _inspect() or reveal absolute
+# coordinates, compass heading, or wall.x.y IDs to the observer.
+func _view_visible(point: Vector2i) -> bool:
+	var delta := point - _anima
+	if delta == Vector2i.ZERO:
+		return false
+	var forward := delta.dot(_facing)
+	var right := delta.x * (-_facing.y) + delta.y * _facing.x
+	if forward <= 0:
+		return false
+	if absf(rad_to_deg(atan2(float(right), float(forward)))) > float(VIEW_FOV_DEGREES) / 2.0:
+		return false
+	var steps: int = maxi(absi(delta.x), absi(delta.y)) * 16
+	for index in range(1, steps):
+		var fraction := float(index) / float(steps)
+		var sampled := Vector2i(
+			floori(float(_anima.x) + 0.5 + float(delta.x) * fraction),
+			floori(float(_anima.y) + 0.5 + float(delta.y) * fraction)
+		)
+		if sampled == point:
+			return true
+		if _blocked(sampled):
+			return false
+	return true
+
+
+func _opaque_ref(point: Vector2i, category: String) -> String:
+	var key := "%s:%d:%d" % [category, point.x, point.y]
+	if not _opaque_refs.has(key):
+		_opaque_refs[key] = "lab.%s.%s" % [
+			category, Crypto.new().generate_random_bytes(12).hex_encode()
+		]
+	return _opaque_refs[key]
+
+
+func _view_reading(ref: String, category: String, point: Vector2i, properties: Dictionary = {}) -> Dictionary:
+	var delta := point - _anima
+	var forward := delta.dot(_facing)
+	var right := delta.x * (-_facing.y) + delta.y * _facing.x
+	return {
+		"entity_ref": ref, "category": category,
+		"bearing_mdeg": roundi(rad_to_deg(atan2(float(right), float(forward))) * 1000.0),
+		"range_milli_cells": roundi(sqrt(float(delta.x * delta.x + delta.y * delta.y)) * 1000.0),
+		"properties": properties,
+	}
+
+
+func _observation_view() -> Dictionary:
+	_sample_seq += 1
+	var readings: Array[Dictionary] = []
+	for wall in _walls:
+		if _view_visible(wall):
+			readings.append(_view_reading(_opaque_ref(wall, "surface"), "surface", wall))
+	if _view_visible(_shortcut):
+		readings.append(_view_reading("lab.obstacle.shortcut", "obstacle", _shortcut))
+	for obstacle in _obstacles:
+		if _view_visible(obstacle):
+			readings.append(_view_reading(
+				_opaque_ref(obstacle, "obstacle"), "obstacle", obstacle
+			))
+	if _view_visible(_item):
+		var owner := {
+			"status": "absent" if _item_owner == "" else "known",
+			"value": null if _item_owner == "" else _item_owner,
+		}
+		readings.append(_view_reading("lab.item.crate", "item", _item, {"owner": owner}))
+	if _view_visible(_delivery):
+		readings.append(_view_reading("lab.zone.delivery", "zone", _delivery))
+	if _view_visible(_landmark):
+		readings.append(_view_reading("lab.landmark.marker", "landmark", _landmark))
+	var sample_id := "worldobs:%s:%d:%d" % [_world_instance_id, _epoch, _sample_seq]
+	var sample := {
+		"schema": VIEW_SCHEMA,
+		"world_instance_id": _world_instance_id, "epoch": _epoch,
+		"revision": _revision, "tick": _tick,
+		"sample_seq": _sample_seq, "sample_id": sample_id,
+		"observer_ref": "lab.actor.anima", "source_ref": "lab.sensor.anima.proximity",
+		"coverage": {
+			"kind": "view_cone", "fov_degrees": VIEW_FOV_DEGREES,
+			"range_limit": "none", "occlusion": "opaque_grid_cells",
+		},
+		"readings": readings,
+	}
+	_last_sample = sample.duplicate(true)
 	return sample
 
 
