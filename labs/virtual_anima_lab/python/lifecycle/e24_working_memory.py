@@ -468,10 +468,32 @@ class E24WorkingMemory:
         selected = snapshots if memory_enabled else snapshots[-1:]
         entities: dict[str, dict] = {}
         edges: dict[tuple[str, str], dict] = {}
+        revisions = []
+        last_property_evidence = {}
         for snap, event_id, digest in selected:
             for mention in mentions_by_sample.get(snap["sample_id"], []):
                 name = mention["entity_ref"]
                 old = entities.get(name)
+                properties = json.loads(mention["properties_json"])
+                # Compare only independently observable entity PROPERTIES, not
+                # relative bearing/range (the viewpoint may have changed).
+                for predicate, value in sorted(properties.items()):
+                    prop_key = (name, predicate)
+                    previous = last_property_evidence.get(prop_key)
+                    if previous is not None and previous["value"] != value:
+                        revisions.append({
+                            "kind": "observed_property_change",
+                            "entity_ref": name, "predicate_ref": predicate,
+                            "previous": previous["value"], "current": value,
+                            "previous_sample": previous["sample_id"],
+                            "previous_event_id": previous["event_id"],
+                            "current_sample": snap["sample_id"],
+                            "current_event_id": event_id,
+                            "interpretation": "changed_report_not_confirmed_knowledge",
+                        })
+                    last_property_evidence[prop_key] = {
+                        "value": value, "sample_id": snap["sample_id"], "event_id": event_id,
+                    }
                 entities[name] = {
                     "entity_ref": name, "category": mention["category"],
                     "last_seen_sample": snap["sample_id"],
@@ -480,9 +502,13 @@ class E24WorkingMemory:
                         "bearing_mdeg": mention["bearing_mdeg"],
                         "range_milli_cells": mention["range_milli_cells"],
                     },
-                    "last_seen_properties": json.loads(mention["properties_json"]),
+                    "last_seen_properties": properties,
                     "evidence_count": 1 if old is None else old["evidence_count"] + 1,
                 }
+            latest_mentions = {
+                entry["entity_ref"]: entry
+                for entry in mentions_by_sample.get(snap["sample_id"], [])
+            }
             for pair in edges_by_sample.get(snap["sample_id"], []):
                 a, b = pair["first_ref"], pair["second_ref"]
                 key = (a, b)
@@ -491,6 +517,15 @@ class E24WorkingMemory:
                     "kind": "co_observed", "first_ref": a, "second_ref": b,
                     "evidence_count": 1 if existing is None else existing["evidence_count"] + 1,
                     "last_sample_id": snap["sample_id"], "last_event_id": event_id,
+                    "last_relative_bearing_mdeg": (
+                        latest_mentions[b]["bearing_mdeg"] -
+                        latest_mentions[a]["bearing_mdeg"]
+                    ),
+                    "last_relative_range_milli_cells": (
+                        latest_mentions[b]["range_milli_cells"] -
+                        latest_mentions[a]["range_milli_cells"]
+                    ),
+                    "relative_frame": "same_observer_view_not_global",
                 }
         present = {reading["entity_ref"] for reading in latest["readings"]}
         for entity in entities.values():
@@ -509,10 +544,13 @@ class E24WorkingMemory:
             "historical_samples": len(selected),
             "entities": [entities[x] for x in sorted(entities)],
             "relations": [edges[x] for x in sorted(edges)],
+            "observed_revisions": revisions,
             "limitations": {
                 "co_observed_is_not_traversable": True,
                 "not_observed_does_not_mean_absent": True,
                 "previous_bearings_may_be_stale": True,
+                "observed_property_changes_are_not_knowledge": True,
+                "no_global_or_traversable_map": True,
                 "full_raw_is_in_sidecar_not_core": True,
             },
         }
