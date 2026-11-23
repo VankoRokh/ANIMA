@@ -139,6 +139,22 @@ def test_malicious_or_inconsistent_proposal_fails_closed(tmp_path, monkeypatch, 
     assert gate.tasks.list_tasks(goal_id=goal["id"]) == []
 
 
+def test_spatial_gate_rejects_capability_aliasing(tmp_path, monkeypatch):
+    core, mem, goal, store, gate, proof = prepare_env(tmp_path, monkeypatch)
+    with pytest.raises(CoreSpatialAdmissionError, match="alias is forbidden"):
+        CoreSpatialActionGateway(
+            core=core, store=store, registry=gate.registry, executor=gate.executor,
+            allowed_capabilities={
+                "world.turn": ("world.step", VERSION),
+                "world.step": ("world.step", VERSION),
+            },
+            source_ref=SOURCE,
+            producer_ref="lab.world.lifecycle.egocentric_adapter",
+            subject_ref=SUBJECT, predicate_ref=PREDICATE,
+        )
+    assert store.list_operations(goal_id=goal["id"]) == []
+
+
 def test_cancelled_goal_cannot_prepare_or_execute(tmp_path, monkeypatch):
     core, mem, goal, store, gate, proof = prepare_env(tmp_path, monkeypatch)
     prepared = gate.prepare(
