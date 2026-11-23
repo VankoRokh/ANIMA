@@ -20,7 +20,7 @@ from typing import Mapping
 
 from anima.agent.tools import ToolRegistry
 from anima.core.assembly import CoreAssembly
-from anima.execution.contracts import ActionSpec, ExecutionAction, VerificationSpec
+from anima.execution.contracts import ActionSpec, ExecutionAction, ExecutionReceipt, VerificationSpec, thaw
 from anima.execution.store import ExecutionStore
 from anima.execution.sandbox import SandboxExecutor
 from anima.tasks.store import TaskStore
@@ -113,7 +113,7 @@ class CoreSpatialActionGateway:
         )
         self.goals = core.internal_state.goals
 
-    def _raw(self, proof: SpatialSourceProof) -> dict:
+    def _raw(self, proof: SpatialSourceProof, *, require_latest: bool = True) -> dict:
         if not isinstance(proof, SpatialSourceProof):
             raise CoreSpatialAdmissionError("typed sealed source proof required")
         if any(type(x) is not str or not x for x in (
@@ -150,13 +150,14 @@ class CoreSpatialActionGateway:
         receipt = ingress.dispatch_receipt(proof.core_event_id)
         if receipt is None or receipt["disposition"] != "forwarded":
             raise CoreSpatialAdmissionError("Core event missing forward receipt")
-        belief = ingress.read_belief(
-            self.subject_ref, self.predicate_ref, as_of_tick=expected_clock,
-        )
-        if (belief["status"] != "known" or belief["freshness"] != "fresh"
-                or belief["value"] != expected_value
-                or proof.core_event_id not in belief["evidence_event_ids"]):
-            raise CoreSpatialAdmissionError("stale or contradicted Core Belief")
+        if require_latest:
+            belief = ingress.read_belief(
+                self.subject_ref, self.predicate_ref, as_of_tick=expected_clock,
+            )
+            if (belief["status"] != "known" or belief["freshness"] != "fresh"
+                    or belief["value"] != expected_value
+                    or proof.core_event_id not in belief["evidence_event_ids"]):
+                raise CoreSpatialAdmissionError("stale or contradicted Core Belief")
         required = {"world_instance_id", "epoch", "revision", "tick", "sample_seq"}
         if any(type(snap.get(k)) is not int for k in required - {"world_instance_id"}):
             raise CoreSpatialAdmissionError("invalid sensor clock")
@@ -273,27 +274,98 @@ class CoreSpatialActionGateway:
         self.before_effect(prepared, proof=proof)
         return self.executor.execute(prepared.action)
 
-    def finish_verified(self, prepared: PreparedSpatialAction, *,
-                        verified: bool, outcome: str) -> None:
-        """Only after independent world receipt+new Raw verified by caller.
+    def finish_verified(
+        self, prepared: PreparedSpatialAction, *,
+        before_proof: SpatialSourceProof,
+        after_proof: SpatialSourceProof,
+        receipt: ExecutionReceipt,
+        readback: Mapping,
+    ) -> str:
+        """Confirm a Stage6 effect against exact original+new Core Raw.
 
-        Do NOT turn Goal into completed here. It is a multi-step goal with
-        independent criterion; caller separately verifies and reports success.
+        Never trust an arbitrary caller-provided 'verified=True'. Check the
+        registered CoreIngress source for BOTH samples, the Stage6 stored
+        Action+VerificationSpec, a Stage6 ExecutionReceipt, and a separate
+        world operation_status readback. This is *corroborated lab evidence*,
+        not an independent physical position sensor.
         """
-        if type(verified) is not bool or not verified:
-            raise CoreSpatialAdmissionError("unverified action cannot complete Task")
-        if outcome not in ("VERIFIED_EFFECT", "VERIFIED_BLOCKED"):
-            raise CoreSpatialAdmissionError("invalid spatial verification result")
+        if not isinstance(prepared, PreparedSpatialAction):
+            raise CoreSpatialAdmissionError("typed Stage6 intent required")
+        before = self._raw(before_proof, require_latest=False)
+        after = self._raw(after_proof)
+        if not isinstance(receipt, ExecutionReceipt) or not isinstance(readback, Mapping):
+            raise CoreSpatialAdmissionError("typed Stage6 receipt and readback required")
         operation = self.store.get_operation(prepared.operation_id)
         task = self.tasks.get_task(prepared.task_id)
+        goal = self.goals.get_goal(prepared.goal_id)
+        stored_action = self.store.load_action(prepared.operation_id)
+        stored_spec = self.store.load_verification_spec(prepared.operation_id)
         if (operation is None or operation["status"] != "succeeded"
-                or task is None or task.status != "active"
-                or self.goals.get_goal(prepared.goal_id)["status"] != "active"):
-            raise CoreSpatialAdmissionError("Stage2/Stage6 state does not allow verification")
+                or task is None or task.goal_id != prepared.goal_id
+                or task.status != "active" or goal is None or goal["status"] != "active"
+                or stored_action.to_dict() != prepared.action.to_dict()
+                or stored_spec != prepared.spec
+                or before_proof.sample_id != prepared.pre_sample_id
+                or before_proof.core_event_id != prepared.source_event_id):
+            raise CoreSpatialAdmissionError("Stage2/Stage6 identity changed after effect")
+        data = receipt.to_dict()
+        result = data["output"]
+        if (receipt.status != "succeeded" or receipt.operation_id != prepared.operation_id
+                or receipt.action_id != prepared.action.public_id
+                or type(result) is not dict
+                or result.get("operation_id") != prepared.operation_id):
+            raise CoreSpatialAdmissionError("Stage6 execution output not bound to intent")
+        spec = thaw(prepared.spec.parameters)
+        action_args = thaw(prepared.action.arguments)
+        if (
+            spec.get("before_sample_id") != before_proof.sample_id
+            or spec.get("source_event_id") != before_proof.core_event_id
+            or spec.get("raw_sha256") != hashlib.sha256(
+                before_proof.raw_json.encode("utf-8")
+            ).hexdigest()
+            or action_args.get("observation_id") != before_proof.sample_id
+            or action_args.get("expected_revision") != before["revision"]
+            or action_args.get("pre_tick") != before["tick"]
+            or action_args.get("world_instance_id") != before["world_instance_id"]
+            or action_args.get("epoch") != before["epoch"]
+            or after["world_instance_id"] != before["world_instance_id"]
+            or after["epoch"] != before["epoch"]
+            or after["sample_seq"] <= before["sample_seq"]
+        ):
+            raise CoreSpatialAdmissionError("stored VerificationSpec or new Raw mismatched")
+        # Stage6 output is a process-bound tool result; the Godot readback
+        # is separately fetched by E24PoseTrail, not generated by this gateway.
+        for field in (
+            "operation_id", "status", "effect_applied", "revision",
+            "tick", "event_id", "reason",
+        ):
+            if readback.get(field) != result.get(field):
+                raise CoreSpatialAdmissionError("Godot readback contradicts Stage6 receipt")
+        if (type(readback.get("revision")) is not int
+                or type(readback.get("tick")) is not int
+                or type(readback.get("effect_applied")) is not bool
+                or readback["tick"] != before["tick"] + 1
+                or after["tick"] != readback["tick"]
+                or after["revision"] != readback["revision"]):
+            raise CoreSpatialAdmissionError("new source Raw doesn't corroborate clocks")
+        expected_revision = before["revision"] + int(readback["effect_applied"])
+        if readback["revision"] != expected_revision:
+            raise CoreSpatialAdmissionError("unexpected change of world revision")
+        kind = spec["action_type"]
+        outcome = (
+            "VERIFIED_EFFECT" if readback["effect_applied"] else "VERIFIED_BLOCKED"
+        )
+        if (kind == "world.turn" and outcome != "VERIFIED_EFFECT") or (
+            kind == "world.step" and readback["status"] not in ("APPLIED", "BLOCKED")
+        ):
+            raise CoreSpatialAdmissionError("world-effect outcome not admissible")
+        # At this point the *Task* represents one verified bounded attempt.
+        # A subsequent Goal success still requires its own explicit criterion.
         self.tasks.transition_task(
             prepared.task_id, "completed",
-            reason="Godot readback and new Core Raw corroborate result: " + outcome,
+            reason="Core-backed Raw and world ledger corroborate Stage6 result: " + outcome,
         )
+        return outcome
 
 
 __all__ = [
