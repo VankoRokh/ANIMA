@@ -1,0 +1,73 @@
+name: ANIMA v0.2 E1.3 Virtual Effects and Readback
+
+on:
+  push:
+    branches:
+      - work/v02-e13-world-effects-readback
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: anima-e13-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  e13-offline:
+    name: Python ${{ matrix.python-version }} / E1.3 contracts and full regression
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ['3.12', '3.13', '3.14']
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v6
+        with:
+          python-version: ${{ matrix.python-version }}
+      - run: python -m pip install -r requirements-dev.txt
+      - name: E1.1–E1.3 contract and sensor-proof tests
+        run: python -m pytest -q -p no:cacheprovider tests/test_lifecycle_world_contracts.py tests/test_lifecycle_scenario.py tests/test_lifecycle_world_verification.py
+      - name: Documentation and syntax
+        run: bash scripts/check.sh
+      - name: Full Python regression
+        run: python -m pytest -q -p no:cacheprovider
+
+  e13-godot:
+    name: Godot 4.7.2 / E1.2 regression + E1.3 live
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.14'
+      - run: python -m pip install -r requirements-dev.txt
+      - name: Install official Godot 4.7.2 with verified digest
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/godot"
+          curl --fail --location --retry 3 --retry-delay 2 \
+            --output "$RUNNER_TEMP/godot/godot.zip" \
+            https://github.com/godotengine/godot-builds/releases/download/4.7.2-stable/Godot_v4.7.2-stable_linux.x86_64.zip
+          echo "cadd3204e728a35d3f13adb7fd0d7902636b79f6b95c40c265eb73b6c35329e4  $RUNNER_TEMP/godot/godot.zip" | sha256sum -c -
+          unzip -q "$RUNNER_TEMP/godot/godot.zip" -d "$RUNNER_TEMP/godot"
+          chmod +x "$RUNNER_TEMP/godot/Godot_v4.7.2-stable_linux.x86_64"
+          echo "GODOT_BIN=$RUNNER_TEMP/godot/Godot_v4.7.2-stable_linux.x86_64" >> "$GITHUB_ENV"
+      - name: E1.2 baseline, E1.3 native/live and P5/P6 regression
+        env:
+          E13_REPORT_DIR: ${{ runner.temp }}/anima-e13-evidence
+        run: bash scripts/run_e13_live_gate.sh
+      - name: Retain raw evidence including failures
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: anima-e13-world-effects-live
+          path: ${{ runner.temp }}/anima-e13-evidence/
+          if-no-files-found: warn
+          retention-days: 14

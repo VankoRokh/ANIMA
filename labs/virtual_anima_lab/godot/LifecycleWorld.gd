@@ -1,10 +1,12 @@
 extends Node2D
-## E1.2 isolated lifecycle world. Not the P5/P6 Main scene.
-## Truth belongs to Godot; the agent bridge exposes local observations ONLY.
-## World effects and Core authority are deliberately deferred to E1.3/E2.
+## Isolated lifecycle world; NEVER replaces the P5/P6 Main scene.
+## Default: E1.2 observe-only; E1.3 world effects require explicit --lifecycle-effects.
+## Self-declared bridge roles are laboratory-only, not trusted authentication or Core authority.
 
 const PROTOCOL := "val.bridge/0.2"
 const OBSERVATION_SCHEMA := "anima.lifecycle.world_observation/0.1"
+const ACTION_SCHEMA := "anima.lifecycle.world_action/0.1"
+const RECEIPT_SCHEMA := "anima.lifecycle.world_receipt/0.1"
 const WORLD_VERSION := "lifecycle-grid/0.1"
 const WIDTH := 14
 const HEIGHT := 11
@@ -12,12 +14,17 @@ const CELL := 48
 const SENSE_RADIUS := 3
 const MAX_LINE_BYTES := 8192
 const MAX_DYNAMIC_OBSTACLES := 8
+const MAX_E13_OPERATIONS := 256
 
 var _server: TCPServer = TCPServer.new()
 var _peer: StreamPeerTCP = null
 var _buffer := ""
 var _port := 46029
 var _seed := 7
+var _effects_enabled := false
+# E1.3 fail-closed duplicate guard only: no replay/status/recovery contract yet.
+var _used_operations: Dictionary = {}
+var _item_owner := ""
 var _world_instance_id := Crypto.new().generate_random_bytes(16).hex_encode()
 var _epoch := 0
 var _revision := 0
@@ -64,6 +71,8 @@ func _parse_args() -> void:
 		elif args[index] == "--lifecycle-seed" and index + 1 < args.size():
 			_seed = int(args[index + 1])
 			index += 1
+		elif args[index] == "--lifecycle-effects":
+			_effects_enabled = true
 		index += 1
 	if _port < 1024 or _port > 65535 or _seed < 0 or _seed > 2147483647:
 		push_error("Lifecycle World: invalid port/seed")
@@ -116,20 +125,24 @@ func _reset_world() -> void:
 	_walls.clear()
 	_obstacles.clear()
 	var partition: Dictionary = _scenario["partition"]
-	var gaps: Array = partition["open_y"]
+	# Godot JSON may represent numeric literals as floats. Normalize gate coords.
+	var gaps: Array[int] = []
+	for raw_gate in partition["open_y"]:
+		gaps.append(int(raw_gate))
 	for x in range(WIDTH):
 		_walls.append(Vector2i(x, 0))
 		_walls.append(Vector2i(x, HEIGHT - 1))
 	for y in range(1, HEIGHT - 1):
 		_walls.append(Vector2i(0, y))
 		_walls.append(Vector2i(WIDTH - 1, y))
-		if not y in gaps:
+		if not (y in gaps):
 			_walls.append(Vector2i(int(partition["x"]), y))
 	_shortcut = _point(_scenario["shortcut_blocker"])
 	var choices: Array = _scenario["seeded_obstacles"]
 	_obstacles.append(_point(choices[_seed % choices.size()]))
 	_anima = _point(_scenario["actor_start"])
 	_item = _point(_scenario["item"]["at"])
+	_item_owner = ""
 	_delivery = _point(_scenario["delivery"]["at"])
 	_landmark = _point(_scenario["landmark"]["at"])
 	_record("harness", "reset", {"seed": _seed, "world_version": WORLD_VERSION})
@@ -196,7 +209,11 @@ func _observation() -> Dictionary:
 		readings.append(_reading(
 			"lab.item.crate", "position", "known", _position_value(_item), _item
 		))
-		readings.append(_reading("lab.item.crate", "owner", "absent", null, _item))
+		if _item_owner == "":
+			readings.append(_reading("lab.item.crate", "owner", "absent", null, _item))
+		else:
+			readings.append(_reading("lab.item.crate", "owner", "known",
+				{"type": "ref", "value": _item_owner}, _item))
 	if _visible(_delivery):
 		readings.append(_reading(
 			"lab.zone.delivery", "position", "known",
@@ -223,6 +240,123 @@ func _observation() -> Dictionary:
 	return sample
 
 
+# E1.3 experimental world effects: the world validates the DTO independently of Python.
+# No goal/task authority is accepted here. Operator cannot use agent act.
+func _valid_ref(value: Variant) -> bool:
+	if typeof(value) != TYPE_STRING:
+		return false
+	var matcher := RegEx.create_from_string("^[A-Za-z][A-Za-z0-9._:/-]{0,127}$")
+	return matcher.search(value) != null
+
+
+func _valid_e13_action(req: Dictionary) -> bool:
+	if req.size() != 5 or typeof(req.get("action")) != TYPE_DICTIONARY:
+		return false
+	var action: Dictionary = req["action"]
+	if action.size() != 8:
+		return false
+	for key in ["schema", "world_instance_id", "epoch", "expected_revision",
+			"observation_id", "operation_id", "action_type", "arguments"]:
+		if not action.has(key):
+			return false
+	if action["schema"] != ACTION_SCHEMA or not _valid_ref(action["operation_id"]):
+		return false
+	if typeof(action["world_instance_id"]) != TYPE_STRING or not _valid_uint(action["epoch"]) or not _valid_uint(action["expected_revision"]):
+		return false
+	if typeof(action["observation_id"]) != TYPE_STRING:
+		return false
+	if typeof(action["arguments"]) != TYPE_DICTIONARY:
+		return false
+	var args: Dictionary = action["arguments"]
+	if action["action_type"] == "world.move":
+		return args.size() == 1 and typeof(args.get("direction")) == TYPE_STRING and args["direction"] in ["N", "S", "E", "W"]
+	if action["action_type"] in ["world.pick", "world.drop"]:
+		return args.size() == 1 and _valid_ref(args.get("item_ref")) and args["item_ref"] == "lab.item.crate"
+	return false
+
+
+func _act(req: Dictionary, request_id: int) -> Dictionary:
+	if not _valid_e13_action(req):
+		return _reply(request_id, false, {}, "INVALID_ACTION")
+	var action: Dictionary = req["action"]
+	if action["world_instance_id"] != _world_instance_id:
+		return _reply(request_id, false, {}, "WORLD_CHANGED")
+	if int(action["epoch"]) != _epoch:
+		return _reply(request_id, false, {}, "EPOCH_CHANGED")
+	var operation_id: String = action["operation_id"]
+	# Even a blocked operation consumes its identifier. E1.4 will add a bounded,
+	# queryable ledger, payload conflict detection and reconciliation.
+	if _used_operations.has(operation_id):
+		return _reply(request_id, false, {}, "OPERATION_REUSED")
+	if _used_operations.size() >= MAX_E13_OPERATIONS:
+		return _reply(request_id, false, {}, "OPERATION_CAPACITY")
+	if int(action["expected_revision"]) != _revision:
+		return _reply(request_id, false, {}, "STALE_REVISION")
+	if _last_sample.is_empty() or action["observation_id"] != _last_sample.get("sample_id"):
+		return _reply(request_id, false, {}, "STALE_SAMPLE")
+	if int(action["expected_revision"]) != int(_last_sample.get("revision", -1)):
+		return _reply(request_id, false, {}, "STALE_SAMPLE")
+	_used_operations[operation_id] = true
+	var kind: String = action["action_type"]
+	var args: Dictionary = action["arguments"]
+	var applied := false
+	var reason := "blocked"
+	if kind == "world.move":
+		var delta := Vector2i.ZERO
+		match args["direction"]:
+			"N":
+				delta = Vector2i(0, -1)
+			"S":
+				delta = Vector2i(0, 1)
+			"E":
+				delta = Vector2i(1, 0)
+			"W":
+				delta = Vector2i(-1, 0)
+		var destination := _anima + delta
+		if _inside(destination) and not _blocked(destination):
+			_anima = destination
+			if _item_owner == "lab.actor.anima":
+				_item = destination
+			applied = true
+		else:
+			reason = "occupied"
+	elif kind == "world.pick":
+		if _item_owner != "":
+			reason = "already_carried"
+		elif absi(_item.x - _anima.x) + absi(_item.y - _anima.y) > 1:
+			reason = "not_adjacent"
+		else:
+			_item_owner = "lab.actor.anima"
+			_item = _anima
+			applied = true
+	elif kind == "world.drop":
+		if _item_owner != "lab.actor.anima":
+			reason = "not_carrying"
+		else:
+			_item_owner = ""
+			_item = _anima
+			applied = true
+	if applied:
+		_revision += 1
+		reason = "ok"
+	_tick += 1
+	_record("agent", "world_action", {
+		"operation_id": operation_id, "action_type": kind,
+		"status": "APPLIED" if applied else "BLOCKED", "reason": reason
+	})
+	queue_redraw()
+	_refresh_status()
+	var receipt := {
+		"schema": RECEIPT_SCHEMA, "world_instance_id": _world_instance_id,
+		"epoch": _epoch, "operation_id": operation_id,
+		"status": "APPLIED" if applied else "BLOCKED",
+		"effect_applied": applied, "reason": reason,
+		"revision": _revision, "tick": _tick,
+		"event_id": "lifecycle_evt:%d" % _event_seq, "replayed": false,
+	}
+	return _reply(request_id, true, receipt)
+
+
 # Only operator can obtain designer truth; never included in agent responses.
 func _inspect() -> Dictionary:
 	var walls: Array[Dictionary] = []
@@ -235,7 +369,7 @@ func _inspect() -> Dictionary:
 		"world_version": WORLD_VERSION, "seed": _seed,
 		"world_instance_id": _world_instance_id, "epoch": _epoch,
 		"revision": _revision, "tick": _tick,
-		"actor": _cell(_anima), "item": _cell(_item),
+		"actor": _cell(_anima), "item": _cell(_item), "item_owner": _item_owner,
 		"delivery": _cell(_delivery), "landmark": _cell(_landmark),
 		"shortcut_blocker": _cell(_shortcut),
 		"walls": walls, "obstacles": obstacles,
@@ -307,10 +441,13 @@ func _request(line: String) -> Dictionary:
 		return _reply(request_id, false, {}, "INVALID_ROLE_OR_OPERATION")
 	if op == "hello" and req.size() == 4:
 		# The agent does not receive the seed or designer truth.
+		var caps: Array[String] = ["observe"]
+		if _effects_enabled:
+			caps.append("act")
 		var greeting := {
 			"ready": true, "world_version": WORLD_VERSION,
 			"world_instance_id": _world_instance_id, "epoch": _epoch,
-			"capabilities": ["observe"],
+			"capabilities": caps,
 		}
 		if role == "operator":
 			greeting["seed"] = _seed
@@ -318,6 +455,10 @@ func _request(line: String) -> Dictionary:
 	if role == "agent":
 		if op == "observe" and req.size() == 4:
 			return _reply(request_id, true, _observation())
+		if op == "act" and _effects_enabled:
+			return _act(req, request_id)
+		return _reply(request_id, false, {}, "FORBIDDEN")
+	if op == "act":
 		return _reply(request_id, false, {}, "FORBIDDEN")
 	if op == "inspect" and req.size() == 4:
 		return _reply(request_id, true, _inspect())
@@ -370,7 +511,8 @@ func _process(_delta: float) -> void:
 
 func _refresh_status() -> void:
 	if _status != null:
-		_status.text = "ANIMA / E1.2  |  seed=%d  epoch=%d  revision=%d\nOBSERVE-ONLY: no agent actions admitted" % [_seed, _epoch, _revision]
+		var mode := "E1.3 TEST EFFECTS" if _effects_enabled else "E1.2 OBSERVE-ONLY"
+		_status.text = "ANIMA / %s  |  seed=%d  epoch=%d  revision=%d\nLaboratory-only; no Core authority" % [mode, _seed, _epoch, _revision]
 
 
 func _draw() -> void:
