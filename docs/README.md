@@ -4,14 +4,15 @@
 
 ## Куда идти
 
-Канонические входы: [дорожная карта](roadmap.md), [история](history/README.md), [архитектура](system/README.md), [исследования](RESEARCH/README.md), [контракт v0.1](versions/v0.1/contract.md), [приёмка v0.1](versions/v0.1/acceptance.md), [ресурсы R-08](versions/v0.1/resources.md), [эксплуатация](operations.md), [рабочее пространство](workspace.md), [верификация](verification.md) и [правила ведения](documentation.md). Старые пути `ROADMAP/`, `STAGES/` и `RELEASES/` пока сохранены для исторических ссылок.
+Канонические входы: [опубликованные релизы](RELEASES/README.md), [запись о выпуске v0.2 RC1](RELEASES/ANIMA_v0_2_RC1_Release_Record.md), [приёмка v0.2 RC1](versions/v0.2/acceptance.md), [контракт v0.2 RC1](versions/v0.2/contract.md), [заметки RC1](versions/v0.2/release-notes.md), [дорожная карта](roadmap.md), [история](history/README.md), [архитектура](system/README.md), [исследования](RESEARCH/README.md), [контракт v0.1](versions/v0.1/contract.md), [приёмка v0.1](versions/v0.1/acceptance.md), [ресурсы R-08](versions/v0.1/resources.md), [эксплуатация](operations.md), [рабочее пространство](workspace.md), [верификация](verification.md) и [правила ведения](documentation.md). Каталог `RELEASES/` теперь содержит карточки публикации и исторические материалы, а канонические контракты находятся в `versions/`. Пути `ROADMAP/` и `STAGES/` сохранены для истории.
 
 | Вопрос | Раздел | Что там находится |
 | --- | --- | --- |
+| Что опубликовано как v0.2 RC1? | [Запись о публикации](RELEASES/ANIMA_v0_2_RC1_Release_Record.md), [контракт](versions/v0.2/contract.md), [приёмка H5.8](versions/v0.2/acceptance.md), [заметки RC1](versions/v0.2/release-notes.md) | Память, Evidence/Knowledge lifecycle, Context, exact SHA и границы доверия O58-01/O58-02 |
 | Что принято в v0.1? | [Контракт](versions/v0.1/contract.md), [приёмка](versions/v0.1/acceptance.md) и [релизные заметки](versions/v0.1/release-notes.md) | Профиль, R-01–R-10, точный SHA и известные ограничения |
 | Как мы сюда пришли? | [История разработки](history/README.md), [Core](history/core-v0.1.md) и [Memory](history/memory-integration.md) | Stage D0–11, typed Core и параллельная интеграция после Stage 6 |
 | Как устроена система сегодня? | [Архитектура и исполняемые профили](system/README.md) | Runtime, Events/Authority, Memory, Goals/Execution, FAST/DEEP и SLEEP с кодом и профильными тестами |
-| Что дальше? | [Дорожная карта](roadmap.md) | Завершённый v0.1 и направления будущих исследований без преждевременного назначения следующей версии |
+| Что дальше? | [Дорожная карта](roadmap.md) | Принятый v0.2 RC1 и направления новых исследований без преждевременного назначения следующей версии |
 | Какие идеи остались экспериментами? | [Исследования](RESEARCH/README.md) | Memory E1–E4, VAL/M0–M6, альтернативы и не принятые гипотезы |
 | Что подтверждено испытаниями? | [Проверки и доказательства](verification.md), [исторические методики](TESTING/README.md) и [TV](TESTING/Results/README.md) | Условия, сценарии, SHA, Passed/Failed/Inconclusive, release gate и ограничения |
 | Почему приняты именно такие решения? | [Архитектурные решения](DECISIONS/README.md) | ADR-001–010 и причины отказа от альтернатив |
@@ -19,7 +20,7 @@
 | Как устроить локальные папки, модели, llama.cpp, worktree? | [Рабочее пространство](workspace.md) | Пути, локальная конфигурация, правила очистки и Obsidian |
 | Где прежние материалы? | [Архив](ARCHIVE/README.md) | История старых структур и переносов |
 
-**Быстрый маршрут:** [назначение ANIMA](../README.md) → [релиз v0.1](versions/v0.1/acceptance.md) → [действующая архитектура](system/README.md) → [история развития](history/stages.md).
+**Быстрый маршрут:** [назначение ANIMA](../README.md) → [v0.1 Foundation](versions/v0.1/acceptance.md) → [v0.2 RC1](versions/v0.2/acceptance.md) → [действующая архитектура](system/README.md) → [история развития](history/stages.md).
 
 ## Статусы и терминология
 

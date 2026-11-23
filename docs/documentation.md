@@ -7,8 +7,10 @@
 | Вопрос | Каноническое место | Правило |
 | --- | --- | --- |
 | Что делаем до текущего выпуска? | [`roadmap.md`](roadmap.md) | Только следующие действия и открытые требования активного релиза |
-| Что является v0.1? | [`versions/v0.1/contract.md`](versions/v0.1/contract.md) | Нормативный объём и R-01–R-10 |
-| Что реально принято? | [`versions/v0.1/acceptance.md`](versions/v0.1/acceptance.md) | Evidence на названных SHA и явное решение владельца |
+| Что является v0.1? | [`versions/v0.1/contract.md`](versions/v0.1/contract.md) | Исторически принятая основа Foundation и R-01–R-10 |
+| Что является v0.2 RC1? | [`versions/v0.2/contract.md`](versions/v0.2/contract.md) | Ограниченный Memory/Knowledge/Context профиль, доверенные writers/adapters |
+| Что принято и опубликовано? | [`versions/v0.2/acceptance.md`](versions/v0.2/acceptance.md), [`RELEASES/ANIMA_v0_2_RC1_Release_Record.md`](RELEASES/ANIMA_v0_2_RC1_Release_Record.md) | Evidence на проверенном SHA, решение владельца, tag и опубликованный prerelease |
+| Где прежняя приёмка? | [`versions/v0.1/acceptance.md`](versions/v0.1/acceptance.md) | Evidence и решение о принятии v0.1 без ретроактивных изменений |
 | Как работает система? | [`system/`](system/README.md) | Действующий код, composition profiles, ownership, границы, профильные тесты |
 | Как развивалась ANIMA? | [`history/`](history/README.md) и [`project.json`](project.json) | Исторические Stage, опыт и статусы, не список релизных задач |
 | Какие гипотезы проверялись? | [`RESEARCH/`](RESEARCH/README.md) | Доказательства, отрицательные выводы, отдельно от интеграции |
