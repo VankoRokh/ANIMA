@@ -14,7 +14,7 @@ from anima.core.assembly import build_core
 from anima.core.spatial_action_gate import (
     CoreSpatialActionGateway, CoreSpatialAdmissionError, SpatialSourceProof,
 )
-from anima.execution.contracts import ExecutionReceipt
+from anima.execution.contracts import ExecutionReceipt, thaw
 from anima.execution.store import ExecutionStore
 from labs.virtual_anima_lab.python.lifecycle.e24_working_memory import (
     E24WorkingMemory, SOURCE, SUBJECT, PREDICATE,
@@ -101,7 +101,7 @@ def test_admit_only_after_canonical_provenance_and_native_goal(tmp_path, monkeyp
     assert gate.goals.get_goal(goal["id"])["status"] == "active"
     spec = store.load_verification_spec(prepared.operation_id)
     assert spec.criterion_kind == "world.egocentric_transition"
-    assert spec.to_dict()["parameters"]["before_sample_id"] == proof.sample_id
+    assert thaw(spec.parameters)["before_sample_id"] == proof.sample_id
     assert prepared.action.to_dict()["arguments"]["observation_id"] == proof.sample_id
     gate.before_effect(prepared, proof=proof)
     with pytest.raises(CoreSpatialAdmissionError, match="existing spatial Task"):
@@ -208,7 +208,7 @@ def test_corroborated_stage6_finishes_task_but_never_goal_automatically(
     ) == "VERIFIED_EFFECT"
     assert gate.tasks.get_task(prepared.task_id).status == "completed"
     assert core.internal_state.goals.get_goal(goal["id"])["status"] == "active"
-    with pytest.raises(CoreSpatialAdmissionError, match="state does not allow"):
+    with pytest.raises(CoreSpatialAdmissionError, match="identity changed after effect"):
         gate.finish_verified(
             prepared, before_proof=before, after_proof=after,
             receipt=receipt, readback=result,
