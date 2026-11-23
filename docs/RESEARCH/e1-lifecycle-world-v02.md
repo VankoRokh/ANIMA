@@ -1,6 +1,6 @@
 # ANIMA v0.2 — E1.2: первый двухкомнатный мир
 
-**Статус:** `Implemented / Lab-only / PARTIAL`. **Native/Live Godot: `NOT_TESTED`** в текущем окружении. Это не E1-min PASS и не E2.  
+**Статус:** `Validated Lab / E1.2 PASS` на проверенном кодовом SHA `811699dbaa9952fcb613794fb79dfa9b03e6459d` (23 ноября 2026 года, GitHub Actions). **Это не E1-min PASS и не E2.**  
 **База:** `1364e62634669ef553df0b2f2d7a1159d404383f`.  
 **Ветка:** `work/v02-e1-lifecycle-world-contracts`.  
 **Программа:** [Continuous Lifecycle](continuous-lifecycle-v02.md); [DTO E1.1](e1-world-contracts-v02.md).  
@@ -40,7 +40,7 @@
 
 ## Проверка
 
-Проверка записанной геометрии отдельным статическим оракулом: **9 seed (0,1,2,3,7,8,13,31,100), оба обхода доступны; центральный блокирован**. Это не эквивалент запуска Godot, не приёмка E1.2 и не тест когнитивного поведения. Нативные проверки ниже необходимо запустить на Godot **4.7.2**.
+Проверка записанной геометрии отдельным статическим оракулом: **9 seed (0,1,2,3,7,8,13,31,100), оба обхода доступны; центральный блокирован**. Статический оракул сам по себе не доказывает работоспособность Godot или когнитивное поведение; отдельные нативные испытания ниже выполнены на Godot **4.7.2**.
 
 Из корня репозитория:
 
@@ -61,4 +61,25 @@ python -m labs.virtual_anima_lab.python.lifecycle.world_smoke \
   --lifecycle-port 46029 --lifecycle-seed 7
 ```
 
-Перед объявлением **E1.2 PASS** требуются результаты `LifecycleWorldTest.gd` и `world_smoke` на реальном Godot 4.7.2, проектная регрессия прежних P5/P6 и зафиксированные SHA/окружение. До этого — `PARTIAL / NOT_TESTED`, без автоматического перехода к E1.3.
+## Результат независимого live-gate — 23 ноября 2026
+
+**Кодовый snapshot:** `811699dbaa9952fcb613794fb79dfa9b03e6459d`; ветка `work/v02-e12-live-validation`. Проверены исходные файлы E1.2 и добавленный проверочный runner/CI; релизный тег `v0.2.0-rc.1` не изменён.
+
+**Первичный источник:** [GitHub Actions run 45157427336](https://github.com/VankoRokh/ANIMA/actions/runs/45157427336); прикреплён артефакт `anima-e12-godot-4-7-2-live` с исходными логами и JSON. Испытание: Ubuntu x86_64, официальный Godot `4.7.2.stable.official.ed1daf0bf`, Python 3.12.16 / 3.13.18 / 3.14.10.
+
+| Gate | Фактический результат |
+| --- | --- |
+| E1.1 DTO и E1.2 scenario tests | 27 PASS на каждой из трёх версий Python |
+| Full pytest | 2342 PASS на каждой из Python 3.12, 3.13 и 3.14; 2342 PASS также в live job |
+| `scripts/check.sh` | PASS; 185 страниц, 1344 локальные ссылки |
+| `LifecycleWorldTest.gd` | `LIFECYCLE_E1_2_NATIVE_PASS` |
+| `world_smoke` | `E1_2_LIVE_PASS` для seed 7 и 8, каждый seed — 2 свежих Godot-процесса |
+| P5-A / P5-B / P5-C / UI / P6 native | PASS, без изменений существующего Main |
+| P5-C scenario replay | 4/4 сценария, по два запуска |
+| M2 Core/VAL + recovery | 3/3 `M2_CASE_PASS`, `M2_INTEGRATED_GODOT_PASS` |
+| Общий нативный итог | **`E1_2_LIVE_GATE_PASS`** |
+
+Ранние служебные CI-прогоны сбоили из-за неверного расположения GitHub expression и генерации неотслеживаемого Godot cache **до** clean-tree релизных тестов. Это ошибки оркестрации проверки: на окончательном snapshot полная регрессия выполняется до импорта Godot, затем запускаются нативные тесты. История прежних failed/cancelled runs остаётся в GitHub Actions и не подменяется PASS.
+
+**Граница принятия:** подтверждён наблюдательный `LifecycleWorld`, локальная видимость, seeded reset и сохранение старых интеграций в лабораторных сценариях. Агент не исполняет `world.move/pick/drop`; receipt, independent readback/proof, operation ledger и Core continuity здесь не проверялись. Следующие обязательные работы — **E1.3/E1.4**, после них отдельный E1-min gate. Никаких новых функций в release v0.2 этот результат не добавляет.
+
