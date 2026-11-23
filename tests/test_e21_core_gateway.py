@@ -18,6 +18,7 @@ from labs.virtual_anima_lab.python.lifecycle.core_gateway import (
 )
 
 WORLD = "a" * 32
+OBSERVER_KEY = "o" * 43
 OTHER_WORLD = "b" * 32
 
 
@@ -43,8 +44,9 @@ def hello(*, world=WORLD, epoch=1, capabilities=None, extra=None):
     result = {
         "ready": True, "world_version": "lifecycle-grid/0.1",
         "world_instance_id": world, "epoch": epoch,
+        "auth_mode": "guarded",
         "capabilities": (
-            ["observe", "act", "operation_status"]
+            ["observe"]
             if capabilities is None else capabilities
         ),
     }
@@ -65,7 +67,8 @@ class FakeConnection:
     def __exit__(self, *unused):
         return None
 
-    def call(self, op):
+    def call(self, op, **kwargs):
+        assert kwargs == {"auth": OBSERVER_KEY}
         self._calls.append(op)
         if op == "hello":
             return reply(self._welcome, epoch=self._welcome["epoch"])
@@ -105,7 +108,7 @@ def bound(tmp_path, pairs):
     core = core_instance(tmp_path)
     factory = FakeFactory(pairs)
     return CoreBoundObservationGateway(
-        core, client_factory=factory,
+        core, observer_key=OBSERVER_KEY, client_factory=factory,
     ), factory, core
 
 
@@ -145,6 +148,7 @@ def test_gateway_never_exports_operator_or_action_capability(tmp_path):
     hello(extra={"walls": []}),
     hello(capabilities=["observe", "act", "operation_status", "inspect"]),
     hello(capabilities=["observe", "act"]),
+    {**hello(), "auth_mode": "none"},
     hello(world=OTHER_WORLD),
     {**hello(), "world_version": "p5a-grid/0.1"},
     {**hello(), "ready": 1},
@@ -163,14 +167,14 @@ def test_unsafe_or_mismatched_handshake_is_rejected(tmp_path, welcome):
 
 def test_exact_core_source_registry_is_required(tmp_path):
     with pytest.raises(WorldBoundaryError, match="registered CoreIngress"):
-        CoreBoundObservationGateway(build_core(tmp_path / "no-source"))
+        CoreBoundObservationGateway(build_core(tmp_path / "no-source"), observer_key=OBSERVER_KEY)
     wrong = SourceRegistration(
         source_ref=SOURCE_REF, producer_ref="test.unapproved.producer",
         allowed_kinds=("state.property",),
     )
     with pytest.raises(WorldBoundaryError, match="registration"):
-        CoreBoundObservationGateway(core_instance(tmp_path, reg=wrong))
-    gateway = CoreBoundObservationGateway(core_instance(tmp_path / "safe"))
+        CoreBoundObservationGateway(core_instance(tmp_path, reg=wrong), observer_key=OBSERVER_KEY)
+    gateway = CoreBoundObservationGateway(core_instance(tmp_path / "safe"), observer_key=OBSERVER_KEY)
     assert gateway.binding_snapshot() is None
 
 
@@ -219,7 +223,7 @@ def test_core_reopen_recovers_pin_not_resets_trust(tmp_path):
         (hello(world=OTHER_WORLD), observation(world=OTHER_WORLD, seq=1, tick=0)),
     ])
     recovered = CoreBoundObservationGateway(
-        fresh_core, client_factory=different_world,
+        fresh_core, observer_key=OBSERVER_KEY, client_factory=different_world,
     )
     assert recovered.binding_snapshot()["world_instance_id"] == WORLD
     with pytest.raises(WorldBoundaryError, match="binding changed"):
@@ -227,12 +231,19 @@ def test_core_reopen_recovers_pin_not_resets_trust(tmp_path):
     assert recovered.binding_snapshot()["world_instance_id"] == WORLD
 
 
+def test_weak_key_is_rejected_before_any_socket(tmp_path):
+    core = core_instance(tmp_path)
+    for bad in ("", "weak", 123, None, "x" * 129, "x" * 31):
+        with pytest.raises(ValueError, match="bearer key"):
+            CoreBoundObservationGateway(core, observer_key=bad)
+
+
 def test_core_execution_conflict_fails_closed(tmp_path):
     core = core_instance(tmp_path)
     with pytest.raises(WorldBoundaryError):
-        CoreBoundObservationGateway(replace(core, core_execution=object()))
+        CoreBoundObservationGateway(replace(core, core_execution=object()), observer_key=OBSERVER_KEY)
     with pytest.raises(TypeError):
-        CoreBoundObservationGateway(object())
+        CoreBoundObservationGateway(object(), observer_key=OBSERVER_KEY)
 
 
 def test_binding_does_not_confuse_source_name_with_authentication(tmp_path):
@@ -244,4 +255,4 @@ def test_binding_does_not_confuse_source_name_with_authentication(tmp_path):
     # this user-forgeable string. No event or Goal is written in E2.1.
     gateway, _, core = bound(tmp_path, [(hello(), observation())])
     gateway.observe()
-    assert core.core_events.ingress.pending_event_ids(limit=10) == ()
+    assert not core.core_events.ingress.pending_event_ids(limit=10)
