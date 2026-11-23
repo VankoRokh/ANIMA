@@ -516,7 +516,7 @@ def launch(*, godot: str, seed: int, headless: bool,
         print(f"Evidence directory: {root}", flush=True)
         print("Use STEP/RUN/PAUSE in Godot; Ctrl+C exits.", flush=True)
         return session, service, process, logfile
-    except BaseException:
+    except BaseException as exc:
         if service:
             service.stop()
         process.terminate()
@@ -526,7 +526,16 @@ def launch(*, godot: str, seed: int, headless: bool,
             process.kill()
             process.wait(timeout=5)
         logfile.close()
-        raise
+        try:
+            text = (root / "godot-visual.log").read_text(
+                encoding="utf-8", errors="replace"
+            )[-6000:]
+        except OSError:
+            text = "Godot log unavailable"
+        raise VisualRunnerError(
+            f"Godot/control startup failed ({type(exc).__name__}): {exc}\\n"
+            f"Godot log:\\n{text}"
+        ) from exc
 
 
 def main():
