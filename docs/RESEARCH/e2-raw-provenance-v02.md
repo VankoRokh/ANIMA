@@ -1,6 +1,7 @@
 # ANIMA v0.2 — E2.2: durable capture и происхождение Raw наблюдений
 
-**Статус:** `Research / E2.2 candidate` — окончательная оценка только после нового CI и отрицательного аудита.  
+**Статус:** **`Validated Lab / E2.2 PASS_LAB_RAW_POINTER`**, полный снимок сохраняется в sidecar, Core получает только адресуемый digest event. [Приёмка и ограничения](e2-2-acceptance-report-v02.md).  
+**Проверенный кодовый snapshot:** `0bd1a6b4de8c40a66b5722926996a4da02601ae0`; [CI 45175700030](https://github.com/VankoRokh/ANIMA/actions/runs/45175700030), 4/4 SUCCESS.  
 **Исходная проверенная база:** `work/v02-e21-core-owned-world-gateway`, `20e0007d634f284203eac2becb7e4883eb109d2a`; `PASS_LAB_APP_BOUNDARY`.  
 **Рабочая ветка:** `work/v02-e22-raw-provenance-outbox`. Без изменений `anima/` и опубликованного `v0.2.0-rc.1`.  
 **Не E2-full:** нет автономного исполнения, новой цели, FAST, самостоятельного Learning или доказанной безопасности против same-UID malicious code.
