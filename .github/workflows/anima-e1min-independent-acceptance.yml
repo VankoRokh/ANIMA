@@ -1,0 +1,152 @@
+name: ANIMA v0.2 E1-min Independent Acceptance
+
+on:
+  push:
+    branches:
+      - audit/v02-e1min-independent-acceptance
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: anima-e1min-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  python-regression:
+    name: Frozen E1 baseline / Python ${{ matrix.python-version }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ['3.12', '3.13', '3.14']
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v6
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Verify audited source files are unchanged
+        shell: bash
+        run: |
+          set -euo pipefail
+          BASE=3a922429aa00e439495346c140048e484c867cb4
+          git merge-base --is-ancestor "$BASE" HEAD
+          git diff --name-only "$BASE"..HEAD | tee /tmp/e1min-changes.txt
+          while IFS= read -r changed_path; do
+            case "$changed_path" in
+              .github/workflows/anima-e1min-independent-acceptance.yml|docs/RESEARCH/README.md|docs/RESEARCH/e1-min-acceptance-brief-v02.md|docs/RESEARCH/e1-min-acceptance-report-v02.md|tests/e1_min_independent_live_audit.py) ;;
+              *) echo "E1_MIN_BLOCKED: unexpected path $changed_path" >&2; exit 2 ;;
+            esac
+          done < /tmp/e1min-changes.txt
+      - name: Install test dependencies
+        run: python -m pip install -r requirements-dev.txt
+      - name: E1.1–E1.4 existing contract/negative checks
+        run: |
+          python -m pytest -q -p no:cacheprovider \
+            tests/test_lifecycle_world_contracts.py \
+            tests/test_lifecycle_scenario.py \
+            tests/test_lifecycle_world_verification.py \
+            tests/test_lifecycle_world_recovery.py
+      - name: Documentation, links, syntax
+        run: bash scripts/check.sh
+      - name: Full Python regression
+        run: python -m pytest -q -p no:cacheprovider
+
+  e1min-blackbox:
+    name: Independent E1-min black-box Godot 4.7.2
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.14'
+      - name: Install test dependencies
+        run: python -m pip install -r requirements-dev.txt
+      - name: Install official Godot 4.7.2 with SHA-256 verification
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/godot"
+          curl --fail --location --retry 3 --retry-delay 2 \
+            --output "$RUNNER_TEMP/godot/godot.zip" \
+            https://github.com/godotengine/godot-builds/releases/download/4.7.2-stable/Godot_v4.7.2-stable_linux.x86_64.zip
+          echo "cadd3204e728a35d3f13adb7fd0d7902636b79f6b95c40c265eb73b6c35329e4  $RUNNER_TEMP/godot/godot.zip" | sha256sum -c -
+          unzip -q "$RUNNER_TEMP/godot/godot.zip" -d "$RUNNER_TEMP/godot"
+          chmod +x "$RUNNER_TEMP/godot/Godot_v4.7.2-stable_linux.x86_64"
+          echo "GODOT_BIN=$RUNNER_TEMP/godot/Godot_v4.7.2-stable_linux.x86_64" >> "$GITHUB_ENV"
+      - name: Import isolated Godot project
+        run: timeout 100s "$GODOT_BIN" --headless --path labs/virtual_anima_lab/godot --editor --import
+      - name: Test real TCP/seeded routes/recovery/capacity/reset/restart
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/anima-e1min-independent/blackbox"
+          {
+            echo "head=$(git rev-parse HEAD)"
+            echo "baseline=3a922429aa00e439495346c140048e484c867cb4"
+            python --version
+            "$GODOT_BIN" --headless --version
+          } | tee "$RUNNER_TEMP/anima-e1min-independent/environment.txt"
+          PYTHONPATH="$GITHUB_WORKSPACE" python tests/e1_min_independent_live_audit.py \
+            --godot "$GODOT_BIN" \
+            --evidence-dir "$RUNNER_TEMP/anima-e1min-independent/blackbox" \
+            2>&1 | tee "$RUNNER_TEMP/anima-e1min-independent/blackbox-summary.log"
+          grep -q '"status": "E1_MIN_INDEPENDENT_LIVE_PASS"' \
+            "$RUNNER_TEMP/anima-e1min-independent/blackbox-summary.log"
+      - name: Preserve primary black-box evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: anima-e1min-independent-blackbox
+          path: ${{ runner.temp }}/anima-e1min-independent/
+          if-no-files-found: warn
+          retention-days: 21
+
+  e14-frozen-regression:
+    name: Frozen baseline E1.2–E1.4 / P5–P6 / M2 Godot
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.14'
+      - name: Install test dependencies
+        run: python -m pip install -r requirements-dev.txt
+      - name: Install official Godot 4.7.2 with SHA-256 verification
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/godot"
+          curl --fail --location --retry 3 --retry-delay 2 \
+            --output "$RUNNER_TEMP/godot/godot.zip" \
+            https://github.com/godotengine/godot-builds/releases/download/4.7.2-stable/Godot_v4.7.2-stable_linux.x86_64.zip
+          echo "cadd3204e728a35d3f13adb7fd0d7902636b79f6b95c40c265eb73b6c35329e4  $RUNNER_TEMP/godot/godot.zip" | sha256sum -c -
+          unzip -q "$RUNNER_TEMP/godot/godot.zip" -d "$RUNNER_TEMP/godot"
+          chmod +x "$RUNNER_TEMP/godot/Godot_v4.7.2-stable_linux.x86_64"
+          echo "GODOT_BIN=$RUNNER_TEMP/godot/Godot_v4.7.2-stable_linux.x86_64" >> "$GITHUB_ENV"
+      - name: Reproduce prior complete live acceptance
+        shell: bash
+        env:
+          E14_REPORT_DIR: ${{ runner.temp }}/anima-e1min-e14-regression
+        run: |
+          set -euo pipefail
+          bash scripts/run_e14_live_gate.sh "$GODOT_BIN" 2>&1 | tee "$RUNNER_TEMP/e14-lab.log"
+          grep -q '^E1_4_LIVE_GATE_PASS' "$RUNNER_TEMP/e14-lab.log"
+      - name: Preserve previous gates' evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: anima-e1min-prior-gates
+          path: |
+            ${{ runner.temp }}/anima-e1min-e14-regression/
+            ${{ runner.temp }}/e14-lab.log
+          if-no-files-found: warn
+          retention-days: 21
