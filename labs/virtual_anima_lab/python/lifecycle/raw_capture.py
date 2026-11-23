@@ -101,6 +101,26 @@ class E22RawCaptureService:
         db.execute("PRAGMA busy_timeout=10000")
         return db
 
+    def _verified_binding(self) -> dict:
+        """Core identity/source must match the stored capture origin."""
+        with closing(self._db()) as db:
+            row = db.execute(
+                "SELECT core_instance_id,source_ref,producer_ref,"
+                " world_instance_id,epoch,last_sample_seq,last_revision,last_tick"
+                " FROM e21_world_binding WHERE singleton=1",
+            ).fetchone()
+        if row is None:
+            raise RawCaptureError("Core has no pinned world source")
+        if (row["core_instance_id"] != self._core.identity.get()["instance_id"]
+                or row["source_ref"] != SOURCE_REF
+                or row["producer_ref"] != PRODUCER_REF):
+            raise RawCaptureError("Core identity/source changed during Raw recovery")
+        return {
+            "world_instance_id": row["world_instance_id"], "epoch": row["epoch"],
+            "sample_seq": row["last_sample_seq"],
+            "revision": row["last_revision"], "tick": row["last_tick"],
+        }
+
     @staticmethod
     def _occurrence(snapshot: dict) -> str:
         # Bound by CoreIngress 128-character occurrence_id length. Every
@@ -177,15 +197,26 @@ class E22RawCaptureService:
         """
         if type(max_samples) is not int or not 1 <= max_samples <= MAX_PENDING:
             raise ValueError("bounded positive recovery batch required")
-        binding = self._gateway.binding_snapshot()
-        if binding is None:
+        if self._gateway.binding_snapshot() is None:
             return ()
+        binding = self._verified_binding()
         with closing(self._db()) as db:
             rows = db.execute(
                 "SELECT * FROM e22_raw_capture WHERE event_id IS NULL"
                 " ORDER BY sample_seq LIMIT ?",
                 (max_samples,),
             ).fetchall()
+            linked_rows = db.execute(
+                "SELECT * FROM e22_raw_capture WHERE event_id IS NOT NULL"
+                " ORDER BY sample_seq DESC LIMIT ?",
+                (max_samples,),
+            ).fetchall()
+        # Bounded integrity audit of recently linked sidecar→Core pointers.
+        for linked in linked_rows:
+            captured, digest = self._validate_capture(linked, binding)
+            self._verify_core(
+                linked["event_id"], self._raw_event(captured, digest), digest,
+            )
         linked_ids = []
         for row in rows:
             snap, digest = self._validate_capture(row, binding)
@@ -235,7 +266,7 @@ class E22RawCaptureService:
         if row is None or row["event_id"] is None:
             raise RawCaptureError("Raw still pending; not exposing observation")
         snap, digest = self._validate_capture(
-            row, self._gateway.binding_snapshot(),
+            row, self._verified_binding(),
         )
         event = self._raw_event(snap, digest)
         self._verify_core(row["event_id"], event, digest)
@@ -258,7 +289,7 @@ class E22RawCaptureService:
         if row is None:
             raise RawCaptureError("unknown Raw sensor sample")
         snap, digest = self._validate_capture(
-            row, self._gateway.binding_snapshot(),
+            row, self._verified_binding(),
         )
         if row["event_id"] is not None:
             # A linked record is never trusted solely because the sidecar
