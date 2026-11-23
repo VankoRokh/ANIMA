@@ -2,8 +2,8 @@
 
 **Вердикт:** `PASS_LAB_APP_BOUNDARY` — принят только контролируемый наблюдательный контур **Core ↔ guarded Godot**, не полный E2.  
 **Дата:** 23 ноября 2026.  
-**Проверенный кодовый snapshot:** `fe1cf645e186d7dd520a50cd23e636ba45c67de5`, ветка `work/v02-e21-core-owned-world-gateway`.  
-**Первоисточник:** [GitHub Actions 45170677368](https://github.com/VankoRokh/ANIMA/actions/runs/45170677368), **4/4 SUCCESS**, artifact `anima-e21-read-only-core-gateway` с первичными логами.  
+**Проверенный кодовый snapshot:** `3e4ea3b93cb093e6c9be45ca926a488c9adf176f`, ветка `work/v02-e21-core-owned-world-gateway`.  
+**Первоисточник:** [GitHub Actions 45171807284](https://github.com/VankoRokh/ANIMA/actions/runs/45171807284), **4/4 SUCCESS**, artifact `anima-e21-read-only-core-gateway` с первичными логами.  
 **Исходная база:** независимый [E1-min `PASS_LAB_RESTRICTED`](e1-min-acceptance-report-v02.md), `bbdbe3a7429ac3002a832c356c9dedac697c2c79`.  
 **Контракт:** [E2.1 trust boundary](e2-core-world-boundary-v02.md).
 
@@ -15,13 +15,13 @@
 | Режимы полномочий | Opt-in `--lifecycle-guarded`, отдельные observer/executor/operator bearer keys; observer-capabilities ограничены `[observe]` |
 | Подмена `role=operator` на raw TCP | **REJECTED** без ключа, с ключом observer или executor; операторский `inspect` разрешён только при operator key |
 | Запрет эскалации ключа | Observer key не допускает `act`; executor key не допускает `observe`; неавторизованный `observe` отклоняется на стороне Godot |
-| Плохая bootstrap-конфигурация | **REJECTED**: отсутствующие, совпадающие либо короткие ключи; защищённый listener не стартует |
+| Плохая bootstrap-конфигурация | **REJECTED**: отсутствующие, совпадающие, короткие ключи, `--lifecycle-effects` без ledger и `--lifecycle-ledger` без effects; защищённый listener не стартует |
 | Отсутствие утечек в stdout | При guarded-mode seed и bearer-ключи не присутствуют в сообщениях startup / log |
 | Core reopen / Godot lifecycle | При новом `CoreAssembly` с тем же Core data dir и **живом** Godot binding сохраняется; reset и замена процесса Godot — **REJECTED** без auto-rebind |
 | Source/handshake spoof & rollback | Python-тесты отклоняют чужой source, несовпадающие identity, лишние capabilities, `seed` в hello, старые sample/revision/tick |
 | Отсутствие новых полномочий Core | В E2.1 не создаются Raw Events, Goals, Task, эффекты или второй Stage6 executor |
 | Совместимость | **2380 pytest PASS** на Python 3.12.16, 3.13.18 и 3.14.10; **2380 PASS** и в Godot CI; прежние E1.2–E1.4, независимый E1-min, P5/P6/P5-C, M2 PASS |
-| Целостность документации на кодовой точке | `scripts/check.sh`: **190 страниц, 1353 локальные ссылки, PASS** |
+| Целостность документации на кодовой точке | `scripts/check.sh`: **191 страница, 1357 локальных ссылок, PASS** |
 
 Среда: Ubuntu x86_64, официальный Godot `4.7.2.stable.official.ed1daf0bf`, бинарник с проверенным SHA-256. При каждом seed (7, 8) использованы новые изолированные Godot-процессы и временные Core-данные. Проверены изменения, внесённые в ветку исследования, без изменения `anima/` или опубликованного релиза `v0.2.0-rc.1`.
 
@@ -31,7 +31,7 @@
 
 E2.1 сделал отказ в недопустимом действии **исполняемым на стороне Godot**, а не только декларацией Python-адаптера. Gateway получает исключительно ключ наблюдения, не управляет `act`, `operation_status`, `inspect` или `reset`, а проверенный Core binding не допускает молчаливой смены процесса/эпохи.
 
-Это устранение **конкретного E1MIN-01 raw-role-spoof сценария** в guarded test profile, а не доказательство защиты от любого недоверенного кода. Existing Stage6 remains sole intended Goal/Task execution authority; новый адаптер не создаёт альтернативный decision/executor.
+Это устранение **конкретного E1MIN-01 raw-role-spoof сценария** в guarded test profile, а не доказательство защиты от любого недоверенного кода. Единственным предусмотренным владельцем допуска Goal/Task остаётся существующий Stage6; новый адаптер не создаёт параллельного планировщика или исполнителя.
 
 ## 3. Открытые ограничения и обязательные требования
 
@@ -58,4 +58,4 @@ GODOT_BIN="$HOME/.local/opt/godot/Godot_v4.7.2-stable_linux.x86_64"
 bash scripts/run_e21_live_gate.sh "$GODOT_BIN"
 ```
 
-Runner: полный E1.4 / E1-min, негативные unit tests, два seed Core ↔ guarded Godot и три негативных Bootstrap. Никогда не передаёт секреты в CLI и не сохраняет их в result/evidence.
+Runner: полный E1.4 / E1-min, негативные unit tests, два seed Core ↔ guarded Godot, пять негативных bootstrap-профилей и позитивная проверка guarded observe-only без исполнительных capabilities. Никогда не передаёт секреты в CLI и не сохраняет их в result/evidence.
