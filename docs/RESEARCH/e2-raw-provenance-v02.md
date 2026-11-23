@@ -45,7 +45,7 @@ Only now observation and event_id returned to trusted caller
 
 `E22RawCaptureService.recover()` может работать после перезапуска **только Core**, при живом Godot. Он перечитывает **полный Raw JSON** из capture journal и проверяет каноничность, SHA-256, sample identity, pinned Core/world/epoch, registered `SourceRegistration`, точный Core event payload и projection outcome. `CoreIngress.admit()` возвращает `ALREADY_SEEN` для уже принятого идентичного события, независимо от аварии до sidecar receipt. Затем штатный dispatcher повторяет только недоставленную запись.
 
-`observe_and_record()` перед новым снимком вызывает recovery, после capture вызывает его повторно и **не возвращает наблюдение**, пока у Core EventLog нет `forwarded` receipt. При невозможности завершить — fail-closed, pending остаётся в SQLite.
+`observe_and_record()` перед новым снимком вызывает recovery, после capture вызывает его повторно и **не возвращает наблюдение**, пока у Core EventLog нет `forwarded` receipt. Публичный `capture_snapshot(sample_id)` также **запрещает** читать pending или linked-but-undispatched Raw: он сверяет Core event ID, digest и наличие `forwarded` receipt. Внутренний восстановитель может читать pending только для передачи в Core. При невозможности завершить — fail-closed, pending остаётся в SQLite.
 
 Ограничение одного batch восстановления — 64 pending. Повторный запуск обработки возможен; сложное конкурентное чтение, мультихостовое распределение, как и гарантированная fsync power-loss на всех драйверах — вне проверенного профиля.
 
