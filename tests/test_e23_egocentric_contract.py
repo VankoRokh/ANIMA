@@ -61,6 +61,7 @@ def test_view_canonical_and_sealed():
     lambda s: s["readings"][0].update(range_milli_cells=0),
     lambda s: s["coverage"].update(fov_degrees=360),
     lambda s: s["coverage"].update(kind="full_map"),
+    lambda s: s.update(source_ref="lab.sensor.anima.proximity"),
     lambda s: s.update(sample_id=f"worldobs:{W}:1:2"),
     lambda s: s.update(sample_seq=True),
     lambda s: s.update(readings=s["readings"] * 2),
