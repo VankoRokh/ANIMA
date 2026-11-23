@@ -195,6 +195,36 @@ def test_crash_cut_recovers_idempotently_across_core_reopen(tmp_path, cut):
     assert fresh_service.capture_snapshot(sensor_data()["sample_id"]).as_dict() == sensor_data()
 
 
+def test_dispatch_crash_after_eventlog_append_does_not_duplicate_raw(tmp_path):
+    root = tmp_path / "same-core"
+    service, gateway, core, fake = bundle(tmp_path, root=root)
+
+    def dispatch_fault(stage, _event_id):
+        if stage == "after_legacy_append":
+            raise RuntimeError("SIMULATED_DISPATCH_CRASH")
+
+    core.core_events.fault_hook = dispatch_fault
+    with pytest.raises(RuntimeError, match="SIMULATED_DISPATCH_CRASH"):
+        service.observe_and_record()
+    assert len(core.event_log.load_events()) == 1
+    row = capture_rows(gateway)[0]
+    assert row["event_id"] is not None
+    assert core.core_events.ingress.dispatch_receipt(row["event_id"]) is None
+    assert len(core.core_events.ingress.pending_event_ids(limit=10)) == 1
+
+    recovered_service, recovered_gateway, reopened, no_world = bundle(
+        tmp_path, root=root, samples=[],
+    )
+    assert recovered_service.recover() == ()
+    assert reopened.core_events.ingress.dispatch_receipt(
+        row["event_id"],
+    )["disposition"] == "forwarded"
+    assert len(reopened.event_log.load_events()) == 1
+    assert not reopened.core_events.ingress.pending_event_ids(limit=10)
+    assert recovered_service.capture_snapshot(row["sample_id"]).canonical_json == row["snapshot_json"]
+    assert no_world.operations == []
+
+
 def test_multiple_samples_use_monotonic_provenance_and_single_belief_authority(tmp_path):
     service, gateway, core, fake = bundle(tmp_path, samples=[
         sensor_data(seq=1, tick=0, pos=(3, 5)),
