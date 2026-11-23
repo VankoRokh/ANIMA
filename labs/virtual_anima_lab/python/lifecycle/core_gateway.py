@@ -19,14 +19,14 @@ from typing import Callable
 from anima.core.assembly import CoreAssembly
 from anima.core.ingress import SourceRegistration
 from labs.virtual_anima_lab.python.lab_client import (
-    LabClient, LabProtocolError, PROTOCOL_V2,
+    LabClient, LabProtocolError, LabRejected, PROTOCOL_V2,
 )
 from .contracts import WorldContractError, WorldObservation
 
 SOURCE_REF = "lab.sensor.anima.proximity"
 PRODUCER_REF = "lab.world.lifecycle.adapter"
 WORLD_VERSION = "lifecycle-grid/0.1"
-_CAPABILITIES = ("observe", "act", "operation_status")
+_CAPABILITIES = ("observe",)
 _SCHEMA = """
 CREATE TABLE IF NOT EXISTS e21_world_binding (
     singleton INTEGER PRIMARY KEY CHECK(singleton=1),
@@ -63,10 +63,11 @@ class CoreBoundObservationGateway:
     An observed incarnation/epoch is persistently pinned and never auto-reset.
     """
 
-    __slots__ = ("_core", "_port", "_timeout", "_client_factory", "_dbfile")
+    __slots__ = ("_core", "_port", "_timeout", "_client_factory", "_dbfile", "_observer_key")
 
     def __init__(
-        self, core: CoreAssembly, *, port: int = 46029, timeout: float = 3.0,
+        self, core: CoreAssembly, *, observer_key: str,
+        port: int = 46029, timeout: float = 3.0,
         client_factory: Callable = LabClient,
     ) -> None:
         if type(core) is not CoreAssembly:
@@ -88,11 +89,15 @@ class CoreBoundObservationGateway:
             raise ValueError("invalid loopback port")
         if type(timeout) not in (float, int) or type(timeout) is bool or timeout <= 0:
             raise ValueError("invalid timeout")
+        if (type(observer_key) is not str or
+                re.fullmatch(r"[A-Za-z0-9_-]{32,128}", observer_key) is None):
+            raise ValueError("guarded E2.1 requires a strong observer-only bearer key")
         if not callable(client_factory):
             raise TypeError("client factory must be callable")
         self._core = core
         self._port = port
         self._timeout = timeout
+        self._observer_key = observer_key
         # Only the trusted composition root may provide an alternate factory,
         # e.g. an in-process test double. This is not a plugin extension point.
         self._client_factory = client_factory
@@ -117,9 +122,10 @@ class CoreBoundObservationGateway:
         if (type(data) is not dict
                 or set(data) != {
                     "ready", "world_version", "world_instance_id",
-                    "epoch", "capabilities",
+                    "epoch", "capabilities", "auth_mode",
                 }
                 or data["ready"] is not True
+                or data["auth_mode"] != "guarded"
                 or data["world_version"] != WORLD_VERSION
                 or type(data["world_instance_id"]) is not str
                 or re.fullmatch(r"[a-f0-9]{32}", data["world_instance_id"]) is None
@@ -195,13 +201,13 @@ class CoreBoundObservationGateway:
         """
         try:
             with self._client() as client:
-                hello = self._validate_hello(client.call("hello")["data"])
-                response = client.call("observe")
+                hello = self._validate_hello(client.call("hello", auth=self._observer_key)["data"])
+                response = client.call("observe", auth=self._observer_key)
             observed = WorldObservation(response["data"])
             self._pin(self._validate_sample(observed, hello, response))
             return observed
         except (OSError, TimeoutError, ConnectionError,
-                LabProtocolError, WorldContractError) as error:
+                LabProtocolError, LabRejected, WorldContractError) as error:
             raise WorldBoundaryError("world observation rejected; no state admitted") from error
 
     def binding_snapshot(self) -> dict | None:
