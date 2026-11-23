@@ -47,13 +47,13 @@ func _initialize() -> void:
 	if not hello["ok"] or hello["data"]["capabilities"] != ["observe", "act"]:
 		_finish(world, false, "opt-in capability not visible")
 		return
-	var first := _call(world, 2, "agent", "observe")["data"]
+	var first: Dictionary = _call(world, 2, "agent", "observe")["data"]
 	var pick := _action(first, "op.native.pick", "world.pick", {"item_ref": "lab.item.crate"})
 	var response := _call(world, 3, "agent", "act", {"action": pick})
 	if not response["ok"] or response["data"]["status"] != "APPLIED" or response["data"]["revision"] != 1:
 		_finish(world, false, "pick not applied with versioned receipt")
 		return
-	var holding := _call(world, 4, "agent", "observe")["data"]
+	var holding: Dictionary = _call(world, 4, "agent", "observe")["data"]
 	if _owner(holding) != "lab.actor.anima" or holding["self_position"] != {"x": 3, "y": 5}:
 		_finish(world, false, "pick not reflected in independent sensor")
 		return
@@ -66,7 +66,7 @@ func _initialize() -> void:
 	if not moved["ok"] or moved["data"]["status"] != "APPLIED":
 		_finish(world, false, "move not applied")
 		return
-	var second := _call(world, 7, "agent", "observe")["data"]
+	var second: Dictionary = _call(world, 7, "agent", "observe")["data"]
 	if second["self_position"] != {"x": 4, "y": 5} or _owner(second) != "lab.actor.anima":
 		_finish(world, false, "moving did not move carried item")
 		return
@@ -89,7 +89,7 @@ func _initialize() -> void:
 	if not released["ok"] or released["data"]["status"] != "APPLIED":
 		_finish(world, false, "drop not applied")
 		return
-	var third := _call(world, 12, "agent", "observe")["data"]
+	var third: Dictionary = _call(world, 12, "agent", "observe")["data"]
 	if _owner(third) != "absent":
 		_finish(world, false, "drop sensor still claims ownership")
 		return
