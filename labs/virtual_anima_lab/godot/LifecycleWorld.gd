@@ -1,7 +1,8 @@
 extends Node2D
 ## Isolated lifecycle world; NEVER replaces the P5/P6 Main scene.
 ## Default: E1.2 observe-only; E1.3 world effects require explicit --lifecycle-effects.
-## Self-declared bridge roles are laboratory-only, not trusted authentication or Core authority.
+## E2.1 guarded mode additionally requires distinct bearer capabilities for sensor,
+## executor and operator. It is lab-only, not OS sandboxing or Core action admission.
 
 const PROTOCOL := "val.bridge/0.2"
 const OBSERVATION_SCHEMA := "anima.lifecycle.world_observation/0.1"
@@ -26,6 +27,12 @@ var _seed := 7
 var _effects_enabled := false
 # E1.4 is a separate opt-in; default E1.2 and E1.3 contracts stay unchanged.
 var _ledger_enabled := false
+var _guarded := false
+var _configuration_ok := true
+# Distinct ephemeral secrets from the trusted harness environment, not argv or hello.
+var _observer_key := ""
+var _executor_key := ""
+var _operator_key := ""
 var _used_operations: Dictionary = {}  # E1.3 legacy: reject duplicates, no replay
 var _operation_ledger: Dictionary = {}  # E1.4: in-memory, bounded, epoch scoped
 var _item_owner := ""
@@ -51,6 +58,8 @@ var _status: Label = null
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
 	_parse_args()
+	if not _configuration_ok:
+		return
 	_reset_world()
 	_status = Label.new()
 	_status.position = Vector2(14, HEIGHT * CELL + 12)
@@ -62,7 +71,10 @@ func _ready() -> void:
 		push_error("Lifecycle World: cannot bind loopback port %d" % _port)
 		get_tree().quit(2)
 		return
-	print("ANIMA_LIFECYCLE_WORLD_READY protocol=%s port=%d seed=%d" % [PROTOCOL, _port, _seed])
+	if _guarded:
+		print("ANIMA_LIFECYCLE_WORLD_READY protocol=%s port=%d guarded=true" % [PROTOCOL, _port])
+	else:
+		print("ANIMA_LIFECYCLE_WORLD_READY protocol=%s port=%d seed=%d" % [PROTOCOL, _port, _seed])
 
 
 func _parse_args() -> void:
@@ -79,7 +91,23 @@ func _parse_args() -> void:
 			_effects_enabled = true
 		elif args[index] == "--lifecycle-ledger":
 			_ledger_enabled = true
+		elif args[index] == "--lifecycle-guarded":
+			_guarded = true
 		index += 1
+	if _guarded:
+		_observer_key = OS.get_environment("ANIMA_LIFECYCLE_OBSERVER_KEY")
+		_executor_key = OS.get_environment("ANIMA_LIFECYCLE_EXECUTOR_KEY")
+		_operator_key = OS.get_environment("ANIMA_LIFECYCLE_OPERATOR_KEY")
+		var key_pattern := RegEx.create_from_string("^[A-Za-z0-9_-]{32,128}$")
+		if (_observer_key == _executor_key or _observer_key == _operator_key
+				or _executor_key == _operator_key
+				or key_pattern.search(_observer_key) == null
+				or key_pattern.search(_executor_key) == null
+				or key_pattern.search(_operator_key) == null):
+			_configuration_ok = false
+			push_error("Lifecycle World: guarded mode requires three distinct strong keys")
+			get_tree().quit(2)
+			return
 	if _ledger_enabled and not _effects_enabled:
 		push_error("Lifecycle World: ledger requires --lifecycle-effects")
 		get_tree().quit(2)
@@ -521,27 +549,54 @@ func _request(line: String) -> Dictionary:
 	var op = req.get("op")
 	if typeof(role) != TYPE_STRING or not role in ["agent", "operator"] or typeof(op) != TYPE_STRING:
 		return _reply(request_id, false, {}, "INVALID_ROLE_OR_OPERATION")
+	var authority := ""
+	if _guarded:
+		# Verify BEFORE performing any operation or constructing hello/inspect.
+		# Remove bearer field from the request forwarded to strict DTO validators
+		# and never include it in event history, hello, receipt or error.
+		var submitted = req.get("auth")
+		if typeof(submitted) != TYPE_STRING:
+			return _reply(request_id, false, {}, "UNAUTHORIZED")
+		if role == "operator" and submitted == _operator_key:
+			authority = "operator"
+		elif role == "agent" and submitted == _observer_key:
+			authority = "observer"
+		elif role == "agent" and submitted == _executor_key:
+			authority = "executor"
+		else:
+			return _reply(request_id, false, {}, "UNAUTHORIZED")
+		req.erase("auth")
 	if op == "hello" and req.size() == 4:
-		# The agent does not receive the seed or designer truth.
+		# The observer sees only observe, even if this world has effects.
 		var caps: Array[String] = ["observe"]
-		if _effects_enabled:
-			caps.append("act")
-		if _ledger_enabled:
-			caps.append("operation_status")
+		if _guarded:
+			if authority == "operator":
+				caps = ["inspect", "reset", "set_obstacle"]
+			elif authority == "executor":
+				caps = ["act"]
+				if _ledger_enabled:
+					caps.append("operation_status")
+		else:
+			if _effects_enabled:
+				caps.append("act")
+			if _ledger_enabled:
+				caps.append("operation_status")
 		var greeting := {
 			"ready": true, "world_version": WORLD_VERSION,
 			"world_instance_id": _world_instance_id, "epoch": _epoch,
 			"capabilities": caps,
 		}
+		if _guarded:
+			greeting["auth_mode"] = "guarded"
 		if role == "operator":
 			greeting["seed"] = _seed
 		return _reply(request_id, true, greeting)
 	if role == "agent":
-		if op == "observe" and req.size() == 4:
+		if op == "observe" and req.size() == 4 and (not _guarded or authority == "observer"):
 			return _reply(request_id, true, _observation())
-		if op == "act" and _effects_enabled:
+		if op == "act" and _effects_enabled and (not _guarded or authority == "executor"):
 			return _act(req, request_id)
-		if op == "operation_status" and _ledger_enabled:
+		if op == "operation_status" and _ledger_enabled and (not _guarded or authority == "executor"):
 			return _operation_status(req, request_id)
 		return _reply(request_id, false, {}, "FORBIDDEN")
 	if op == "act":
@@ -597,8 +652,11 @@ func _process(_delta: float) -> void:
 
 func _refresh_status() -> void:
 	if _status != null:
-		var mode := "E1.3 TEST EFFECTS" if _effects_enabled else "E1.2 OBSERVE-ONLY"
-		_status.text = "ANIMA / %s  |  seed=%d  epoch=%d  revision=%d\nLaboratory-only; no Core authority" % [mode, _seed, _epoch, _revision]
+		if _guarded:
+			_status.text = "ANIMA / E2.1 GUARDED LAB | epoch=%d revision=%d\nNo Core action authority" % [_epoch, _revision]
+		else:
+			var mode := "E1.3 TEST EFFECTS" if _effects_enabled else "E1.2 OBSERVE-ONLY"
+			_status.text = "ANIMA / %s  |  seed=%d  epoch=%d  revision=%d\nLaboratory-only; no Core authority" % [mode, _seed, _epoch, _revision]
 
 
 func _draw() -> void:
