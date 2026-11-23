@@ -288,15 +288,19 @@ class E22RawCaptureService:
             ).fetchone()
         if row is None:
             raise RawCaptureError("unknown Raw sensor sample")
+        if row["event_id"] is None:
+            raise RawCaptureError("pending Raw snapshot has no committed Core provenance")
         snap, digest = self._validate_capture(
             row, self._verified_binding(),
         )
-        if row["event_id"] is not None:
-            # A linked record is never trusted solely because the sidecar
-            # contains a syntactically plausible event-id string.
-            self._verify_core(
-                row["event_id"], self._raw_event(snap, digest), digest,
-            )
+        # A linked record is never trusted solely because the sidecar
+        # contains a syntactically plausible event-id string.
+        self._verify_core(
+            row["event_id"], self._raw_event(snap, digest), digest,
+        )
+        receipt = self._core.core_events.ingress.dispatch_receipt(row["event_id"])
+        if receipt is None or receipt["disposition"] != "forwarded":
+            raise RawCaptureError("Raw snapshot not yet dispatched; no public provenance")
         return WorldObservation(snap)
 
 
