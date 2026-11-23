@@ -125,14 +125,17 @@ func _reset_world() -> void:
 	_walls.clear()
 	_obstacles.clear()
 	var partition: Dictionary = _scenario["partition"]
-	var gaps: Array = partition["open_y"]
+	# Godot JSON may represent numeric literals as floats. Normalize gate coords.
+	var gaps: Array[int] = []
+	for raw_gate in partition["open_y"]:
+		gaps.append(int(raw_gate))
 	for x in range(WIDTH):
 		_walls.append(Vector2i(x, 0))
 		_walls.append(Vector2i(x, HEIGHT - 1))
 	for y in range(1, HEIGHT - 1):
 		_walls.append(Vector2i(0, y))
 		_walls.append(Vector2i(WIDTH - 1, y))
-		if not y in gaps:
+		if not (y in gaps):
 			_walls.append(Vector2i(int(partition["x"]), y))
 	_shortcut = _point(_scenario["shortcut_blocker"])
 	var choices: Array = _scenario["seeded_obstacles"]
