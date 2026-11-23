@@ -334,8 +334,9 @@ func _act(req: Dictionary, request_id: int) -> Dictionary:
 	if int(action["epoch"]) != _epoch:
 		return _reply(request_id, false, {}, "EPOCH_CHANGED")
 	var operation_id: String = action["operation_id"]
+	var digest := ""
 	if _ledger_enabled:
-		var digest: String = _action_digest(action)
+		digest = _action_digest(action)
 		if _operation_ledger.has(operation_id):
 			var saved: Dictionary = _operation_ledger[operation_id]
 			if digest != saved["digest"]:
