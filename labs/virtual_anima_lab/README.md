@@ -205,3 +205,16 @@ Runner повторяет E1.2–E1.4 и независимый E1-min, зате
 **Предупреждение:** bearer-ключи в environment/plaintext loopback и Python private fields не защищены от процесса с доступом к тому же UID, `/proc` или памяти. FAST и недоверенные плагины должны исполняться без raw TCP и доступа к ключам; гарантии такой OS-изоляции здесь нет. Оригинальный E1-min endpoint без guarded flag по-прежнему позволяет самообъявленную операторскую роль. Это разные профили, их нельзя смешивать.
 
 [Подробный контракт и список проверок E2.1](../../docs/RESEARCH/e2-core-world-boundary-v02.md).
+
+## E2.2 — атомарный Raw capture и Core provenance (lab only)
+
+**Статус: `PASS_LAB_RAW_POINTER`**, [проверенный CI](https://github.com/VankoRokh/ANIMA/actions/runs/45175700030) — 2392 full pytest PASS на Python 3.12–3.14 и Godot 4.7.2, `E2_2_LIVE_GATE_PASS` на seed 7/8. **Релизный код ANIMA не изменён.**
+
+`CoreBoundObservationGateway(..., capture_raw=True)` сохраняет весь immutable `WorldObservation` и SHA-256 в таблице `e22_raw_capture` *в той же SQLite-транзакции*, что и фиксацию sample-кроме. `E22RawCaptureService` восстанавливает ещё не переданные снимки, записывает Core event `snapshot_digest` через обычный `CoreIngress` и дожидается `CoreEventDispatcher` receipt. При повторе после аварии уже существующий `event_id` не дублируется.
+
+```bash
+GODOT_BIN="$HOME/.local/opt/godot/Godot_v4.7.2-stable_linux.x86_64"
+bash scripts/run_e22_live_gate.sh "$GODOT_BIN"
+```
+
+Гарантия **не** распространяется на потерю sidecar SQLite, power-loss, межхостовую аутентификацию или восстанавливаемую память самого Godot. Core EventLog хранит **ссылку с digest**, а не полный сенсорный JSON. Нет FAST, Goal/Task, WorldAction, Knowledge и самостоятельного цикла. [Подробный контракт](../../docs/RESEARCH/e2-raw-provenance-v02.md) · [Итоговый отчёт](../../docs/RESEARCH/e2-2-acceptance-report-v02.md).
