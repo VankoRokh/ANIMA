@@ -219,6 +219,26 @@ class E25LabCognitiveCoordinator:
                 self._finalize(turn_id, step, outcome)
                 outcomes.append(outcome)
                 break
+            # Adapter execution may overlap another sensor process. Never
+            # admit a proposal against an observation which changed while the
+            # candidate was being prepared.
+            fresh = self._memory.context_for_cognition(
+                focus_refs=focus_refs, memory_enabled=memory_enabled,
+            )
+            if _sha(_json(fresh)) != _sha(base):
+                self._record(
+                    turn=turn_id, step=step, context=frozen,
+                    proposal_id=None, op=None, proposal=None,
+                    admission="REJECTED", reason="STALE_CONTEXT",
+                )
+                output = {
+                    "schema": "anima.lab.cognitive_outcome/0.1",
+                    "status": "REJECTED", "reason_code": "STALE_CONTEXT",
+                    "step_index": step, "proposal_id": None,
+                }
+                self._finalize(turn_id, step, output)
+                outcomes.append(output)
+                break
             if raw is None:
                 # An empty proposal is an explicit stop and is not a cognitive step.
                 break
