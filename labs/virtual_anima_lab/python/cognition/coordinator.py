@@ -37,6 +37,7 @@ CREATE TABLE IF NOT EXISTS e25_cognitive_trace (
  admission TEXT NOT NULL CHECK(admission IN ('ADMITTED','REJECTED')),
  reason_code TEXT NOT NULL,
  outcome_json TEXT,
+ outcome_sha256 TEXT,
  PRIMARY KEY(turn_id, step_index),
  UNIQUE(proposal_id)
 );
@@ -142,7 +143,7 @@ class E25LabCognitiveCoordinator:
                     "INSERT INTO e25_cognitive_trace("
                     "turn_id,step_index,proposal_id,operation_kind,"
                     "context_json,context_sha256,proposal_json,admission,"
-                    "reason_code,outcome_json) VALUES(?,?,?,?,?,?,?,?,?,NULL)",
+                    "reason_code,outcome_json,outcome_sha256) VALUES(?,?,?,?,?,?,?,?,?,NULL,NULL)",
                     (turn, step, proposal_id, op, context, _sha(context),
                      proposal, admission, reason),
                 )
@@ -159,9 +160,9 @@ class E25LabCognitiveCoordinator:
             db.execute("BEGIN IMMEDIATE")
             try:
                 cursor = db.execute(
-                    "UPDATE e25_cognitive_trace SET outcome_json=? "
+                    "UPDATE e25_cognitive_trace SET outcome_json=?,outcome_sha256=? "
                     "WHERE turn_id=? AND step_index=? AND outcome_json IS NULL",
-                    (data, turn, step),
+                    (data, _sha(data), turn, step),
                 )
                 if cursor.rowcount != 1:
                     raise E25CognitionError("decision result cannot be overwritten")
@@ -304,6 +305,11 @@ class E25LabCognitiveCoordinator:
                 }
                 if len(_json(output).encode("utf-8")) > MAX_RESULT_BYTES:
                     raise E25CognitionError("OUTCOME_BUDGET_EXCEEDED")
+                verified_context = self._memory.context_for_cognition(
+                    focus_refs=focus_refs, memory_enabled=memory_enabled,
+                )
+                if _sha(_json(verified_context)) != _sha(base):
+                    raise E25CognitionError("STALE_CONTEXT")
             except (E24MemoryError, E25CognitionError, ValueError, TypeError):
                 output = {
                     "schema": "anima.lab.cognitive_outcome/0.1",
@@ -343,14 +349,31 @@ class E25LabCognitiveCoordinator:
                 "ORDER BY step_index", (turn_id,),
             ).fetchall()
         out = []
+        first_context_hash = None
         for row in records:
             if _sha(row["context_json"]) != row["context_sha256"]:
                 raise E25CognitionError("decision context was modified after admission")
-            if row["outcome_json"] is None:
+            if first_context_hash is None:
+                first_context_hash = row["context_sha256"]
+            elif first_context_hash != row["context_sha256"]:
+                raise E25CognitionError("cognitive turn changed Context without renewal")
+            if row["outcome_json"] is None or row["outcome_sha256"] is None:
                 raise E25CognitionError("interrupted step; outcome unknown")
+            if _sha(row["outcome_json"]) != row["outcome_sha256"]:
+                raise E25CognitionError("decision result was modified after admission")
             outcome = json.loads(row["outcome_json"])
-            if outcome.get("step_index") != row["step_index"]:
-                raise E25CognitionError("outcome identity mismatched")
+            if (outcome.get("step_index") != row["step_index"]
+                    or outcome.get("proposal_id") != row["proposal_id"]
+                    or (row["admission"] == "REJECTED" and outcome.get("status") != "REJECTED")
+                    or outcome.get("status") not in ("REJECTED", "COMPLETED")):
+                raise E25CognitionError("outcome/admission identity mismatched")
+            if row["proposal_json"] is not None:
+                candidate = CognitiveStepProposal(json.loads(row["proposal_json"])).as_dict()
+                if (candidate["proposal_id"] != row["proposal_id"]
+                        or candidate["operation_kind"] != row["operation_kind"]):
+                    raise E25CognitionError("proposal identity mismatched")
+            elif row["admission"] == "ADMITTED":
+                raise E25CognitionError("admitted operation has no typed proposal")
             out.append({
                 "turn_id": turn_id, "step_index": row["step_index"],
                 "context_snapshot": json.loads(row["context_json"]),
