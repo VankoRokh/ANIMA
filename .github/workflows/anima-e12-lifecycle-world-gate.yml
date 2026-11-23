@@ -1,0 +1,78 @@
+name: ANIMA v0.2 E1.2 Lifecycle World Live Gate
+
+on:
+  push:
+    branches:
+      - work/v02-e12-live-validation
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: anima-e12-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  e12-offline:
+    name: Offline and regression / Python ${{ matrix.python-version }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ['3.12', '3.13', '3.14']
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v6
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Install test dependencies
+        run: python -m pip install -r requirements-dev.txt
+      - name: E1.1/E1.2 synthetic and contract tests
+        run: python -m pytest -q -p no:cacheprovider tests/test_lifecycle_world_contracts.py tests/test_lifecycle_scenario.py
+      - name: Documentation, links and syntax check
+        run: bash scripts/check.sh
+      - name: Full project regression
+        run: python -m pytest -q -p no:cacheprovider
+
+  e12-godot-472:
+    name: Real Godot 4.7.2 / live E1.2 and P5/P6
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      E12_REPORT_DIR: ${{ runner.temp }}/anima-e12-evidence
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.14'
+      - name: Install test dependencies
+        run: python -m pip install -r requirements-dev.txt
+      - name: Install official Godot 4.7.2 and verify SHA-256
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/godot"
+          curl --fail --location --retry 3 --retry-delay 2 \
+            --output "$RUNNER_TEMP/godot/godot.zip" \
+            https://github.com/godotengine/godot-builds/releases/download/4.7.2-stable/Godot_v4.7.2-stable_linux.x86_64.zip
+          echo "cadd3204e728a35d3f13adb7fd0d7902636b79f6b95c40c265eb73b6c35329e4  $RUNNER_TEMP/godot/godot.zip" | sha256sum -c -
+          unzip -q "$RUNNER_TEMP/godot/godot.zip" -d "$RUNNER_TEMP/godot"
+          chmod +x "$RUNNER_TEMP/godot/Godot_v4.7.2-stable_linux.x86_64"
+          echo "GODOT_BIN=$RUNNER_TEMP/godot/Godot_v4.7.2-stable_linux.x86_64" >> "$GITHUB_ENV"
+      - name: Import Godot assets headlessly
+        run: timeout 100s "$GODOT_BIN" --headless --path labs/virtual_anima_lab/godot --editor --import
+      - name: Run E1.2 native/live, full regression and P5/P6 recovery gates
+        shell: bash
+        run: bash scripts/run_e12_live_gate.sh
+      - name: Preserve E1.2 raw evidence and failure logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: anima-e12-godot-4-7-2-live
+          if-no-files-found: warn
+          retention-days: 14
+          path: ${{ runner.temp }}/anima-e12-evidence/
