@@ -61,8 +61,6 @@ jobs:
           unzip -q "$RUNNER_TEMP/godot/godot.zip" -d "$RUNNER_TEMP/godot"
           chmod +x "$RUNNER_TEMP/godot/Godot_v4.7.2-stable_linux.x86_64"
           echo "GODOT_BIN=$RUNNER_TEMP/godot/Godot_v4.7.2-stable_linux.x86_64" >> "$GITHUB_ENV"
-      - name: Import Godot assets headlessly
-        run: timeout 100s "$GODOT_BIN" --headless --path labs/virtual_anima_lab/godot --editor --import
       - name: Run E1.2 native/live, full regression and P5/P6 recovery gates
         shell: bash
         env:
