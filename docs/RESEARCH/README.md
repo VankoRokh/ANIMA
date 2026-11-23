@@ -36,6 +36,7 @@
 | E2.4b / Verified relative viewpoint | **PASS_LAB_RELATIVE_POSE:** readback Godot operation_status + next Core Raw verifies turn/step and relative pose; **не** full topo map, Core Stage6/FAST | [Приёмка, ограничения, доказательства](e2-4b-relative-pose-acceptance-v02.md) |
 | E2.5a / Read-only cognitive initiative | **PASS_LAB_READ_ONLY_INITIATION:** stub предлагает следующий bounded Retrieval после результата первого, Core-backed Raw proof и DecisionRecord; **не** настоящая FAST, нативный Core Admission или Goal/Action | [Результаты, негативные тесты, будущая FAST](e2-5a-cognitive-initiative-acceptance-v02.md) |
 | E2.5b / Visual deterministic decision loop | **PASS_LAB_DETERMINISTIC_CLOSED_LOOP:** реальный Godot STEP/RUN, выбранные по сенсору turn/step, Core-backed Raw, verified readback + durable lab decision; **не** FAST или Core-native Stage6 | [Отчёт, риски, запуск](e2-5b-visual-decision-lab-acceptance-v02.md) |
+| E2.5c / Stage2 Goal/Task + Stage6 spatial action | **PASS_LAB_STAGE2_STAGE6_SPATIAL:** agent-selected turn/step through canonical Goal/Task, ExecutionStore, SandboxExecutor, readback + next Core Raw; **не** generic CoreGoalDecision или FAST | [Приёмка, лимиты и команды](e2-5c-stage6-spatial-acceptance-v02.md) |
 | Core P0–P6 и аудит B1–B4 | Исправления и независимые ограничения; исторический путь реализации | [История Core](../history/core-v0.1.md) |
 | Pi, FAST/DEEP/SLEEP, perception, метапамять | Отдельные пробы и будущие варианты; не навязаны Foundation | [Аппаратные и дальнейшие направления](future-directions.md) |
 
