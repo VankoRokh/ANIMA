@@ -109,10 +109,17 @@ func _parse_args() -> void:
 			get_tree().quit(2)
 			return
 	if _ledger_enabled and not _effects_enabled:
+		_configuration_ok = false
 		push_error("Lifecycle World: ledger requires --lifecycle-effects")
 		get_tree().quit(2)
 		return
+	if _guarded and _effects_enabled and not _ledger_enabled:
+		_configuration_ok = false
+		push_error("Lifecycle World: guarded execution requires operation ledger")
+		get_tree().quit(2)
+		return
 	if _port < 1024 or _port > 65535 or _seed < 0 or _seed > 2147483647:
+		_configuration_ok = false
 		push_error("Lifecycle World: invalid port/seed")
 		get_tree().quit(2)
 
@@ -573,7 +580,9 @@ func _request(line: String) -> Dictionary:
 			if authority == "operator":
 				caps = ["inspect", "reset", "set_obstacle"]
 			elif authority == "executor":
-				caps = ["act"]
+				caps = []
+				if _effects_enabled:
+					caps.append("act")
 				if _ledger_enabled:
 					caps.append("operation_status")
 		else:
