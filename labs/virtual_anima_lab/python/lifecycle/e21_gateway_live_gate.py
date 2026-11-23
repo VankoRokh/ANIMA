@@ -67,12 +67,16 @@ def finish(process, output):
 
 def negative_bootstrap(binary: str, evidence: Path) -> dict:
     """A guarded listener must not start with absent/weak/reused credentials."""
+    valid = ("o" * 43, "e" * 43, "p" * 43)
+    guarded_flags = ["--lifecycle-effects", "--lifecycle-ledger", "--lifecycle-guarded"]
     cases = {
-        "missing": ("", "", ""),
-        "same": ("s" * 43, "s" * 43, "o" * 43),
-        "weak": ("x" * 12, "e" * 43, "o" * 43),
+        "missing": (("", "", ""), guarded_flags),
+        "same": (("s" * 43, "s" * 43, "o" * 43), guarded_flags),
+        "weak": (("x" * 12, "e" * 43, "o" * 43), guarded_flags),
+        "effects_without_ledger": (valid, ["--lifecycle-effects", "--lifecycle-guarded"]),
+        "ledger_without_effects": (valid, ["--lifecycle-ledger", "--lifecycle-guarded"]),
     }
-    for label, keys in cases.items():
+    for label, (keys, flags) in cases.items():
         port = _port()
         env = {
             **os.environ,
@@ -86,9 +90,7 @@ def negative_bootstrap(binary: str, evidence: Path) -> dict:
                 [binary, "--headless", "--path", str(PROJECT),
                  "res://LifecycleWorld.tscn", "--",
                  "--lifecycle-port", str(port),
-                 "--lifecycle-seed", "7",
-                 "--lifecycle-effects", "--lifecycle-ledger",
-                 "--lifecycle-guarded"],
+                 "--lifecycle-seed", "7", *flags],
                 cwd=PROJECT, stdout=output, stderr=subprocess.STDOUT,
                 env=env, timeout=10, check=False,
             )
@@ -96,7 +98,46 @@ def negative_bootstrap(binary: str, evidence: Path) -> dict:
                 f"guarded {label} config started without valid credentials")
         require("ANIMA_LIFECYCLE_WORLD_READY" not in logfile.read_text(encoding="utf-8"),
                 f"guarded {label} config opened a listener before failing")
-    return {"missing": "REJECTED", "reused": "REJECTED", "weak": "REJECTED"}
+    return {label: "REJECTED" for label in cases}
+
+
+def guarded_observe_only(binary: str, evidence: Path) -> bool:
+    """Observer-only guarded launch must advertise no executor capability."""
+    keys = ("o" * 43, "e" * 43, "p" * 43)
+    port = _port()
+    logfile = evidence / "guarded-observe-only.log"
+    output = logfile.open("w", encoding="utf-8")
+    process = subprocess.Popen(
+        [binary, "--headless", "--path", str(PROJECT),
+         "res://LifecycleWorld.tscn", "--",
+         "--lifecycle-port", str(port), "--lifecycle-seed", "7",
+         "--lifecycle-guarded"],
+        cwd=PROJECT, stdout=output, stderr=subprocess.STDOUT,
+        env={**os.environ,
+             "ANIMA_LIFECYCLE_OBSERVER_KEY": keys[0],
+             "ANIMA_LIFECYCLE_EXECUTOR_KEY": keys[1],
+             "ANIMA_LIFECYCLE_OPERATOR_KEY": keys[2]},
+    )
+    try:
+        connection = _wait(process, port)
+        connection.close()
+        with LabClient(port, role="agent", protocol=PROTOCOL_V2) as agent:
+            hello_observer = agent.call("hello", auth=keys[0])["data"]
+            hello_executor = agent.call("hello", auth=keys[1])["data"]
+            require(hello_observer["capabilities"] == ["observe"],
+                    "guarded observer-only world leaked capabilities")
+            require(hello_executor["capabilities"] == [],
+                    "guarded executor announced disabled actions")
+            try:
+                agent.call("act", auth=keys[1], action={})
+            except LabRejected as exc:
+                require(exc.error == "FORBIDDEN",
+                        "guarded observer-only unexpectedly enabled actions")
+            else:
+                raise AssertionError("guarded-only world executed action")
+    finally:
+        finish(process, output)
+    return True
 
 
 def run_once(binary: str, seed: int, evidence: Path) -> dict:
@@ -271,16 +312,19 @@ def main(argv: list[str] | None = None) -> int:
             root = Path(args.evidence_dir)
             root.mkdir(parents=True, exist_ok=True)
             bootstrap = negative_bootstrap(binary, root)
+            observed_only = guarded_observe_only(binary, root)
             trials = [run_once(binary, seed, root) for seed in (7, 8)]
         else:
             with tempfile.TemporaryDirectory(prefix="anima-e21-trust-") as tmp:
                 bootstrap = negative_bootstrap(binary, Path(tmp))
+                observed_only = guarded_observe_only(binary, Path(tmp))
                 trials = [run_once(binary, seed, Path(tmp)) for seed in (7, 8)]
         print(json.dumps({
             "schema": "anima.e2_1.core_world_boundary_gate/0.1",
             "status": "E2_1_READ_ONLY_GATE_PASS",
             "trials": trials,
             "invalid_guarded_bootstrap": bootstrap,
+            "guarded_observe_only_capabilities_correct": observed_only,
             "scope": "CORE_BOUND_OBSERVE_ONLY",
             "stage6_execution_admitted": False,
             "model_used": False,
