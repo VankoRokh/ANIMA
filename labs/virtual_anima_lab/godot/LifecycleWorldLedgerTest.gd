@@ -1,4 +1,5 @@
 extends SceneTree
+const MAX_LEDGER_ENTRIES := 256
 ## E1.4 native ledger acceptance; E1.3 & prior contracts must remain unchanged.
 ## No IO/network trust: use the Godot world directly to isolate effects and clocks.
 
@@ -116,7 +117,7 @@ func _initialize() -> void:
 		_finish(world, false)
 		return
 	# Fully populate without evicting known events. Capacity must fail-closed.
-	for i in range(world.MAX_E14_LEDGER_ENTRIES - 2):
+	for i in range(MAX_LEDGER_ENTRIES - 2):
 		var sample: Dictionary = _call(world, 1000 + i * 2, "agent", "observe")["data"]
 		var act := _action(sample, "e14.fill.%03d" % i, "E")
 		var result := _call(world, 1001 + i * 2, "agent", "act", {"action": act})
@@ -126,7 +127,7 @@ func _initialize() -> void:
 	var full_sample: Dictionary = _call(world, 2001, "agent", "observe")["data"]
 	var extra := _action(full_sample, "e14.capacity.extra", "E")
 	var cap := _call(world, 2002, "agent", "act", {"action": extra})
-	if not _expect(not cap["ok"] and cap["error"] == "OPERATION_CAPACITY" and world._operation_ledger.size() == world.MAX_E14_LEDGER_ENTRIES, "capacity failed open"):
+	if not _expect(not cap["ok"] and cap["error"] == "OPERATION_CAPACITY" and world._operation_ledger.size() == MAX_LEDGER_ENTRIES, "capacity failed open"):
 		_finish(world, false)
 		return
 	var old_replay := _call(world, 2003, "agent", "act", {"action": move})
