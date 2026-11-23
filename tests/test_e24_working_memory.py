@@ -25,7 +25,8 @@ SURFACE = "lab.surface." + "0" * 24
 KEY = "o" * 43
 
 
-def sample(number: int, *, item: bool, epoch=1, world=WORLD, revision=None):
+def sample(number: int, *, item: bool, epoch=1, world=WORLD, revision=None,
+           item_owner="absent"):
     data = {
         "schema": VIEW_SCHEMA, "world_instance_id": world,
         "epoch": epoch, "revision": number - 1 if revision is None else revision,
@@ -44,7 +45,10 @@ def sample(number: int, *, item: bool, epoch=1, world=WORLD, revision=None):
         data["readings"].append({
             "entity_ref": "lab.item.crate", "category": "item",
             "bearing_mdeg": 30_000, "range_milli_cells": 1000,
-            "properties": {"owner": {"status": "absent", "value": None}},
+            "properties": {"owner": {
+                "status": item_owner,
+                "value": None if item_owner == "absent" else "lab.actor.anima",
+            }},
         })
     return EgocentricView(data)
 
@@ -99,7 +103,9 @@ def test_memory_retrieves_prior_object_without_claiming_absence(tmp_path, monkey
     assert remembered["lab.item.crate"]["last_seen_sample"] == records[1].sample_id
     assert remembered["lab.item.crate"]["last_seen_properties"]["owner"]["status"] == "absent"
     assert any(
-        edge["kind"] == "co_observed" and edge["evidence_count"] == 1
+        edge["kind"] == "co_observed" and edge["evidence_count"] == 1 and
+        edge["relative_frame"] == "same_observer_view_not_global" and
+        type(edge["last_relative_bearing_mdeg"]) is int
         for edge in memory["relations"]
     )
     assert no_memory["historical_samples"] == 1
@@ -119,6 +125,29 @@ def test_memory_retrieves_prior_object_without_claiming_absence(tmp_path, monkey
     assert len(reopened._core.event_log.load_events()) == 3
     assert reopened.recover() == ()
     assert db_query(tmp_path, "SELECT COUNT(*) FROM e24_mentions")[0][0] == 4
+
+
+def test_observed_property_revision_is_not_promoted_to_knowledge(tmp_path, monkeypatch):
+    fake_sensing(monkeypatch, [
+        sample(1, item=True, item_owner="absent"),
+        sample(2, item=True, item_owner="known"),
+        sample(3, item=False),
+    ])
+    instance = core(tmp_path)
+    service = E24WorkingMemory(instance, observer())
+    for _ in range(3):
+        service.observe_and_record()
+    model = service.world_model()
+    changes = model["observed_revisions"]
+    assert len(changes) == 1
+    assert changes[0]["entity_ref"] == "lab.item.crate"
+    assert changes[0]["predicate_ref"] == "owner"
+    assert changes[0]["previous"]["status"] == "absent"
+    assert changes[0]["current"]["status"] == "known"
+    assert changes[0]["interpretation"] == "changed_report_not_confirmed_knowledge"
+    assert model["limitations"]["observed_property_changes_are_not_knowledge"]
+    assert service.world_model(memory_enabled=False)["observed_revisions"] == []
+    assert instance.memory_store.count() == 0
 
 
 @pytest.mark.parametrize("cut", [
