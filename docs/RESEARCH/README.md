@@ -33,6 +33,7 @@
 | E2.2 / Raw capture and provenance | **PASS_LAB_RAW_POINTER:** atomic complete WorldObservation + Core digest event, crash replay; **не** self-contained Core Raw / Context / FAST / Knowledge | [Вердикт и доказательства](e2-2-acceptance-report-v02.md) · [Контракт](e2-raw-provenance-v02.md) |
 | E2.3 / Directed sensor and cognitive proposal schema | **PASS_LAB_SENSOR_ONLY:** real Godot relative 90° view + opaque IDs + turn/step replay, only lab proposal validator; **не** карта, Memory, Core action или FAST | [Приёмка, evidence и риски](e2-3-perception-acceptance-v02.md) · [Направление E2.3–E3](e2-cognitive-initiative-v02.md) |
 | E2.4a / Core-backed associative working memory | **PASS_LAB_ASSOCIATIVE_MEMORY:** 3 Raw+Core events/seed, visual recall vs memory-off, observed changes and same-view associations; **не** топологическая карта, CognitiveCoordinator или FAST | [Результаты, ограничения, дальнейший план](e2-4-working-memory-acceptance-v02.md) |
+| E2.4b / Verified relative viewpoint | **PASS_LAB_RELATIVE_POSE:** readback Godot operation_status + next Core Raw verifies turn/step and relative pose; **не** full topo map, Core Stage6/FAST | [Приёмка, ограничения, доказательства](e2-4b-relative-pose-acceptance-v02.md) |
 | Core P0–P6 и аудит B1–B4 | Исправления и независимые ограничения; исторический путь реализации | [История Core](../history/core-v0.1.md) |
 | Pi, FAST/DEEP/SLEEP, perception, метапамять | Отдельные пробы и будущие варианты; не навязаны Foundation | [Аппаратные и дальнейшие направления](future-directions.md) |
 
