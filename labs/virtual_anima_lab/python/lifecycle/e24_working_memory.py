@@ -67,6 +67,7 @@ CREATE TABLE IF NOT EXISTS e24_mentions (
  category TEXT NOT NULL,
  bearing_mdeg INTEGER NOT NULL,
  range_milli_cells INTEGER NOT NULL,
+ properties_json TEXT NOT NULL,
  PRIMARY KEY(sample_id,entity_ref)
 );
 CREATE TABLE IF NOT EXISTS e24_co_seen (
@@ -301,9 +302,11 @@ class E24WorkingMemory:
                     names.append(name)
                     db.execute(
                         "INSERT INTO e24_mentions(sample_id,entity_ref,category,"
-                        "bearing_mdeg,range_milli_cells) VALUES(?,?,?,?,?)",
+                        "bearing_mdeg,range_milli_cells,properties_json) "
+                        "VALUES(?,?,?,?,?,?)",
                         (sample, name, reading["category"],
-                         reading["bearing_mdeg"], reading["range_milli_cells"]),
+                         reading["bearing_mdeg"], reading["range_milli_cells"],
+                         self._json(reading["properties"])),
                     )
                 for i, a in enumerate(sorted(names)):
                     for b in sorted(names)[i + 1:]:
@@ -411,11 +414,15 @@ class E24WorkingMemory:
         with closing(self._connect()) as db:
             raw = db.execute("SELECT * FROM e24_raw ORDER BY sample_seq").fetchall()
             processed = db.execute("SELECT * FROM e24_processed").fetchall()
+            mentions = db.execute("SELECT * FROM e24_mentions").fetchall()
+            co_seen = db.execute("SELECT * FROM e24_co_seen").fetchall()
         if len(raw) != len(processed) or not raw:
             raise E24MemoryError("unprocessed Raw exists: working model not available")
         # Check all evidence before exposing working projections.
         seen = {r["sample_id"]: r for r in processed}
         snapshots = []
+        expected_mentions = {}
+        expected_edges = set()
         for row in raw:
             snap, digest = self._verify_row(row, binding)
             proof = seen.get(row["sample_id"])
@@ -424,36 +431,67 @@ class E24WorkingMemory:
                 raise E24MemoryError("missing/forged derived evidence")
             self._verify_core(row["core_event_id"], snap, digest, require_forwarded=True)
             snapshots.append((snap, row["core_event_id"], digest))
+            sample = snap["sample_id"]
+            labels = []
+            for reading in snap["readings"]:
+                name = reading["entity_ref"]
+                expected_mentions[(sample, name)] = (
+                    reading["category"], reading["bearing_mdeg"],
+                    reading["range_milli_cells"], self._json(reading["properties"]),
+                )
+                labels.append(name)
+            labels.sort()
+            for index, first in enumerate(labels):
+                for second in labels[index + 1:]:
+                    expected_edges.add((sample, first, second))
+        actual_mentions = {
+            (m["sample_id"], m["entity_ref"]): (
+                m["category"], m["bearing_mdeg"], m["range_milli_cells"],
+                m["properties_json"],
+            ) for m in mentions
+        }
+        actual_edges = {(e["sample_id"], e["first_ref"], e["second_ref"]) for e in co_seen}
+        if (len(actual_mentions) != len(mentions) or
+                actual_mentions != expected_mentions or
+                len(actual_edges) != len(co_seen) or
+                actual_edges != expected_edges):
+            raise E24MemoryError("materialized world memory deviates from verified Raw")
+        # Read memory from the persisted materialized tables only after
+        # verifying that each row is reproducible from canonical Raw+Core.
+        mentions_by_sample = {}
+        for mention in mentions:
+            mentions_by_sample.setdefault(mention["sample_id"], []).append(mention)
+        edges_by_sample = {}
+        for edge in co_seen:
+            edges_by_sample.setdefault(edge["sample_id"], []).append(edge)
         latest, _, _ = snapshots[-1]
         selected = snapshots if memory_enabled else snapshots[-1:]
         entities: dict[str, dict] = {}
         edges: dict[tuple[str, str], dict] = {}
         for snap, event_id, digest in selected:
-            labels = []
-            for reading in snap["readings"]:
-                name = reading["entity_ref"]
-                labels.append(name)
+            for mention in mentions_by_sample.get(snap["sample_id"], []):
+                name = mention["entity_ref"]
                 old = entities.get(name)
                 entities[name] = {
-                    "entity_ref": name, "category": reading["category"],
+                    "entity_ref": name, "category": mention["category"],
                     "last_seen_sample": snap["sample_id"],
                     "last_seen_event_id": event_id, "last_seen_raw_sha256": digest,
                     "last_seen_view": {
-                        "bearing_mdeg": reading["bearing_mdeg"],
-                        "range_milli_cells": reading["range_milli_cells"],
+                        "bearing_mdeg": mention["bearing_mdeg"],
+                        "range_milli_cells": mention["range_milli_cells"],
                     },
+                    "last_seen_properties": json.loads(mention["properties_json"]),
                     "evidence_count": 1 if old is None else old["evidence_count"] + 1,
                 }
-            names = sorted(labels)
-            for i, a in enumerate(names):
-                for b in names[i + 1:]:
-                    key = (a, b)
-                    existing = edges.get(key)
-                    edges[key] = {
-                        "kind": "co_observed", "first_ref": a, "second_ref": b,
-                        "evidence_count": 1 if existing is None else existing["evidence_count"] + 1,
-                        "last_sample_id": snap["sample_id"], "last_event_id": event_id,
-                    }
+            for pair in edges_by_sample.get(snap["sample_id"], []):
+                a, b = pair["first_ref"], pair["second_ref"]
+                key = (a, b)
+                existing = edges.get(key)
+                edges[key] = {
+                    "kind": "co_observed", "first_ref": a, "second_ref": b,
+                    "evidence_count": 1 if existing is None else existing["evidence_count"] + 1,
+                    "last_sample_id": snap["sample_id"], "last_event_id": event_id,
+                }
         present = {reading["entity_ref"] for reading in latest["readings"]}
         for entity in entities.values():
             entity["current_observation"] = (
