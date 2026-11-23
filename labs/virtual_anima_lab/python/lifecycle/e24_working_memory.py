@@ -555,6 +555,74 @@ class E24WorkingMemory:
             },
         }
 
+    def context_for_cognition(
+        self, *, focus_refs: tuple[str, ...] = (), memory_enabled: bool = True,
+        max_entities: int = 12, max_relations: int = 24,
+    ) -> dict:
+        """Bounded, source-backed working Context for future FAST/stub comparison.
+
+        This is NOT yet connected to ContextBuilder, CognitiveCoordinator or
+        LLM. No hidden Godot coordinates, synthetic Knowledge or permissions.
+        Missing focus refs remain unresolved, not 'absent'.
+        """
+        if (type(focus_refs) is not tuple or len(focus_refs) > 16
+                or any(type(x) is not str or not x.startswith("lab.")
+                       or len(x) > 128 for x in focus_refs)
+                or len(set(focus_refs)) != len(focus_refs)):
+            raise ValueError("bounded distinct lab entity focus refs required")
+        if type(max_entities) is not int or not 1 <= max_entities <= 32:
+            raise ValueError("max_entities must be 1..32")
+        if type(max_relations) is not int or not 0 <= max_relations <= 64:
+            raise ValueError("max_relations must be 0..64")
+        model = self.world_model(memory_enabled=memory_enabled)
+        focused = set(focus_refs)
+        entities = sorted(
+            model["entities"],
+            key=lambda e: (
+                e["entity_ref"] not in focused,
+                e["current_observation"] != "observed",
+                -e["evidence_count"],
+                e["entity_ref"],
+            ),
+        )
+        selected = entities[:max_entities]
+        included = {e["entity_ref"] for e in selected}
+        available_relations = [
+            edge for edge in model["relations"]
+            if edge["first_ref"] in included and edge["second_ref"] in included
+        ]
+        relations = available_relations[:max_relations]
+        revisions = [
+            record for record in model["observed_revisions"]
+            if record["entity_ref"] in included
+        ][:max_relations]
+        return {
+            "schema": "anima.lab.cognitive_world_context/0.1",
+            "world_instance_id": model["world_instance_id"],
+            "epoch": model["epoch"],
+            "latest_sample_id": model["latest_sample_id"],
+            "coverage": model["coverage"],
+            "memory_enabled": memory_enabled,
+            "source_ref": SOURCE,
+            "entities": selected, "relations": relations,
+            "observed_revisions": revisions,
+            "unresolved_focus_refs": [
+                ref for ref in focus_refs
+                if not any(e["entity_ref"] == ref for e in model["entities"])
+            ],
+            "truncated": (
+                len(selected) < len(entities)
+                or len(relations) < len(available_relations)
+                or len(revisions) < len([
+                    rec for rec in model["observed_revisions"]
+                    if rec["entity_ref"] in included
+                ])
+            ),
+            "coverage_scope": "captured_view_history_only",
+            "provenance_bound": True,
+            "not_observed_does_not_mean_absent": True,
+        }
+
     def raw_evidence(self, sample_id: str) -> EgocentricView:
         """Read verified original view bytes, never an unproven materialized claim."""
         if type(sample_id) is not str:
