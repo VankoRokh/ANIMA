@@ -13,6 +13,8 @@ var _command: HTTPRequest
 var _timer: Timer
 var _status: Label
 var _buttons: Array[Button] = []
+var _poll_pending := false
+var _command_pending := false
 
 
 func configure(port: int, key: String) -> void:
@@ -70,27 +72,32 @@ func _headers() -> PackedStringArray:
 
 
 func _fetch() -> void:
-	if _poll.get_http_client_status() != HTTPClient.STATUS_DISCONNECTED:
+	if _poll_pending:
 		return
+	_poll_pending = true
 	var err: Error = _poll.request(_api("state"), _headers(), HTTPClient.METHOD_GET)
 	if err != OK:
+		_poll_pending = false
 		_status.text = "API: offline"
 		get_parent().call("_visual_runner_error", "HTTP request error")
 
 
 func _send(command: String) -> void:
-	if _command.get_http_client_status() != HTTPClient.STATUS_DISCONNECTED:
+	if _command_pending:
 		return
+	_command_pending = true
 	for button in _buttons:
 		button.disabled = true
 	var err: Error = _command.request(_api(command), _headers(), HTTPClient.METHOD_POST, "")
 	if err != OK:
+		_command_pending = false
 		_status.text = "Control failed"
 		for button in _buttons:
 			button.disabled = false
 
 
 func _on_command(result: int, code: int, _headers_in: PackedStringArray, _body: PackedByteArray) -> void:
+	_command_pending = false
 	for button in _buttons:
 		button.disabled = false
 	if result != HTTPRequest.RESULT_SUCCESS or code != 202:
@@ -101,6 +108,7 @@ func _on_command(result: int, code: int, _headers_in: PackedStringArray, _body: 
 
 
 func _on_poll(result: int, code: int, _headers_in: PackedStringArray, body: PackedByteArray) -> void:
+	_poll_pending = false
 	if result != HTTPRequest.RESULT_SUCCESS or code != 200:
 		_status.text = "API offline"
 		get_parent().call("_visual_runner_error", "API disconnected")
