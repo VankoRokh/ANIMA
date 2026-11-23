@@ -84,7 +84,7 @@ func _ready() -> void:
 		var visual_script: Script = load("res://VisualControlHUD.gd")
 		var visual: Control = visual_script.new()
 		visual.position = Vector2(WIDTH * CELL + 7, HEIGHT * CELL + 6)
-		visual.configure(_visual_control_port, _visual_control_token)
+		visual.call("configure", _visual_control_port, _visual_control_token)
 		add_child(visual)
 	var listen_error := _server.listen(_port, "127.0.0.1")
 	if listen_error != OK:
