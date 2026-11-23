@@ -81,6 +81,8 @@ def verify_world_effect(
         return proof("UNVERIFIED", "INTENT_NOT_BOUND_TO_BEFORE")
     if r["operation_id"] != op:
         return proof("UNVERIFIED", "OPERATION_MISMATCH")
+    if r["replayed"]:
+        return proof("UNVERIFIED", "REPLAY_NOT_VERIFIED_IN_E13")
     if (t["sample_seq"] <= b["sample_seq"] or
             t["sample_id"] == b["sample_id"] or
             t["tick"] <= b["tick"] or
