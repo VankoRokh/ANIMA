@@ -86,9 +86,18 @@ class CoreSpatialActionGateway:
         selected = dict(allowed_capabilities)
         if any(not isinstance(v, tuple) or len(v) != 2 for v in selected.values()):
             raise ValueError("invalid fixed capability mapping")
-        for name, version in selected.values():
-            if registry.get(name, version) is None or (name, version) not in executor.handlers:
-                raise CoreSpatialAdmissionError("allowed capability missing trusted executable")
+        for kind, (name, version) in selected.items():
+            # Reject tool aliasing: a trusted config must not map a spatial
+            # proposal onto a different filesystem/network capability.
+            if name != kind:
+                raise CoreSpatialAdmissionError("spatial tool alias is forbidden")
+            descriptor = registry.get(name, version)
+            if (descriptor is None or (name, version) not in executor.handlers
+                    or descriptor.effect_class != "reversible_write"
+                    or descriptor.idempotency != "keyed"):
+                raise CoreSpatialAdmissionError(
+                    "spatial capability must be an exact keyed reversible handler"
+                )
         source = core.core_events.ingress.sources.get(source_ref)
         if source is None or source.producer_ref != producer_ref or "state.property" not in source.allowed_kinds:
             raise CoreSpatialAdmissionError("unregistered exact Core source/producer")
