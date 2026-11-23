@@ -9,8 +9,10 @@ if ! git merge-base --is-ancestor "$BASE" HEAD; then
   echo 'E1_2_BLOCKED: checkout is not based on the reviewed E1.2 snapshot' >&2
   exit 2
 fi
-if [[ -n "$(git status --porcelain --untracked-files=normal)" ]]; then
-  echo 'E1_2_BLOCKED: dirty working tree; use a clean, isolated checkout' >&2
+# Godot --editor --import produces untracked .godot caches in a clean checkout.
+# Reject tracked-source changes, but do not mistake generated caches for code changes.
+if [[ -n "$(git status --porcelain --untracked-files=no)" ]]; then
+  echo 'E1_2_BLOCKED: tracked files were modified; use an isolated checkout' >&2
   exit 2
 fi
 GODOT_BIN="${GODOT_BIN:-${1:-}}"
