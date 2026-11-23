@@ -257,9 +257,15 @@ class E22RawCaptureService:
             ).fetchone()
         if row is None:
             raise RawCaptureError("unknown Raw sensor sample")
-        snap, _digest = self._validate_capture(
+        snap, digest = self._validate_capture(
             row, self._gateway.binding_snapshot(),
         )
+        if row["event_id"] is not None:
+            # A linked record is never trusted solely because the sidecar
+            # contains a syntactically plausible event-id string.
+            self._verify_core(
+                row["event_id"], self._raw_event(snap, digest), digest,
+            )
         return WorldObservation(snap)
 
 
