@@ -304,7 +304,9 @@ func _action_digest(action: Dictionary) -> String:
 
 
 func _operation_status(req: Dictionary, request_id: int) -> Dictionary:
-	if req.size() != 7 or not _valid_ref(req.get("operation_id")):
+	# Lookup is bound to the FULL intended action, not just a claimed operation ID.
+	# Otherwise a caller could attach an existing receipt to different arguments.
+	if req.size() != 8 or not _valid_ref(req.get("operation_id")):
 		return _reply(request_id, false, {}, "INVALID_LOOKUP")
 	if typeof(req.get("world_instance_id")) != TYPE_STRING or not _valid_uint(req.get("epoch")):
 		return _reply(request_id, false, {}, "INVALID_LOOKUP")
@@ -312,7 +314,18 @@ func _operation_status(req: Dictionary, request_id: int) -> Dictionary:
 	var matcher := RegEx.create_from_string("^[a-f0-9]{32}$")
 	if matcher.search(world_id) == null or int(req["epoch"]) < 1:
 		return _reply(request_id, false, {}, "INVALID_LOOKUP")
+	var requested_action = req.get("action")
+	if typeof(requested_action) != TYPE_DICTIONARY:
+		return _reply(request_id, false, {}, "INVALID_LOOKUP")
+	if not _valid_e13_action({
+		"protocol": PROTOCOL, "id": request_id, "role": "agent",
+		"op": "act", "action": requested_action,
+	}):
+		return _reply(request_id, false, {}, "INVALID_LOOKUP")
+	var action: Dictionary = requested_action
 	var operation_id: String = req["operation_id"]
+	if action["world_instance_id"] != world_id or int(action["epoch"]) != int(req["epoch"]) or action["operation_id"] != operation_id:
+		return _reply(request_id, false, {}, "INVALID_LOOKUP")
 	var data := {
 		"schema": OPERATION_STATUS_SCHEMA,
 		"world_instance_id": world_id, "epoch": int(req["epoch"]),
@@ -320,8 +333,11 @@ func _operation_status(req: Dictionary, request_id: int) -> Dictionary:
 	}
 	# UNKNOWN means absent from *this living ledger*; it never proves no effect.
 	if world_id == _world_instance_id and int(req["epoch"]) == _epoch and _operation_ledger.has(operation_id):
+		var saved: Dictionary = _operation_ledger[operation_id]
+		if saved["digest"] != _action_digest(action):
+			return _reply(request_id, false, {}, "OPERATION_CONFLICT")
 		data["status"] = "RECORDED"
-		data["receipt"] = _operation_ledger[operation_id]["receipt"].duplicate(true)
+		data["receipt"] = saved["receipt"].duplicate(true)
 	return _reply(request_id, true, data)
 
 
