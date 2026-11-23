@@ -6,6 +6,9 @@ extends Node2D
 
 const PROTOCOL := "val.bridge/0.2"
 const OBSERVATION_SCHEMA := "anima.lifecycle.world_observation/0.1"
+const VIEW_SCHEMA := "anima.lifecycle.egocentric_observation/0.1"
+const VIEW_ACTION_SCHEMA := "anima.lifecycle.egocentric_action/0.1"
+const VIEW_FOV_DEGREES := 90
 const ACTION_SCHEMA := "anima.lifecycle.world_action/0.1"
 const RECEIPT_SCHEMA := "anima.lifecycle.world_receipt/0.1"
 const OPERATION_STATUS_SCHEMA := "anima.lifecycle.world_operation_status/0.1"
@@ -28,6 +31,7 @@ var _effects_enabled := false
 # E1.4 is a separate opt-in; default E1.2 and E1.3 contracts stay unchanged.
 var _ledger_enabled := false
 var _guarded := false
+var _egocentric := false
 var _configuration_ok := true
 # Distinct ephemeral secrets from the trusted harness environment, not argv or hello.
 var _observer_key := ""
@@ -46,6 +50,8 @@ var _walls: Array[Vector2i] = []
 var _obstacles: Array[Vector2i] = []
 var _shortcut := Vector2i.ZERO
 var _anima := Vector2i.ZERO
+var _facing := Vector2i(0, -1)
+var _opaque_refs: Dictionary = {}
 var _item := Vector2i.ZERO
 var _delivery := Vector2i.ZERO
 var _landmark := Vector2i.ZERO
@@ -93,6 +99,8 @@ func _parse_args() -> void:
 			_ledger_enabled = true
 		elif args[index] == "--lifecycle-guarded":
 			_guarded = true
+		elif args[index] == "--lifecycle-egocentric":
+			_egocentric = true
 		index += 1
 	if _guarded:
 		_observer_key = OS.get_environment("ANIMA_LIFECYCLE_OBSERVER_KEY")
@@ -108,6 +116,11 @@ func _parse_args() -> void:
 			push_error("Lifecycle World: guarded mode requires three distinct strong keys")
 			get_tree().quit(2)
 			return
+	if _egocentric and not _guarded:
+		_configuration_ok = false
+		push_error("Lifecycle World: egocentric sensor requires guarded role separation")
+		get_tree().quit(2)
+		return
 	if _ledger_enabled and not _effects_enabled:
 		_configuration_ok = false
 		push_error("Lifecycle World: ledger requires --lifecycle-effects")
@@ -170,6 +183,8 @@ func _reset_world() -> void:
 	_tick = 0
 	_last_sample.clear()
 	_history.clear()
+	_facing = Vector2i(0, -1)
+	_opaque_refs.clear()
 	_walls.clear()
 	_obstacles.clear()
 	var partition: Dictionary = _scenario["partition"]
@@ -288,6 +303,94 @@ func _observation() -> Dictionary:
 	return sample
 
 
+
+# E2.3 directed actor-relative sensor: never call _inspect() or reveal absolute
+# coordinates, compass heading, or wall.x.y IDs to the observer.
+func _view_visible(point: Vector2i) -> bool:
+	var delta := point - _anima
+	if delta == Vector2i.ZERO:
+		return false
+	var forward: int = delta.x * _facing.x + delta.y * _facing.y
+	var right := delta.x * (-_facing.y) + delta.y * _facing.x
+	if forward <= 0:
+		return false
+	if absf(rad_to_deg(atan2(float(right), float(forward)))) > float(VIEW_FOV_DEGREES) / 2.0:
+		return false
+	var steps: int = maxi(absi(delta.x), absi(delta.y)) * 16
+	for index in range(1, steps):
+		var fraction := float(index) / float(steps)
+		var sampled := Vector2i(
+			floori(float(_anima.x) + 0.5 + float(delta.x) * fraction),
+			floori(float(_anima.y) + 0.5 + float(delta.y) * fraction)
+		)
+		if sampled == point:
+			return true
+		if _blocked(sampled):
+			return false
+	return true
+
+
+func _opaque_ref(point: Vector2i, category: String) -> String:
+	var key := "%s:%d:%d" % [category, point.x, point.y]
+	if not _opaque_refs.has(key):
+		_opaque_refs[key] = "lab.%s.%s" % [
+			category, Crypto.new().generate_random_bytes(12).hex_encode()
+		]
+	return _opaque_refs[key]
+
+
+func _view_reading(ref: String, category: String, point: Vector2i, properties: Dictionary = {}) -> Dictionary:
+	var delta := point - _anima
+	var forward: int = delta.x * _facing.x + delta.y * _facing.y
+	var right := delta.x * (-_facing.y) + delta.y * _facing.x
+	return {
+		"entity_ref": ref, "category": category,
+		"bearing_mdeg": roundi(rad_to_deg(atan2(float(right), float(forward))) * 1000.0),
+		"range_milli_cells": roundi(sqrt(float(delta.x * delta.x + delta.y * delta.y)) * 1000.0),
+		"properties": properties,
+	}
+
+
+func _observation_view() -> Dictionary:
+	_sample_seq += 1
+	var readings: Array[Dictionary] = []
+	for wall in _walls:
+		if _view_visible(wall):
+			readings.append(_view_reading(_opaque_ref(wall, "surface"), "surface", wall))
+	if _view_visible(_shortcut):
+		readings.append(_view_reading("lab.obstacle.shortcut", "obstacle", _shortcut))
+	for obstacle in _obstacles:
+		if _view_visible(obstacle):
+			readings.append(_view_reading(
+				_opaque_ref(obstacle, "obstacle"), "obstacle", obstacle
+			))
+	if _view_visible(_item):
+		var owner := {
+			"status": "absent" if _item_owner == "" else "known",
+			"value": null if _item_owner == "" else _item_owner,
+		}
+		readings.append(_view_reading("lab.item.crate", "item", _item, {"owner": owner}))
+	if _view_visible(_delivery):
+		readings.append(_view_reading("lab.zone.delivery", "zone", _delivery))
+	if _view_visible(_landmark):
+		readings.append(_view_reading("lab.landmark.marker", "landmark", _landmark))
+	var sample_id := "worldobs:%s:%d:%d" % [_world_instance_id, _epoch, _sample_seq]
+	var sample := {
+		"schema": VIEW_SCHEMA,
+		"world_instance_id": _world_instance_id, "epoch": _epoch,
+		"revision": _revision, "tick": _tick,
+		"sample_seq": _sample_seq, "sample_id": sample_id,
+		"observer_ref": "lab.actor.anima", "source_ref": "lab.sensor.anima.vision",
+		"coverage": {
+			"kind": "view_cone", "fov_degrees": VIEW_FOV_DEGREES,
+			"range_limit": "none", "occlusion": "opaque_grid_cells",
+		},
+		"readings": readings,
+	}
+	_last_sample = sample.duplicate(true)
+	return sample
+
+
 # E1.3 experimental world effects: the world validates the DTO independently of Python.
 # No goal/task authority is accepted here. Operator cannot use agent act.
 func _valid_ref(value: Variant) -> bool:
@@ -307,7 +410,13 @@ func _valid_e13_action(req: Dictionary) -> bool:
 			"observation_id", "operation_id", "action_type", "arguments"]:
 		if not action.has(key):
 			return false
-	if action["schema"] != ACTION_SCHEMA or not _valid_ref(action["operation_id"]):
+	var kind = action["action_type"]
+	if _egocentric and kind in ["world.turn", "world.step"]:
+		if action["schema"] != VIEW_ACTION_SCHEMA:
+			return false
+	elif action["schema"] != ACTION_SCHEMA:
+		return false
+	if not _valid_ref(action["operation_id"]):
 		return false
 	if typeof(action["world_instance_id"]) != TYPE_STRING or not _valid_uint(action["epoch"]) or not _valid_uint(action["expected_revision"]):
 		return false
@@ -316,8 +425,12 @@ func _valid_e13_action(req: Dictionary) -> bool:
 	if typeof(action["arguments"]) != TYPE_DICTIONARY:
 		return false
 	var args: Dictionary = action["arguments"]
-	if action["action_type"] == "world.move":
-		return args.size() == 1 and typeof(args.get("direction")) == TYPE_STRING and args["direction"] in ["N", "S", "E", "W"]
+	if kind == "world.turn":
+		return _egocentric and args.size() == 1 and args.get("direction") in ["left", "right"]
+	if kind == "world.step":
+		return _egocentric and args.size() == 1 and args.get("direction") == "forward"
+	if kind == "world.move":
+		return not _egocentric and args.size() == 1 and typeof(args.get("direction")) == TYPE_STRING and args["direction"] in ["N", "S", "E", "W"]
 	if action["action_type"] in ["world.pick", "world.drop"]:
 		return args.size() == 1 and _valid_ref(args.get("item_ref")) and args["item_ref"] == "lab.item.crate"
 	return false
@@ -327,7 +440,7 @@ func _valid_e13_action(req: Dictionary) -> bool:
 # A digest identifies the exact intended action including epoch, revision and sample.
 func _action_digest(action: Dictionary) -> String:
 	var argument: String = ""
-	if action["action_type"] == "world.move":
+	if action["action_type"] in ["world.move", "world.turn", "world.step"]:
 		argument = action["arguments"]["direction"]
 	else:
 		argument = action["arguments"]["item_ref"]
@@ -416,7 +529,22 @@ func _act(req: Dictionary, request_id: int) -> Dictionary:
 	var args: Dictionary = action["arguments"]
 	var applied := false
 	var reason := "blocked"
-	if kind == "world.move":
+	if kind == "world.turn":
+		if args["direction"] == "left":
+			_facing = Vector2i(_facing.y, -_facing.x)
+		else:
+			_facing = Vector2i(-_facing.y, _facing.x)
+		applied = true
+	elif kind == "world.step":
+		var destination := _anima + _facing
+		if _inside(destination) and not _blocked(destination):
+			_anima = destination
+			if _item_owner == "lab.actor.anima":
+				_item = destination
+			applied = true
+		else:
+			reason = "occupied"
+	elif kind == "world.move":
 		var delta := Vector2i.ZERO
 		match args["direction"]:
 			"N":
@@ -576,6 +704,9 @@ func _request(line: String) -> Dictionary:
 	if op == "hello" and req.size() == 4:
 		# The observer sees only observe, even if this world has effects.
 		var caps: Array[String] = ["observe"]
+		if _egocentric:
+			caps.clear()
+			caps.append("observe_view")
 		if _guarded:
 			if authority == "operator":
 				caps = ["inspect", "reset", "set_obstacle"]
@@ -601,7 +732,9 @@ func _request(line: String) -> Dictionary:
 			greeting["seed"] = _seed
 		return _reply(request_id, true, greeting)
 	if role == "agent":
-		if op == "observe" and req.size() == 4 and (not _guarded or authority == "observer"):
+		if op == "observe_view" and _egocentric and req.size() == 4 and authority == "observer":
+			return _reply(request_id, true, _observation_view())
+		if op == "observe" and not _egocentric and req.size() == 4 and (not _guarded or authority == "observer"):
 			return _reply(request_id, true, _observation())
 		if op == "act" and _effects_enabled and (not _guarded or authority == "executor"):
 			return _act(req, request_id)
