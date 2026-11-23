@@ -8,7 +8,7 @@ Requires Godot 4.7.2 and is safe only on an isolated loopback test machine.
 from __future__ import annotations
 
 import argparse
-import copy
+from contextlib import nullcontext
 import json
 import socket
 import subprocess
@@ -370,11 +370,15 @@ def restart_boundary(binary: str, seed: int, logdir: Path) -> dict:
 def main() -> int:
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument("--godot", required=True)
+    p.add_argument("--evidence-dir", help="persistent folder for raw Godot logs")
     args = p.parse_args()
     godot = _binary(args.godot)
     try:
-        with tempfile.TemporaryDirectory(prefix="anima-e1min-audit-") as directory:
+        workspace = (nullcontext(args.evidence_dir) if args.evidence_dir else
+                     tempfile.TemporaryDirectory(prefix="anima-e1min-audit-"))
+        with workspace as directory:
             tmp = Path(directory)
+            tmp.mkdir(parents=True, exist_ok=True)
             mode_checks = capabilities(godot, 7, tmp)
             traces = [
                 complete_route(godot, seed, route, tmp)
