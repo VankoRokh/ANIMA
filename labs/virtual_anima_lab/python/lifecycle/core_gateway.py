@@ -10,6 +10,8 @@ NOT a sandbox for arbitrary Python code with network/socket permissions.
 """
 from __future__ import annotations
 
+import hashlib
+import json
 import re
 import sqlite3
 from contextlib import closing
@@ -41,6 +43,25 @@ CREATE TABLE IF NOT EXISTS e21_world_binding (
 );
 """
 
+# E2.2: optional additive capture journal. Full original sensor snapshots are
+# committed in the SAME SQLite transaction as the monotonic sample cursor.
+# This table is NOT a competing Core event log or Belief/Knowledge authority.
+_CAPTURE_SCHEMA = """
+CREATE TABLE IF NOT EXISTS e22_raw_capture (
+    sample_id TEXT PRIMARY KEY,
+    world_instance_id TEXT NOT NULL,
+    epoch INTEGER NOT NULL CHECK(epoch > 0),
+    sample_seq INTEGER NOT NULL CHECK(sample_seq > 0),
+    revision INTEGER NOT NULL CHECK(revision >= 0),
+    tick INTEGER NOT NULL CHECK(tick >= 0),
+    snapshot_json TEXT NOT NULL,
+    snapshot_sha256 TEXT NOT NULL,
+    event_id TEXT,
+    UNIQUE(world_instance_id,epoch,sample_seq),
+    CHECK (length(snapshot_sha256) = 64)
+);
+"""
+
 
 class WorldBoundaryError(RuntimeError):
     """Fail closed. Do not retry effects or silently rebind another world."""
@@ -63,12 +84,12 @@ class CoreBoundObservationGateway:
     An observed incarnation/epoch is persistently pinned and never auto-reset.
     """
 
-    __slots__ = ("_core", "_port", "_timeout", "_client_factory", "_dbfile", "_observer_key")
+    __slots__ = ("_core", "_port", "_timeout", "_client_factory", "_dbfile", "_observer_key", "_capture_raw")
 
     def __init__(
         self, core: CoreAssembly, *, observer_key: str,
         port: int = 46029, timeout: float = 3.0,
-        client_factory: Callable = LabClient,
+        client_factory: Callable = LabClient, capture_raw: bool = False,
     ) -> None:
         if type(core) is not CoreAssembly:
             raise TypeError("E2.1 requires a CoreAssembly from the existing composition root")
@@ -92,12 +113,15 @@ class CoreBoundObservationGateway:
         if (type(observer_key) is not str or
                 re.fullmatch(r"[A-Za-z0-9_-]{32,128}", observer_key) is None):
             raise ValueError("guarded E2.1 requires a strong observer-only bearer key")
+        if type(capture_raw) is not bool:
+            raise TypeError("capture_raw must be boolean")
         if not callable(client_factory):
             raise TypeError("client factory must be callable")
         self._core = core
         self._port = port
         self._timeout = timeout
         self._observer_key = observer_key
+        self._capture_raw = capture_raw
         # Only the trusted composition root may provide an alternate factory,
         # e.g. an in-process test double. This is not a plugin extension point.
         self._client_factory = client_factory
@@ -105,6 +129,8 @@ class CoreBoundObservationGateway:
         self._dbfile.parent.mkdir(parents=True, exist_ok=True)
         with closing(self._connect()) as db:
             db.executescript(_SCHEMA)
+            if capture_raw:
+                db.executescript(_CAPTURE_SCHEMA)
 
     def _connect(self) -> sqlite3.Connection:
         db = sqlite3.connect(self._dbfile, timeout=10)
@@ -188,6 +214,27 @@ class CoreBoundObservationGateway:
                         "last_sample_seq=?,last_revision=?,last_tick=? WHERE singleton=1",
                         observed,
                     )
+                if self._capture_raw:
+                    # Canonical bytes are durable BEFORE sample cursor commit.
+                    # Any failure aborts both records, so no observation can
+                    # be consumed without its complete original Raw snapshot.
+                    snapshot = json.dumps(
+                        data, sort_keys=True, separators=(",", ":"),
+                        ensure_ascii=False, allow_nan=False,
+                    )
+                    digest = hashlib.sha256(snapshot.encode("utf-8")).hexdigest()
+                    db.execute(
+                        "INSERT INTO e22_raw_capture("
+                        "sample_id,world_instance_id,epoch,sample_seq,revision,tick,"
+                        "snapshot_json,snapshot_sha256,event_id"
+                        ") VALUES (?,?,?,?,?,?,?,?,NULL)",
+                        (
+                            data["sample_id"], data["world_instance_id"],
+                            data["epoch"], data["sample_seq"],
+                            data["revision"], data["tick"],
+                            snapshot, digest,
+                        ),
+                    )
                 db.commit()
             except BaseException:
                 db.rollback()
@@ -196,8 +243,9 @@ class CoreBoundObservationGateway:
     def observe(self) -> WorldObservation:
         """Return only a sealed local observation; never creates WorldAction.
 
-        No authoritative Raw Event exists until E2.2 records provenance in
-        the existing Core ingress/EventLog and validates producer trust.
+        With capture_raw=True, full evidence and the cursor commit together.
+        That pending snapshot is not a Core Event until the E2.2 outbox
+        service admits it through the existing CoreIngress/EventLog.
         """
         try:
             with self._client() as client:
