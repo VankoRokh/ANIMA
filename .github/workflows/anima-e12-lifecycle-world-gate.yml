@@ -40,8 +40,6 @@ jobs:
     name: Real Godot 4.7.2 / live E1.2 and P5/P6
     runs-on: ubuntu-latest
     timeout-minutes: 25
-    env:
-      E12_REPORT_DIR: ${{ runner.temp }}/anima-e12-evidence
     steps:
       - uses: actions/checkout@v4
         with:
@@ -67,6 +65,8 @@ jobs:
         run: timeout 100s "$GODOT_BIN" --headless --path labs/virtual_anima_lab/godot --editor --import
       - name: Run E1.2 native/live, full regression and P5/P6 recovery gates
         shell: bash
+        env:
+          E12_REPORT_DIR: ${{ runner.temp }}/anima-e12-evidence
         run: bash scripts/run_e12_live_gate.sh
       - name: Preserve E1.2 raw evidence and failure logs
         if: always()
