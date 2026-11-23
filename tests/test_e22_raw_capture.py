@@ -259,7 +259,35 @@ def test_core_identity_collision_does_not_overwrite_captured_receipt(tmp_path):
     # A forged event-id pointer must never pass as a recovered sensor record.
     with pytest.raises(RawCaptureError, match="Core event"):
         service.capture_snapshot(result.observation.sample_id)
+    with pytest.raises(RawCaptureError, match="Core event"):
+        service.recover()
     assert row["snapshot_sha256"] == result.raw_digest
+
+
+@pytest.mark.parametrize("field,spoof", [
+    ("core_instance_id", "unrelated-core-instance"),
+    ("source_ref", "lab.sensor.untrusted"),
+    ("producer_ref", "lab.world.forged"),
+])
+def test_pending_raw_cannot_migrate_to_other_core_or_producer(tmp_path, field, spoof):
+    def crash(stage, _sample):
+        if stage == "after_snapshot_commit":
+            raise RuntimeError("SIMULATED_CRASH")
+
+    service, gateway, core, fake = bundle(tmp_path, hook=crash)
+    with pytest.raises(RuntimeError, match="SIMULATED_CRASH"):
+        service.observe_and_record()
+    with sqlite3.connect(gateway._dbfile) as db:
+        db.execute(f"UPDATE e21_world_binding SET {field}=? WHERE singleton=1", (spoof,))
+    reopened, new_gateway, new_core, new_world = bundle(
+        tmp_path, root=core.data_dir, samples=[],
+    )
+    with pytest.raises(RawCaptureError, match="Core identity/source changed"):
+        reopened.recover()
+    assert len(new_core.event_log.load_events()) == 0
+    assert not new_core.core_events.ingress.pending_event_ids(limit=10)
+    assert capture_rows(new_gateway)[0]["event_id"] is None
+    assert new_world.operations == []
 
 
 def test_constructor_rejects_unregistered_or_legacy_gateway(tmp_path):
