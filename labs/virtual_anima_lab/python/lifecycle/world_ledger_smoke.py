@@ -102,6 +102,16 @@ def _one_run(binary: str, seed: int, logfile: Path) -> dict:
                 else:
                     raise AssertionError("conflicting operation reused same ID")
 
+                # A lookup for an existing ID with changed intent must fail
+                # before it could be misinterpreted as the new action receipt.
+                try:
+                    query_world_operation(recovered, WorldAction(conflict))
+                except LabRejected as exc:
+                    _require(exc.error == "OPERATION_CONFLICT",
+                             "status lookup accepted altered payload")
+                else:
+                    raise AssertionError("forged status lookup returned old receipt")
+
                 wrong = pick.as_dict()
                 wrong["operation_id"] = "e14.missing"
                 missing = query_world_operation(recovered, WorldAction(wrong))
@@ -131,6 +141,7 @@ def _one_run(binary: str, seed: int, logfile: Path) -> dict:
                         world_instance_id=pick.as_dict()["world_instance_id"],
                         epoch=pick.as_dict()["epoch"],
                         operation_id=pick.as_dict()["operation_id"],
+                        action=pick.as_dict(),
                     )
                 except LabRejected as exc:
                     _require(exc.error == "UNKNOWN_OPERATION",
