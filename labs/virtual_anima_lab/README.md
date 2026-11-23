@@ -210,7 +210,7 @@ Runner повторяет E1.2–E1.4 и независимый E1-min, зате
 
 **Статус: `PASS_LAB_RAW_POINTER`**, [проверенный CI](https://github.com/VankoRokh/ANIMA/actions/runs/45175700030) — 2392 full pytest PASS на Python 3.12–3.14 и Godot 4.7.2, `E2_2_LIVE_GATE_PASS` на seed 7/8. **Релизный код ANIMA не изменён.**
 
-`CoreBoundObservationGateway(..., capture_raw=True)` сохраняет весь immutable `WorldObservation` и SHA-256 в таблице `e22_raw_capture` *в той же SQLite-транзакции*, что и фиксацию sample-кроме. `E22RawCaptureService` восстанавливает ещё не переданные снимки, записывает Core event `snapshot_digest` через обычный `CoreIngress` и дожидается `CoreEventDispatcher` receipt. При повторе после аварии уже существующий `event_id` не дублируется.
+`CoreBoundObservationGateway(..., capture_raw=True)` сохраняет весь immutable `WorldObservation` и SHA-256 в таблице `e22_raw_capture` *в той же SQLite-транзакции*, что и фиксацию sample-курсора. `E22RawCaptureService` восстанавливает ещё не переданные снимки, записывает Core event `snapshot_digest` через обычный `CoreIngress` и дожидается `CoreEventDispatcher` receipt. При повторе после аварии уже существующий `event_id` не дублируется.
 
 ```bash
 GODOT_BIN="$HOME/.local/opt/godot/Godot_v4.7.2-stable_linux.x86_64"
