@@ -26,6 +26,7 @@
 | ANIMA v0.2 / Continuous Lifecycle | Research / Proposed: эксперимент E0–E6, вне релизных контрактов | [План эксперимента](continuous-lifecycle-v02.md) |
 | E1.1 / World DTOs | Implemented / Lab-only / PARTIAL: типизированные world contracts и локальные unit tests; интеграция с Godot не проверена | [Граница контрактов E1.1](e1-world-contracts-v02.md) |
 | E1.2 / LifecycleWorld | **Validated Lab / E1.2 PASS** (Godot 4.7.2, Python 3.12–3.14, P5/P6, M2); **E1-min ещё не принят**, агентские эффекты отложены до E1.3/E1.4 | [Первый мир и доказательства E1.2](e1-lifecycle-world-v02.md) |
+| E1.3 / Virtual effects & readback | **Validated Lab / E1.3 PASS:** opt-in `world.move/pick/drop`, свежий sensor proof; E1.4 ledger/recovery и E1-min ещё не приняты | [Действия мира E1.3](e1-world-effects-v02.md) |
 | Core P0–P6 и аудит B1–B4 | Исправления и независимые ограничения; исторический путь реализации | [История Core](../history/core-v0.1.md) |
 | Pi, FAST/DEEP/SLEEP, perception, метапамять | Отдельные пробы и будущие варианты; не навязаны Foundation | [Аппаратные и дальнейшие направления](future-directions.md) |
 
