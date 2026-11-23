@@ -410,7 +410,13 @@ func _valid_e13_action(req: Dictionary) -> bool:
 			"observation_id", "operation_id", "action_type", "arguments"]:
 		if not action.has(key):
 			return false
-	if action["schema"] != ACTION_SCHEMA or not _valid_ref(action["operation_id"]):
+	var kind = action["action_type"]
+	if _egocentric and kind in ["world.turn", "world.step"]:
+		if action["schema"] != VIEW_ACTION_SCHEMA:
+			return false
+	elif action["schema"] != ACTION_SCHEMA:
+		return false
+	if not _valid_ref(action["operation_id"]):
 		return false
 	if typeof(action["world_instance_id"]) != TYPE_STRING or not _valid_uint(action["epoch"]) or not _valid_uint(action["expected_revision"]):
 		return false
@@ -419,7 +425,11 @@ func _valid_e13_action(req: Dictionary) -> bool:
 	if typeof(action["arguments"]) != TYPE_DICTIONARY:
 		return false
 	var args: Dictionary = action["arguments"]
-	if action["action_type"] == "world.move":
+	if kind == "world.turn":
+		return _egocentric and args.size() == 1 and args.get("direction") in ["left", "right"]
+	if kind == "world.step":
+		return _egocentric and args.size() == 1 and args.get("direction") == "forward"
+	if kind == "world.move":
 		return args.size() == 1 and typeof(args.get("direction")) == TYPE_STRING and args["direction"] in ["N", "S", "E", "W"]
 	if action["action_type"] in ["world.pick", "world.drop"]:
 		return args.size() == 1 and _valid_ref(args.get("item_ref")) and args["item_ref"] == "lab.item.crate"
@@ -430,7 +440,7 @@ func _valid_e13_action(req: Dictionary) -> bool:
 # A digest identifies the exact intended action including epoch, revision and sample.
 func _action_digest(action: Dictionary) -> String:
 	var argument: String = ""
-	if action["action_type"] == "world.move":
+	if action["action_type"] in ["world.move", "world.turn", "world.step"]:
 		argument = action["arguments"]["direction"]
 	else:
 		argument = action["arguments"]["item_ref"]
@@ -519,7 +529,22 @@ func _act(req: Dictionary, request_id: int) -> Dictionary:
 	var args: Dictionary = action["arguments"]
 	var applied := false
 	var reason := "blocked"
-	if kind == "world.move":
+	if kind == "world.turn":
+		if args["direction"] == "left":
+			_facing = Vector2i(_facing.y, -_facing.x)
+		else:
+			_facing = Vector2i(-_facing.y, _facing.x)
+		applied = true
+	elif kind == "world.step":
+		var destination := _anima + _facing
+		if _inside(destination) and not _blocked(destination):
+			_anima = destination
+			if _item_owner == "lab.actor.anima":
+				_item = destination
+			applied = true
+		else:
+			reason = "occupied"
+	elif kind == "world.move":
 		var delta := Vector2i.ZERO
 		match args["direction"]:
 			"N":
@@ -678,7 +703,7 @@ func _request(line: String) -> Dictionary:
 		req.erase("auth")
 	if op == "hello" and req.size() == 4:
 		# The observer sees only observe, even if this world has effects.
-		var caps: Array[String] = ["observe"]
+		var caps: Array[String] = ["observe_view"] if _egocentric else ["observe"]
 		if _guarded:
 			if authority == "operator":
 				caps = ["inspect", "reset", "set_obstacle"]
@@ -704,7 +729,9 @@ func _request(line: String) -> Dictionary:
 			greeting["seed"] = _seed
 		return _reply(request_id, true, greeting)
 	if role == "agent":
-		if op == "observe" and req.size() == 4 and (not _guarded or authority == "observer"):
+		if op == "observe_view" and _egocentric and req.size() == 4 and authority == "observer":
+			return _reply(request_id, true, _observation_view())
+		if op == "observe" and not _egocentric and req.size() == 4 and (not _guarded or authority == "observer"):
 			return _reply(request_id, true, _observation())
 		if op == "act" and _effects_enabled and (not _guarded or authority == "executor"):
 			return _act(req, request_id)
