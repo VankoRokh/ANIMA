@@ -23,6 +23,7 @@ from anima.core.assembly import CoreAssembly
 from anima.execution.contracts import ActionSpec, ExecutionAction, VerificationSpec
 from anima.execution.store import ExecutionStore
 from anima.execution.sandbox import SandboxExecutor
+from anima.tasks.store import TaskStore
 
 
 def _now() -> str:
@@ -75,8 +76,6 @@ class CoreSpatialActionGateway:
     ):
         if not isinstance(core, CoreAssembly) or core.core_events is None:
             raise CoreSpatialAdmissionError("CoreAssembly requires registered CoreIngress")
-        if core.core_decision is None:
-            raise CoreSpatialAdmissionError("CoreAssembly requires shared Core TaskStore")
         if not isinstance(store, ExecutionStore) or not isinstance(registry, ToolRegistry):
             raise TypeError("Stage6 ExecutionStore and exact ToolRegistry required")
         if not isinstance(executor, SandboxExecutor) or executor.store is not store or executor.registry is not registry:
@@ -105,7 +104,13 @@ class CoreSpatialActionGateway:
         self.producer_ref = producer_ref
         self.subject_ref = subject_ref
         self.predicate_ref = predicate_ref
-        self.tasks = core.core_decision.tasks
+        # TaskStore's canonical database is shared with CoreGoalDecision when
+        # that optional decision module exists. Do not force a dummy Goal
+        # action registry merely to obtain the real Stage6 Task store.
+        self.tasks = (
+            core.core_decision.tasks if core.core_decision is not None
+            else TaskStore(core.data_dir / "tasks.db")
+        )
         self.goals = core.internal_state.goals
 
     def _raw(self, proof: SpatialSourceProof) -> dict:
