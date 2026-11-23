@@ -342,6 +342,59 @@ def complete_route(binary: str, seed: int, route: str, logdir: Path) -> dict:
         }
 
 
+def capacity_blackbox(binary: str, seed: int, logdir: Path) -> dict:
+    """Independent TCP capacity check (not a Godot private-method shortcut)."""
+    with RunningWorld(
+        binary, seed, ["--lifecycle-effects", "--lifecycle-ledger"],
+        logdir / "capacity-live.log",
+    ) as world:
+        client = world.client
+        assert client is not None
+        baseline = observe(client)
+        first_action = None
+        first_receipt = None
+        for i in range(256):
+            intended = action(
+                baseline, f"e1min.capacity.{i:03d}",
+                "world.drop", {"item_ref": "lab.item.crate"},
+            )
+            receipt = WorldReceipt(client.call("act", action=intended.as_dict())["data"])
+            require(receipt.as_dict()["status"] == "BLOCKED",
+                    f"capacity probe {i}: unexpectedly applied effect")
+            if i == 0:
+                first_action = intended
+                first_receipt = receipt
+        assert first_action is not None and first_receipt is not None
+        overflow = action(
+            baseline, "e1min.capacity.overflow", "world.drop",
+            {"item_ref": "lab.item.crate"},
+        )
+        tick_before = client.call("hello")["tick"]
+        rejected(client, "OPERATION_CAPACITY", "act", action=overflow.as_dict())
+        require(client.call("hello")["tick"] == tick_before,
+                "rejected capacity overflow mutated world tick")
+        stored = query_world_operation(client, first_action)
+        require(stored.state == "RECORDED" and
+                stored.receipt.as_dict() == first_receipt.as_dict(),
+                "full ledger lost first receipt")
+        replayed = WorldReceipt(client.call("act", action=first_action.as_dict())["data"])
+        require(replayed.as_dict()["replayed"] and
+                replayed.as_dict()["status"] == "BLOCKED",
+                "blocked replay failed under capacity")
+        require(client.call("hello")["tick"] == tick_before,
+                "replay under capacity changed tick")
+        unknown = query_world_operation(client, overflow)
+        require(unknown.state == "UNKNOWN" and not unknown.safe_to_reissue,
+                "overflow acquired fake ledger record")
+        final = observe(client).as_dict()
+        require(final["revision"] == baseline.as_dict()["revision"] and
+                final["self_position"] == baseline.as_dict()["self_position"],
+                "capacity probe changed virtual actor")
+        return {"capacity": 256, "blocked_recorded": 256,
+                "overflow": "OPERATION_CAPACITY",
+                "old_receipt_preserved": True, "no_effects": True}
+
+
 def restart_boundary(binary: str, seed: int, logdir: Path) -> dict:
     """Process restart changes world identity; no cross-incarnation replay."""
     flags = ["--lifecycle-effects", "--lifecycle-ledger"]
@@ -384,6 +437,7 @@ def main() -> int:
                 complete_route(godot, seed, route, tmp)
                 for seed in (7, 8) for route in ("top", "bottom")
             ]
+            capacity = capacity_blackbox(godot, 7, tmp)
             restarts = restart_boundary(godot, 7, tmp)
         print(json.dumps({
             "schema": "anima.e1min.independent_lab_audit/0.1",
@@ -391,6 +445,7 @@ def main() -> int:
             "capability_profiles": mode_checks,
             "routes": traces,
             "process_restart": restarts,
+            "capacity_blackbox": capacity,
             "core_connected": False,
             "model_used": False,
             "physical_effects_tested": False,
