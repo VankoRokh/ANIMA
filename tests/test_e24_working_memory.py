@@ -127,6 +127,33 @@ def test_memory_retrieves_prior_object_without_claiming_absence(tmp_path, monkey
     assert db_query(tmp_path, "SELECT COUNT(*) FROM e24_mentions")[0][0] == 4
 
 
+def test_bounded_world_context_tracks_unknown_focus_and_retained_history(tmp_path, monkeypatch):
+    fake_sensing(monkeypatch, [
+        sample(1, item=True), sample(2, item=False), sample(3, item=False),
+    ])
+    service = E24WorkingMemory(core(tmp_path), observer())
+    for _ in range(3):
+        service.observe_and_record()
+    focused = service.context_for_cognition(
+        focus_refs=("lab.item.crate", "lab.item.unseen"),
+        max_entities=1, max_relations=0,
+    )
+    assert focused["entities"][0]["entity_ref"] == "lab.item.crate"
+    assert focused["entities"][0]["current_observation"] == "not_observed"
+    assert focused["unresolved_focus_refs"] == ["lab.item.unseen"]
+    assert focused["truncated"] is True
+    assert focused["source_ref"] == SOURCE and focused["provenance_bound"]
+    ablated = service.context_for_cognition(memory_enabled=False)
+    assert "lab.item.crate" not in {e["entity_ref"] for e in ablated["entities"]}
+    for malformed in (
+        {"max_entities": 0}, {"max_entities": True}, {"max_relations": -1},
+        {"focus_refs": ["lab.item.crate"]},
+        {"focus_refs": ("lab.item.crate",) * 2},
+    ):
+        with pytest.raises(ValueError):
+            service.context_for_cognition(**malformed)
+
+
 def test_observed_property_revision_is_not_promoted_to_knowledge(tmp_path, monkeypatch):
     fake_sensing(monkeypatch, [
         sample(1, item=True, item_owner="absent"),
