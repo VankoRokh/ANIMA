@@ -143,3 +143,24 @@ python -m labs.virtual_anima_lab.python.lifecycle.world_smoke --godot "$GODOT_BI
 Agent через `val.bridge/0.2` сейчас может только `hello` и `observe`. Текст маршрута, полная карта, инспекция и управление препятствиями агенту не доступны. Операторские fixture-команды существуют только для изолированного тестового стенда и не аутентифицируют процесс. Реальное `world.move/pick/drop`, admission, effect proof и операции восстановления относятся к E1.3–E1.4.
 
 Дизайн, геометрия и статус проверок: [E1.2](../../docs/RESEARCH/e1-lifecycle-world-v02.md).
+
+## E1.3 — opt-in world.move/pick/drop и сенсорный proof
+
+**Статус:** `Validated Lab / E1.3 PASS` на SHA `e3ec16b90f8dc839364aaf9a5187151f261d101b`. В GitHub Actions `45160793477` — 2347 Python PASS, Godot native/live на seed 7/8 ×2, старые P5/P6, M2. Это лаборатория: нет Core Goal/Task, памяти, FAST или самостоятельного планирования.
+
+По умолчанию `LifecycleWorld` остаётся `observe`-only. Для явного включения трёх виртуальных действий:
+
+```bash
+GODOT_BIN="$HOME/.local/opt/godot/Godot_v4.7.2-stable_linux.x86_64"
+"$GODOT_BIN" --path labs/virtual_anima_lab/godot res://LifecycleWorld.tscn -- \
+  --lifecycle-port 46029 --lifecycle-seed 7 --lifecycle-effects
+
+# В отдельном чистом checkout: полные E1.2/P5/P6 и E1.3 native/live проверки
+bash scripts/run_e13_live_gate.sh "$GODOT_BIN"
+```
+
+Блокирующий receipt не доказывает движение; `verify_world_effect` требует свежий `WorldObservation` и согласованные world/epoch/revision/operation/sample. `delivery_verified=true` относится только к реальному `drop` в наблюдаемой зоне доставки. Старые native/Godot тесты остаются неизменными; после обнаруженного расхождения координат новая нативная проверка дополнительно фиксирует реальную проходимость `(6,2)` и `(6,8)`.
+
+**Граница E1.4:** `operation_id` не может повторно исполниться в текущем процессе, но операция **не** имеет queryable ledger/status, replay и durable recovery. Повтор после потерянного ответа запрещён. `role` по-прежнему самообъявленная роль и не является аутентификацией. Нельзя переносить этот порт на физические устройства или считать его production authority.
+
+Подробности, команды и доказательства: [E1.3](../../docs/RESEARCH/e1-world-effects-v02.md).
