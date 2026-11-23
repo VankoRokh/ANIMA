@@ -53,6 +53,7 @@ def query_world_operation(client, action: WorldAction) -> OperationReconciliatio
     envelope = client.call(
         "operation_status", world_instance_id=data["world_instance_id"],
         epoch=data["epoch"], operation_id=data["operation_id"],
+        action=data,
     )
     status = WorldOperationStatus(envelope["data"])
     return reconcile_world_status(action, status)
