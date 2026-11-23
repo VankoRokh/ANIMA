@@ -380,7 +380,7 @@ func _observation_view() -> Dictionary:
 		"world_instance_id": _world_instance_id, "epoch": _epoch,
 		"revision": _revision, "tick": _tick,
 		"sample_seq": _sample_seq, "sample_id": sample_id,
-		"observer_ref": "lab.actor.anima", "source_ref": "lab.sensor.anima.proximity",
+		"observer_ref": "lab.actor.anima", "source_ref": "lab.sensor.anima.vision",
 		"coverage": {
 			"kind": "view_cone", "fov_degrees": VIEW_FOV_DEGREES,
 			"range_limit": "none", "occlusion": "opaque_grid_cells",
@@ -430,7 +430,7 @@ func _valid_e13_action(req: Dictionary) -> bool:
 	if kind == "world.step":
 		return _egocentric and args.size() == 1 and args.get("direction") == "forward"
 	if kind == "world.move":
-		return args.size() == 1 and typeof(args.get("direction")) == TYPE_STRING and args["direction"] in ["N", "S", "E", "W"]
+		return not _egocentric and args.size() == 1 and typeof(args.get("direction")) == TYPE_STRING and args["direction"] in ["N", "S", "E", "W"]
 	if action["action_type"] in ["world.pick", "world.drop"]:
 		return args.size() == 1 and _valid_ref(args.get("item_ref")) and args["item_ref"] == "lab.item.crate"
 	return false
