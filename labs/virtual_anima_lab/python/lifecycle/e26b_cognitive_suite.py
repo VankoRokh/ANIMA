@@ -14,6 +14,7 @@ from pathlib import Path
 from urllib.parse import urlsplit
 
 from labs.virtual_anima_lab.python.cognition.native_lab import NativeLabAdapter
+from labs.virtual_anima_lab.python.cognition.completion import CompletionRequirement, evaluate_completion
 
 CRATE = "lab.item.crate"
 SHORTCUT = "lab.obstacle.shortcut"
@@ -97,6 +98,17 @@ def assess(case, report, trace, calls):
             "output_tokens": [c.get("output_tokens") for c in calls]}
 
 
+def information_requirement(case):
+    # Trusted fixture mapping, not model input or a natural language parser.
+    if case["kind"] == "positive":
+        return CompletionRequirement("verified_observation", entities=case["targets"])
+    if case["kind"] == "negative":
+        return CompletionRequirement("empty_search", query=case["query"])
+    if case["kind"] == "no_tool":
+        return CompletionRequirement("no_service_read")
+    raise ValueError("unknown case kind")
+
+
 def run_cases(memory, coordinator, root, seed, *, base_url, model, check_world, check_core,
               variant="baseline", selected_cases=None):
     historical = {r["entity_ref"]: r for r in memory.world_model()["entities"]}
@@ -126,7 +138,8 @@ def run_cases(memory, coordinator, root, seed, *, base_url, model, check_world, 
                   "variant": variant,
                   "memory_enabled": case["enabled"], "world_unchanged": world_ok,
                   "canonical_baseline_unchanged": core_ok,
-                  **assess(case, report, trace, adapter.calls)}
+                  **assess(case, report, trace, adapter.calls),
+                  "information_completion": evaluate_completion(information_requirement(case), report, trace)}
         if not case["enabled"] and CRATE in result["verified_entities"]:
             raise AssertionError("memory ablation exposed crate history")
         (root / f"{turn_id}-result.json").write_text(
@@ -184,6 +197,8 @@ def main():
               "strict_operation_passes":sum(r["strict_operation_gate_pass"] for r in results),
               "feedback_deliveries":sum(r["feedback_deliveries"] for r in results),
               "recovered_objectives":sum(r["recovered_objective"] for r in results),
+              "information_requirements_satisfied":sum(r["information_completion"]["information_requirement_satisfied"] for r in results),
+              "model_stopped_with_missing_information":sum(r["information_completion"]["model_stopped"] and not r["information_completion"]["information_requirement_satisfied"] for r in results),
               "semantic_review":"PENDING", "results":results}
     (out / "e26b-results.json").write_text(json.dumps(report, indent=2), encoding="utf-8")
     print(json.dumps(report), flush=True)
