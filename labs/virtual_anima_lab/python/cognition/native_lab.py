@@ -110,6 +110,14 @@ class NativeLabAdapter:
         self.pending = None
         self.allowed_ids = set()
         self.binding = None
+        self._resuming = False
+
+    def resume_after_stop(self, *, turn_id, context_snapshot_id, feedback):
+        if (self.binding != (turn_id, context_snapshot_id) or self.session is None
+                or self.pending is not None or self.rejected_pending is not None):
+            raise ValueError('continuation does not bind stopped turn')
+        self.session.resume_after_stop(feedback)
+        self._resuming = True
 
     def propose(self, context, outcomes, *, turn_id, step_index):
         binding = (turn_id, context["context_snapshot_id"])
@@ -144,8 +152,9 @@ class NativeLabAdapter:
                 argument_feedback=self.error_feedback,
                 user_prompt=canonical(prompt_context))
         elif (self.binding != binding or len(outcomes) != step_index
-              or (self.pending is None and self.rejected_pending is None)):
+              or (self.pending is None and self.rejected_pending is None and not self._resuming)):
             raise ValueError("invalid native turn continuation")
+        self._resuming = False
         if self.rejected_pending is not None:
             descriptor, previous_step, reason_code = self.rejected_pending
             outcome = outcomes[-1]
@@ -240,6 +249,7 @@ class NativeLabAdapter:
                               temporal=self.temporal, compact_temporal=self.compact_temporal,
                               error_feedback=self.error_feedback,
                               turn_id=turn_id, step_index=step_index,
+                              model_call_index=len(self.calls),
                               context_snapshot_id=binding[1])
                 self.calls.append(record)
                 with self.trace_path.open("a", encoding="utf-8") as stream:

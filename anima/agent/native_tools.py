@@ -157,6 +157,21 @@ class NativeToolSession:
         self.seen_ids = set()
         self.calls = []
         self.terminal = False
+        self.continuation_used = False
+
+    def resume_after_stop(self, feedback):
+        """Host-only bounded continuation of a valid final response."""
+        if (not self.terminal or self.pending is not None or self.continuation_used
+                or not self.calls or not self.calls[-1].get('valid')
+                or not self.calls[-1].get('final_text')):
+            raise ValueError('no resumable model stop')
+        content = canonical(feedback)
+        if len(content.encode('utf-8')) > 2048:
+            raise ValueError('continuation feedback exceeds byte budget')
+        self.messages.append({'role':'assistant', 'content':self.calls[-1]['final_text']})
+        self.messages.append({'role':'user', 'content':content})
+        self.continuation_used = True
+        self.terminal = False
 
     def next(self):
         if self.pending is not None or self.terminal:
