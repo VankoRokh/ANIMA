@@ -34,6 +34,19 @@ def canonical(value):
                       separators=(",", ":"))
 
 
+class NativeArgumentError(ValueError):
+    """Well-formed JSON arguments rejected by a known tool's input contract."""
+    def __init__(self, descriptor, cause):
+        super().__init__(str(cause))
+        self.descriptor = descriptor
+
+
+RECOVERABLE_TOOL_ERRORS = {
+    "UNEXPOSED_EVIDENCE_ID": "Use only event IDs already exposed in observations or completed search results. You may choose another available information tool or stop with uncertainty.",
+    "INVALID_TOOL_ARGUMENTS": "Arguments do not match the tool input schema. Inspect the available tool definitions, choose valid arguments or stop with uncertainty.",
+}
+
+
 class NativeToolCatalog:
     """Detached registry snapshot. Exact, collision-checked wire-name mapping."""
 
@@ -83,10 +96,13 @@ class NativeToolCatalog:
         args = strict_json(arguments)
         descriptor = self._by_wire[name]
         fields = self._set_fields[name]
-        if fields:
-            validate_instance(args, validate_schema(self._wire_schemas[name], input_schema=True))
-            args = {**args, **{field: list(dict.fromkeys(args[field])) for field in fields}}
-        descriptor.validate_input(args)
+        try:
+            if fields:
+                validate_instance(args, validate_schema(self._wire_schemas[name], input_schema=True))
+                args = {**args, **{field: list(dict.fromkeys(args[field])) for field in fields}}
+            descriptor.validate_input(args)
+        except ValueError as exc:
+            raise NativeArgumentError(descriptor, exc) from exc
         return descriptor, args
 
 
@@ -124,10 +140,14 @@ class NativeToolSession:
     """One model conversation; caller submits only verified tool results."""
 
     def __init__(self, catalog, *, model, system_prompt, user_prompt, transport,
-                 first_tool_required=False):
+                 first_tool_required=False, argument_feedback=False):
         if type(first_tool_required) is not bool:
             raise TypeError('first_tool_required must be boolean')
         self.first_tool_required = first_tool_required
+        if type(argument_feedback) is not bool:
+            raise TypeError("argument_feedback must be boolean")
+        self.argument_feedback = argument_feedback
+        self.pending_error = None
         self.catalog = catalog
         self.model = model
         self.transport = transport
@@ -196,7 +216,21 @@ class NativeToolSession:
             fn = call["function"]
             if type(fn) is not dict or set(fn) != {"name", "arguments"}:
                 raise ValueError("invalid function fields")
-            descriptor, args = self.catalog.decode(fn["name"], fn["arguments"])
+            try:
+                descriptor, args = self.catalog.decode(fn["name"], fn["arguments"])
+            except NativeArgumentError as exc:
+                if not self.argument_feedback:
+                    raise
+                descriptor = exc.descriptor
+                self.seen_ids.add(call_id)
+                self.pending = (call_id, descriptor)
+                self.pending_error = "INVALID_TOOL_ARGUMENTS"
+                self.messages.append({"role":"assistant", "content":content or "",
+                                      "tool_calls":[call]})
+                record.update(valid=False, error=str(exc), tool_name=descriptor.name,
+                              tool_call_id=call_id, error_code=self.pending_error,
+                              original_arguments=strict_json(fn["arguments"]))
+                return descriptor, None
             original_args = strict_json(fn["arguments"])
             record.update(original_arguments=original_args,
                           arguments_normalized=original_args != args)
@@ -216,8 +250,9 @@ class NativeToolSession:
             self.calls.append(record)
 
     def submit_result(self, descriptor, result):
-        if self.pending is None or self.pending[1] is not descriptor or self.terminal:
-            raise ValueError("result does not bind pending tool")
+        if (self.pending is None or self.pending[1] is not descriptor or self.terminal
+                or self.pending_error is not None):
+            raise ValueError("result does not bind valid pending tool")
         descriptor.validate_output(result)
         content = canonical(result)
         if len(content.encode("utf-8")) > 16384:
@@ -235,10 +270,12 @@ class NativeToolSession:
         """
         if self.pending is None or self.pending[1] is not descriptor or self.terminal:
             raise ValueError("error does not bind pending tool")
-        if reason_code != "UNEXPOSED_EVIDENCE_ID":
-            raise ValueError("unsupported recoverable rejection")
+        expected = self.pending_error or "UNEXPOSED_EVIDENCE_ID"
+        if reason_code != expected or reason_code not in RECOVERABLE_TOOL_ERRORS:
+            raise ValueError("unsupported or mismatched recoverable rejection")
         self.messages.append({"role": "tool", "tool_call_id": self.pending[0],
             "content": canonical({"status": "rejected", "error_code": reason_code,
                                   "execution_performed": False,
-                                  "message": "Use only event IDs already exposed in observations or completed search results."})})
+                                  "message": RECOVERABLE_TOOL_ERRORS[reason_code]})})
         self.pending = None
+        self.pending_error = None

@@ -300,3 +300,35 @@ def test_native_denial_binds_tool_call_and_does_not_change_authority():
     feedback = fake.requests[-1]["messages"][-1]
     assert feedback["role"] == "tool" and feedback["tool_call_id"] == "id1"
     assert json.loads(feedback["content"])["execution_performed"] is False
+
+
+def test_known_argument_error_has_no_valid_result_path():
+    fake = Fake(completion("retrieve_memory", '{"query":"crate","top_k":99}'),
+                completion(content="Cannot continue."))
+    s = NativeToolSession(NativeToolCatalog(lab_registry()), model="test",
+        system_prompt="test",user_prompt="test",transport=fake,argument_feedback=True)
+    descriptor,args = s.next()
+    assert args is None and not s.calls[-1]["valid"]
+    with pytest.raises(ValueError):
+        s.submit_result(descriptor, {})
+    with pytest.raises(ValueError):
+        s.reject_pending(descriptor,reason_code="UNEXPOSED_EVIDENCE_ID")
+    s.reject_pending(descriptor,reason_code="INVALID_TOOL_ARGUMENTS")
+    assert s.next() is None
+    error = json.loads(fake.requests[-1]["messages"][-1]["content"])
+    assert error["error_code"] == "INVALID_TOOL_ARGUMENTS"
+    assert error["execution_performed"] is False
+
+
+@pytest.mark.parametrize("name,args", [
+    ("world_step","{}"),
+    ("retrieve_memory",'{"query":"a","query":"b","top_k":1}'),
+    ("retrieve_memory", '{"query":"a"'),
+])
+def test_unknown_or_malformed_calls_remain_terminal_with_feedback(name,args):
+    fake = Fake(completion(name,args))
+    s = NativeToolSession(NativeToolCatalog(lab_registry()),model="test",
+        system_prompt="test",user_prompt="test",transport=fake,argument_feedback=True)
+    with pytest.raises(ValueError):
+        s.next()
+    assert s.terminal and s.pending is None

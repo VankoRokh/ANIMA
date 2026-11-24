@@ -310,3 +310,45 @@ def test_feedback_uses_last_budget_step_without_extra_model_call(tmp_path, monke
     assert report["status"] == "STEP_BUDGET_EXHAUSTED"
     assert len(adapter.calls) == 1
     assert coord.decision_records("feedback_budget")[0]["admission"] == "REJECTED"
+
+
+@pytest.mark.parametrize("mode", ["stop", "repair", "second_error"])
+def test_schema_feedback_and_model_stop_are_separate_from_objective(tmp_path,monkeypatch,mode):
+    from labs.virtual_anima_lab.python.cognition.native_lab import NativeLabAdapter
+    from labs.virtual_anima_lab.python.cognition import coordinator as module
+    from labs.virtual_anima_lab.python.lifecycle.e26b_cognitive_suite import assess, CASES
+    mem = memory(tmp_path,monkeypatch)
+    reads=[]
+    original=module._read_only_result
+    def observe_read(*args,**kwargs):
+        reads.append(kwargs["kind"])
+        return original(*args,**kwargs)
+    monkeypatch.setattr(module,"_read_only_result",observe_read)
+    def tool(name,args,cid):
+        return {"choices":[{"finish_reason":"tool_calls","message":{"role":"assistant",
+            "content":"","tool_calls":[{"id":cid,"type":"function",
+            "function":{"name":name,"arguments":json.dumps(args)}}]}}]}
+    invalid=tool("retrieve_memory",{"query":"crate","top_k":99},"one")
+    stop={"choices":[{"finish_reason":"stop","message":{"role":"assistant","content":"No accessible history."}}]}
+    responses=iter([invalid,stop] if mode=="stop" else (
+        [invalid,tool("retrieve_memory",{"query":"crate","top_k":1},"two"),stop]
+        if mode=="repair" else [invalid,tool("lookup_raw_evidence",{"event_ids":["ev_hidden"]},"two")]))
+    class Transport:
+        def complete(self,payload):
+            return next(responses)
+    adapter=NativeLabAdapter(base_url="http://127.0.0.1:8085",model="test",
+        trace_path=tmp_path/"schema-feedback.jsonl",task="find crate",
+        transport=Transport(),error_feedback=True)
+    coord=E25LabCognitiveCoordinator(mem,error_feedback=True)
+    report=coord.run_turn(adapter,turn_id="schema_feedback",memory_enabled=False)
+    trace=coord.decision_records("schema_feedback")
+    assert trace[0]["outcome"]["reason_code"]=="INVALID_TOOL_ARGUMENTS"
+    assert trace[0]["outcome"]["execution_performed"] is False
+    assert reads==(["retrieve_memory"] if mode=="repair" else [])
+    assert report["status"]==("REJECTED" if mode=="second_error" else "STOPPED")
+    case=next(c for c in CASES if c["id"]=="C02_OFF")
+    result=assess(case,report,trace,adapter.calls)
+    assert result["feedback_deliveries"]==1
+    assert result["operation_gate_pass"]==(mode=="repair")
+    assert not result["strict_operation_gate_pass"]
+    assert len(mem._core.event_log.load_events())==3

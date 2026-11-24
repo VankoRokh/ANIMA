@@ -54,14 +54,17 @@ def assess(case, report, trace, calls):
     for i, call in enumerate(calls[:-1]):
         if not call.get("feedback_eligible") or call["valid"]:
             continue
+        reason_code = call.get("error_code")
+        if reason_code not in ("UNEXPOSED_EVIDENCE_ID", "INVALID_TOOL_ARGUMENTS"):
+            continue
         denial = any(o.get("step_index") == call.get("step_index")
             and o.get("status") == "REJECTED"
-            and o.get("reason_code") == "UNEXPOSED_EVIDENCE_ID"
+            and o.get("reason_code") == reason_code
             and o.get("execution_performed") is False for o in report["outcomes"])
         messages = calls[i+1].get("request", {}).get("messages", [])
         if denial and messages and messages[-1].get("role") == "tool" and messages[-1].get("tool_call_id") == call.get("tool_call_id"):
             error = json.loads(messages[-1]["content"])
-            if error.get("error_code") == "UNEXPOSED_EVIDENCE_ID" and error.get("execution_performed") is False:
+            if error.get("error_code") == reason_code and error.get("execution_performed") is False:
                 recovered.append(i)
     strict_valid = bool(calls and all(c["valid"] and c["transport_ok"] for c in calls))
     valid = bool(calls and all(c["transport_ok"] and (c["valid"] or i in recovered)
