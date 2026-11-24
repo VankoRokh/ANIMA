@@ -41,7 +41,8 @@ def operator_truth(port, key):
         return client.call("inspect", auth=key)["data"]
 
 
-def case(binary: str, seed: int, root: Path, *, base_url, model, profile, suite=False):
+def case(binary: str, seed: int, root: Path, *, base_url, model, profile, suite=False,
+         suite_variant="baseline", suite_cases=None):
     port = _port()
     keys = tuple(secrets.token_urlsafe(32) for _ in range(3))
     logfile = (root / f"e26a-world-{seed}.log").open("w", encoding="utf-8")
@@ -87,6 +88,7 @@ def case(binary: str, seed: int, root: Path, *, base_url, model, profile, suite=
         if suite:
             from .e26b_cognitive_suite import run_cases
             return run_cases(memory, coordinator, root, seed, base_url=base_url, model=model,
+                             variant=suite_variant, selected_cases=suite_cases,
                              check_world=lambda: operator_truth(port, keys[2]) == world_before,
                              check_core=lambda: len(instance.event_log.load_events()) == 3
                              and instance.memory_store.count() == 0

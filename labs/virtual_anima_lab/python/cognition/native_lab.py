@@ -32,7 +32,7 @@ def _records_schema():
             "items": {"type": "object", "additionalProperties": True}}
 
 
-def lab_registry():
+def lab_registry(*, temporal=False):
     text = {"type": "string"}
     integer = {"type": "integer", "minimum": 0}
     boolean = {"type": "boolean"}
@@ -47,12 +47,16 @@ def lab_registry():
                                    "truncated": boolean, "memory_enabled": boolean}),
             effect_class="read_only", idempotency="repeat_safe"),
         ToolDescriptor(name="lookup_raw_evidence", version="1",
-            description="Verify original captured observations by previously exposed source event IDs.",
+            description=("Verify original captured observations by previously exposed source event IDs. "
+                         "Verification concerns the source sample, not current visibility."
+                         if temporal else "Verify original captured observations by previously exposed source event IDs."),
             input_schema=_object({"event_ids": {"type": "array", "minItems": 1, "maxItems": 16,
                                                 "uniqueItems": True,
                                                 "items": {"type": "string", "minLength": 1,
                                                           "maxLength": 128}}}),
-            output_schema=_object({"kind": text, "records": _records_schema()}),
+            output_schema=_object({"kind": text, "records": _records_schema(),
+                                   **({"as_of_sample_id": text} if temporal else {})},
+                                  required=["kind", "records"]),
             effect_class="read_only", idempotency="repeat_safe"),
     ])
 
@@ -60,8 +64,12 @@ def lab_registry():
 class NativeLabAdapter:
     """Bind native calls to typed lab proposals; no access to service handles."""
     def __init__(self, *, base_url, model, trace_path, task, transport=None, registry=None,
-                 first_tool_required=False):
-        self.catalog = NativeToolCatalog(registry if registry is not None else lab_registry())
+                 first_tool_required=False, canonical_sets=False, temporal=False):
+        self.temporal = temporal
+        self.canonical_sets = canonical_sets
+        self.catalog = NativeToolCatalog(
+            registry if registry is not None else lab_registry(temporal=temporal),
+            set_arguments={("lookup_raw_evidence", "1"): ("event_ids",)} if canonical_sets else None)
         self.transport = transport if transport is not None else LoopbackChatTransport(base_url)
         self.model = model
         self.first_tool_required = first_tool_required
@@ -83,12 +91,21 @@ class NativeLabAdapter:
             self.allowed_ids = {row["last_seen_event_id"] for row in entities
                                 if "last_seen_event_id" in row}
             self.binding = binding
+            prompt_context = {"task": self.task, "observations": entities,
+                              "memory_enabled": context["memory_enabled"],
+                              "coverage": "captured observations only"}
+            if self.temporal:
+                self.latest_sample_id = context["latest_sample_id"]
+                if type(self.latest_sample_id) is not str or not self.latest_sample_id:
+                    raise ValueError("latest captured sample identity required")
+                prompt_context["as_of_latest_sample_id"] = self.latest_sample_id
+                prompt_context["observation_scope"] = "current_observation refers to latest captured sample; not_observed is not absent"
+                for entity, original in zip(entities, (row for row in context["entities"] if row["category"] != "surface")):
+                    entity["last_seen_sample_id"] = original["last_seen_sample"]
             self.session = NativeToolSession(self.catalog, model=self.model,
                 system_prompt=SYSTEM, transport=self.transport,
                 first_tool_required=self.first_tool_required,
-                user_prompt=canonical({"task": self.task, "observations": entities,
-                    "memory_enabled": context["memory_enabled"],
-                    "coverage": "captured observations only"}))
+                user_prompt=canonical(prompt_context))
         elif self.binding != binding or self.pending is None or len(outcomes) != step_index:
             raise ValueError("invalid native turn continuation")
         if self.pending is not None:
@@ -100,6 +117,14 @@ class NativeLabAdapter:
                     or outcome.get("status") != "COMPLETED"):
                 raise ValueError("unverified or mismatched tool outcome")
             result = outcome["result"]
+            descriptor.validate_output(result)
+            if self.temporal and descriptor.name == "lookup_raw_evidence":
+                result = {**result, "as_of_sample_id": self.latest_sample_id,
+                          "records": [{**row, "temporal_scope": (
+                              ("latest_captured_sample" if row["sample_id"] == self.latest_sample_id
+                               else "historical_sample")
+                              if row["status"] == "verified_source_view" else "unverified")}
+                                      for row in result["records"]]}
             self.session.submit_result(descriptor, result)
             if descriptor.name == "retrieve_memory":
                 self.allowed_ids.update(row["last_seen_event_id"] for row in result["records"]
@@ -129,7 +154,8 @@ class NativeLabAdapter:
             return {"invalid_model_output": True}
         finally:
             for record in self.session.calls[before:]:
-                record.update(profile="native", turn_id=turn_id, step_index=step_index,
+                record.update(profile="native", canonical_sets=self.canonical_sets,
+                              temporal=self.temporal, turn_id=turn_id, step_index=step_index,
                               context_snapshot_id=binding[1])
                 self.calls.append(record)
                 with self.trace_path.open("a", encoding="utf-8") as stream:
