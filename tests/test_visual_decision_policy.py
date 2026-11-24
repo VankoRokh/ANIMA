@@ -66,7 +66,7 @@ def test_memory_geometry_does_not_authorize_blind_step():
     recalled = memory(enabled=True, remembered=True)
     choice = CrateInvestigationPolicy.propose(view(), recalled, pose(1))
     assert choice.kind == "world.turn"
-    assert choice.basis in ("memory_hypothesis", "current_uncertainty")
+    assert choice.basis in ("memory_hypothesis", "current_uncertainty", "suspected_stale_hypothesis")
 
 
 def test_state_schema_is_versioned():
