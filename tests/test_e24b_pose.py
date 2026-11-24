@@ -257,7 +257,7 @@ def test_operator_only_world_change_is_not_actor_movement(tmp_path, monkeypatch)
         proof = db.execute(
             "SELECT receipt_json FROM e24b_external_changes"
         ).fetchone()[0]
-    assert "at" not in proof and '"x"' not in proof and '"y"' not in proof
+    assert not {"at", "x", "y", "destination"} & set(json.loads(proof))
 
 
 def test_external_proof_mutation_or_bad_clocks_fail_closed(tmp_path, monkeypatch):
