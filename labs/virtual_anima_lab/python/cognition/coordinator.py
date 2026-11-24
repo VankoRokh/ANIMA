@@ -144,7 +144,8 @@ def _read_only_result(memory: E24WorkingMemory, *, kind: str,
 class E25LabCognitiveCoordinator:
     """Only read-only lab cognition; no independent Core identity or executor."""
 
-    def __init__(self, memory: E24WorkingMemory, *, max_steps: int = 4, ranked=False):
+    def __init__(self, memory: E24WorkingMemory, *, max_steps: int = 4, ranked=False,
+                 error_feedback=False):
         if type(memory) is not E24WorkingMemory:
             raise TypeError("trusted E24WorkingMemory required")
         if type(max_steps) is not int or not 1 <= max_steps <= MAX_STEPS:
@@ -156,6 +157,9 @@ class E25LabCognitiveCoordinator:
         if type(ranked) is not bool:
             raise TypeError("ranked must be boolean")
         self._ranked = ranked
+        if type(error_feedback) is not bool:
+            raise TypeError("error_feedback must be boolean")
+        self._error_feedback = error_feedback
         with closing(memory._connect()) as db:
             db.executescript(_SCHEMA)
 
@@ -220,6 +224,7 @@ class E25LabCognitiveCoordinator:
         context = {**view, "context_snapshot_id": ctx_id}
         frozen = _json(context)
         outcomes = []
+        feedback_used = False
         for step in range(self._max_steps):
             # Reject races/new observations between generated proposals.
             checked = self._memory.context_for_cognition(
@@ -269,6 +274,22 @@ class E25LabCognitiveCoordinator:
             if raw is None:
                 # An empty proposal is an explicit stop and is not a cognitive step.
                 break
+            # Only the opt-in, trusted native adapter can request this bounded
+            # non-execution continuation. It still consumes one turn step.
+            if self._error_feedback and not feedback_used and raw == {
+                    "rejected_native_call": "UNEXPOSED_EVIDENCE_ID"}:
+                from .native_lab import NativeLabAdapter
+                if type(adapter) is NativeLabAdapter and adapter.rejected_pending is not None:
+                    feedback_used = True
+                    self._record(turn=turn_id, step=step, context=frozen,
+                        proposal_id=None, op=None, proposal=None,
+                        admission="REJECTED", reason="UNEXPOSED_EVIDENCE_ID")
+                    output = {"schema":"anima.lab.cognitive_outcome/0.1",
+                        "status":"REJECTED", "reason_code":"UNEXPOSED_EVIDENCE_ID",
+                        "step_index":step, "proposal_id":None, "execution_performed":False}
+                    self._finalize(turn_id, step, output)
+                    outcomes.append(output)
+                    continue
             try:
                 proposal = CognitiveStepProposal(raw).as_dict()
                 if proposal["turn_id"] != turn_id:

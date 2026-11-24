@@ -47,7 +47,25 @@ def assess(case, report, trace, calls):
               if case.get("query", "").lower() in r["proposal"]["arguments"]["query"].lower()
               and not r["outcome"]["result"]["records"]]
     final = calls[-1].get("final_text") if calls else None
-    valid = bool(calls and all(c["valid"] and c["transport_ok"] for c in calls))
+    # A denied call is still invalid. Separate the strict wire metric from
+    # the recovery-aware objective, and require persisted denial plus feedback
+    # in the very next actual model request (never silently repair a call).
+    recovered = []
+    for i, call in enumerate(calls[:-1]):
+        if not call.get("feedback_eligible") or call["valid"]:
+            continue
+        denial = any(o.get("step_index") == call.get("step_index")
+            and o.get("status") == "REJECTED"
+            and o.get("reason_code") == "UNEXPOSED_EVIDENCE_ID"
+            and o.get("execution_performed") is False for o in report["outcomes"])
+        messages = calls[i+1].get("request", {}).get("messages", [])
+        if denial and messages and messages[-1].get("role") == "tool" and messages[-1].get("tool_call_id") == call.get("tool_call_id"):
+            error = json.loads(messages[-1]["content"])
+            if error.get("error_code") == "UNEXPOSED_EVIDENCE_ID" and error.get("execution_performed") is False:
+                recovered.append(i)
+    strict_valid = bool(calls and all(c["valid"] and c["transport_ok"] for c in calls))
+    valid = bool(calls and all(c["transport_ok"] and (c["valid"] or i in recovered)
+                               for i,c in enumerate(calls)))
     stopped = report["status"] == "STOPPED" and bool(final)
     if case["kind"] == "positive":
         objective = set(case["targets"]) <= verified
@@ -59,6 +77,9 @@ def assess(case, report, trace, calls):
     signatures = [json.dumps([r["proposal"]["operation_kind"], r["proposal"]["arguments"]],
                               sort_keys=True) for r in trace if r["proposal"] is not None]
     return {"operation_gate_pass": bool(valid and stopped and objective),
+            "strict_operation_gate_pass": bool(strict_valid and stopped and objective),
+            "feedback_deliveries": len(recovered),
+            "recovered_objective": bool(recovered and valid and stopped and objective),
             "valid_model_outputs": sum(c["valid"] for c in calls),
             "normalized_calls": sum(bool(c.get("arguments_normalized")) for c in calls),
             "strict_wire_valid_outputs": sum(c["valid"] and not c.get("arguments_normalized", False) for c in calls),
@@ -89,9 +110,10 @@ def run_cases(memory, coordinator, root, seed, *, base_url, model, check_world, 
         turn_id = f"suite_{seed}_{case['id']}"
         adapter = NativeLabAdapter(base_url=base_url, model=model,
             trace_path=root / f"{turn_id}-model-calls.jsonl", task=case["task"],
-            canonical_sets=variant in ("set", "combined", "compact", "ranked", "refined"),
-            temporal=variant in ("temporal", "combined", "compact", "ranked", "refined"),
-            compact_temporal=variant in ("compact", "refined"))
+            canonical_sets=variant in ("set", "combined", "compact", "ranked", "refined", "feedback", "feedback_probe"),
+            temporal=variant in ("temporal", "combined", "compact", "ranked", "refined", "feedback", "feedback_probe"),
+            compact_temporal=variant in ("compact", "refined", "feedback"),
+            error_feedback=variant in ("feedback", "feedback_probe"))
         report = coordinator.run_turn(adapter, turn_id=turn_id, memory_enabled=case["enabled"])
         trace = coordinator.decision_records(turn_id)
         world_ok, core_ok = check_world(), check_core()
@@ -121,7 +143,7 @@ def main():
     ap.add_argument("--model", required=True)
     ap.add_argument("--model-file", type=Path, required=True)
     ap.add_argument("--evidence-dir", type=Path)
-    ap.add_argument("--variant", choices=("baseline", "set", "temporal", "combined", "compact", "ranked", "refined"), default="baseline")
+    ap.add_argument("--variant", choices=("baseline", "set", "temporal", "combined", "compact", "ranked", "refined", "feedback", "feedback_probe"), default="baseline")
     ap.add_argument("--case", action="append", choices=[c["id"] for c in CASES])
     args = ap.parse_args()
     url = urlsplit(args.base_url)
@@ -156,6 +178,9 @@ def main():
                        else "E26B_OPERATION_GATE_FAIL",
               "operation_passes":total, "cases":len(results), "variant":args.variant,
               "normalized_calls":sum(r["normalized_calls"] for r in results),
+              "strict_operation_passes":sum(r["strict_operation_gate_pass"] for r in results),
+              "feedback_deliveries":sum(r["feedback_deliveries"] for r in results),
+              "recovered_objectives":sum(r["recovered_objective"] for r in results),
               "semantic_review":"PENDING", "results":results}
     (out / "e26b-results.json").write_text(json.dumps(report, indent=2), encoding="utf-8")
     print(json.dumps(report), flush=True)

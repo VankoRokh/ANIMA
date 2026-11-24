@@ -85,7 +85,8 @@ def case(binary: str, seed: int, root: Path, *, base_url, model, profile, suite=
         }, "crate must no longer be visible")
         world_before = operator_truth(port, keys[2])
         coordinator = E25LabCognitiveCoordinator(memory, max_steps=4,
-            ranked=suite and suite_variant in ("ranked", "refined"))
+            ranked=suite and suite_variant in ("ranked", "refined", "feedback"),
+            error_feedback=suite and suite_variant in ("feedback", "feedback_probe"))
         if suite:
             from .e26b_cognitive_suite import run_cases
             return run_cases(memory, coordinator, root, seed, base_url=base_url, model=model,

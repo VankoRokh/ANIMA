@@ -243,3 +243,70 @@ def test_unknown_raw_event_not_created_by_model(tmp_path, monkeypatch):
         "event_id": "ev_nonexistent", "status": "not_found",
     }
     assert len(mem._core.event_log.load_events()) == 3
+
+
+@pytest.mark.parametrize("repeat", [False, True])
+def test_native_error_feedback_is_bounded_and_does_not_read_hidden_source(tmp_path, monkeypatch, repeat):
+    from labs.virtual_anima_lab.python.cognition.native_lab import NativeLabAdapter
+    from labs.virtual_anima_lab.python.cognition import coordinator as module
+    mem = memory(tmp_path, monkeypatch)
+    crate = next(r for r in mem.world_model()["entities"] if r["entity_ref"] == "lab.item.crate")
+    hidden = crate["last_seen_event_id"]
+    reads = []
+    original = module._read_only_result
+    def observe_read(*args, **kwargs):
+        reads.append(kwargs["kind"])
+        return original(*args, **kwargs)
+    monkeypatch.setattr(module, "_read_only_result", observe_read)
+    def tool(name, arguments, call_id):
+        return {"choices":[{"finish_reason":"tool_calls","message":{"role":"assistant",
+            "content":"","tool_calls":[{"id":call_id,"type":"function","function":{
+                "name":name,"arguments":json.dumps(arguments)}}]}}]}
+    denied = lambda i: tool("lookup_raw_evidence", {"event_ids":[hidden]}, i)
+    stop = {"choices":[{"finish_reason":"stop","message":{"role":"assistant","content":"No accessible history."}}]}
+    responses = iter([denied("one"), denied("two")] if repeat else [
+        denied("one"), tool("retrieve_memory", {"query":"crate","top_k":1},"two"), stop])
+    class Transport:
+        def complete(self,payload):
+            return next(responses)
+    adapter = NativeLabAdapter(base_url="http://127.0.0.1:8085",model="test",
+        trace_path=tmp_path/"feedback.jsonl",task="find crate",transport=Transport(),
+        error_feedback=True)
+    coord = E25LabCognitiveCoordinator(mem, error_feedback=True)
+    report = coord.run_turn(adapter,turn_id="feedback_turn",memory_enabled=False)
+    records = coord.decision_records("feedback_turn")
+    assert records[0]["admission"] == "REJECTED"
+    assert records[0]["outcome"]["execution_performed"] is False
+    assert records[0]["reason_code"] == "UNEXPOSED_EVIDENCE_ID"
+    assert not adapter.calls[0]["valid"]
+    feedback = json.loads(adapter.calls[1]["request"]["messages"][-1]["content"])
+    assert feedback["error_code"] == "UNEXPOSED_EVIDENCE_ID" and hidden not in json.dumps(feedback)
+    assert reads == ([] if repeat else ["retrieve_memory"])
+    assert not adapter.allowed_ids
+    assert report["status"] == ("REJECTED" if repeat else "STOPPED")
+    assert len(mem._core.event_log.load_events()) == 3
+    if not repeat:
+        assert report["outcomes"][1]["result"]["records"] == []
+        from labs.virtual_anima_lab.python.lifecycle.e26b_cognitive_suite import assess, CASES
+        case = next(c for c in CASES if c["id"] == "C02_OFF")
+        score = assess(case,report,records,adapter.calls)
+        assert score["operation_gate_pass"] and not score["strict_operation_gate_pass"]
+        assert score["recovered_objective"] and score["feedback_deliveries"] == 1
+
+
+def test_feedback_uses_last_budget_step_without_extra_model_call(tmp_path, monkeypatch):
+    from labs.virtual_anima_lab.python.cognition.native_lab import NativeLabAdapter
+    mem = memory(tmp_path, monkeypatch)
+    class Transport:
+        def complete(self,payload):
+            return {"choices":[{"finish_reason":"tool_calls","message":{"role":"assistant",
+                "content":"","tool_calls":[{"id":"one","type":"function","function":{
+                    "name":"lookup_raw_evidence","arguments":'{"event_ids":["ev_hidden"]}'}}]}}]}
+    adapter = NativeLabAdapter(base_url="http://127.0.0.1:8085",model="test",
+        trace_path=tmp_path/"feedback.jsonl",task="find crate",transport=Transport(),
+        error_feedback=True)
+    coord = E25LabCognitiveCoordinator(mem,max_steps=1,error_feedback=True)
+    report = coord.run_turn(adapter,turn_id="feedback_budget",memory_enabled=False)
+    assert report["status"] == "STEP_BUDGET_EXHAUSTED"
+    assert len(adapter.calls) == 1
+    assert coord.decision_records("feedback_budget")[0]["admission"] == "REJECTED"
