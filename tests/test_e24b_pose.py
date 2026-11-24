@@ -222,3 +222,69 @@ def test_no_unknown_second_action_without_observation(tmp_path, monkeypatch):
         pose.record_verified_external_action(
             make_action(1, 0, "turn2", "world.turn", "right")
         )
+
+
+def fixture_proof(first, *, event_id="lifecycle_evt:2"):
+    return {
+        "schema": "anima.lifecycle.operator_fixture_receipt/0.1",
+        "fixture_id": "fixture_move_crate", "world_instance_id": WORLD,
+        "epoch": 1, "before_sample_id": first["sample_id"],
+        "kind": "item_relocated", "status": "APPLIED",
+        "revision": first["revision"] + 1,
+        "tick": first["tick"] + 1,
+        "event_id": event_id, "replayed": False,
+    }
+
+
+def test_operator_only_world_change_is_not_actor_movement(tmp_path, monkeypatch):
+    first = view(1, 0, 0)
+    second = view(2, 1, 1)
+    memory = setup(tmp_path, monkeypatch, [first, second])
+    pose = E24PoseTrail(memory, port=46029, executor_key=KEY)
+    memory.observe_and_record()
+    receipt = fixture_proof(first)
+    pose.record_operator_world_change(receipt)
+    assert pose.reconstruct()["pending_next_sensor"] == ["fixture_move_crate"]
+    memory.observe_and_record()
+    result = pose.reconstruct()
+    assert result["pending_next_sensor"] == []
+    assert len(result["verified_external_changes"]) == 1
+    assert result["verified_transitions"] == []
+    assert result["poses"][0]["local_right_steps"] == 0
+    assert result["poses"][-1]["local_right_steps"] == 0
+    assert result["poses"][-1]["relative_heading_quadrants"] == 0
+    with sqlite3.connect(memory._file) as db:
+        proof = db.execute(
+            "SELECT receipt_json FROM e24b_external_changes"
+        ).fetchone()[0]
+    assert not {"at", "x", "y", "destination"} & set(json.loads(proof))
+
+
+def test_external_proof_mutation_or_bad_clocks_fail_closed(tmp_path, monkeypatch):
+    first = view(1, 0, 0)
+    memory = setup(tmp_path, monkeypatch, [first, view(2, 1, 1)])
+    pose = E24PoseTrail(memory, port=46029, executor_key=KEY)
+    memory.observe_and_record()
+    malformed = fixture_proof(first)
+    malformed["tick"] += 3
+    with pytest.raises(E24PoseError):
+        pose.record_operator_world_change(malformed)
+    pose.record_operator_world_change(fixture_proof(first))
+    memory.observe_and_record()
+    with sqlite3.connect(memory._file) as db:
+        db.execute(
+            "UPDATE e24b_external_changes SET receipt_json='{}'"
+        )
+    with pytest.raises(E24PoseError, match="operator proof modified"):
+        pose.reconstruct()
+
+
+def test_external_clocks_require_matching_next_core_raw(tmp_path, monkeypatch):
+    first = view(1, 0, 0)
+    memory = setup(tmp_path, monkeypatch, [first, view(2, 0, 1)])
+    pose = E24PoseTrail(memory, port=46029, executor_key=KEY)
+    memory.observe_and_record()
+    pose.record_operator_world_change(fixture_proof(first))
+    memory.observe_and_record()
+    with pytest.raises(E24PoseError, match="new Raw does not support operator event clocks"):
+        pose.reconstruct()

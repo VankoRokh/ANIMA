@@ -30,11 +30,18 @@ CREATE TABLE IF NOT EXISTS e24b_viewpoint_actions(
  receipt_sha256 TEXT NOT NULL,
  UNIQUE(before_sample_id)
 );
+CREATE TABLE IF NOT EXISTS e24b_external_changes(
+ fixture_id TEXT PRIMARY KEY,
+ before_sample_id TEXT NOT NULL UNIQUE REFERENCES e24_raw(sample_id),
+ receipt_json TEXT NOT NULL,
+ receipt_sha256 TEXT NOT NULL
+);
 """
 _KEY = re.compile(r"[A-Za-z0-9_-]{32,128}\Z")
 _EVENT = re.compile(r"lifecycle_evt:[1-9][0-9]*\Z")
 _RECEIPT_SCHEMA = "anima.lifecycle.world_receipt/0.1"
 _STATUS_SCHEMA = "anima.lifecycle.world_operation_status/0.1"
+_EXTERNAL_SCHEMA = "anima.lifecycle.operator_fixture_receipt/0.1"
 
 
 class E24PoseError(E24MemoryError):
@@ -91,6 +98,36 @@ def _validate_receipt(action: dict, data: Any, before: dict) -> dict:
         else:
             raise E24PoseError("step outcome is unverified")
     return data
+
+
+def _validate_external(receipt: Any, before: dict) -> dict:
+    """Operator intervention proof; never include hidden target coordinates."""
+    _require(type(receipt) is dict and set(receipt) == {
+        "schema", "fixture_id", "world_instance_id", "epoch",
+        "before_sample_id", "kind", "status", "revision",
+        "tick", "event_id", "replayed",
+    }, "invalid operator fixture proof shape")
+    _require(receipt["schema"] == _EXTERNAL_SCHEMA
+             and receipt["kind"] == "item_relocated"
+             and receipt["status"] == "APPLIED"
+             and receipt["replayed"] is False, "unproven external intervention")
+    _require(type(receipt["fixture_id"]) is str
+             and re.fullmatch(r"[A-Za-z][A-Za-z0-9_-]{0,63}", receipt["fixture_id"])
+             is not None, "invalid fixture identifier")
+    _require(receipt["world_instance_id"] == before["world_instance_id"]
+             and type(receipt["epoch"]) is int
+             and receipt["epoch"] == before["epoch"]
+             and receipt["before_sample_id"] == before["sample_id"],
+             "operator intervention not bound to prior Core-backed Raw")
+    _require(type(receipt["revision"]) is int
+             and receipt["revision"] == before["revision"] + 1
+             and type(receipt["tick"]) is int
+             and receipt["tick"] == before["tick"] + 1,
+             "external revision/tick not contiguous with Raw")
+    _require(type(receipt["event_id"]) is str
+             and _EVENT.fullmatch(receipt["event_id"]) is not None,
+             "invalid operator event evidence")
+    return receipt
 
 
 class E24PoseTrail:
@@ -176,6 +213,50 @@ class E24PoseTrail:
                 raise
         return json.loads(payload)
 
+    def record_operator_world_change(self, receipt: dict) -> dict:
+        """Trusted lab harness records a world intervention, not an ANIMA act.
+
+        The caller must possess operator authority to obtain this Godot
+        receipt. This lab-only trust is NOT cryptographic source attestation.
+        """
+        self._memory.world_model()
+        with closing(self._memory._connect()) as db:
+            last = db.execute(
+                "SELECT sample_id FROM e24_raw ORDER BY sample_seq DESC LIMIT 1"
+            ).fetchone()
+            _require(last is not None, "missing pre-fixture Core Raw")
+            pending = db.execute(
+                "SELECT 1 FROM e24b_viewpoint_actions WHERE before_sample_id=?",
+                (last["sample_id"],),
+            ).fetchone()
+            _require(pending is None, "cannot interleave unknown agent effect and fixture")
+        before = self._memory.raw_evidence(last["sample_id"]).as_dict()
+        _validate_external(receipt, before)
+        body = _canonical(receipt)
+        with closing(self._memory._connect()) as db:
+            db.execute("BEGIN IMMEDIATE")
+            try:
+                earlier = db.execute(
+                    "SELECT before_sample_id,receipt_json,receipt_sha256 "
+                    "FROM e24b_external_changes WHERE fixture_id=?",
+                    (receipt["fixture_id"],),
+                ).fetchone()
+                if earlier is not None:
+                    _require(earlier["before_sample_id"] == before["sample_id"]
+                             and earlier["receipt_json"] == body
+                             and earlier["receipt_sha256"] == _sha(body),
+                             "conflicting operator proof")
+                else:
+                    db.execute(
+                        "INSERT INTO e24b_external_changes VALUES(?,?,?,?)",
+                        (receipt["fixture_id"], before["sample_id"], body, _sha(body)),
+                    )
+                db.commit()
+            except BaseException:
+                db.rollback()
+                raise
+        return json.loads(body)
+
     def reconstruct(self) -> dict:
         """Reconstruct local viewpoint relative to first verified sensor view.
 
@@ -188,6 +269,7 @@ class E24PoseTrail:
                 "SELECT sample_id FROM e24_raw ORDER BY sample_seq"
             ).fetchall()
             actions = db.execute("SELECT * FROM e24b_viewpoint_actions").fetchall()
+            external = db.execute("SELECT * FROM e24b_external_changes").fetchall()
         views = [self._memory.raw_evidence(x["sample_id"]).as_dict() for x in samples]
         action_by_sample = {}
         for row in actions:
@@ -203,17 +285,51 @@ class E24PoseTrail:
             _require(row["operation_id"] == action["operation_id"],
                      "operation ID differs from sealed action")
             action_by_sample[row["before_sample_id"]] = (action, receipt)
+        external_by_sample = {}
+        for row in external:
+            _require(_sha(row["receipt_json"]) == row["receipt_sha256"],
+                     "operator proof modified")
+            try:
+                receipt = json.loads(row["receipt_json"])
+            except (ValueError, TypeError) as error:
+                raise E24PoseError("malformed operator proof") from error
+            _require(row["fixture_id"] == receipt.get("fixture_id"),
+                     "operator fixture identifier mismatched")
+            _require(row["before_sample_id"] not in external_by_sample
+                     and row["before_sample_id"] not in action_by_sample,
+                     "two world interventions without an intermediate Raw")
+            external_by_sample[row["before_sample_id"]] = receipt
         heading = 0  # 0=facing initial forward; 1=right; 2=back; 3=left
         right = 0
         forward = 0
         poses = []
         effects = []
+        external_effects = []
         for index, view in enumerate(views):
             if index == 0:
                 poses.append(self._entry(view, right, forward, heading))
                 continue
             before = views[index - 1]
+            external_receipt = external_by_sample.pop(before["sample_id"], None)
             recorded = action_by_sample.pop(before["sample_id"], None)
+            _require(external_receipt is None or recorded is None,
+                     "operator and agent changed same observation interval")
+            if external_receipt is not None:
+                _validate_external(external_receipt, before)
+                _require(view["revision"] == external_receipt["revision"]
+                         and view["tick"] == external_receipt["tick"],
+                         "new Raw does not support operator event clocks")
+                external_effects.append({
+                    "kind": "world_fixture_change",
+                    "fixture_id": external_receipt["fixture_id"],
+                    "event_id": external_receipt["event_id"],
+                    "before_sample_id": before["sample_id"],
+                    "after_sample_id": view["sample_id"],
+                    "verified_clocks": True,
+                    "no_agent_pose_effect": True,
+                })
+                poses.append(self._entry(view, right, forward, heading))
+                continue
             if recorded is None:
                 _require(
                     view["revision"] == before["revision"]
@@ -253,6 +369,11 @@ class E24PoseTrail:
         # pending, never treated as a confirmed pose transition.
         pending = []
         last_sample = views[-1]
+        for sample_id, proof in external_by_sample.items():
+            _require(sample_id == last_sample["sample_id"],
+                     "orphaned operator change")
+            _validate_external(proof, last_sample)
+            pending.append(proof["fixture_id"])
         for sample_id, (action, receipt) in action_by_sample.items():
             _require(sample_id == last_sample["sample_id"]
                      and action["observation_id"] == sample_id,
@@ -266,6 +387,7 @@ class E24PoseTrail:
             "origin": "arbitrary_first_observation",
             "poses": poses,
             "verified_transitions": effects,
+            "verified_external_changes": external_effects,
             "pending_next_sensor": pending,
             "hidden_godot_coordinates_used": False,
             "not_stage6_authorized": True,
