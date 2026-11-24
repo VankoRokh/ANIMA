@@ -15,6 +15,7 @@ from urllib.parse import urlsplit
 
 from labs.virtual_anima_lab.python.cognition.native_lab import NativeLabAdapter
 from labs.virtual_anima_lab.python.cognition.completion import CompletionRequirement, evaluate_completion
+from labs.virtual_anima_lab.python.cognition.claim_verification import ObservationClaim, ObservationClaimVerifier
 
 CRATE = "lab.item.crate"
 SHORTCUT = "lab.obstacle.shortcut"
@@ -140,6 +141,20 @@ def run_cases(memory, coordinator, root, seed, *, base_url, model, check_world, 
                   "canonical_baseline_unchanged": core_ok,
                   **assess(case, report, trace, adapter.calls),
                   "information_completion": evaluate_completion(information_requirement(case), report, trace)}
+        # Host-authored diagnostic claims, NOT extracted from model prose.
+        # Never expose additional source IDs to the model or affect its gate.
+        probes = []
+        verifier = ObservationClaimVerifier(coordinator)
+        if case["kind"] == "positive":
+            for entity in case["targets"]:
+                candidate = historical[entity]
+                claim_args = (entity, "observed_in_sample")
+                for value, scope in ((True,"source_sample"),(False,"source_sample"),
+                                     (True,"latest_captured_sample")):
+                    claim = ObservationClaim(*claim_args,value,
+                        candidate["last_seen_event_id"],candidate["last_seen_sample"],scope)
+                    probes.append(verifier.verify(turn_id,claim))
+        result["host_claim_probes"] = probes
         if not case["enabled"] and CRATE in result["verified_entities"]:
             raise AssertionError("memory ablation exposed crate history")
         (root / f"{turn_id}-result.json").write_text(
@@ -199,6 +214,8 @@ def main():
               "recovered_objectives":sum(r["recovered_objective"] for r in results),
               "information_requirements_satisfied":sum(r["information_completion"]["information_requirement_satisfied"] for r in results),
               "model_stopped_with_missing_information":sum(r["information_completion"]["model_stopped"] and not r["information_completion"]["information_requirement_satisfied"] for r in results),
+              "host_claim_probe_counts":{status:sum(p["status"] == status for r in results for p in r["host_claim_probes"])
+                                         for status in ("VERIFIED","CONTRADICTED","UNSUPPORTED")},
               "semantic_review":"PENDING", "results":results}
     (out / "e26b-results.json").write_text(json.dumps(report, indent=2), encoding="utf-8")
     print(json.dumps(report), flush=True)
