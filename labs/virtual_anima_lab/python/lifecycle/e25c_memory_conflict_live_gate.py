@@ -14,7 +14,7 @@ import tempfile
 from pathlib import Path
 
 from labs.virtual_anima_lab.python.lab_client import LabClient, LabRejected, PROTOCOL_V2
-from .visual_runner import launch
+from .visual_runner import VisualRunnerError, launch
 from .visual_runner_live_gate import request, until
 from .world_smoke import _binary
 
@@ -137,6 +137,28 @@ def run_case(godot, seed, scenario, memory_enabled, root):
             not any("self_position" in x[6] or '"at"' in x[6] for x in decisions),
             "operator coordinates entered action proposal",
         )
+        if scenario == "relocated" and memory_enabled:
+            with sqlite3.connect(session.memory._file) as db:
+                original = db.execute(
+                    "SELECT prior_event_id FROM visual_hypotheses"
+                ).fetchone()[0]
+                db.execute(
+                    "UPDATE visual_hypotheses SET prior_event_id='ev_forged'"
+                )
+            try:
+                session.hypotheses()
+            except VisualRunnerError:
+                pass
+            else:
+                raise AssertionError("forged hypothesis provenance was accepted")
+            finally:
+                with sqlite3.connect(session.memory._file) as db:
+                    db.execute(
+                        "UPDATE visual_hypotheses SET prior_event_id=?",
+                        (original,),
+                    )
+            require(session.hypotheses()[0]["prior_event_id"] == original,
+                    "hypothesis proof did not recover after restoring DB")
         effects = session.pose.reconstruct()["verified_transitions"]
         require(len(effects) == expected_steps + 2,
                 "missing verified prehistory/action transitions")
