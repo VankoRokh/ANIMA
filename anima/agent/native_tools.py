@@ -11,7 +11,7 @@ import time
 import urllib.request
 from urllib.parse import urlsplit
 
-from anima.agent.tools import ToolRegistry
+from anima.agent.tools import ToolRegistry, validate_schema, validate_instance
 
 
 def strict_json(text):
@@ -37,10 +37,13 @@ def canonical(value):
 class NativeToolCatalog:
     """Detached registry snapshot. Exact, collision-checked wire-name mapping."""
 
-    def __init__(self, registry):
+    def __init__(self, registry, *, set_arguments=None):
         if not isinstance(registry, ToolRegistry):
             raise TypeError("ToolRegistry required")
         self._by_wire = {}
+        self._wire_schemas = {}
+        self._set_fields = {}
+        pending = dict(set_arguments or {})
         for descriptor in registry.list_descriptors():
             if descriptor.effect_class != "read_only":
                 raise ValueError("native read-only profile cannot expose effectful tools")
@@ -48,12 +51,27 @@ class NativeToolCatalog:
             if len(wire) > 64 or wire in self._by_wire:
                 raise ValueError("ambiguous or overlong wire tool name")
             self._by_wire[wire] = descriptor
+            schema = descriptor.to_dict()['input_schema']
+            fields = tuple(pending.pop(descriptor.key, ()))
+            for field in fields:
+                prop = schema['properties'].get(field, {})
+                if (field not in schema['required'] or prop.get('type') != 'array'
+                        or prop.get('uniqueItems') is not True
+                        or prop.get('items', {}).get('type') != 'string'
+                        or type(prop.get('maxItems')) is not int):
+                    raise ValueError('set projection requires a bounded required unique string array')
+                # Validate original input size and items before canonicalization.
+                prop.pop('uniqueItems')
+            self._wire_schemas[wire] = schema
+            self._set_fields[wire] = fields
+        if pending:
+            raise ValueError('set projection references unregistered tool version')
 
     def definitions(self):
         return [
             {"type": "function", "function": {
                 "name": name, "description": descriptor.description,
-                "parameters": descriptor.to_dict()["input_schema"],
+                "parameters": strict_json(canonical(self._wire_schemas[name])),
             }} for name, descriptor in self._by_wire.items()
         ]
 
@@ -64,6 +82,10 @@ class NativeToolCatalog:
             raise ValueError("invalid tool arguments envelope")
         args = strict_json(arguments)
         descriptor = self._by_wire[name]
+        fields = self._set_fields[name]
+        if fields:
+            validate_instance(args, validate_schema(self._wire_schemas[name], input_schema=True))
+            args = {**args, **{field: list(dict.fromkeys(args[field])) for field in fields}}
         descriptor.validate_input(args)
         return descriptor, args
 
@@ -175,6 +197,9 @@ class NativeToolSession:
             if type(fn) is not dict or set(fn) != {"name", "arguments"}:
                 raise ValueError("invalid function fields")
             descriptor, args = self.catalog.decode(fn["name"], fn["arguments"])
+            original_args = strict_json(fn["arguments"])
+            record.update(original_arguments=original_args,
+                          arguments_normalized=original_args != args)
             self.seen_ids.add(call_id)
             self.pending = (call_id, descriptor)
             self.messages.append({"role": "assistant", "content": content or "",

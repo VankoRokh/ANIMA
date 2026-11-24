@@ -143,3 +143,71 @@ def test_required_profile_still_rejects_hidden_source(tmp_path):
     assert a.propose(context(), [], turn_id="t", step_index=0) == {"invalid_model_output":True}
     assert fake.requests[0]["tool_choice"] == "required"
     assert not a.calls[-1]["valid"]
+
+
+def set_catalog():
+    return NativeToolCatalog(lab_registry(),
+        set_arguments={("lookup_raw_evidence", "1"): ("event_ids",)})
+
+
+def test_set_projection_keeps_canonical_contract_and_wire_log():
+    catalog = set_catalog()
+    raw = '{"event_ids":["ev_a","ev_a","ev_b"]}'
+    fake = Fake(completion("lookup_raw_evidence", raw))
+    s = NativeToolSession(catalog, model="test", system_prompt="test",
+                          user_prompt="test", transport=fake)
+    d, args = s.next()
+    assert args == {"event_ids":["ev_a","ev_b"]}
+    assert s.calls[-1]["original_arguments"] == json.loads(raw)
+    assert s.calls[-1]["arguments_normalized"]
+    assert s.messages[-1]["tool_calls"][0]["function"]["arguments"] == raw
+    with pytest.raises(ValueError):
+        d.validate_input(json.loads(raw))
+    assert "uniqueItems" not in next(x for x in catalog.definitions()
+        if x["function"]["name"] == "lookup_raw_evidence")["function"]["parameters"]["properties"]["event_ids"]
+
+
+@pytest.mark.parametrize("args", [
+    {"event_ids":["ev_a"]*17},
+    {"event_ids":["ev_a", 1]},
+    {"event_ids":[]},
+    {"event_ids":["ev_a"], "extra":True},
+])
+def test_set_projection_validates_original_bounds(args):
+    with pytest.raises(ValueError):
+        set_catalog().decode("lookup_raw_evidence", json.dumps(args))
+
+
+def test_set_projection_never_authorizes_unexposed_ids(tmp_path):
+    fake = Fake(completion("lookup_raw_evidence", '{"event_ids":["ev_hidden","ev_hidden"]}'))
+    a = NativeLabAdapter(base_url="http://127.0.0.1:8085", model="test",
+        trace_path=tmp_path/"calls.jsonl", task="find", transport=fake, canonical_sets=True)
+    assert a.propose(context(), [], turn_id="t", step_index=0) == {"invalid_model_output":True}
+    assert a.calls[-1]["arguments_normalized"] and not a.calls[-1]["valid"]
+
+
+def test_temporal_projection_binds_verified_source_to_latest_sample(tmp_path):
+    ctx = {**context(), "memory_enabled":True, "latest_sample_id":"sample3",
+           "entities":[{"category":"item","entity_ref":"lab.item.crate",
+                        "current_observation":"not_observed","last_seen_event_id":"ev_a",
+                        "last_seen_sample":"sample2"}]}
+    fake = Fake(completion("lookup_raw_evidence", '{"event_ids":["ev_a"]}'),
+                completion(content="Historical observation."))
+    a = NativeLabAdapter(base_url="http://127.0.0.1:8085", model="test",
+        trace_path=tmp_path/"calls.jsonl", task="find", transport=fake, temporal=True)
+    p = a.propose(ctx, [], turn_id="t", step_index=0)
+    prompt = json.loads(fake.requests[0]["messages"][1]["content"])
+    assert prompt["as_of_latest_sample_id"] == "sample3"
+    assert prompt["observations"][0]["last_seen_sample_id"] == "sample2"
+    result = {"kind":"verified_raw_evidence","records":[
+        {"event_id":"ev_a","status":"verified_source_view","sample_id":"sample2"},
+        {"event_id":"ev_b","status":"verified_source_view","sample_id":"sample3"},
+        {"event_id":"ev_c","status":"not_found"}]}
+    outcome = {"proposal_id":p["proposal_id"], "operation_kind":p["operation_kind"],
+               "step_index":0,"status":"COMPLETED","result":result}
+    assert a.propose(ctx,[outcome],turn_id="t",step_index=1) is None
+    projected = json.loads(fake.requests[1]["messages"][-1]["content"])
+    assert projected["as_of_sample_id"] == "sample3"
+    assert [r["temporal_scope"] for r in projected["records"]] == [
+        "historical_sample","latest_captured_sample","unverified"]
+    assert "as_of_sample_id" not in result and "temporal_scope" not in result["records"][0]

@@ -60,6 +60,8 @@ def assess(case, report, trace, calls):
                               sort_keys=True) for r in trace if r["proposal"] is not None]
     return {"operation_gate_pass": bool(valid and stopped and objective),
             "valid_model_outputs": sum(c["valid"] for c in calls),
+            "normalized_calls": sum(bool(c.get("arguments_normalized")) for c in calls),
+            "strict_wire_valid_outputs": sum(c["valid"] and not c.get("arguments_normalized", False) for c in calls),
             "transport_successes": sum(c["transport_ok"] for c in calls),
             "model_calls": len(calls), "verified_entities": sorted(verified),
             "completed_search_queries": [r["proposal"]["arguments"]["query"] for r in searches],
@@ -71,7 +73,8 @@ def assess(case, report, trace, calls):
             "output_tokens": [c.get("output_tokens") for c in calls]}
 
 
-def run_cases(memory, coordinator, root, seed, *, base_url, model, check_world, check_core):
+def run_cases(memory, coordinator, root, seed, *, base_url, model, check_world, check_core,
+              variant="baseline", selected_cases=None):
     historical = {r["entity_ref"]: r for r in memory.world_model()["entities"]}
     if not {CRATE, SHORTCUT} <= set(historical):
         raise AssertionError("fixture missing expected observed entities")
@@ -81,15 +84,20 @@ def run_cases(memory, coordinator, root, seed, *, base_url, model, check_world, 
         raise AssertionError("unknown entity fixture is invalid")
     results = []
     for case in CASES:
+        if selected_cases is not None and case["id"] not in selected_cases:
+            continue
         turn_id = f"suite_{seed}_{case['id']}"
         adapter = NativeLabAdapter(base_url=base_url, model=model,
-            trace_path=root / f"{turn_id}-model-calls.jsonl", task=case["task"])
+            trace_path=root / f"{turn_id}-model-calls.jsonl", task=case["task"],
+            canonical_sets=variant in ("set", "combined"),
+            temporal=variant in ("temporal", "combined"))
         report = coordinator.run_turn(adapter, turn_id=turn_id, memory_enabled=case["enabled"])
         trace = coordinator.decision_records(turn_id)
         world_ok, core_ok = check_world(), check_core()
         if not world_ok or not core_ok:
             raise AssertionError("read-only invariant changed")
         result = {"seed": seed, "case": case["id"], "task": case["task"],
+                  "variant": variant,
                   "memory_enabled": case["enabled"], "world_unchanged": world_ok,
                   "canonical_baseline_unchanged": core_ok,
                   **assess(case, report, trace, adapter.calls)}
@@ -112,6 +120,8 @@ def main():
     ap.add_argument("--model", required=True)
     ap.add_argument("--model-file", type=Path, required=True)
     ap.add_argument("--evidence-dir", type=Path)
+    ap.add_argument("--variant", choices=("baseline", "set", "temporal", "combined"), default="baseline")
+    ap.add_argument("--case", action="append", choices=[c["id"] for c in CASES])
     args = ap.parse_args()
     url = urlsplit(args.base_url)
     if (url.scheme != "http" or url.hostname not in ("127.0.0.1", "::1")
@@ -131,17 +141,20 @@ def main():
         "local_file_sha256":digest, "server_models":models,
         "file_hash_not_attested_by_server":True, "profile":"native",
         "temperature":0, "max_steps":4, "max_output_tokens":256,
-        "scenarios":CASES}, indent=2), encoding="utf-8")
+        "variant":args.variant,
+        "scenarios":[c for c in CASES if args.case is None or c["id"] in args.case]}, indent=2), encoding="utf-8")
     print(f"Evidence directory: {out}", flush=True)
     results = []
     for seed in (7, 8):
         results.extend(case(_binary(args.godot), seed, out, base_url=args.base_url,
-                            model=args.model, profile="native", suite=True))
+                            model=args.model, profile="native", suite=True,
+                            suite_variant=args.variant, suite_cases=args.case))
     total = sum(r["operation_gate_pass"] for r in results)
     report = {"schema":"anima.e26b.cognitive_suite/0.1",
               "status":"E26B_OPERATION_GATE_PASS" if total == len(results)
                        else "E26B_OPERATION_GATE_FAIL",
-              "operation_passes":total, "cases":len(results),
+              "operation_passes":total, "cases":len(results), "variant":args.variant,
+              "normalized_calls":sum(r["normalized_calls"] for r in results),
               "semantic_review":"PENDING", "results":results}
     (out / "e26b-results.json").write_text(json.dumps(report, indent=2), encoding="utf-8")
     print(json.dumps(report), flush=True)
