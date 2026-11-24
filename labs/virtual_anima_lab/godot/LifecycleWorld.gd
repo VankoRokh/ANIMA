@@ -1020,6 +1020,7 @@ func _refresh_debug_panel() -> void:
 		lines.append("Mode: DETERMINISTIC / FAST OFF")
 		lines.append("Step: %d / %d" % [
 			int(_visual_state.get("steps", 0)), int(_visual_state.get("max_steps", 0))])
+		lines.append("Trial: " + String(_visual_state.get("scenario", "baseline")))
 		lines.append("Memory: " + ("ON" if _visual_state.get("memory_enabled") else "OFF"))
 		lines.append("Admission: LAB_ONLY, NOT Stage6")
 		lines.append("Agent view (real Core Raw):")
@@ -1044,6 +1045,17 @@ func _refresh_debug_panel() -> void:
 				String(last_choice.get("direction", "?"))
 			])
 			lines.append("Reason: " + String(last_choice.get("reason_code", "?")))
+		lines.append("MEMORY HYPOTHESES (not Knowledge)")
+		var hypotheses: Array = _visual_state.get("hypotheses", [])
+		if hypotheses.is_empty():
+			lines.append("  No conflict detected")
+		for hypothesis in hypotheses:
+			if typeof(hypothesis) != TYPE_DICTIONARY:
+				continue
+			lines.append("  " + String(hypothesis.get("status", "?")))
+			lines.append("  old: " + String(hypothesis.get("prior_event_id", "?")))
+			lines.append("  check: " + String(hypothesis.get("suspected_event_id", "?")))
+		lines.append("")
 		var last_outcome: Variant = _visual_state.get("last_outcome")
 		if typeof(last_outcome) == TYPE_DICTIONARY:
 			lines.append("Verification: " + String(last_outcome.get("status", "?")))
