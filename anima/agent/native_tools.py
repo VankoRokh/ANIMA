@@ -225,3 +225,20 @@ class NativeToolSession:
         self.messages.append({"role": "tool", "tool_call_id": self.pending[0],
                               "content": content})
         self.pending = None
+
+
+    def reject_pending(self, descriptor, *, reason_code):
+        """Resolve a syntactically valid call with a trusted denial, not a result.
+
+        Only the host may invoke this method after recording non-execution.
+        Does not change the catalog, arguments, or source permissions.
+        """
+        if self.pending is None or self.pending[1] is not descriptor or self.terminal:
+            raise ValueError("error does not bind pending tool")
+        if reason_code != "UNEXPOSED_EVIDENCE_ID":
+            raise ValueError("unsupported recoverable rejection")
+        self.messages.append({"role": "tool", "tool_call_id": self.pending[0],
+            "content": canonical({"status": "rejected", "error_code": reason_code,
+                                  "execution_performed": False,
+                                  "message": "Use only event IDs already exposed in observations or completed search results."})})
+        self.pending = None

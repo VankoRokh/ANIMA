@@ -285,3 +285,18 @@ def test_compact_projection_retains_event_and_verified_sequence(tmp_path):
     assert "sample_id" not in proof["records"][0]
     assert raw["records"][0]["sample_id"] == "worldobs:w:1:2"
     assert result["records"][0]["last_seen_sample"] == "worldobs:w:1:2"
+
+
+def test_native_denial_binds_tool_call_and_does_not_change_authority():
+    s, fake = session(completion("lookup_raw_evidence", '{"event_ids":["ev_hidden"]}'),
+                      completion(content="No evidence."))
+    d, _ = s.next()
+    with pytest.raises(ValueError):
+        s.reject_pending(d, reason_code="OTHER")
+    s.reject_pending(d, reason_code="UNEXPOSED_EVIDENCE_ID")
+    with pytest.raises(ValueError):
+        s.reject_pending(d, reason_code="UNEXPOSED_EVIDENCE_ID")
+    assert s.next() is None
+    feedback = fake.requests[-1]["messages"][-1]
+    assert feedback["role"] == "tool" and feedback["tool_call_id"] == "id1"
+    assert json.loads(feedback["content"])["execution_performed"] is False

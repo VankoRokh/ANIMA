@@ -86,7 +86,12 @@ class NativeLabAdapter:
     """Bind native calls to typed lab proposals; no access to service handles."""
     def __init__(self, *, base_url, model, trace_path, task, transport=None, registry=None,
                  first_tool_required=False, canonical_sets=False, temporal=False,
-                 compact_temporal=False):
+                 compact_temporal=False, error_feedback=False):
+        if type(error_feedback) is not bool:
+            raise TypeError("error_feedback must be boolean")
+        self.error_feedback = error_feedback
+        self.feedback_used = False
+        self.rejected_pending = None
         if compact_temporal and not temporal:
             raise ValueError("compact temporal projection requires temporal scope")
         self.compact_temporal = compact_temporal
@@ -137,8 +142,20 @@ class NativeLabAdapter:
                 system_prompt=SYSTEM, transport=self.transport,
                 first_tool_required=self.first_tool_required,
                 user_prompt=canonical(prompt_context))
-        elif self.binding != binding or self.pending is None or len(outcomes) != step_index:
+        elif (self.binding != binding or len(outcomes) != step_index
+              or (self.pending is None and self.rejected_pending is None)):
             raise ValueError("invalid native turn continuation")
+        if self.rejected_pending is not None:
+            descriptor, previous_step = self.rejected_pending
+            outcome = outcomes[-1]
+            if (outcome.get("step_index") != previous_step
+                    or outcome.get("status") != "REJECTED"
+                    or outcome.get("reason_code") != "UNEXPOSED_EVIDENCE_ID"
+                    or outcome.get("proposal_id") is not None
+                    or outcome.get("execution_performed") is not False):
+                raise ValueError("rejection not bound to previous denied call")
+            self.session.reject_pending(descriptor, reason_code="UNEXPOSED_EVIDENCE_ID")
+            self.rejected_pending = None
         if self.pending is not None:
             descriptor, proposal_id, previous_step = self.pending
             outcome = outcomes[-1]
@@ -188,6 +205,12 @@ class NativeLabAdapter:
                 return None
             descriptor, args = selected
             if descriptor.name == "lookup_raw_evidence" and not set(args["event_ids"]) <= self.allowed_ids:
+                if self.error_feedback and not self.feedback_used:
+                    self.feedback_used = True
+                    self.rejected_pending = (descriptor, step_index)
+                    self.session.calls[-1].update(valid=False, error="unexposed evidence ID",
+                        feedback_eligible=True, execution_performed=False)
+                    return {"rejected_native_call": "UNEXPOSED_EVIDENCE_ID"}
                 raise ValueError("unexposed evidence ID")
             proposal = CognitiveStepProposal({
                 "schema": SCHEMA, "proposal_id": f"pr_{turn_id}_{step_index}",
@@ -207,6 +230,7 @@ class NativeLabAdapter:
             for record in self.session.calls[before:]:
                 record.update(profile="native", canonical_sets=self.canonical_sets,
                               temporal=self.temporal, compact_temporal=self.compact_temporal,
+                              error_feedback=self.error_feedback,
                               turn_id=turn_id, step_index=step_index,
                               context_snapshot_id=binding[1])
                 self.calls.append(record)
