@@ -126,11 +126,12 @@ def run_cases(memory, coordinator, root, seed, *, base_url, model, check_world, 
         turn_id = f"suite_{seed}_{case['id']}"
         adapter = NativeLabAdapter(base_url=base_url, model=model,
             trace_path=root / f"{turn_id}-model-calls.jsonl", task=case["task"],
-            canonical_sets=variant in ("set", "combined", "compact", "ranked", "refined", "feedback", "feedback_probe"),
-            temporal=variant in ("temporal", "combined", "compact", "ranked", "refined", "feedback", "feedback_probe"),
-            compact_temporal=variant in ("compact", "refined", "feedback"),
-            error_feedback=variant in ("feedback", "feedback_probe"))
-        report = coordinator.run_turn(adapter, turn_id=turn_id, memory_enabled=case["enabled"])
+            canonical_sets=variant in ("set", "combined", "compact", "ranked", "refined", "feedback", "feedback_probe", "continuation"),
+            temporal=variant in ("temporal", "combined", "compact", "ranked", "refined", "feedback", "feedback_probe", "continuation"),
+            compact_temporal=variant in ("compact", "refined", "feedback", "continuation"),
+            error_feedback=variant in ("feedback", "feedback_probe", "continuation"))
+        report = coordinator.run_turn(adapter, turn_id=turn_id, memory_enabled=case["enabled"],
+            completion_requirement=information_requirement(case) if variant == "continuation" else None)
         trace = coordinator.decision_records(turn_id)
         world_ok, core_ok = check_world(), check_core()
         if not world_ok or not core_ok:
@@ -155,6 +156,10 @@ def run_cases(memory, coordinator, root, seed, *, base_url, model, check_world, 
                         candidate["last_seen_event_id"],candidate["last_seen_sample"],scope)
                     probes.append(verifier.verify(turn_id,claim))
         result["host_claim_probes"] = probes
+        result["continuation_decisions"] = report.get("continuation_decisions", [])
+        result["continued"] = any(x["decision"] == "CONTINUE" for x in result["continuation_decisions"])
+        if variant == "continuation" and (report["model_calls_used"] != len(adapter.calls) or len(adapter.calls) > 4):
+            raise AssertionError("model call budget/accounting mismatch")
         if not case["enabled"] and CRATE in result["verified_entities"]:
             raise AssertionError("memory ablation exposed crate history")
         (root / f"{turn_id}-result.json").write_text(
@@ -174,7 +179,7 @@ def main():
     ap.add_argument("--model", required=True)
     ap.add_argument("--model-file", type=Path, required=True)
     ap.add_argument("--evidence-dir", type=Path)
-    ap.add_argument("--variant", choices=("baseline", "set", "temporal", "combined", "compact", "ranked", "refined", "feedback", "feedback_probe"), default="baseline")
+    ap.add_argument("--variant", choices=("baseline", "set", "temporal", "combined", "compact", "ranked", "refined", "feedback", "feedback_probe", "continuation"), default="baseline")
     ap.add_argument("--case", action="append", choices=[c["id"] for c in CASES])
     args = ap.parse_args()
     url = urlsplit(args.base_url)
@@ -214,6 +219,8 @@ def main():
               "recovered_objectives":sum(r["recovered_objective"] for r in results),
               "information_requirements_satisfied":sum(r["information_completion"]["information_requirement_satisfied"] for r in results),
               "model_stopped_with_missing_information":sum(r["information_completion"]["model_stopped"] and not r["information_completion"]["information_requirement_satisfied"] for r in results),
+              "continued_turns":sum(r["continued"] for r in results),
+              "continued_information_satisfied":sum(r["continued"] and r["information_completion"]["information_requirement_satisfied"] for r in results),
               "host_claim_probe_counts":{status:sum(p["status"] == status for r in results for p in r["host_claim_probes"])
                                          for status in ("VERIFIED","CONTRADICTED","UNSUPPORTED")},
               "semantic_review":"PENDING", "results":results}

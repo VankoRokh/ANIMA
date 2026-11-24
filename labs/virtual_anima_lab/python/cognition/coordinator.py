@@ -203,13 +203,19 @@ class E25LabCognitiveCoordinator:
 
     def run_turn(self, adapter: Any, *, turn_id: str,
                  memory_enabled: bool = True,
-                 focus_refs: tuple[str, ...] = ()) -> dict:
+                 focus_refs: tuple[str, ...] = (),
+                 completion_requirement=None) -> dict:
         if type(turn_id) is not str or _TURN_ID.fullmatch(turn_id) is None:
             raise ValueError("bounded safe turn_id required")
         if type(memory_enabled) is not bool:
             raise TypeError("memory_enabled must be boolean")
         if not callable(getattr(adapter, "propose", None)):
             raise TypeError("adapter must expose propose(context,outcomes,turn_id,step_index)")
+        if completion_requirement is not None:
+            from .completion import CompletionRequirement, evaluate_completion
+            from .native_lab import NativeLabAdapter
+            if type(completion_requirement) is not CompletionRequirement or type(adapter) is not NativeLabAdapter:
+                raise TypeError("continuation requires trusted requirement and native adapter")
         with closing(self._memory._connect()) as db:
             if db.execute("SELECT 1 FROM e25_cognitive_trace WHERE turn_id=?",
                           (turn_id,)).fetchone():
@@ -226,13 +232,18 @@ class E25LabCognitiveCoordinator:
         outcomes = []
         feedback_used = False
         model_stopped = False
-        for step in range(self._max_steps):
+        continuation_decisions = []
+        calls_used = 0
+        for call_index in range(self._max_steps):
+            # Model stops consume budget, but are not service operations.
+            step = len(outcomes)
             # Reject races/new observations between generated proposals.
             checked = self._memory.context_for_cognition(
                 focus_refs=focus_refs, memory_enabled=memory_enabled,
             )
             if _sha(_json(checked)) != _sha(base):
                 raise E25CognitionError("context changed during cognitive turn")
+            calls_used += 1
             try:
                 raw = adapter.propose(
                     json.loads(frozen), json.loads(_json(outcomes)),
@@ -275,6 +286,30 @@ class E25LabCognitiveCoordinator:
             if raw is None:
                 # A stop is independent of the status of the previous call.
                 model_stopped = True
+                if completion_requirement is not None:
+                    intermediate = {'turn_id':turn_id,'context_snapshot_id':ctx_id,
+                                    'status':'STOPPED','outcomes':outcomes}
+                    evaluation = evaluate_completion(completion_requirement, intermediate,
+                                                     self.decision_records(turn_id))
+                    if (not evaluation['information_requirement_satisfied']
+                            and completion_requirement.kind != 'no_service_read'):
+                        remaining = self._max_steps - calls_used
+                        reason = ('CONTINUE' if remaining and not continuation_decisions
+                                  else 'BUDGET_EXHAUSTED' if not remaining else 'CONTINUATION_LIMIT')
+                        decision = {'decision':reason,'model_calls_used':calls_used,
+                                    'model_calls_remaining':remaining,
+                                    'reason_code':evaluation['reason_code']}
+                        continuation_decisions.append(decision)
+                        if reason == 'CONTINUE':
+                            # No new source IDs, tools, authority or automatic service calls.
+                            adapter.resume_after_stop(turn_id=turn_id,context_snapshot_id=ctx_id,
+                                feedback={'type':'information_requirement_feedback',
+                                          'status':'INCOMPLETE',
+                                          'reason_code':evaluation['reason_code'],
+                                          'remaining_model_calls':remaining,
+                                          'message':'The required information is not yet established. You may continue using the available tools or stop with uncertainty.'})
+                            model_stopped = False
+                            continue
                 break
             # Only the opt-in, trusted native adapter can request this bounded
             # non-execution continuation. It still consumes one turn step.
@@ -382,6 +417,8 @@ class E25LabCognitiveCoordinator:
                 "status": "STEP_BUDGET_EXHAUSTED", "outcomes": outcomes,
                 "lab_admission_only": True,
                 "model_executive_authority": False,
+                **({"model_calls_used":calls_used,"continuation_decisions":continuation_decisions}
+                   if completion_requirement is not None else {}),
             }
         return {
             "schema": "anima.lab.cognitive_turn/0.1",
@@ -390,6 +427,8 @@ class E25LabCognitiveCoordinator:
             "outcomes": outcomes,
             "lab_admission_only": True,
             "model_executive_authority": False,
+            **({"model_calls_used":calls_used,"continuation_decisions":continuation_decisions}
+               if completion_requirement is not None else {}),
         }
 
     def decision_records(self, turn_id: str) -> list[dict]:
