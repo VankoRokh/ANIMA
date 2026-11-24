@@ -12,6 +12,7 @@ const VIEW_FOV_DEGREES := 90
 const ACTION_SCHEMA := "anima.lifecycle.world_action/0.1"
 const RECEIPT_SCHEMA := "anima.lifecycle.world_receipt/0.1"
 const OPERATION_STATUS_SCHEMA := "anima.lifecycle.world_operation_status/0.1"
+const E25C_FIXTURE_RECEIPT := "anima.lifecycle.operator_fixture_receipt/0.1"
 const WORLD_VERSION := "lifecycle-grid/0.1"
 const WIDTH := 14
 const HEIGHT := 11
@@ -32,6 +33,8 @@ var _effects_enabled := false
 var _ledger_enabled := false
 var _guarded := false
 var _egocentric := false
+var _e25c_fixtures := false # Operator-only and explicit opt-in; never agent-visible.
+var _fixture_ledger: Dictionary = {}
 var _debug_ui_enabled := false # Human-only. Never enters agent DTO or Core context.
 var _visual_control_port := 0
 var _visual_control_token := ""
@@ -115,6 +118,8 @@ func _parse_args() -> void:
 			_guarded = true
 		elif args[index] == "--lifecycle-egocentric":
 			_egocentric = true
+		elif args[index] == "--lifecycle-e25c-fixtures":
+			_e25c_fixtures = true
 		elif args[index] == "--lifecycle-debug-ui":
 			_debug_ui_enabled = true
 		elif args[index] == "--lifecycle-visual-control-port" and index + 1 < args.size():
@@ -138,6 +143,11 @@ func _parse_args() -> void:
 	if _egocentric and not _guarded:
 		_configuration_ok = false
 		push_error("Lifecycle World: egocentric sensor requires guarded role separation")
+		get_tree().quit(2)
+		return
+	if _e25c_fixtures and not (_guarded and _egocentric and _effects_enabled and _ledger_enabled):
+		_configuration_ok = false
+		push_error("Lifecycle World: E2.5c fixture requires full guarded egocentric mode")
 		get_tree().quit(2)
 		return
 	if _visual_control_port != 0:
@@ -211,6 +221,7 @@ func _reset_world() -> void:
 	# A new epoch is a new operation namespace. Old-epoch receipts are unavailable.
 	_used_operations.clear()
 	_operation_ledger.clear()
+	_fixture_ledger.clear()
 	_revision = 0
 	_tick = 0
 	_last_sample.clear()
@@ -704,6 +715,66 @@ func _set_obstacle(req: Dictionary, request_id: int) -> Dictionary:
 	return _reply(request_id, true, {"cell": _cell(position), "blocked": req["blocked"], "changed": changed})
 
 
+
+# E2.5c: strictly operator-only intervention to create contradictory history.
+# No global target coordinates are returned to observer/executor or included in
+# the runner's agent Context. The test harness may separately inspect truth.
+func _relocate_item(req: Dictionary, request_id: int) -> Dictionary:
+	if req.size() != 10:
+		return _reply(request_id, false, {}, "INVALID_FIXTURE")
+	var fixture_id = req.get("fixture_id")
+	var key_pattern := RegEx.create_from_string("^[A-Za-z][A-Za-z0-9_-]{0,63}$")
+	if typeof(fixture_id) != TYPE_STRING or key_pattern.search(fixture_id) == null:
+		return _reply(request_id, false, {}, "INVALID_FIXTURE")
+	if typeof(req.get("world_instance_id")) != TYPE_STRING or not _valid_uint(req.get("epoch")):
+		return _reply(request_id, false, {}, "INVALID_FIXTURE")
+	if req["world_instance_id"] != _world_instance_id or int(req["epoch"]) != _epoch:
+		return _reply(request_id, false, {}, "WORLD_CHANGED")
+	if not _valid_uint(req.get("expected_revision")) or typeof(req.get("expected_sample_id")) != TYPE_STRING:
+		return _reply(request_id, false, {}, "INVALID_FIXTURE")
+	var at = req.get("at")
+	if typeof(at) != TYPE_DICTIONARY:
+		return _reply(request_id, false, {}, "INVALID_CELL")
+	var raw: Dictionary = at
+	if raw.size() != 2 or not raw.has("x") or not raw.has("y") or not _valid_uint(raw["x"]) or not _valid_uint(raw["y"]):
+		return _reply(request_id, false, {}, "INVALID_CELL")
+	var destination := Vector2i(int(raw["x"]), int(raw["y"]))
+	if (not _inside(destination) or _blocked(destination) or destination == _anima
+			or destination == _delivery or destination == _landmark
+			or destination == _item or _item_owner != ""):
+		return _reply(request_id, false, {}, "INVALID_CELL")
+	var digest := JSON.stringify([fixture_id, req["world_instance_id"], int(req["epoch"]),
+		int(req["expected_revision"]), req["expected_sample_id"], destination.x, destination.y]).sha256_text()
+	if _fixture_ledger.has(fixture_id):
+		var saved: Dictionary = _fixture_ledger[fixture_id]
+		if digest != saved["digest"]:
+			return _reply(request_id, false, {}, "FIXTURE_CONFLICT")
+		var replay: Dictionary = saved["receipt"].duplicate(true)
+		replay["replayed"] = true
+		return _reply(request_id, true, replay)
+	if int(req["expected_revision"]) != _revision:
+		return _reply(request_id, false, {}, "STALE_REVISION")
+	if (_last_sample.is_empty() or req["expected_sample_id"] != _last_sample.get("sample_id")
+			or int(_last_sample.get("revision", -1)) != _revision):
+		return _reply(request_id, false, {}, "STALE_SAMPLE")
+	_item = destination
+	_revision += 1
+	_tick += 1
+	_record("operator_fixture", "relocate_item", {"fixture_id": fixture_id, "changed": true})
+	queue_redraw()
+	_refresh_status()
+	var receipt := {
+		"schema": E25C_FIXTURE_RECEIPT,
+		"fixture_id": fixture_id, "world_instance_id": _world_instance_id,
+		"epoch": _epoch, "before_sample_id": req["expected_sample_id"],
+		"kind": "item_relocated", "status": "APPLIED",
+		"revision": _revision, "tick": _tick,
+		"event_id": "lifecycle_evt:%d" % _event_seq, "replayed": false,
+	}
+	_fixture_ledger[fixture_id] = {"digest": digest, "receipt": receipt.duplicate(true)}
+	return _reply(request_id, true, receipt)
+
+
 func _request(line: String) -> Dictionary:
 	var req = JSON.parse_string(line)
 	if typeof(req) != TYPE_DICTIONARY:
@@ -743,6 +814,8 @@ func _request(line: String) -> Dictionary:
 		if _guarded:
 			if authority == "operator":
 				caps = ["inspect", "reset", "set_obstacle"]
+				if _e25c_fixtures:
+					caps.append("relocate_item")
 			elif authority == "executor":
 				caps = []
 				if _effects_enabled:
@@ -786,6 +859,8 @@ func _request(line: String) -> Dictionary:
 		})
 	if op == "set_obstacle":
 		return _set_obstacle(req, request_id)
+	if op == "relocate_item" and _guarded and authority == "operator" and _e25c_fixtures:
+		return _relocate_item(req, request_id)
 	return _reply(request_id, false, {}, "UNKNOWN_OPERATION")
 
 
