@@ -259,19 +259,34 @@ class VisualDecisionSession:
                 "SELECT * FROM visual_hypotheses ORDER BY suspected_sample_id"
             ).fetchall()
         evidence = []
+        with closing(self.memory._connect()) as db:
+            core_links = {
+                row["sample_id"]: row["core_event_id"]
+                for row in db.execute("SELECT sample_id,core_event_id FROM e24_raw")
+            }
         for entry in entries:
             previous = self.memory.raw_evidence(entry["prior_sample_id"]).as_dict()
             current = self.memory.raw_evidence(entry["suspected_sample_id"]).as_dict()
-            if (not any(x["entity_ref"] == "lab.item.crate"
-                        for x in previous["readings"])
+            if (entry["prior_event_id"] != core_links.get(entry["prior_sample_id"])
+                    or entry["suspected_event_id"] != core_links.get(entry["suspected_sample_id"])
+                    or not any(x["entity_ref"] == "lab.item.crate"
+                               for x in previous["readings"])
                     or any(x["entity_ref"] == "lab.item.crate"
                            for x in current["readings"])):
-                raise VisualRunnerError("contradiction hypothesis has no original sensor evidence")
-            if entry["revised_sample_id"]:
+                raise VisualRunnerError("contradiction hypothesis not bound to source Raw/Core")
+            if entry["status"] == "SUSPECTED_STALE":
+                if entry["revised_sample_id"] is not None or entry["revised_event_id"] is not None:
+                    raise VisualRunnerError("unconfirmed revision attached to stale hypothesis")
+            elif entry["status"] == "REOBSERVED_AFTER_CONFLICT":
+                if (not entry["revised_sample_id"]
+                        or entry["revised_event_id"] != core_links.get(entry["revised_sample_id"])):
+                    raise VisualRunnerError("revision not bound to later Core evidence")
                 later = self.memory.raw_evidence(entry["revised_sample_id"]).as_dict()
                 if (not any(x["entity_ref"] == "lab.item.crate"
                             for x in later["readings"])):
                     raise VisualRunnerError("revised hypothesis is missing re-observation")
+            else:
+                raise VisualRunnerError("unknown hypothesis state")
             evidence.append({
                 "prior_sample_id": entry["prior_sample_id"],
                 "suspected_sample_id": entry["suspected_sample_id"],
