@@ -7,7 +7,7 @@ from labs.virtual_anima_lab.python.cognition.claim_verification import (
 from labs.virtual_anima_lab.python.cognition.coordinator import (
     E25LabCognitiveCoordinator, TwoStepEvidenceStub,
 )
-from test_e25a_cognition import memory, prop
+from tests.test_e25a_cognition import memory, prop
 
 CRATE = "lab.item.crate"
 
