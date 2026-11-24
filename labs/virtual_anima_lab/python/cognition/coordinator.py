@@ -204,7 +204,7 @@ class E25LabCognitiveCoordinator:
     def run_turn(self, adapter: Any, *, turn_id: str,
                  memory_enabled: bool = True,
                  focus_refs: tuple[str, ...] = (),
-                 completion_requirement=None) -> dict:
+                 completion_requirement=None, resource_limits=None) -> dict:
         if type(turn_id) is not str or _TURN_ID.fullmatch(turn_id) is None:
             raise ValueError("bounded safe turn_id required")
         if type(memory_enabled) is not bool:
@@ -230,6 +230,14 @@ class E25LabCognitiveCoordinator:
         context = {**view, "context_snapshot_id": ctx_id}
         frozen = _json(context)
         outcomes = []
+        budget = None
+        budget_stopped = False
+        if resource_limits is not None:
+            from .resource_budget import ResourceBudget
+            from .native_lab import NativeLabAdapter
+            if type(adapter) is not NativeLabAdapter or completion_requirement is None:
+                raise TypeError('resource budget requires native adapter and completion contract')
+            budget = ResourceBudget(resource_limits)
         feedback_used = False
         model_stopped = False
         continuation_decisions = []
@@ -243,13 +251,19 @@ class E25LabCognitiveCoordinator:
             )
             if _sha(_json(checked)) != _sha(base):
                 raise E25CognitionError("context changed during cognitive turn")
+            if budget is not None and not budget.reserve():
+                budget_stopped = True
+                break
             calls_used += 1
+            previous_calls = len(adapter.calls) if budget is not None else 0
             try:
                 raw = adapter.propose(
                     json.loads(frozen), json.loads(_json(outcomes)),
                     turn_id=turn_id, step_index=step,
                 )
             except Exception as exc:
+                if budget is not None:
+                    budget.settle(adapter.calls[-1] if len(adapter.calls) == previous_calls + 1 else None)
                 self._record(
                     turn=turn_id, step=step, context=frozen,
                     proposal_id=None, op=None, proposal=None,
@@ -263,6 +277,12 @@ class E25LabCognitiveCoordinator:
                 self._finalize(turn_id, step, outcome)
                 outcomes.append(outcome)
                 break
+            if budget is not None:
+                reason = budget.settle(adapter.calls[-1] if len(adapter.calls) == previous_calls + 1 else None)
+                if reason is not None:
+                    # Keep model-call evidence but never admit an over-budget proposal.
+                    budget_stopped = True
+                    break
             # Adapter execution may overlap another sensor process. Never
             # admit a proposal against an observation which changed while the
             # candidate was being prepared.
@@ -294,6 +314,9 @@ class E25LabCognitiveCoordinator:
                     if (not evaluation['information_requirement_satisfied']
                             and completion_requirement.kind != 'no_service_read'):
                         remaining = self._max_steps - calls_used
+                        if budget is not None and budget.check_next() is not None:
+                            remaining = 0
+                            budget.reason = budget.check_next()
                         reason = ('CONTINUE' if remaining and not continuation_decisions
                                   else 'BUDGET_EXHAUSTED' if not remaining else 'CONTINUATION_LIMIT')
                         decision = {'decision':reason,'model_calls_used':calls_used,
@@ -415,6 +438,7 @@ class E25LabCognitiveCoordinator:
                 "schema": "anima.lab.cognitive_turn/0.1",
                 "turn_id": turn_id, "context_snapshot_id": ctx_id,
                 "status": "STEP_BUDGET_EXHAUSTED", "outcomes": outcomes,
+                **({"resource_budget":budget.snapshot()} if budget is not None else {}),
                 "lab_admission_only": True,
                 "model_executive_authority": False,
                 **({"model_calls_used":calls_used,"continuation_decisions":continuation_decisions}
@@ -423,7 +447,9 @@ class E25LabCognitiveCoordinator:
         return {
             "schema": "anima.lab.cognitive_turn/0.1",
             "turn_id": turn_id, "context_snapshot_id": ctx_id,
-            "status": "STOPPED" if model_stopped else "REJECTED",
+            "status": ("STEP_BUDGET_EXHAUSTED" if budget_stopped else
+                       "STOPPED" if model_stopped else "REJECTED"),
+            **({"resource_budget":budget.snapshot()} if budget is not None else {}),
             "outcomes": outcomes,
             "lab_admission_only": True,
             "model_executive_authority": False,
