@@ -129,16 +129,16 @@ def run_cases(memory, coordinator, root, seed, *, base_url, model, check_world, 
         turn_id = f"suite_{seed}_{case['id']}"
         adapter = NativeLabAdapter(base_url=base_url, model=model,
             trace_path=root / f"{turn_id}-model-calls.jsonl", task=case["task"],
-            canonical_sets=variant in ("set", "combined", "compact", "ranked", "refined", "feedback", "feedback_probe", "continuation", "budgeted", "budget_probe", "claims", "claims_separated"),
-            temporal=variant in ("temporal", "combined", "compact", "ranked", "refined", "feedback", "feedback_probe", "continuation", "budgeted", "budget_probe", "claims", "claims_separated"),
-            compact_temporal=variant in ("compact", "refined", "feedback", "continuation", "budgeted", "budget_probe", "claims", "claims_separated"),
-            error_feedback=variant in ("feedback", "feedback_probe", "continuation", "budgeted", "budget_probe", "claims", "claims_separated"),
-            model_claims=variant == "claims")
-        limits = (ResourceLimits() if variant in ("budgeted","claims","claims_separated") else
+            canonical_sets=variant in ("set", "combined", "compact", "ranked", "refined", "feedback", "feedback_probe", "continuation", "budgeted", "budget_probe", "claims", "claims_separated", "temporal_sources"),
+            temporal=variant in ("temporal", "combined", "compact", "ranked", "refined", "feedback", "feedback_probe", "continuation", "budgeted", "budget_probe", "claims", "claims_separated", "temporal_sources"),
+            compact_temporal=variant in ("compact", "refined", "feedback", "continuation", "budgeted", "budget_probe", "claims", "claims_separated", "temporal_sources"),
+            error_feedback=variant in ("feedback", "feedback_probe", "continuation", "budgeted", "budget_probe", "claims", "claims_separated", "temporal_sources"),
+            model_claims=variant == "claims", latest_observation=variant == "temporal_sources")
+        limits = (ResourceLimits() if variant in ("budgeted","claims","claims_separated","temporal_sources") else
                   ResourceLimits(max_calls=1) if variant == "budget_probe" else None)
         report = coordinator.run_turn(adapter, turn_id=turn_id, memory_enabled=case["enabled"],
-            completion_requirement=information_requirement(case) if variant in ("continuation","budgeted","budget_probe","claims","claims_separated") else None,
-            resource_limits=limits, project_result_claims=variant == "claims_separated")
+            completion_requirement=information_requirement(case) if variant in ("continuation","budgeted","budget_probe","claims","claims_separated","temporal_sources") else None,
+            resource_limits=limits, project_result_claims=variant in ("claims_separated","temporal_sources"))
         trace = coordinator.decision_records(turn_id)
         world_ok, core_ok = check_world(), check_core()
         if not world_ok or not core_ok:
@@ -166,13 +166,13 @@ def run_cases(memory, coordinator, root, seed, *, base_url, model, check_world, 
         result["continuation_decisions"] = report.get("continuation_decisions", [])
         result["continued"] = any(x["decision"] == "CONTINUE" for x in result["continuation_decisions"])
         result["resource_budget"] = report.get("resource_budget")
-        if variant in ("claims","claims_separated"):
+        if variant in ("claims","claims_separated","temporal_sources"):
             from labs.virtual_anima_lab.python.cognition.model_claims import evaluate_model_claims
             projection = report.get("claim_projection", {"status":"RESEARCH_NOT_STOPPED","call":None})
             claim_calls = adapter.calls if variant == "claims" else (
                 [projection["call"]] if projection["status"] == "GENERATED" else [])
             evaluation = evaluate_model_claims(coordinator, report, claim_calls)
-            if variant == "claims_separated":
+            if variant in ("claims_separated","temporal_sources"):
                 result["claim_projection_status"] = projection["status"]
                 result["claim_projection_call"] = projection["call"]
                 result["total_model_calls"] = len(adapter.calls) + int(projection["call"] is not None)
@@ -185,15 +185,20 @@ def run_cases(memory, coordinator, root, seed, *, base_url, model, check_world, 
                 and all(v["status"] == "VERIFIED" for v in evaluation["verdicts"])
                 and (set(case["targets"]) <= set(evaluation["verified_positive_entities"])
                      if case["kind"] == "positive" else not evaluation["claims"]))
-        if variant in ("continuation","budgeted","budget_probe","claims","claims_separated") and (report["model_calls_used"] != len(adapter.calls) or len(adapter.calls) > 4):
+        if variant in ("continuation","budgeted","budget_probe","claims","claims_separated","temporal_sources") and (report["model_calls_used"] != len(adapter.calls) or len(adapter.calls) > 4):
             raise AssertionError("model call budget/accounting mismatch")
         if not case["enabled"] and CRATE in result["verified_entities"]:
             raise AssertionError("memory ablation exposed crate history")
+        result["latest_observation_reads"] = sum(o["status"] == "COMPLETED" and o["operation_kind"] == "inspect_latest_observation" for o in report["outcomes"])
         (root / f"{turn_id}-result.json").write_text(
             json.dumps({"result":result, "turn":report, "trace":trace}, indent=2),
             encoding="utf-8")
+        # Preserve all evidence in the JSON files; do not duplicate full model payloads on stdout.
         results.append(result)
-        print(json.dumps(result), flush=True)
+        print(json.dumps({k:result[k] for k in ("seed","case","variant","operation_gate_pass","turn_status","model_calls","latest_observation_reads")}
+            | {"information_satisfied":result["information_completion"]["information_requirement_satisfied"],
+               "projection_status":result.get("claim_projection_status"),"claim_objective_pass":result.get("claim_objective_pass"),
+               "resource_budget":result.get("resource_budget")}), flush=True)
     return results
 
 
@@ -206,7 +211,7 @@ def main():
     ap.add_argument("--model", required=True)
     ap.add_argument("--model-file", type=Path, required=True)
     ap.add_argument("--evidence-dir", type=Path)
-    ap.add_argument("--variant", choices=("baseline", "set", "temporal", "combined", "compact", "ranked", "refined", "feedback", "feedback_probe", "continuation", "budgeted", "budget_probe", "claims", "claims_separated"), default="baseline")
+    ap.add_argument("--variant", choices=("baseline", "set", "temporal", "combined", "compact", "ranked", "refined", "feedback", "feedback_probe", "continuation", "budgeted", "budget_probe", "claims", "claims_separated", "temporal_sources"), default="baseline")
     ap.add_argument("--case", action="append", choices=[c["id"] for c in CASES])
     args = ap.parse_args()
     url = urlsplit(args.base_url)
@@ -254,11 +259,13 @@ def main():
               "model_claim_format_valid":sum(r.get("model_claims",{}).get("format_status") == "VALID" for r in results),
               "claim_objective_passes":sum(r.get("claim_objective_pass",False) for r in results),
               "model_claim_verdict_counts":{status:sum(v["status"] == status for r in results for v in r.get("model_claims",{}).get("verdicts",[])) for status in ("VERIFIED","CONTRADICTED","UNSUPPORTED")},
+              "latest_observation_reads":sum(r["latest_observation_reads"] for r in results),
               "host_claim_probe_counts":{status:sum(p["status"] == status for r in results for p in r["host_claim_probes"])
                                          for status in ("VERIFIED","CONTRADICTED","UNSUPPORTED")},
               "semantic_review":"PENDING", "results":results}
     (out / "e26b-results.json").write_text(json.dumps(report, indent=2), encoding="utf-8")
-    print(json.dumps(report), flush=True)
+    print(json.dumps({k:v for k,v in report.items() if k != "results"},indent=2), flush=True)
+    print(f"Full report: {out / 'e26b-results.json'}", flush=True)
     if total != len(results):
         raise SystemExit(1)
 

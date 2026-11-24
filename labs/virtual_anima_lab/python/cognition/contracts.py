@@ -14,7 +14,7 @@ SCHEMA = "anima.cognition.step_proposal/0.1"
 _REF = re.compile(r"[A-Za-z][A-Za-z0-9._:/@-]{0,127}\Z")
 _ALLOWED = frozenset({
     "retrieve_memory", "lookup_raw_evidence", "inspect_current_belief",
-    "inspect_goal_status",
+    "inspect_goal_status", "inspect_latest_observation",
 })
 _MAX_JSON_BYTES = 4096
 
@@ -50,6 +50,8 @@ def _args(op: str, value: Any) -> None:
         for item in ids:
             _ref(item, "evidence event ID")
         _require(len(set(ids)) == len(ids), "duplicate event reference")
+    elif op == "inspect_latest_observation":
+        _require(not value, "latest observation takes no arguments")
     elif op == "inspect_current_belief":
         _require(set(value) == {"subject_ref", "predicate_ref"}, "belief args")
         _ref(value["subject_ref"], "subject_ref")

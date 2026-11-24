@@ -10,6 +10,7 @@ from contextlib import closing
 import hashlib
 
 from .coordinator import E25LabCognitiveCoordinator
+from .source_binding import admitted_source_rows
 from labs.virtual_anima_lab.python.lifecycle.e24_working_memory import E24MemoryError
 
 
@@ -62,17 +63,8 @@ class ObservationClaimVerifier:
         records = self._coordinator.decision_records(turn_id)
         eligible = []
         for record in records:
-            p, o = record["proposal"], record["outcome"]
-            if (record["admission"] != "ADMITTED" or o["status"] != "COMPLETED"
-                    or p is None or p["operation_kind"] != "lookup_raw_evidence"
-                    or o.get("operation_kind") != p["operation_kind"]
-                    or p["turn_id"] != turn_id
-                    or p["context_snapshot_id"] != record["context_snapshot"]["context_snapshot_id"]
-                    or o["result"]["kind"] != "verified_raw_evidence"
-                    or claim.event_id not in p["arguments"]["event_ids"]):
-                continue
-            eligible.extend((row,record["context_snapshot"]) for row in o["result"]["records"]
-                if row["event_id"] == claim.event_id and row["status"] == "verified_source_view")
+            eligible.extend((row,record["context_snapshot"]) for row in admitted_source_rows(record)
+                if row["event_id"] == claim.event_id)
         if not eligible:
             return verdict("UNSUPPORTED","SOURCE_NOT_VERIFIED_IN_TURN")
         row, ctx = eligible[0]

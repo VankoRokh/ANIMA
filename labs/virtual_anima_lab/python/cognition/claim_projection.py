@@ -3,6 +3,7 @@ import time
 
 from anima.agent.native_tools import canonical
 from .model_claims import CLAIM_INSTRUCTION
+from .source_binding import admitted_source_rows
 
 
 def project_claims(adapter, report, records, budget):
@@ -18,13 +19,12 @@ def project_claims(adapter, report, records, budget):
         p, o = rec["proposal"], rec["outcome"]
         if rec["admission"] != "ADMITTED" or o["status"] != "COMPLETED" or not p:
             continue
-        if p["operation_kind"] == "lookup_raw_evidence":
-            for row in o["result"]["records"]:
-                if row["status"] == "verified_source_view" and row["event_id"] in p["arguments"]["event_ids"]:
-                    sources.append({"event_id":row["event_id"],"sample_seq":row["sample_seq"],
-                        "scope":("latest_captured_sample" if row["sample_id"] ==
-                                 rec["context_snapshot"]["latest_sample_id"] else "source_sample"),
-                        "entities_observed":row["entities_observed"]})
+        if p["operation_kind"] in ("lookup_raw_evidence","inspect_latest_observation"):
+            for row in admitted_source_rows(rec):
+                sources.append({"event_id":row["event_id"],"sample_seq":row["sample_seq"],
+                    "scope":("latest_captured_sample" if row["sample_id"] ==
+                             rec["context_snapshot"]["latest_sample_id"] else "source_sample"),
+                    "entities_observed":row["entities_observed"]})
         elif p["operation_kind"] == "retrieve_memory":
             searches.append({"query":p["arguments"]["query"],"returned":o["result"]["returned"],
                              "memory_enabled":o["result"]["memory_enabled"]})
