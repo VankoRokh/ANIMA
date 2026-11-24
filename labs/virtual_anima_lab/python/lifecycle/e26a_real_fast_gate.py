@@ -91,9 +91,10 @@ def case(binary: str, seed: int, root: Path, *, base_url, model, profile):
                 trace_path = root / f"{turn_id}-model-calls.jsonl"
                 if mode == "STUB":
                     adapter = TwoStepEvidenceStub()
-                elif profile == "native":
+                elif profile in ("native", "native_required"):
                     adapter = NativeLabAdapter(base_url=base_url, model=model,
-                        trace_path=trace_path, task="Find and verify previous observations of the crate.")
+                        trace_path=trace_path, task="Find and verify previous observations of the crate.",
+                        first_tool_required=(profile == "native_required"))
                 else:
                     adapter_type = LocalFastChoiceAdapter if profile == "choice" else LocalFastEvidenceAdapter
                     adapter = adapter_type(base_url=base_url, model=model, trace_path=trace_path)
@@ -153,7 +154,10 @@ def case(binary: str, seed: int, root: Path, *, base_url, model, profile):
                           "native_result_messages_sent": sum(
                               sum(m["role"] == "tool" for m in c.get("request", {}).get("messages", []))
                               for c in calls),
-                          "model_stopped": report["status"] == "STOPPED" and mode == "FAST"}
+                          "model_stopped": report["status"] == "STOPPED" and mode == "FAST",
+                          "first_tool_required": mode == "FAST" and profile == "native_required",
+                          "first_call_valid_tool": bool(calls and calls[0]["valid"] and
+                                                        "tool_name" in calls[0])}
                 (root / f"{turn_id}-result.json").write_text(
                     json.dumps({"result": result, "turn": report, "trace": trace},
                                ensure_ascii=False, indent=2), encoding="utf-8")
@@ -173,7 +177,7 @@ def main():
     ap.add_argument("--model", default="Qwen3-0.6B-Q8_0")
     ap.add_argument("--model-file", type=Path, required=True)
     ap.add_argument("--evidence-dir", type=Path)
-    ap.add_argument("--profile", choices=("legacy", "choice", "native"), default="legacy")
+    ap.add_argument("--profile", choices=("legacy", "choice", "native", "native_required"), default="legacy")
     args = ap.parse_args()
     url = urlsplit(args.base_url)
     if (url.scheme != "http" or url.hostname not in ("127.0.0.1", "::1")
@@ -190,7 +194,8 @@ def main():
     out.mkdir(parents=True, exist_ok=True)
     require(not any(out.iterdir()), "evidence directory must be empty; preserve prior runs")
     print(f"Evidence directory: {out}", flush=True)
-    manifest = {"profile": args.profile, "model_alias": args.model, "local_file": args.model_file.name,
+    manifest = {"profile": args.profile,
+                "first_tool_required": args.profile == "native_required", "model_alias": args.model, "local_file": args.model_file.name,
                 "local_file_sha256": model_hash, "server_models": server_models,
                 "file_hash_not_attested_by_server": True,
                 "temperature": 0, "max_output_tokens": 256, "max_steps": 4}

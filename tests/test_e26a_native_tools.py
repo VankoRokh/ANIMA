@@ -106,3 +106,40 @@ def test_verified_result_roundtrip_and_stop(tmp_path):
     assert a.propose(context(), [outcome], turn_id="t", step_index=1) is None
     assert json.loads(fake.requests[-1]["messages"][-1]["content"]) == result
     assert a.calls[-1]["final_text"] == "No past evidence found."
+
+
+def test_required_only_first_then_auto():
+    fake = Fake(completion("retrieve_memory", '{"query":"crate","top_k":5}'),
+                completion(content="No evidence found."))
+    s = NativeToolSession(NativeToolCatalog(lab_registry()), model="test",
+                          system_prompt="test", user_prompt="test", transport=fake,
+                          first_tool_required=True)
+    descriptor, _ = s.next()
+    result = {"kind":"working_world_memory_search",
+              "strategy":"substring_baseline_not_semantic_retrieval",
+              "records":[], "returned":0, "possible_matches":0,
+              "truncated":False, "memory_enabled":False}
+    s.submit_result(descriptor, result)
+    assert s.next() is None
+    assert [r["tool_choice"] for r in fake.requests] == ["required", "auto"]
+    assert fake.requests[1]["messages"][-1]["tool_call_id"] == "id1"
+
+
+def test_required_rejects_premature_final_answer():
+    fake = Fake(completion(content="No evidence."))
+    s = NativeToolSession(NativeToolCatalog(lab_registry()), model="test",
+                          system_prompt="test", user_prompt="test", transport=fake,
+                          first_tool_required=True)
+    with pytest.raises(ValueError, match="required first tool call missing"):
+        s.next()
+    assert not s.calls[-1]["valid"]
+
+
+def test_required_profile_still_rejects_hidden_source(tmp_path):
+    fake = Fake(completion("lookup_raw_evidence", '{"event_ids":["ev_hidden"]}'))
+    a = NativeLabAdapter(base_url="http://127.0.0.1:8085", model="test",
+                         trace_path=tmp_path/"calls.jsonl", task="find crate", transport=fake,
+                         first_tool_required=True)
+    assert a.propose(context(), [], turn_id="t", step_index=0) == {"invalid_model_output":True}
+    assert fake.requests[0]["tool_choice"] == "required"
+    assert not a.calls[-1]["valid"]

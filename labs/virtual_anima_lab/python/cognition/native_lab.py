@@ -59,10 +59,12 @@ def lab_registry():
 
 class NativeLabAdapter:
     """Bind native calls to typed lab proposals; no access to service handles."""
-    def __init__(self, *, base_url, model, trace_path, task, transport=None, registry=None):
+    def __init__(self, *, base_url, model, trace_path, task, transport=None, registry=None,
+                 first_tool_required=False):
         self.catalog = NativeToolCatalog(registry if registry is not None else lab_registry())
         self.transport = transport if transport is not None else LoopbackChatTransport(base_url)
         self.model = model
+        self.first_tool_required = first_tool_required
         self.task = task
         self.trace_path = Path(trace_path)
         self.session = None
@@ -83,6 +85,7 @@ class NativeLabAdapter:
             self.binding = binding
             self.session = NativeToolSession(self.catalog, model=self.model,
                 system_prompt=SYSTEM, transport=self.transport,
+                first_tool_required=self.first_tool_required,
                 user_prompt=canonical({"task": self.task, "observations": entities,
                     "memory_enabled": context["memory_enabled"],
                     "coverage": "captured observations only"}))
