@@ -74,3 +74,27 @@ def evaluate_model_claims(coordinator, report, calls):
         if v["status"] == "VERIFIED" and v["submitted_claim"]["predicate"] == "observed_in_sample"
         and v["submitted_claim"]["value"] is True})
     return result
+
+
+def temporal_claim_coverage(completion, evaluation):
+    """Check both time scopes using trusted same-turn completion/verifier outputs."""
+    if (completion["requirement"]["kind"] != "historical_and_latest_observation"
+            or not completion["information_requirement_satisfied"]
+            or evaluation["format_status"] != "VALID"
+            or any(v["status"] != "VERIFIED" for v in evaluation["verdicts"])):
+        return False
+    latest = completion["latest_source"]
+    claims = [v["claim"] for v in evaluation["verdicts"]
+              if v["claim"]["predicate"] == "observed_in_sample"]
+    for entity in completion["requirement"]["entities"]:
+        historical = any(c["entity_ref"] == entity and c["scope"] == "source_sample"
+                         and c["value"] is True and c["event_id"] in
+                         completion["historical_sources_by_entity"][entity]
+                         for c in claims)
+        current = any(c["entity_ref"] == entity and c["scope"] == "latest_captured_sample"
+                      and c["event_id"] == latest["event_id"] and c["sample_id"] == latest["sample_id"]
+                      and c["value"] is completion["latest_observed_by_entity"][entity]
+                      for c in claims)
+        if not historical or not current:
+            return False
+    return True

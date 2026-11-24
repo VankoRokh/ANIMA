@@ -343,7 +343,9 @@ class E25LabCognitiveCoordinator:
                                   else 'BUDGET_EXHAUSTED' if not remaining else 'CONTINUATION_LIMIT')
                         decision = {'decision':reason,'model_calls_used':calls_used,
                                     'model_calls_remaining':remaining,
-                                    'reason_code':evaluation['reason_code']}
+                                    'reason_code':evaluation['reason_code'],
+                                    **({'missing_requirements':evaluation['missing_requirements']}
+                                       if 'missing_requirements' in evaluation else {})}
                         continuation_decisions.append(decision)
                         if reason == 'CONTINUE':
                             # No new source IDs, tools, authority or automatic service calls.
@@ -352,6 +354,8 @@ class E25LabCognitiveCoordinator:
                                           'status':'INCOMPLETE',
                                           'reason_code':evaluation['reason_code'],
                                           'remaining_model_calls':remaining,
+                                          **({'missing_requirements':evaluation['missing_requirements']}
+                                             if 'missing_requirements' in evaluation else {}),
                                           'message':'The required information is not yet established. You may continue using the available tools or stop with uncertainty.'})
                             model_stopped = False
                             continue

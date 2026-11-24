@@ -5,6 +5,7 @@ text or arbitrary imported evidence). No execution, retries, knowledge writes,
 or inference of claims. This is not a canonical Core Goal/Task completion gate.
 """
 from dataclasses import dataclass
+from .source_binding import admitted_source_rows
 
 
 def _query_key(value):
@@ -20,7 +21,8 @@ class CompletionRequirement:
     query: str = ""
 
     def __post_init__(self):
-        if self.kind not in ("verified_observation", "empty_search", "no_service_read"):
+        if self.kind not in ("verified_observation", "empty_search", "no_service_read",
+                             "historical_and_latest_observation"):
             raise ValueError("unknown completion requirement")
         if type(self.entities) is not tuple or any(
             type(e) is not str or not e.strip() for e in self.entities
@@ -28,7 +30,7 @@ class CompletionRequirement:
             raise ValueError("unique entity references required")
         if type(self.query) is not str:
             raise ValueError("query must be text")
-        if self.kind == "verified_observation":
+        if self.kind in ("verified_observation", "historical_and_latest_observation"):
             if not self.entities or self.query:
                 raise ValueError("verified observation requires entity refs only")
         elif self.kind == "empty_search":
@@ -57,6 +59,9 @@ def evaluate_completion(requirement, report, records):
     verified = {}
     empty_queries = set()
     completed_reads = 0
+    historical = {}
+    latest_rows = []
+    temporal = requirement.kind == "historical_and_latest_observation"
     for step, (record, outcome) in enumerate(zip(records, outcomes)):
         if (record["turn_id"] != report["turn_id"]
                 or record["step_index"] != step
@@ -74,6 +79,14 @@ def evaluate_completion(requirement, report, records):
             raise ValueError("invalid completed read")
         completed_reads += 1
         result = outcome["result"]
+        if temporal:
+            for row in admitted_source_rows(record):
+                if row["sample_id"] == record["context_snapshot"]["latest_sample_id"]:
+                    if row not in latest_rows:
+                        latest_rows.append(row)
+                else:
+                    for entity in row["entities_observed"]:
+                        historical.setdefault(entity, set()).add(row["event_id"])
         if proposal["operation_kind"] == "lookup_raw_evidence":
             if result["kind"] != "verified_raw_evidence":
                 raise ValueError("unexpected evidence result")
@@ -91,7 +104,26 @@ def evaluate_completion(requirement, report, records):
                 empty_queries.add(_query_key(proposal["arguments"]["query"]))
 
     missing = []
-    if requirement.kind == "verified_observation":
+    temporal_details = {}
+    if temporal:
+        missing = [e for e in requirement.entities if e not in historical]
+        latest = latest_rows[0] if len(latest_rows) == 1 else None
+        missing_conditions = (["VERIFIED_HISTORICAL_OBSERVATION"] if missing else [])
+        if latest is None:
+            missing_conditions.append("VERIFIED_LATEST_CAPTURED_SAMPLE")
+        satisfied = not missing_conditions
+        reason = ("TEMPORAL_EVIDENCE_COMPLETE" if satisfied else
+                  "INCONSISTENT_LATEST_SOURCE" if len(latest_rows) > 1 else
+                  "TEMPORAL_EVIDENCE_INCOMPLETE")
+        temporal_details = {
+            "missing_requirements": missing_conditions,
+            "historical_sources_by_entity": {e:sorted(ids) for e,ids in sorted(historical.items())},
+            "latest_source": ({"event_id":latest["event_id"],"sample_id":latest["sample_id"],
+                               "sample_seq":latest["sample_seq"]} if latest is not None else None),
+            "latest_observed_by_entity": {e:e in latest["entities_observed"] for e in requirement.entities}
+                                         if latest is not None else {},
+        }
+    elif requirement.kind == "verified_observation":
         missing = [e for e in requirement.entities if e not in verified]
         satisfied = not missing
         reason = "VERIFIED_TARGET_OBSERVATIONS" if satisfied else "REQUIRED_SOURCE_NOT_VERIFIED"
@@ -111,6 +143,7 @@ def evaluate_completion(requirement, report, records):
         "information_requirement_satisfied": satisfied,
         "reason_code": reason,
         "missing_entities": missing,
+        **temporal_details,
         "verified_sources_by_entity": {e: sorted(verified[e]) for e in sorted(verified)},
         "completed_service_reads": completed_reads,
         "rejected_steps": sum(o["status"] == "REJECTED" for o in outcomes),
