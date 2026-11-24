@@ -225,6 +225,7 @@ class E25LabCognitiveCoordinator:
         frozen = _json(context)
         outcomes = []
         feedback_used = False
+        model_stopped = False
         for step in range(self._max_steps):
             # Reject races/new observations between generated proposals.
             checked = self._memory.context_for_cognition(
@@ -272,20 +273,24 @@ class E25LabCognitiveCoordinator:
                 outcomes.append(output)
                 break
             if raw is None:
-                # An empty proposal is an explicit stop and is not a cognitive step.
+                # A stop is independent of the status of the previous call.
+                model_stopped = True
                 break
             # Only the opt-in, trusted native adapter can request this bounded
             # non-execution continuation. It still consumes one turn step.
-            if self._error_feedback and not feedback_used and raw == {
-                    "rejected_native_call": "UNEXPOSED_EVIDENCE_ID"}:
+            if (self._error_feedback and not feedback_used and type(raw) is dict
+                    and set(raw) == {"rejected_native_call"}
+                    and raw["rejected_native_call"] in ("UNEXPOSED_EVIDENCE_ID", "INVALID_TOOL_ARGUMENTS")):
                 from .native_lab import NativeLabAdapter
-                if type(adapter) is NativeLabAdapter and adapter.rejected_pending is not None:
+                reason_code = raw["rejected_native_call"]
+                if (type(adapter) is NativeLabAdapter and adapter.rejected_pending is not None
+                        and adapter.rejected_pending[1:] == (step, reason_code)):
                     feedback_used = True
                     self._record(turn=turn_id, step=step, context=frozen,
                         proposal_id=None, op=None, proposal=None,
-                        admission="REJECTED", reason="UNEXPOSED_EVIDENCE_ID")
+                        admission="REJECTED", reason=reason_code)
                     output = {"schema":"anima.lab.cognitive_outcome/0.1",
-                        "status":"REJECTED", "reason_code":"UNEXPOSED_EVIDENCE_ID",
+                        "status":"REJECTED", "reason_code":reason_code,
                         "step_index":step, "proposal_id":None, "execution_performed":False}
                     self._finalize(turn_id, step, output)
                     outcomes.append(output)
@@ -381,8 +386,7 @@ class E25LabCognitiveCoordinator:
         return {
             "schema": "anima.lab.cognitive_turn/0.1",
             "turn_id": turn_id, "context_snapshot_id": ctx_id,
-            "status": ("STOPPED" if not outcomes or outcomes[-1]["status"] == "COMPLETED"
-                       else "REJECTED"),
+            "status": "STOPPED" if model_stopped else "REJECTED",
             "outcomes": outcomes,
             "lab_admission_only": True,
             "model_executive_authority": False,

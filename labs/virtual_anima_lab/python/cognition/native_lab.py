@@ -141,20 +141,21 @@ class NativeLabAdapter:
             self.session = NativeToolSession(self.catalog, model=self.model,
                 system_prompt=SYSTEM, transport=self.transport,
                 first_tool_required=self.first_tool_required,
+                argument_feedback=self.error_feedback,
                 user_prompt=canonical(prompt_context))
         elif (self.binding != binding or len(outcomes) != step_index
               or (self.pending is None and self.rejected_pending is None)):
             raise ValueError("invalid native turn continuation")
         if self.rejected_pending is not None:
-            descriptor, previous_step = self.rejected_pending
+            descriptor, previous_step, reason_code = self.rejected_pending
             outcome = outcomes[-1]
             if (outcome.get("step_index") != previous_step
                     or outcome.get("status") != "REJECTED"
-                    or outcome.get("reason_code") != "UNEXPOSED_EVIDENCE_ID"
+                    or outcome.get("reason_code") != reason_code
                     or outcome.get("proposal_id") is not None
                     or outcome.get("execution_performed") is not False):
                 raise ValueError("rejection not bound to previous denied call")
-            self.session.reject_pending(descriptor, reason_code="UNEXPOSED_EVIDENCE_ID")
+            self.session.reject_pending(descriptor, reason_code=reason_code)
             self.rejected_pending = None
         if self.pending is not None:
             descriptor, proposal_id, previous_step = self.pending
@@ -204,14 +205,21 @@ class NativeLabAdapter:
             if selected is None:
                 return None
             descriptor, args = selected
-            if descriptor.name == "lookup_raw_evidence" and not set(args["event_ids"]) <= self.allowed_ids:
+            reason_code = None
+            if args is None and self.session.pending_error == "INVALID_TOOL_ARGUMENTS":
+                reason_code = "INVALID_TOOL_ARGUMENTS"
+            elif descriptor.name == "lookup_raw_evidence" and not set(args["event_ids"]) <= self.allowed_ids:
+                reason_code = "UNEXPOSED_EVIDENCE_ID"
+            if reason_code is not None:
+                record = self.session.calls[-1]
+                record.update(valid=False, error_code=reason_code, execution_performed=False)
+                record.setdefault("error", "unexposed evidence ID")
                 if self.error_feedback and not self.feedback_used:
                     self.feedback_used = True
-                    self.rejected_pending = (descriptor, step_index)
-                    self.session.calls[-1].update(valid=False, error="unexposed evidence ID",
-                        feedback_eligible=True, execution_performed=False)
-                    return {"rejected_native_call": "UNEXPOSED_EVIDENCE_ID"}
-                raise ValueError("unexposed evidence ID")
+                    self.rejected_pending = (descriptor, step_index, reason_code)
+                    record["feedback_eligible"] = True
+                    return {"rejected_native_call": reason_code}
+                raise ValueError(record["error"])
             proposal = CognitiveStepProposal({
                 "schema": SCHEMA, "proposal_id": f"pr_{turn_id}_{step_index}",
                 "turn_id": turn_id, "context_snapshot_id": binding[1],
