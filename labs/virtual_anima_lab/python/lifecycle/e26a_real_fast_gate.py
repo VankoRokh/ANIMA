@@ -1,0 +1,192 @@
+"""E2.6a genuine local llama.cpp proposals on captured Godot observations."""
+from __future__ import annotations
+
+import argparse
+import json
+import os
+import secrets
+import subprocess
+import tempfile
+import hashlib
+import urllib.request
+from urllib.parse import urlsplit
+from pathlib import Path
+
+from anima.core.assembly import build_core
+from labs.virtual_anima_lab.python.cognition.local_fast import LocalFastEvidenceAdapter
+from labs.virtual_anima_lab.python.cognition.coordinator import (
+    E25LabCognitiveCoordinator, TwoStepEvidenceStub,
+)
+from labs.virtual_anima_lab.python.lab_client import LabClient, PROTOCOL_V2
+from .e21_gateway_live_gate import finish
+from .egocentric import E23ObserverPort
+from .e24_memory_live_gate import turn
+from .e24_working_memory import (
+    E24WorkingMemory, SOURCE, SUBJECT, PREDICATE,
+    vision_source_registration, vision_digest_rule,
+)
+from .world_smoke import PROJECT, _binary, _port, _wait
+
+
+def require(ok, msg):
+    if not ok:
+        raise AssertionError(msg)
+
+
+def operator_truth(port, key):
+    with LabClient(port, role="operator", protocol=PROTOCOL_V2) as client:
+        return client.call("inspect", auth=key)["data"]
+
+
+def case(binary: str, seed: int, root: Path, *, base_url, model):
+    port = _port()
+    keys = tuple(secrets.token_urlsafe(32) for _ in range(3))
+    logfile = (root / f"e26a-world-{seed}.log").open("w", encoding="utf-8")
+    process = subprocess.Popen(
+        [binary, "--headless", "--path", str(PROJECT),
+         "res://LifecycleWorld.tscn", "--",
+         "--lifecycle-port", str(port), "--lifecycle-seed", str(seed),
+         "--lifecycle-guarded", "--lifecycle-effects", "--lifecycle-ledger",
+         "--lifecycle-egocentric", "--lifecycle-debug-ui"],
+        cwd=PROJECT, stdout=logfile, stderr=subprocess.STDOUT,
+        env={**os.environ,
+             "ANIMA_LIFECYCLE_OBSERVER_KEY": keys[0],
+             "ANIMA_LIFECYCLE_EXECUTOR_KEY": keys[1],
+             "ANIMA_LIFECYCLE_OPERATOR_KEY": keys[2]},
+    )
+    try:
+        ready = _wait(process, port)
+        ready.close()
+        instance = build_core(
+            root / f"e26a-core-{seed}",
+            sources={SOURCE: vision_source_registration()},
+            properties={(SUBJECT, PREDICATE): vision_digest_rule()},
+        )
+        memory = E24WorkingMemory(
+            instance, E23ObserverPort(port=port, observer_key=keys[0]),
+        )
+        first = memory.observe_and_record()
+        require("lab.item.crate" not in {
+            x["entity_ref"] for x in memory.world_model()["entities"]
+        }, "crate must not be initially visible")
+        turn(port, keys[1], memory.raw_evidence(first.sample_id).as_dict(), f"e25turn1_{seed}")
+        second = memory.observe_and_record()
+        require("lab.item.crate" in {
+            x["entity_ref"] for x in memory.world_model()["entities"]
+        }, "crate should be visible when east-facing")
+        turn(port, keys[1], memory.raw_evidence(second.sample_id).as_dict(), f"e25turn2_{seed}")
+        third = memory.observe_and_record()
+        require("lab.item.crate" not in {
+            x["entity_ref"] for x in memory.world_model(memory_enabled=False)["entities"]
+        }, "crate must no longer be visible")
+        world_before = operator_truth(port, keys[2])
+        coordinator = E25LabCognitiveCoordinator(memory, max_steps=4)
+        results = []
+        for enabled in (True, False):
+            for mode in ("STUB", "FAST"):
+                turn_id = f"{mode.lower()}_{seed}_{'on' if enabled else 'off'}"
+                adapter = (TwoStepEvidenceStub() if mode == "STUB" else
+                           LocalFastEvidenceAdapter(base_url=base_url, model=model,
+                               trace_path=root / f"{turn_id}-model-calls.jsonl"))
+                report = coordinator.run_turn(adapter, turn_id=turn_id,
+                                               memory_enabled=enabled)
+                trace = coordinator.decision_records(turn_id)
+                require(operator_truth(port, keys[2]) == world_before,
+                        "read-only cognition mutated world")
+                require(len(instance.event_log.load_events()) == 3
+                        and instance.memory_store.count() == 0
+                        and instance.core_execution is None,
+                        "read-only turn mutated canonical state")
+                rows = [row for o in report["outcomes"]
+                        if o["status"] == "COMPLETED" and
+                        o["operation_kind"] == "retrieve_memory"
+                        for row in o["result"]["records"]
+                        if row["entity_ref"] == "lab.item.crate"]
+                proofs = [row for o in report["outcomes"]
+                          if o["status"] == "COMPLETED" and
+                          o["operation_kind"] == "lookup_raw_evidence"
+                          for row in o["result"]["records"]
+                          if row["status"] == "verified_source_view"
+                          and "lab.item.crate" in row["entities_observed"]]
+                calls = [] if mode == "STUB" else adapter.calls
+                if not enabled:
+                    require(not rows and not proofs, "memory-off exposed crate history")
+                success = (
+                    report["status"] == "STOPPED" and
+                    (bool(proofs) if enabled else not rows and not proofs) and
+                    (enabled or any(o["operation_kind"] == "retrieve_memory"
+                                    and o["status"] == "COMPLETED"
+                                    for o in report["outcomes"])) and
+                    (mode == "STUB" or bool(calls) and all(c["valid"] for c in calls))
+                )
+                result = {"seed": seed, "mode": mode, "memory_enabled": enabled,
+                          "turn_status": report["status"], "quality_pass": bool(success),
+                          "operations": [o.get("operation_kind") for o in report["outcomes"]],
+                          "remembered_crate": bool(rows), "verified_crate_source": bool(proofs),
+                          "model_calls": len(calls),
+                          "transport_successes": sum(c["transport_ok"] for c in calls),
+                          "valid_model_outputs": sum(c["valid"] for c in calls),
+                          "latency_ms": [c.get("latency_ms") for c in calls],
+                          "input_tokens": [c.get("input_tokens") for c in calls],
+                          "output_tokens": [c.get("output_tokens") for c in calls],
+                          "world_unchanged": True}
+                (root / f"{turn_id}-result.json").write_text(
+                    json.dumps({"result": result, "turn": report, "trace": trace},
+                               ensure_ascii=False, indent=2), encoding="utf-8")
+                results.append(result)
+                print(json.dumps(result, ensure_ascii=False), flush=True)
+                if mode == "STUB":
+                    require(success, "stub regression")
+        return results
+    finally:
+        finish(process, logfile)
+
+
+def main():
+    ap = argparse.ArgumentParser(description=__doc__)
+    ap.add_argument("--godot", required=True)
+    ap.add_argument("--base-url", default="http://127.0.0.1:8085")
+    ap.add_argument("--model", default="Qwen3-0.6B-Q8_0")
+    ap.add_argument("--model-file", type=Path, required=True)
+    ap.add_argument("--evidence-dir", type=Path)
+    args = ap.parse_args()
+    url = urlsplit(args.base_url)
+    if (url.scheme != "http" or url.hostname not in ("127.0.0.1", "::1")
+            or url.port is None or url.path not in ("", "/")
+            or url.username or url.password or url.query or url.fragment):
+        ap.error("loopback llama-server only")
+    with urllib.request.urlopen(args.base_url.rstrip("/") + "/v1/models", timeout=10) as response:
+        server_models = json.loads(response.read(65536))
+    require(any(x.get("id") == args.model for x in server_models["data"]),
+            "server model ID differs from requested alias")
+    with args.model_file.open("rb") as stream:
+        model_hash = hashlib.file_digest(stream, "sha256").hexdigest()
+    out = args.evidence_dir or Path(tempfile.mkdtemp(prefix="anima-e26a-"))
+    out.mkdir(parents=True, exist_ok=True)
+    print(f"Evidence directory: {out}", flush=True)
+    manifest = {"model_alias": args.model, "local_file": args.model_file.name,
+                "local_file_sha256": model_hash, "server_models": server_models,
+                "file_hash_not_attested_by_server": True,
+                "temperature": 0, "max_output_tokens": 256, "max_steps": 4}
+    (out / "model-manifest.json").write_text(json.dumps(manifest, indent=2), encoding="utf-8")
+    cases = []
+    for seed in (7, 8):
+        cases.extend(case(_binary(args.godot), seed, out,
+                          base_url=args.base_url, model=args.model))
+    fast = [c for c in cases if c["mode"] == "FAST"]
+    transport_ok = all(c["model_calls"] > 0 and
+                       c["transport_successes"] == c["model_calls"] for c in fast)
+    report = {"schema": "anima.e26a.real_fast_readonly/0.1",
+              "status": "E2_6A_MODEL_RUN_COMPLETE" if transport_ok else "E2_6A_TRANSPORT_FAIL",
+              "fast_quality_passes": sum(c["quality_pass"] for c in fast),
+              "fast_cases": len(fast), "cases": cases,
+              "world_action_authority": False, "no_fallback": True,
+              "scope": "real Godot captured Raw; read-only model proposals"}
+    (out / "e26a-results.json").write_text(json.dumps(report, indent=2), encoding="utf-8")
+    print(json.dumps(report, sort_keys=True), flush=True)
+    if not transport_ok:
+        raise SystemExit(2)
+
+
+if __name__ == "__main__":
+    main()
