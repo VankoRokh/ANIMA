@@ -1,0 +1,86 @@
+name: ANIMA v0.2 E2.5c Paired Memory and Stale History
+
+on:
+  push:
+    branches:
+      - work/v02-e25c-memory-conflict
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: anima-e25c-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  memory-offline:
+    name: Python ${{ matrix.python-version }} / E2.5c paired history and contradiction
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ['3.12', '3.13', '3.14']
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v6
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Install test dependencies
+        run: python -m pip install -r requirements-dev.txt
+      - name: Memory conflict policy and previous Raw/Core contracts
+        run: python -m pytest -q -p no:cacheprovider tests/test_visual_decision_policy.py tests/test_e24b_pose.py tests/test_e25a_cognition.py tests/test_e24b_pose.py tests/test_e24_working_memory.py tests/test_e23_egocentric_contract.py tests/test_e23_cognitive_proposal_contract.py tests/test_e22_raw_capture.py
+      - name: E2.1 and frozen E1 contracts
+        run: |
+          python -m pytest -q -p no:cacheprovider \
+            tests/test_e21_core_gateway.py \
+            tests/test_lifecycle_world_contracts.py \
+            tests/test_lifecycle_scenario.py \
+            tests/test_lifecycle_world_verification.py \
+            tests/test_lifecycle_world_recovery.py
+      - name: Docs and Python syntax
+        run: bash scripts/check.sh
+      - name: Full Python regression
+        run: python -m pytest -q -p no:cacheprovider
+
+  memory-godot:
+    name: Godot 4.7.2 / E2.5c paired memory / E2.5b regression
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.14'
+      - name: Install test dependencies
+        run: python -m pip install -r requirements-dev.txt
+      - name: Verified official Godot 4.7.2
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/godot"
+          curl --fail --location --retry 3 --retry-delay 2 \
+            --output "$RUNNER_TEMP/godot/godot.zip" \
+            https://github.com/godotengine/godot-builds/releases/download/4.7.2-stable/Godot_v4.7.2-stable_linux.x86_64.zip
+          echo "cadd3204e728a35d3f13adb7fd0d7902636b79f6b95c40c265eb73b6c35329e4  $RUNNER_TEMP/godot/godot.zip" | sha256sum -c -
+          unzip -q "$RUNNER_TEMP/godot/godot.zip" -d "$RUNNER_TEMP/godot"
+          chmod +x "$RUNNER_TEMP/godot/Godot_v4.7.2-stable_linux.x86_64"
+          echo "GODOT_BIN=$RUNNER_TEMP/godot/Godot_v4.7.2-stable_linux.x86_64" >> "$GITHUB_ENV"
+      - name: E2.5c real Godot memory pairs and E2.5b regression
+        shell: bash
+        env:
+          E25C_REPORT_DIR: ${{ runner.temp }}/anima-e25c-evidence
+        run: bash scripts/run_e25c_memory_gate.sh "$GODOT_BIN"
+      - name: Preserve raw logs even on failure
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: anima-e25c-memory-evidence
+          path: ${{ runner.temp }}/anima-e25c-evidence/
+          if-no-files-found: warn
+          retention-days: 21
