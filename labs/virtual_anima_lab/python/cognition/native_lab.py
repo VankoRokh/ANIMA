@@ -86,7 +86,10 @@ class NativeLabAdapter:
     """Bind native calls to typed lab proposals; no access to service handles."""
     def __init__(self, *, base_url, model, trace_path, task, transport=None, registry=None,
                  first_tool_required=False, canonical_sets=False, temporal=False,
-                 compact_temporal=False, error_feedback=False):
+                 compact_temporal=False, error_feedback=False, model_claims=False):
+        if type(model_claims) is not bool or (model_claims and not compact_temporal):
+            raise ValueError('model claims require compact temporal projection')
+        self.model_claims = model_claims
         if type(error_feedback) is not bool:
             raise TypeError("error_feedback must be boolean")
         self.error_feedback = error_feedback
@@ -146,8 +149,12 @@ class NativeLabAdapter:
                         entity["last_seen_sample_seq"] = _sample_seq_in_scope(original["last_seen_sample"], self.latest_sample_id)
                     else:
                         entity["last_seen_sample_id"] = original["last_seen_sample"]
+            system_prompt = SYSTEM
+            if self.model_claims:
+                from .model_claims import CLAIM_INSTRUCTION
+                system_prompt += CLAIM_INSTRUCTION
             self.session = NativeToolSession(self.catalog, model=self.model,
-                system_prompt=SYSTEM, transport=self.transport,
+                system_prompt=system_prompt, transport=self.transport,
                 first_tool_required=self.first_tool_required,
                 argument_feedback=self.error_feedback,
                 user_prompt=canonical(prompt_context))
