@@ -99,8 +99,10 @@ def assess(case, report, trace, calls):
             "output_tokens": [c.get("output_tokens") for c in calls]}
 
 
-def information_requirement(case):
+def information_requirement(case, *, temporal_completion=False):
     # Trusted fixture mapping, not model input or a natural language parser.
+    if temporal_completion and case["id"] == "C06":
+        return CompletionRequirement("historical_and_latest_observation", entities=case["targets"])
     if case["kind"] == "positive":
         return CompletionRequirement("verified_observation", entities=case["targets"])
     if case["kind"] == "negative":
@@ -129,16 +131,17 @@ def run_cases(memory, coordinator, root, seed, *, base_url, model, check_world, 
         turn_id = f"suite_{seed}_{case['id']}"
         adapter = NativeLabAdapter(base_url=base_url, model=model,
             trace_path=root / f"{turn_id}-model-calls.jsonl", task=case["task"],
-            canonical_sets=variant in ("set", "combined", "compact", "ranked", "refined", "feedback", "feedback_probe", "continuation", "budgeted", "budget_probe", "claims", "claims_separated", "temporal_sources"),
-            temporal=variant in ("temporal", "combined", "compact", "ranked", "refined", "feedback", "feedback_probe", "continuation", "budgeted", "budget_probe", "claims", "claims_separated", "temporal_sources"),
-            compact_temporal=variant in ("compact", "refined", "feedback", "continuation", "budgeted", "budget_probe", "claims", "claims_separated", "temporal_sources"),
-            error_feedback=variant in ("feedback", "feedback_probe", "continuation", "budgeted", "budget_probe", "claims", "claims_separated", "temporal_sources"),
-            model_claims=variant == "claims", latest_observation=variant == "temporal_sources")
-        limits = (ResourceLimits() if variant in ("budgeted","claims","claims_separated","temporal_sources") else
+            canonical_sets=variant in ("set", "combined", "compact", "ranked", "refined", "feedback", "feedback_probe", "continuation", "budgeted", "budget_probe", "claims", "claims_separated", "temporal_sources", "temporal_completion"),
+            temporal=variant in ("temporal", "combined", "compact", "ranked", "refined", "feedback", "feedback_probe", "continuation", "budgeted", "budget_probe", "claims", "claims_separated", "temporal_sources", "temporal_completion"),
+            compact_temporal=variant in ("compact", "refined", "feedback", "continuation", "budgeted", "budget_probe", "claims", "claims_separated", "temporal_sources", "temporal_completion"),
+            error_feedback=variant in ("feedback", "feedback_probe", "continuation", "budgeted", "budget_probe", "claims", "claims_separated", "temporal_sources", "temporal_completion"),
+            model_claims=variant == "claims", latest_observation=variant in ("temporal_sources","temporal_completion"))
+        limits = (ResourceLimits() if variant in ("budgeted","claims","claims_separated","temporal_sources", "temporal_completion") else
                   ResourceLimits(max_calls=1) if variant == "budget_probe" else None)
+        requirement = information_requirement(case, temporal_completion=variant == "temporal_completion")
         report = coordinator.run_turn(adapter, turn_id=turn_id, memory_enabled=case["enabled"],
-            completion_requirement=information_requirement(case) if variant in ("continuation","budgeted","budget_probe","claims","claims_separated","temporal_sources") else None,
-            resource_limits=limits, project_result_claims=variant in ("claims_separated","temporal_sources"))
+            completion_requirement=requirement if variant in ("continuation","budgeted","budget_probe","claims","claims_separated","temporal_sources", "temporal_completion") else None,
+            resource_limits=limits, project_result_claims=variant in ("claims_separated","temporal_sources", "temporal_completion"))
         trace = coordinator.decision_records(turn_id)
         world_ok, core_ok = check_world(), check_core()
         if not world_ok or not core_ok:
@@ -148,7 +151,12 @@ def run_cases(memory, coordinator, root, seed, *, base_url, model, check_world, 
                   "memory_enabled": case["enabled"], "world_unchanged": world_ok,
                   "canonical_baseline_unchanged": core_ok,
                   **assess(case, report, trace, adapter.calls),
-                  "information_completion": evaluate_completion(information_requirement(case), report, trace)}
+                  "information_completion": evaluate_completion(requirement, report, trace)}
+        if requirement.kind == "historical_and_latest_observation":
+            result["legacy_operation_gate_pass"] = result["operation_gate_pass"]
+            temporal_ok = result["information_completion"]["information_requirement_satisfied"]
+            for key in ("operation_gate_pass", "strict_operation_gate_pass", "recovered_objective"):
+                result[key] = result[key] and temporal_ok
         # Host-authored diagnostic claims, NOT extracted from model prose.
         # Never expose additional source IDs to the model or affect its gate.
         probes = []
@@ -166,13 +174,13 @@ def run_cases(memory, coordinator, root, seed, *, base_url, model, check_world, 
         result["continuation_decisions"] = report.get("continuation_decisions", [])
         result["continued"] = any(x["decision"] == "CONTINUE" for x in result["continuation_decisions"])
         result["resource_budget"] = report.get("resource_budget")
-        if variant in ("claims","claims_separated","temporal_sources"):
+        if variant in ("claims","claims_separated","temporal_sources", "temporal_completion"):
             from labs.virtual_anima_lab.python.cognition.model_claims import evaluate_model_claims
             projection = report.get("claim_projection", {"status":"RESEARCH_NOT_STOPPED","call":None})
             claim_calls = adapter.calls if variant == "claims" else (
                 [projection["call"]] if projection["status"] == "GENERATED" else [])
             evaluation = evaluate_model_claims(coordinator, report, claim_calls)
-            if variant in ("claims_separated","temporal_sources"):
+            if variant in ("claims_separated","temporal_sources", "temporal_completion"):
                 result["claim_projection_status"] = projection["status"]
                 result["claim_projection_call"] = projection["call"]
                 result["total_model_calls"] = len(adapter.calls) + int(projection["call"] is not None)
@@ -185,7 +193,11 @@ def run_cases(memory, coordinator, root, seed, *, base_url, model, check_world, 
                 and all(v["status"] == "VERIFIED" for v in evaluation["verdicts"])
                 and (set(case["targets"]) <= set(evaluation["verified_positive_entities"])
                      if case["kind"] == "positive" else not evaluation["claims"]))
-        if variant in ("continuation","budgeted","budget_probe","claims","claims_separated","temporal_sources") and (report["model_calls_used"] != len(adapter.calls) or len(adapter.calls) > 4):
+            if requirement.kind == "historical_and_latest_observation":
+                from labs.virtual_anima_lab.python.cognition.model_claims import temporal_claim_coverage
+                result["temporal_claim_coverage"] = temporal_claim_coverage(result["information_completion"], evaluation)
+                result["claim_objective_pass"] = result["claim_objective_pass"] and result["temporal_claim_coverage"]
+        if variant in ("continuation","budgeted","budget_probe","claims","claims_separated","temporal_sources", "temporal_completion") and (report["model_calls_used"] != len(adapter.calls) or len(adapter.calls) > 4):
             raise AssertionError("model call budget/accounting mismatch")
         if not case["enabled"] and CRATE in result["verified_entities"]:
             raise AssertionError("memory ablation exposed crate history")
@@ -211,7 +223,7 @@ def main():
     ap.add_argument("--model", required=True)
     ap.add_argument("--model-file", type=Path, required=True)
     ap.add_argument("--evidence-dir", type=Path)
-    ap.add_argument("--variant", choices=("baseline", "set", "temporal", "combined", "compact", "ranked", "refined", "feedback", "feedback_probe", "continuation", "budgeted", "budget_probe", "claims", "claims_separated", "temporal_sources"), default="baseline")
+    ap.add_argument("--variant", choices=("baseline", "set", "temporal", "combined", "compact", "ranked", "refined", "feedback", "feedback_probe", "continuation", "budgeted", "budget_probe", "claims", "claims_separated", "temporal_sources", "temporal_completion"), default="baseline")
     ap.add_argument("--case", action="append", choices=[c["id"] for c in CASES])
     args = ap.parse_args()
     url = urlsplit(args.base_url)
@@ -260,6 +272,10 @@ def main():
               "claim_objective_passes":sum(r.get("claim_objective_pass",False) for r in results),
               "model_claim_verdict_counts":{status:sum(v["status"] == status for r in results for v in r.get("model_claims",{}).get("verdicts",[])) for status in ("VERIFIED","CONTRADICTED","UNSUPPORTED")},
               "latest_observation_reads":sum(r["latest_observation_reads"] for r in results),
+              "legacy_operation_passes":sum(r.get("legacy_operation_gate_pass",r["operation_gate_pass"]) for r in results),
+              "temporal_cases":sum(r["information_completion"]["requirement"]["kind"] == "historical_and_latest_observation" for r in results),
+              "temporal_information_passes":sum(r["information_completion"]["requirement"]["kind"] == "historical_and_latest_observation" and r["information_completion"]["information_requirement_satisfied"] for r in results),
+              "temporal_claim_passes":sum(r.get("temporal_claim_coverage",False) for r in results),
               "host_claim_probe_counts":{status:sum(p["status"] == status for r in results for p in r["host_claim_probes"])
                                          for status in ("VERIFIED","CONTRADICTED","UNSUPPORTED")},
               "semantic_review":"PENDING", "results":results}
