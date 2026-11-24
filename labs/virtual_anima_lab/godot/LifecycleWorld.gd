@@ -740,8 +740,7 @@ func _relocate_item(req: Dictionary, request_id: int) -> Dictionary:
 		return _reply(request_id, false, {}, "INVALID_CELL")
 	var destination := Vector2i(int(raw["x"]), int(raw["y"]))
 	if (not _inside(destination) or _blocked(destination) or destination == _anima
-			or destination == _delivery or destination == _landmark
-			or destination == _item or _item_owner != ""):
+			or destination == _delivery or destination == _landmark or _item_owner != ""):
 		return _reply(request_id, false, {}, "INVALID_CELL")
 	var digest := JSON.stringify([fixture_id, req["world_instance_id"], int(req["epoch"]),
 		int(req["expected_revision"]), req["expected_sample_id"], destination.x, destination.y]).sha256_text()
@@ -752,6 +751,8 @@ func _relocate_item(req: Dictionary, request_id: int) -> Dictionary:
 		var replay: Dictionary = saved["receipt"].duplicate(true)
 		replay["replayed"] = true
 		return _reply(request_id, true, replay)
+	if destination == _item:
+		return _reply(request_id, false, {}, "INVALID_CELL")
 	if int(req["expected_revision"]) != _revision:
 		return _reply(request_id, false, {}, "STALE_REVISION")
 	if (_last_sample.is_empty() or req["expected_sample_id"] != _last_sample.get("sample_id")
