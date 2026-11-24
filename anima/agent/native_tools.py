@@ -101,7 +101,11 @@ class LoopbackChatTransport:
 class NativeToolSession:
     """One model conversation; caller submits only verified tool results."""
 
-    def __init__(self, catalog, *, model, system_prompt, user_prompt, transport):
+    def __init__(self, catalog, *, model, system_prompt, user_prompt, transport,
+                 first_tool_required=False):
+        if type(first_tool_required) is not bool:
+            raise TypeError('first_tool_required must be boolean')
+        self.first_tool_required = first_tool_required
         self.catalog = catalog
         self.model = model
         self.transport = transport
@@ -115,8 +119,10 @@ class NativeToolSession:
     def next(self):
         if self.pending is not None or self.terminal:
             raise ValueError("unresolved tool call or terminal session")
+        require_tool = self.first_tool_required and not self.calls
         payload = {"model": self.model, "messages": strict_json(canonical(self.messages)),
-                   "tools": self.catalog.definitions(), "tool_choice": "auto",
+                   "tools": self.catalog.definitions(),
+                   "tool_choice": "required" if require_tool else "auto",
                    "parallel_tool_calls": False, "temperature": 0, "max_tokens": 256,
                    "chat_template_kwargs": {"enable_thinking": False}}
         record = {"request": payload, "raw_response": None, "transport_ok": False,
@@ -149,6 +155,8 @@ class NativeToolSession:
             if content is not None and type(content) is not str:
                 raise ValueError("invalid assistant content")
             if not calls:
+                if require_tool:
+                    raise ValueError("required first tool call missing")
                 if finish != "stop" or not content or not content.strip():
                     raise ValueError("no explicit completed assistant response")
                 self.terminal = True
