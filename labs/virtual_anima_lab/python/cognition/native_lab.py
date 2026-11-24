@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+import re
 
 from anima.agent.native_tools import (
     NativeToolCatalog, NativeToolSession, LoopbackChatTransport, canonical,
@@ -32,7 +33,26 @@ def _records_schema():
             "items": {"type": "object", "additionalProperties": True}}
 
 
-def lab_registry(*, temporal=False):
+def _sample_parts(sample_id):
+    # EgocentricView validates this canonical identity at ingress.
+    # Use numerical sequence only within the frozen world/epoch.
+    if type(sample_id) is not str:
+        raise ValueError("sample identity required")
+    match = re.fullmatch(r"(worldobs:[^:]+:[0-9]+):([1-9][0-9]*)", sample_id)
+    if match is None:
+        raise ValueError("invalid sample identity")
+    return match[1], int(match[2])
+
+
+def _sample_seq_in_scope(sample_id, latest_sample_id):
+    domain, seq = _sample_parts(sample_id)
+    latest_domain, latest_seq = _sample_parts(latest_sample_id)
+    if domain != latest_domain or seq > latest_seq:
+        raise ValueError("sample outside frozen world/epoch or future")
+    return seq
+
+
+def lab_registry(*, temporal=False, compact_temporal=False):
     text = {"type": "string"}
     integer = {"type": "integer", "minimum": 0}
     boolean = {"type": "boolean"}
@@ -55,7 +75,8 @@ def lab_registry(*, temporal=False):
                                                 "items": {"type": "string", "minLength": 1,
                                                           "maxLength": 128}}}),
             output_schema=_object({"kind": text, "records": _records_schema(),
-                                   **({"as_of_sample_id": text} if temporal else {})},
+                                   **({"as_of_sample_id": text} if temporal else {}),
+                                   **({"as_of_sample_seq": integer} if compact_temporal else {})},
                                   required=["kind", "records"]),
             effect_class="read_only", idempotency="repeat_safe"),
     ])
@@ -64,11 +85,15 @@ def lab_registry(*, temporal=False):
 class NativeLabAdapter:
     """Bind native calls to typed lab proposals; no access to service handles."""
     def __init__(self, *, base_url, model, trace_path, task, transport=None, registry=None,
-                 first_tool_required=False, canonical_sets=False, temporal=False):
+                 first_tool_required=False, canonical_sets=False, temporal=False,
+                 compact_temporal=False):
+        if compact_temporal and not temporal:
+            raise ValueError("compact temporal projection requires temporal scope")
+        self.compact_temporal = compact_temporal
         self.temporal = temporal
         self.canonical_sets = canonical_sets
         self.catalog = NativeToolCatalog(
-            registry if registry is not None else lab_registry(temporal=temporal),
+            registry if registry is not None else lab_registry(temporal=temporal, compact_temporal=compact_temporal),
             set_arguments={("lookup_raw_evidence", "1"): ("event_ids",)} if canonical_sets else None)
         self.transport = transport if transport is not None else LoopbackChatTransport(base_url)
         self.model = model
@@ -98,10 +123,16 @@ class NativeLabAdapter:
                 self.latest_sample_id = context["latest_sample_id"]
                 if type(self.latest_sample_id) is not str or not self.latest_sample_id:
                     raise ValueError("latest captured sample identity required")
-                prompt_context["as_of_latest_sample_id"] = self.latest_sample_id
+                if self.compact_temporal:
+                    prompt_context["latest_sample_seq"] = _sample_parts(self.latest_sample_id)[1]
+                else:
+                    prompt_context["as_of_latest_sample_id"] = self.latest_sample_id
                 prompt_context["observation_scope"] = "current_observation refers to latest captured sample; not_observed is not absent"
                 for entity, original in zip(entities, (row for row in context["entities"] if row["category"] != "surface")):
-                    entity["last_seen_sample_id"] = original["last_seen_sample"]
+                    if self.compact_temporal:
+                        entity["last_seen_sample_seq"] = _sample_seq_in_scope(original["last_seen_sample"], self.latest_sample_id)
+                    else:
+                        entity["last_seen_sample_id"] = original["last_seen_sample"]
             self.session = NativeToolSession(self.catalog, model=self.model,
                 system_prompt=SYSTEM, transport=self.transport,
                 first_tool_required=self.first_tool_required,
@@ -125,6 +156,26 @@ class NativeLabAdapter:
                                else "historical_sample")
                               if row["status"] == "verified_source_view" else "unverified")}
                                       for row in result["records"]]}
+            if self.compact_temporal and descriptor.name == "lookup_raw_evidence":
+                projected = []
+                for row in result["records"]:
+                    entry = dict(row)
+                    if row["status"] == "verified_source_view":
+                        seq = _sample_seq_in_scope(entry.pop("sample_id"), self.latest_sample_id)
+                        if type(entry["sample_seq"]) is not int or entry["sample_seq"] != seq:
+                            raise ValueError("source sample sequence mismatch")
+                    projected.append(entry)
+                result = {**result, "records": projected,
+                          "as_of_sample_seq": _sample_parts(self.latest_sample_id)[1]}
+                del result["as_of_sample_id"]
+            elif self.compact_temporal and descriptor.name == "retrieve_memory":
+                projected = []
+                for row in result["records"]:
+                    entry = dict(row)
+                    entry["last_seen_sample_seq"] = _sample_seq_in_scope(
+                        entry.pop("last_seen_sample"), self.latest_sample_id)
+                    projected.append(entry)
+                result = {**result, "records": projected}
             self.session.submit_result(descriptor, result)
             if descriptor.name == "retrieve_memory":
                 self.allowed_ids.update(row["last_seen_event_id"] for row in result["records"]
@@ -155,7 +206,8 @@ class NativeLabAdapter:
         finally:
             for record in self.session.calls[before:]:
                 record.update(profile="native", canonical_sets=self.canonical_sets,
-                              temporal=self.temporal, turn_id=turn_id, step_index=step_index,
+                              temporal=self.temporal, compact_temporal=self.compact_temporal,
+                              turn_id=turn_id, step_index=step_index,
                               context_snapshot_id=binding[1])
                 self.calls.append(record)
                 with self.trace_path.open("a", encoding="utf-8") as stream:

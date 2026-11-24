@@ -84,7 +84,8 @@ def case(binary: str, seed: int, root: Path, *, base_url, model, profile, suite=
             x["entity_ref"] for x in memory.world_model(memory_enabled=False)["entities"]
         }, "crate must no longer be visible")
         world_before = operator_truth(port, keys[2])
-        coordinator = E25LabCognitiveCoordinator(memory, max_steps=4)
+        coordinator = E25LabCognitiveCoordinator(memory, max_steps=4,
+            ranked=suite and suite_variant in ("ranked", "refined"))
         if suite:
             from .e26b_cognitive_suite import run_cases
             return run_cases(memory, coordinator, root, seed, base_url=base_url, model=model,

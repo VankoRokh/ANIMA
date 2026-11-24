@@ -89,8 +89,9 @@ def run_cases(memory, coordinator, root, seed, *, base_url, model, check_world, 
         turn_id = f"suite_{seed}_{case['id']}"
         adapter = NativeLabAdapter(base_url=base_url, model=model,
             trace_path=root / f"{turn_id}-model-calls.jsonl", task=case["task"],
-            canonical_sets=variant in ("set", "combined"),
-            temporal=variant in ("temporal", "combined"))
+            canonical_sets=variant in ("set", "combined", "compact", "ranked", "refined"),
+            temporal=variant in ("temporal", "combined", "compact", "ranked", "refined"),
+            compact_temporal=variant in ("compact", "refined"))
         report = coordinator.run_turn(adapter, turn_id=turn_id, memory_enabled=case["enabled"])
         trace = coordinator.decision_records(turn_id)
         world_ok, core_ok = check_world(), check_core()
@@ -120,7 +121,7 @@ def main():
     ap.add_argument("--model", required=True)
     ap.add_argument("--model-file", type=Path, required=True)
     ap.add_argument("--evidence-dir", type=Path)
-    ap.add_argument("--variant", choices=("baseline", "set", "temporal", "combined"), default="baseline")
+    ap.add_argument("--variant", choices=("baseline", "set", "temporal", "combined", "compact", "ranked", "refined"), default="baseline")
     ap.add_argument("--case", action="append", choices=[c["id"] for c in CASES])
     args = ap.parse_args()
     url = urlsplit(args.base_url)
