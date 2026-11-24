@@ -153,3 +153,115 @@ class LocalFastEvidenceAdapter:
             with self.trace_path.open("a", encoding="utf-8") as stream:
                 stream.write(json.dumps(trace, ensure_ascii=False, allow_nan=False) + "\n")
                 stream.flush()
+
+
+# A second model-facing profile. This is a bounded choice experiment, not
+# free-form planning. Preserve the original profile unchanged for comparison.
+CHOICE_SYSTEM = (
+    "Task: find and verify past evidence about the crate. "
+    "Choose exactly one available choice. Search crate memory if needed. "
+    "Inspect a source that mentions the crate to verify it. "
+    "If a crate search returns no records, or a source confirms the crate, stop. "
+    "Old observations do not establish current visibility. "
+    'Output JSON only: {"choice":"one available choice"} .'
+)
+
+
+def _choice_context(context, outcomes):
+    """Map only already exposed provenance to short, per-call source handles."""
+    source_ids = {}
+    def alias(event_id):
+        if event_id not in source_ids:
+            source_ids[event_id] = f"source_{len(source_ids) + 1}"
+        return source_ids[event_id]
+
+    def entity(row):
+        return {"entity": row["entity_ref"], "visibility": row["current_observation"],
+                "source": alias(row["last_seen_event_id"])}
+
+    observations = [entity(row) for row in context["entities"]
+                    if row["category"] != "surface"]
+    history = []
+    for outcome in outcomes:
+        result = outcome.get("result", {})
+        records = result.get("records", [])
+        if outcome.get("operation_kind") == "retrieve_memory":
+            # Same trusted result scope as legacy profile.
+            data = [entity(row) for row in records if row["category"] != "surface"]
+        else:
+            data = [{"source": source_ids.get(row["event_id"], "unavailable"),
+                     "status": row["status"], "entities": row.get("entities_observed", [])}
+                    for row in records]
+        history.append({"operation": outcome.get("operation_kind"),
+                        "status": outcome["status"], "records": data})
+    choices = {
+        "search_crate": ("retrieve_memory", {"query": "crate", "top_k": 3}),
+        "search_obstacle": ("retrieve_memory", {"query": "obstacle", "top_k": 3}),
+        "stop": None,
+    }
+    for event_id, handle in source_ids.items():
+        choices["inspect_" + handle] = ("lookup_raw_evidence", {"event_ids": [event_id]})
+    payload = {"memory_enabled": context["memory_enabled"],
+               "observations": observations, "previous_results": history,
+               "available_choices": list(choices)}
+    return payload, choices
+
+
+def _decode_choice(text, choices, *, turn_id, step_index, context_id):
+    if type(text) is not str or len(text.encode("utf-8")) > 4096:
+        raise ValueError("invalid response byte budget")
+    raw = json.loads(text, object_pairs_hook=_unique_pairs)
+    if (type(raw) is not dict or set(raw) != {"choice"}
+            or type(raw["choice"]) is not str or raw["choice"] not in choices):
+        raise ValueError("unknown choice or unexpected output fields")
+    selected = choices[raw["choice"]]
+    if selected is None:
+        return None
+    op, arguments = selected
+    return CognitiveStepProposal({
+        "schema": SCHEMA, "proposal_id": f"pr_{turn_id}_{step_index}",
+        "turn_id": turn_id, "context_snapshot_id": context_id,
+        "operation_kind": op, "arguments": arguments,
+        "expected_information": "",
+    }).as_dict()
+
+
+class LocalFastChoiceAdapter(LocalFastEvidenceAdapter):
+    """Translate an exact finite choice, never repair or infer model intent."""
+    def propose(self, context, outcomes, *, turn_id, step_index):
+        payload, choices = _choice_context(context, outcomes)
+        schema = {"type": "object",
+                  "properties": {"choice": {"type": "string", "enum": list(choices)}},
+                  "required": ["choice"], "additionalProperties": False}
+        prompt = json.dumps(payload, ensure_ascii=False, sort_keys=True, allow_nan=False)
+        if len(prompt.encode("utf-8")) > 12000:
+            raise ValueError("model input exceeds compact budget")
+        trace = {"profile": "choice_v1", "turn_id": turn_id, "step_index": step_index,
+                 "context_snapshot_id": context["context_snapshot_id"],
+                 "system_prompt": CHOICE_SYSTEM, "user_prompt": prompt,
+                 "response_schema": schema, "choice_bindings": choices,
+                 "raw_response": None, "transport_ok": False, "valid": False}
+        try:
+            response = self.transport.complete_structured(
+                system_prompt=CHOICE_SYSTEM, user_prompt=prompt,
+                timeout_seconds=self.timeout, response_schema=schema)
+            trace.update(transport_ok=True, raw_response=response.text,
+                         latency_ms=response.latency_ms, input_tokens=response.input_tokens,
+                         output_tokens=response.output_tokens, finish_reason=response.finish_reason)
+            try:
+                proposal = _decode_choice(response.text, choices, turn_id=turn_id,
+                                          step_index=step_index,
+                                          context_id=context["context_snapshot_id"])
+            except (ValueError, TypeError) as exc:
+                trace["error"] = str(exc)
+                return {"invalid_model_output": True}
+            trace.update(valid=True, proposal=proposal)
+            return proposal
+        except Exception as exc:
+            trace["error"] = f"{type(exc).__name__}: {exc}"
+            raise
+        finally:
+            self.calls.append(trace)
+            with self.trace_path.open("a", encoding="utf-8") as stream:
+                stream.write(json.dumps(trace, ensure_ascii=False, allow_nan=False) + "\n")
+                stream.flush()
