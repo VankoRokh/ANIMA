@@ -632,8 +632,83 @@ class VisualControlService:
         self.http_worker.join(timeout=3)
 
 
+def prepare_trial(session: VisualDecisionSession, *, scenario: str,
+                  operator_key: str) -> None:
+    """Controlled prehistory only. All evaluated actions come from policy.
+
+    Harness sets up the previous experience before user-controlled STEP/RUN.
+    For relocated only, it applies one privileged world intervention. Only
+    redacted receipt clocks reach E24PoseTrail; target x/y are never added
+    to agent Context, Raw, decisions or UI telemetry.
+    """
+    if scenario == "baseline":
+        return
+    if scenario not in ("familiar", "relocated"):
+        raise ValueError("unsupported scenario")
+    first = session.memory.observe_and_record()
+    session.last_sample_id = first.sample_id
+    session._event("PREP", "Familiarization: initial view", evidence=first.core_event_id)
+    for index in (1, 2):
+        before = session.memory.raw_evidence(session.last_sample_id).as_dict()
+        action = EgocentricAction({
+            "schema": VIEW_ACTION_SCHEMA,
+            "world_instance_id": before["world_instance_id"],
+            "epoch": before["epoch"], "expected_revision": before["revision"],
+            "observation_id": before["sample_id"],
+            "operation_id": f"prehistory_turn_{index}",
+            "action_type": "world.turn", "arguments": {"direction": "right"},
+        })
+        with LabClient(session.world_port, role="agent", protocol=PROTOCOL_V2) as client:
+            receipt = client.call(
+                "act", auth=session.executor_key, action=action.as_dict()
+            )["data"]
+        confirmed = session.pose.record_verified_external_action(action)
+        if (confirmed["event_id"] != receipt["event_id"]
+                or confirmed["revision"] != receipt["revision"]
+                or confirmed["tick"] != receipt["tick"]):
+            raise VisualRunnerError("prehistory action receipt not reverified")
+        after = session.memory.observe_and_record()
+        session.last_sample_id = after.sample_id
+        session.pose.reconstruct()
+    session._event(
+        "PREP", "Previous crate observation is now outside current view",
+        evidence=session.memory.world_model()["entities"][0]["last_seen_event_id"]
+                 if session.memory.world_model()["entities"] else None,
+    )
+    if scenario == "relocated":
+        before = session.memory.raw_evidence(session.last_sample_id).as_dict()
+        with LabClient(session.world_port, role="operator", protocol=PROTOCOL_V2) as op:
+            receipt = op.call(
+                "relocate_item", auth=operator_key,
+                fixture_id="fixture_move_crate",
+                world_instance_id=before["world_instance_id"],
+                epoch=before["epoch"],
+                expected_revision=before["revision"],
+                expected_sample_id=before["sample_id"],
+                at={"x": 2, "y": 5},
+            )["data"]
+        if receipt["status"] != "APPLIED" or receipt["replayed"] is not False:
+            raise VisualRunnerError("operator-only relocation did not apply")
+        session.pose.record_operator_world_change(receipt)
+        after = session.memory.observe_and_record()
+        session.last_sample_id = after.sample_id
+        changes = session.pose.reconstruct()["verified_external_changes"]
+        if len(changes) != 1 or changes[0]["after_sample_id"] != after.sample_id:
+            raise VisualRunnerError("unexpected external change not linked to new Raw")
+        session._event(
+            "PREP", "Operator changed hidden world; agent receives only new vision",
+            evidence=after.core_event_id,
+        )
+    session._event("READY", "Evaluation begins: agent policy chooses all next actions")
+
+
 def launch(*, godot: str, seed: int, headless: bool,
-           report_dir: Path | None = None, step_interval: float = 1.2):
+           report_dir: Path | None = None, step_interval: float = 1.2,
+           scenario: str = "baseline", memory_enabled: bool = True):
+    if scenario not in ("baseline", "familiar", "relocated"):
+        raise ValueError("unsupported visual experiment")
+    if type(memory_enabled) is not bool:
+        raise ValueError("memory access ablation must be bool")
     root = report_dir or Path(tempfile.mkdtemp(prefix="anima-visual-runner-"))
     root.mkdir(parents=True, exist_ok=True)
     world_port, control_port = _port(), _port()
@@ -659,6 +734,8 @@ def launch(*, godot: str, seed: int, headless: bool,
         "--lifecycle-egocentric", "--lifecycle-debug-ui",
         "--lifecycle-visual-control-port", str(control_port),
     ]
+    if scenario == "relocated":
+        args.append("--lifecycle-e25c-fixtures")
     logfile = (root / "godot-visual.log").open("w", encoding="utf-8")
     process = subprocess.Popen(args, cwd=PROJECT, env=env,
                                stdout=logfile, stderr=subprocess.STDOUT)
@@ -678,7 +755,9 @@ def launch(*, godot: str, seed: int, headless: bool,
         session = VisualDecisionSession(
             memory=memory, pose=pose,
             world_port=world_port, executor_key=executor_key,
+            scenario=scenario, memory_enabled=memory_enabled,
         )
+        prepare_trial(session, scenario=scenario, operator_key=operator_key)
         service = VisualControlService(
             session, port=control_port, token=control_key, interval=step_interval,
         )
@@ -686,6 +765,7 @@ def launch(*, godot: str, seed: int, headless: bool,
         print("ANIMA_VISUAL_RUNNER_READY", flush=True)
         print(f"Godot world: {world_port}, diagnostics/control: {control_port}", flush=True)
         print("Mode: deterministic / LAB_ADMISSION / Core-backed Raw", flush=True)
+        print(f"Scenario: {scenario}; historical memory: {'ON' if memory_enabled else 'OFF'}", flush=True)
         print(f"Evidence directory: {root}", flush=True)
         print("Use STEP/RUN/PAUSE in Godot; Ctrl+C exits.", flush=True)
         return session, service, process, logfile
@@ -718,6 +798,9 @@ def main():
     parser.add_argument("--headless", action="store_true")
     parser.add_argument("--report-dir", type=Path)
     parser.add_argument("--step-interval", type=float, default=1.2)
+    parser.add_argument("--scenario", choices=("baseline", "familiar", "relocated"),
+                        default="baseline")
+    parser.add_argument("--memory", choices=("on", "off"), default="on")
     args = parser.parse_args()
     godot = (args.godot or shutil.which("godot") or shutil.which("godot4")
              or str(Path.home() / ".local/opt/godot/Godot_v4.7.2-stable_linux.x86_64"))
@@ -728,6 +811,7 @@ def main():
     session, service, proc, logfile = launch(
         godot=godot, seed=args.seed, headless=args.headless,
         report_dir=args.report_dir, step_interval=args.step_interval,
+        scenario=args.scenario, memory_enabled=args.memory == "on",
     )
     try:
         while proc.poll() is None:
