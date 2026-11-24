@@ -66,8 +66,57 @@ def test_memory_geometry_does_not_authorize_blind_step():
     recalled = memory(enabled=True, remembered=True)
     choice = CrateInvestigationPolicy.propose(view(), recalled, pose(1))
     assert choice.kind == "world.turn"
-    assert choice.basis in ("memory_hypothesis", "current_uncertainty")
+    assert choice.basis in ("memory_hypothesis", "current_uncertainty", "suspected_stale_hypothesis")
 
 
 def test_state_schema_is_versioned():
     assert CONTROL_SCHEMA == "anima.lab.visual_runner_state/0.1"
+
+
+def test_familiar_crate_changes_first_decision_only_with_memory():
+    recalled = memory(enabled=True, remembered=True)
+    first = CrateInvestigationPolicy.propose(view(), recalled, pose(2))
+    no_history = CrateInvestigationPolicy.propose(
+        view(), memory(), pose(2),
+    )
+    assert first.reason == "CHECK_REMEMBERED_TARGET"
+    assert first.direction == "left" and first.basis == "memory_hypothesis"
+    assert no_history.reason == "SEARCH_NEW_VIEW"
+    assert no_history.direction == "right"
+
+
+def test_missing_crate_at_predicted_visible_position_weakens_hypothesis():
+    recalled = memory(enabled=True, remembered=True)
+    choice = CrateInvestigationPolicy.propose(view(), recalled, pose(1))
+    assert choice.kind == "world.turn"
+    assert choice.reason == "PRIOR_LOCATION_NOT_REOBSERVED"
+    assert choice.suspect_prior_sample == "first"
+    assert choice.basis == "suspected_stale_hypothesis"
+    afterwards = CrateInvestigationPolicy.propose(
+        view(), recalled, pose(1), stale_sample_ids=frozenset(("first",)),
+    )
+    assert afterwards.reason == "SEARCH_AFTER_MEMORY_CONFLICT"
+    assert afterwards.suspect_prior_sample is None
+
+
+def test_possible_occlusion_prevents_false_memory_contradiction():
+    recalled = memory(enabled=True, remembered=True)
+    occluded = view()
+    occluded["readings"] = [{
+        "entity_ref": "lab.obstacle.opaque",
+        "category": "obstacle",
+        "bearing_mdeg": 0,
+        "range_milli_cells": 300,
+        "properties": {},
+    }]
+    choice = CrateInvestigationPolicy.propose(occluded, recalled, pose(1))
+    assert choice.suspect_prior_sample is None
+    assert choice.reason != "PRIOR_LOCATION_NOT_REOBSERVED"
+
+
+def test_direct_current_evidence_overrides_prior_stale_hypothesis():
+    recalled = memory(enabled=True, remembered=True)
+    choice = CrateInvestigationPolicy.propose(
+        view(0), recalled, pose(3), stale_sample_ids=frozenset(("first",)),
+    )
+    assert choice.kind == "world.step" and choice.basis == "current_raw"

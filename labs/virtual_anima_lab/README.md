@@ -107,6 +107,34 @@ PYTHON_BIN=~/Projects/ANIMA/.venv/bin/python bash scripts/run_visual_decision_la
 
 **CI:** `bash scripts/run_visual_decision_gate.sh "$GODOT_BIN"` (headless Godot + реальный Core + API STEP/RUN + регрессия E1.2–E2.5a). Формальная приёмка/ограничения: [E2.5b research report](../../docs/RESEARCH/e2-5b-visual-decision-lab-acceptance-v02.md).
 
+## E2.5c-M — визуальные эксперименты с памятью и устаревшими сведениями
+
+В этой ветке Visual Decision Runner поддерживает два дополнительных исследовательских сценария. Они требуют **нового процесса Godot и нового временного Core на каждый запуск**; не нужно переписывать или очищать уже существующие данные:
+
+```bash
+# Доверенный harness сначала позволяет ANIMA увидеть предмет, затем отворачивает её.
+# Дальнейшие действия выбирает детерминированный агент по текущим наблюдениям.
+bash scripts/run_visual_decision_lab.sh --scenario familiar --memory on --seed 7
+bash scripts/run_visual_decision_lab.sh --scenario familiar --memory off --seed 7
+
+# Вторая ситуация: предмет незаметно перемещён только operator fixture.
+# ANIMA получает только очередное эгоцентрическое наблюдение.
+bash scripts/run_visual_decision_lab.sh --scenario relocated --memory on --seed 7
+bash scripts/run_visual_decision_lab.sh --scenario relocated --memory off --seed 7
+```
+
+**Нажимай RUN** после появления нового окна; для подробного разбора используй STEP. В панели теперь указаны `Trial`, `Memory`, причина каждого решения и `MEMORY HYPOTHESES (not Knowledge)`. Статус `SUSPECTED_STALE` означает лишь несоответствие предполагаемого положения текущему обзору, а `REOBSERVED_AFTER_CONFLICT` — новое прямое наблюдение объекта. Это **не** автоматическое опровержение исходного воспоминания и не нативный Knowledge layer.
+
+При фиксированном сценарии и seed итоговое число **оцениваемых** policy actions:
+- FAMILIAR: память ON — 2, OFF — 4.
+- RELOCATED: память ON — 4 (с пересмотром гипотезы), OFF — 2.
+
+Внешние подготовительные повороты не входят в метрику. Новая operator-команда `relocate_item` доступна только при отдельном флаге `--lifecycle-e25c-fixtures`, который автоматически включается **только** для RELOCATED. Она не доступна observer/executor и не отдаёт свои координаты через agent Raw, Context или UI telemetry.
+
+Для полного автоматического Godot+Python воспроизведения: `bash scripts/run_e25c_memory_gate.sh "$GODOT_BIN"`. Отчёт: [E2.5c-M](../../docs/RESEARCH/e2-5c-memory-conflict-acceptance-v02.md).
+
+**Границы:** нет FAST/DEEP; `LAB_ADMISSION` остаётся исследовательским, не Core Stage6; созданная вручную история — экспериментальная подготовка, а не самостоятельное исследование среды. Опыт может как помочь, так и направить неверно; это именно то, что проверяется.
+
 ## Проверки
 
 Из корня репозитория при закрытом окне Lab:
