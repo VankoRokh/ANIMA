@@ -52,7 +52,7 @@ def _sample_seq_in_scope(sample_id, latest_sample_id):
     return seq
 
 
-def lab_registry(*, temporal=False, compact_temporal=False):
+def lab_registry(*, temporal=False, compact_temporal=False, latest_observation=False):
     text = {"type": "string"}
     integer = {"type": "integer", "minimum": 0}
     boolean = {"type": "boolean"}
@@ -79,6 +79,15 @@ def lab_registry(*, temporal=False, compact_temporal=False):
                                    **({"as_of_sample_seq": integer} if compact_temporal else {})},
                                   required=["kind", "records"]),
             effect_class="read_only", idempotency="repeat_safe"),
+        *([ToolDescriptor(name="inspect_latest_observation", version="1",
+            description="Read the verified latest captured observation in this research context. "
+                        "Returns the source event ID, sample sequence and observed entities. "
+                        "Does not capture a new observation or prove absence from the world.",
+            input_schema=_object({}),
+            output_schema=_object({"kind": text, "records": _records_schema(),
+                                   "as_of_sample_id": text, "as_of_sample_seq": integer},
+                                  required=["kind","records"]),
+            effect_class="read_only", idempotency="repeat_safe")] if latest_observation else []),
     ])
 
 
@@ -86,7 +95,10 @@ class NativeLabAdapter:
     """Bind native calls to typed lab proposals; no access to service handles."""
     def __init__(self, *, base_url, model, trace_path, task, transport=None, registry=None,
                  first_tool_required=False, canonical_sets=False, temporal=False,
-                 compact_temporal=False, error_feedback=False, model_claims=False):
+                 compact_temporal=False, error_feedback=False, model_claims=False,
+                 latest_observation=False):
+        if type(latest_observation) is not bool or (latest_observation and not compact_temporal):
+            raise ValueError("latest observation requires compact temporal projection")
         if type(model_claims) is not bool or (model_claims and not compact_temporal):
             raise ValueError('model claims require compact temporal projection')
         self.model_claims = model_claims
@@ -101,7 +113,8 @@ class NativeLabAdapter:
         self.temporal = temporal
         self.canonical_sets = canonical_sets
         self.catalog = NativeToolCatalog(
-            registry if registry is not None else lab_registry(temporal=temporal, compact_temporal=compact_temporal),
+            registry if registry is not None else lab_registry(temporal=temporal, compact_temporal=compact_temporal,
+                                                              latest_observation=latest_observation),
             set_arguments={("lookup_raw_evidence", "1"): ("event_ids",)} if canonical_sets else None)
         self.transport = transport if transport is not None else LoopbackChatTransport(base_url)
         self.model = model
@@ -183,14 +196,20 @@ class NativeLabAdapter:
                 raise ValueError("unverified or mismatched tool outcome")
             result = outcome["result"]
             descriptor.validate_output(result)
-            if self.temporal and descriptor.name == "lookup_raw_evidence":
+            if descriptor.name == "inspect_latest_observation":
+                rows = result["records"]
+                if (result["kind"] != "verified_raw_evidence" or len(rows) != 1
+                        or rows[0]["status"] != "verified_source_view"
+                        or rows[0]["sample_id"] != self.latest_sample_id):
+                    raise ValueError("latest observation result mismatch")
+            if self.temporal and descriptor.name in ("lookup_raw_evidence", "inspect_latest_observation"):
                 result = {**result, "as_of_sample_id": self.latest_sample_id,
                           "records": [{**row, "temporal_scope": (
                               ("latest_captured_sample" if row["sample_id"] == self.latest_sample_id
                                else "historical_sample")
                               if row["status"] == "verified_source_view" else "unverified")}
                                       for row in result["records"]]}
-            if self.compact_temporal and descriptor.name == "lookup_raw_evidence":
+            if self.compact_temporal and descriptor.name in ("lookup_raw_evidence", "inspect_latest_observation"):
                 projected = []
                 for row in result["records"]:
                     entry = dict(row)
@@ -214,6 +233,8 @@ class NativeLabAdapter:
             if descriptor.name == "retrieve_memory":
                 self.allowed_ids.update(row["last_seen_event_id"] for row in result["records"]
                                         if "last_seen_event_id" in row)
+            if descriptor.name == "inspect_latest_observation":
+                self.allowed_ids.add(result["records"][0]["event_id"])
             self.pending = None
         before = len(self.session.calls)
         try:

@@ -1,6 +1,7 @@
 """Experimental final claim wire format, not a completion or Knowledge gate."""
 from anima.agent.native_tools import strict_json
 from .claim_verification import ObservationClaim, ObservationClaimVerifier
+from .source_binding import admitted_source_rows
 
 CLAIM_INSTRUCTION = (
     ' Finish with one JSON object, no markdown: {"answer":"brief answer","claims":[]}. '
@@ -56,14 +57,8 @@ def evaluate_model_claims(coordinator, report, calls):
     # the database to discover a source ID supplied by the model.
     sources = {}
     for rec in records:
-        p, o = rec["proposal"], rec["outcome"]
-        if (rec["admission"] != "ADMITTED" or o["status"] != "COMPLETED"
-                or not p or p["operation_kind"] != "lookup_raw_evidence"
-                or o["result"]["kind"] != "verified_raw_evidence"):
-            continue
-        for row in o["result"]["records"]:
-            if row["status"] == "verified_source_view" and row["event_id"] in p["arguments"]["event_ids"]:
-                sources.setdefault((row["event_id"],row["sample_seq"]),set()).add(row["sample_id"])
+        for row in admitted_source_rows(rec):
+            sources.setdefault((row["event_id"],row["sample_seq"]),set()).add(row["sample_id"])
     verifier = ObservationClaimVerifier(coordinator)
     for item in obj["claims"]:
         ids = sources.get((item["event_id"],item["sample_seq"]),set())

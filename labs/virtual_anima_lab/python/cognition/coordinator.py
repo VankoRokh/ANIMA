@@ -82,7 +82,7 @@ def _rank_memory_matches(entities, query):
 
 
 def _read_only_result(memory: E24WorkingMemory, *, kind: str,
-                      args: dict, memory_enabled: bool, ranked=False) -> dict:
+                      args: dict, memory_enabled: bool, ranked=False, latest_sample_id=None) -> dict:
     """Actual trusted service reads, never a model-generated outcome."""
     if kind == "retrieve_memory":
         model = memory.world_model(memory_enabled=memory_enabled)
@@ -105,6 +105,23 @@ def _read_only_result(memory: E24WorkingMemory, *, kind: str,
             "truncated": len(matches) > args["top_k"],
             "memory_enabled": memory_enabled,
         }
+    if kind == "inspect_latest_observation":
+        # Identity is supplied by the frozen host context, never by the model.
+        if args != {} or type(latest_sample_id) is not str:
+            raise E25CognitionError("LATEST_SAMPLE_NOT_BOUND")
+        with closing(memory._connect()) as db:
+            row = db.execute("SELECT core_event_id FROM e24_raw WHERE sample_id=?",
+                             (latest_sample_id,)).fetchone()
+        if row is None or not row["core_event_id"]:
+            raise E25CognitionError("LATEST_SOURCE_MISSING")
+        result = _read_only_result(memory, kind="lookup_raw_evidence",
+            args={"event_ids":[row["core_event_id"]]}, memory_enabled=memory_enabled)
+        rows = result["records"]
+        if (len(rows) != 1 or rows[0]["status"] != "verified_source_view"
+                or rows[0]["sample_id"] != latest_sample_id
+                or rows[0]["event_id"] != row["core_event_id"]):
+            raise E25CognitionError("LATEST_SOURCE_MISMATCH")
+        return result
     if kind == "lookup_raw_evidence":
         records = []
         # Explicit IDs; never arbitrary paths, raw SQL, or model-provided raw.
@@ -145,7 +162,10 @@ class E25LabCognitiveCoordinator:
     """Only read-only lab cognition; no independent Core identity or executor."""
 
     def __init__(self, memory: E24WorkingMemory, *, max_steps: int = 4, ranked=False,
-                 error_feedback=False):
+                 error_feedback=False, latest_observation=False):
+        if type(latest_observation) is not bool:
+            raise TypeError("latest_observation must be boolean")
+        self._latest_observation = latest_observation
         if type(memory) is not E24WorkingMemory:
             raise TypeError("trusted E24WorkingMemory required")
         if type(max_steps) is not int or not 1 <= max_steps <= MAX_STEPS:
@@ -383,6 +403,8 @@ class E25LabCognitiveCoordinator:
             admissible = kind in {
                 "retrieve_memory", "lookup_raw_evidence", "inspect_current_belief"
             }
+            if kind == "inspect_latest_observation":
+                admissible = self._latest_observation
             if kind == "inspect_goal_status":
                 # No trusted GoalDecision configured in this lab. Fail closed.
                 admissible = False
@@ -409,6 +431,8 @@ class E25LabCognitiveCoordinator:
                     self._memory, kind=kind, args=proposal["arguments"],
                     memory_enabled=memory_enabled,
                     **({"ranked": True} if self._ranked else {}),
+                    **({"latest_sample_id": context["latest_sample_id"]}
+                       if kind == "inspect_latest_observation" else {}),
                 )
                 output = {
                     "schema": "anima.lab.cognitive_outcome/0.1",
