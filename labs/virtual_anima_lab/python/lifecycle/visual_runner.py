@@ -677,18 +677,25 @@ def prepare_trial(session: VisualDecisionSession, *, scenario: str,
     )
     if scenario == "relocated":
         before = session.memory.raw_evidence(session.last_sample_id).as_dict()
+        fixture_request = {
+            "fixture_id": "fixture_move_crate",
+            "world_instance_id": before["world_instance_id"],
+            "epoch": before["epoch"],
+            "expected_revision": before["revision"],
+            "expected_sample_id": before["sample_id"],
+            "at": {"x": 2, "y": 5},
+        }
         with LabClient(session.world_port, role="operator", protocol=PROTOCOL_V2) as op:
-            receipt = op.call(
-                "relocate_item", auth=operator_key,
-                fixture_id="fixture_move_crate",
-                world_instance_id=before["world_instance_id"],
-                epoch=before["epoch"],
-                expected_revision=before["revision"],
-                expected_sample_id=before["sample_id"],
-                at={"x": 2, "y": 5},
-            )["data"]
-        if receipt["status"] != "APPLIED" or receipt["replayed"] is not False:
-            raise VisualRunnerError("operator-only relocation did not apply")
+            receipt = op.call("relocate_item", auth=operator_key,
+                              **fixture_request)["data"]
+            replay = op.call("relocate_item", auth=operator_key,
+                             **fixture_request)["data"]
+        if (receipt["status"] != "APPLIED" or receipt["replayed"] is not False
+                or replay["replayed"] is not True
+                or replay["event_id"] != receipt["event_id"]
+                or replay["revision"] != receipt["revision"]
+                or replay["tick"] != receipt["tick"]):
+            raise VisualRunnerError("operator fixture isn't idempotent")
         session.pose.record_operator_world_change(receipt)
         after = session.memory.observe_and_record()
         session.last_sample_id = after.sample_id
