@@ -57,6 +57,15 @@ CREATE TABLE IF NOT EXISTS visual_decisions (
  after_sample_id TEXT,
  outcome TEXT
 );
+CREATE TABLE IF NOT EXISTS visual_hypotheses(
+ prior_sample_id TEXT PRIMARY KEY REFERENCES e24_raw(sample_id),
+ suspected_sample_id TEXT NOT NULL REFERENCES e24_raw(sample_id),
+ prior_event_id TEXT NOT NULL,
+ suspected_event_id TEXT NOT NULL,
+ status TEXT NOT NULL CHECK(status IN ('SUSPECTED_STALE','REOBSERVED_AFTER_CONFLICT')),
+ revised_sample_id TEXT REFERENCES e24_raw(sample_id),
+ revised_event_id TEXT
+);
 """
 
 
@@ -202,7 +211,8 @@ class VisualDecisionSession:
     """One-actor step engine. All external actions live in this trusted object."""
 
     def __init__(self, *, memory: E24WorkingMemory, pose: E24PoseTrail,
-                 world_port: int, executor_key: str, max_steps: int = MAX_STEPS):
+                 world_port: int, executor_key: str, max_steps: int = MAX_STEPS,
+                 scenario: str = "baseline", memory_enabled: bool = True):
         if type(memory) is not E24WorkingMemory or type(pose) is not E24PoseTrail:
             raise TypeError("visual engine requires verified E24 Core and pose")
         if type(world_port) is not int or not 1024 <= world_port <= 65535:
@@ -211,12 +221,17 @@ class VisualDecisionSession:
             raise ValueError("invalid executor capability")
         if type(max_steps) is not int or not 1 <= max_steps <= MAX_STEPS:
             raise ValueError("bounded max_steps 1..32")
+        if scenario not in ("baseline", "familiar", "relocated"):
+            raise ValueError("unsupported E2.5c experiment scenario")
+        if type(memory_enabled) is not bool:
+            raise ValueError("memory_enabled must be bool")
         self.memory = memory
         self.pose = pose
         self.world_port = world_port
         self.executor_key = executor_key
         self.max_steps = max_steps
-        self.memory_enabled = True
+        self.scenario = scenario
+        self.memory_enabled = memory_enabled
         self.goal_status = "ACTIVE"
         self.sequence = 0
         self.last_sample_id: str | None = None
@@ -237,6 +252,97 @@ class VisualDecisionSession:
             "sequence": self.sequence,
         })
         del self.events[:-EVENT_LIMIT]
+
+    def hypotheses(self) -> list[dict]:
+        with closing(self.memory._connect()) as db:
+            entries = db.execute(
+                "SELECT * FROM visual_hypotheses ORDER BY suspected_sample_id"
+            ).fetchall()
+        evidence = []
+        for entry in entries:
+            previous = self.memory.raw_evidence(entry["prior_sample_id"]).as_dict()
+            current = self.memory.raw_evidence(entry["suspected_sample_id"]).as_dict()
+            if (not any(x["entity_ref"] == "lab.item.crate"
+                        for x in previous["readings"])
+                    or any(x["entity_ref"] == "lab.item.crate"
+                           for x in current["readings"])):
+                raise VisualRunnerError("contradiction hypothesis has no original sensor evidence")
+            if entry["revised_sample_id"]:
+                later = self.memory.raw_evidence(entry["revised_sample_id"]).as_dict()
+                if (not any(x["entity_ref"] == "lab.item.crate"
+                            for x in later["readings"])):
+                    raise VisualRunnerError("revised hypothesis is missing re-observation")
+            evidence.append({
+                "prior_sample_id": entry["prior_sample_id"],
+                "suspected_sample_id": entry["suspected_sample_id"],
+                "prior_event_id": entry["prior_event_id"],
+                "suspected_event_id": entry["suspected_event_id"],
+                "status": entry["status"],
+                "revised_sample_id": entry["revised_sample_id"],
+                "revised_event_id": entry["revised_event_id"],
+                "claim": "observation_conflicts_with_old_location_hypothesis"
+                         if entry["status"] == "SUSPECTED_STALE"
+                         else "new_observation_revises_old_location_hypothesis",
+            })
+        return evidence
+
+    def _record_suspected_stale(self, prior_id: str, current_id: str) -> None:
+        prior = self.memory.raw_evidence(prior_id).as_dict()
+        current = self.memory.raw_evidence(current_id).as_dict()
+        if (prior["sample_seq"] >= current["sample_seq"]
+                or not any(r["entity_ref"] == "lab.item.crate"
+                           for r in prior["readings"])
+                or any(r["entity_ref"] == "lab.item.crate"
+                       for r in current["readings"])):
+            raise VisualRunnerError("weak location hypothesis without two source views")
+        with closing(self.memory._connect()) as db:
+            db.execute("BEGIN IMMEDIATE")
+            try:
+                ids = {}
+                for sample_id in (prior_id, current_id):
+                    row = db.execute(
+                        "SELECT core_event_id FROM e24_raw WHERE sample_id=?",
+                        (sample_id,),
+                    ).fetchone()
+                    if row is None or not row["core_event_id"]:
+                        raise VisualRunnerError("missing proven Core Raw for hypothesis")
+                    ids[sample_id] = row["core_event_id"]
+                db.execute(
+                    "INSERT OR IGNORE INTO visual_hypotheses VALUES(?,?,?,?,?,NULL,NULL)",
+                    (prior_id, current_id, ids[prior_id], ids[current_id],
+                     "SUSPECTED_STALE"),
+                )
+                db.commit()
+            except BaseException:
+                db.rollback()
+                raise
+        self._event(
+            "HYPOTHESIS", "Old crate position NOT RE-OBSERVED; investigate elsewhere",
+            evidence=ids[current_id],
+        )
+
+    def _revise_if_reobserved(self, sample_id: str, event_id: str) -> None:
+        view = self.memory.raw_evidence(sample_id).as_dict()
+        if not any(r["entity_ref"] == "lab.item.crate" for r in view["readings"]):
+            return
+        with closing(self.memory._connect()) as db:
+            db.execute("BEGIN IMMEDIATE")
+            try:
+                changed = db.execute(
+                    "UPDATE visual_hypotheses SET status='REOBSERVED_AFTER_CONFLICT',"
+                    "revised_sample_id=?,revised_event_id=? "
+                    "WHERE status='SUSPECTED_STALE'",
+                    (sample_id, event_id),
+                )
+                db.commit()
+            except BaseException:
+                db.rollback()
+                raise
+        if changed.rowcount:
+            self._event(
+                "REVISION", "Found new sensor evidence; previous location hypothesis revised",
+                evidence=event_id,
+            )
 
     def snapshot(self) -> dict:
         with self.lock:
@@ -270,6 +376,8 @@ class VisualDecisionSession:
                     "run_enabled": self.run_enabled,
                     "busy": self.busy,
                     "memory_enabled": self.memory_enabled,
+                    "scenario": self.scenario,
+                    "hypotheses": self.hypotheses(),
                     "max_steps": self.max_steps,
                     "steps": self.sequence,
                     "latest_sample": self.last_sample_id,
@@ -306,8 +414,15 @@ class VisualDecisionSession:
                 view = self.memory.raw_evidence(self.last_sample_id).as_dict()
                 model = self.memory.world_model(memory_enabled=self.memory_enabled)
                 pose = self.pose.reconstruct()
-                choice = CrateInvestigationPolicy.propose(view, model, pose)
+                stale = frozenset(x["prior_sample_id"] for x in self.hypotheses())
+                choice = CrateInvestigationPolicy.propose(
+                    view, model, pose, stale_sample_ids=stale,
+                )
                 self.sequence += 1
+                if choice.suspect_prior_sample is not None:
+                    self._record_suspected_stale(
+                        choice.suspect_prior_sample, view["sample_id"],
+                    )
                 self.last_choice = {
                     "operation": choice.kind, "direction": choice.direction,
                     "reason_code": choice.reason, "basis": choice.basis,
@@ -390,6 +505,7 @@ class VisualDecisionSession:
                     except BaseException:
                         db.rollback()
                         raise
+                self._revise_if_reobserved(observed.sample_id, observed.core_event_id)
                 self.last_outcome = {
                     "status": "VERIFIED_EFFECT" if receipt["effect_applied"] else "VERIFIED_BLOCKED",
                     "operation_id": operation, "after_sample_id": observed.sample_id,
