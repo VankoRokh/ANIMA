@@ -16,6 +16,7 @@ from anima.core.assembly import build_core
 from labs.virtual_anima_lab.python.cognition.local_fast import (
     LocalFastEvidenceAdapter, LocalFastChoiceAdapter,
 )
+from labs.virtual_anima_lab.python.cognition.native_lab import NativeLabAdapter
 from labs.virtual_anima_lab.python.cognition.coordinator import (
     E25LabCognitiveCoordinator, TwoStepEvidenceStub,
 )
@@ -87,10 +88,15 @@ def case(binary: str, seed: int, root: Path, *, base_url, model, profile):
         for enabled in (True, False):
             for mode in ("STUB", "FAST"):
                 turn_id = f"{mode.lower()}_{seed}_{'on' if enabled else 'off'}"
-                adapter_type = LocalFastChoiceAdapter if profile == "choice" else LocalFastEvidenceAdapter
-                adapter = (TwoStepEvidenceStub() if mode == "STUB" else
-                           adapter_type(base_url=base_url, model=model,
-                               trace_path=root / f"{turn_id}-model-calls.jsonl"))
+                trace_path = root / f"{turn_id}-model-calls.jsonl"
+                if mode == "STUB":
+                    adapter = TwoStepEvidenceStub()
+                elif profile == "native":
+                    adapter = NativeLabAdapter(base_url=base_url, model=model,
+                        trace_path=trace_path, task="Find and verify previous observations of the crate.")
+                else:
+                    adapter_type = LocalFastChoiceAdapter if profile == "choice" else LocalFastEvidenceAdapter
+                    adapter = adapter_type(base_url=base_url, model=model, trace_path=trace_path)
                 report = coordinator.run_turn(adapter, turn_id=turn_id,
                                                memory_enabled=enabled)
                 trace = coordinator.decision_records(turn_id)
@@ -141,7 +147,13 @@ def case(binary: str, seed: int, root: Path, *, base_url, model, profile):
                           "latency_ms": [c.get("latency_ms") for c in calls],
                           "input_tokens": [c.get("input_tokens") for c in calls],
                           "output_tokens": [c.get("output_tokens") for c in calls],
-                          "world_unchanged": True}
+                          "world_unchanged": True,
+                          "final_text": calls[-1].get("final_text") if calls else None,
+                          "native_tool_calls": sum("tool_name" in c for c in calls),
+                          "native_result_messages_sent": sum(
+                              sum(m["role"] == "tool" for m in c.get("request", {}).get("messages", []))
+                              for c in calls),
+                          "model_stopped": report["status"] == "STOPPED" and mode == "FAST"}
                 (root / f"{turn_id}-result.json").write_text(
                     json.dumps({"result": result, "turn": report, "trace": trace},
                                ensure_ascii=False, indent=2), encoding="utf-8")
@@ -161,7 +173,7 @@ def main():
     ap.add_argument("--model", default="Qwen3-0.6B-Q8_0")
     ap.add_argument("--model-file", type=Path, required=True)
     ap.add_argument("--evidence-dir", type=Path)
-    ap.add_argument("--profile", choices=("legacy", "choice"), default="legacy")
+    ap.add_argument("--profile", choices=("legacy", "choice", "native"), default="legacy")
     args = ap.parse_args()
     url = urlsplit(args.base_url)
     if (url.scheme != "http" or url.hostname not in ("127.0.0.1", "::1")
