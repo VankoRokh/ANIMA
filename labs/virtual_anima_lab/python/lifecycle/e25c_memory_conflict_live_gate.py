@@ -13,6 +13,7 @@ import sqlite3
 import tempfile
 from pathlib import Path
 
+from labs.virtual_anima_lab.python.lab_client import LabClient, LabRejected, PROTOCOL_V2
 from .visual_runner import launch
 from .visual_runner_live_gate import request, until
 from .world_smoke import _binary
@@ -49,6 +50,23 @@ def run_case(godot, seed, scenario, memory_enabled, root):
             require("lab.item.crate" not in remembered,
                     "memory-off condition leaked previous crate")
         if scenario == "relocated":
+            # The agent executor credential must never be able to call the
+            # operator-only intervention, even though both share loopback.
+            view = session.memory.raw_evidence(initial["latest_sample"]).as_dict()
+            with LabClient(session.world_port, role="agent", protocol=PROTOCOL_V2) as client:
+                try:
+                    client.call(
+                        "relocate_item", auth=session.executor_key,
+                        fixture_id="agent_attempt",
+                        world_instance_id=view["world_instance_id"],
+                        epoch=view["epoch"], expected_revision=view["revision"],
+                        expected_sample_id=view["sample_id"],
+                        at={"x": 4, "y": 5},
+                    )
+                except LabRejected as error:
+                    require(error.error == "FORBIDDEN", "fixture leak to agent role")
+                else:
+                    raise AssertionError("agent invoked operator-only fixture")
             pose = session.pose.reconstruct()
             require(len(pose["verified_external_changes"]) == 1,
                     "relocation did not reconcile as a non-actor world change")
