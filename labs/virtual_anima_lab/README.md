@@ -517,3 +517,14 @@ bash scripts/run_e22_live_gate.sh "$GODOT_BIN"
 В новом checkout запуск `bash scripts/run_visual_stage6_lab.sh --scenario relocated --memory on --seed 7` включает обе исследовательские возможности. Подготовительные повороты и operator fixture выполняются до создания оцениваемой Core Goal; последующие policy actions должны проходить Stage6. Таблица `visual_core_decisions` — диагностический след, не источник допуска; `visual_decisions` остаётся исключительно LAB-контролем.
 
 `bash scripts/run_e25c_integration_gate.sh "$GODOT_BIN"` проверяет обе схемы и предыдущую регрессию. До получения evidence и независимого аудита статус **CANDIDATE / NOT ACCEPTED**, FAST не подключена. Cross-DB recovery, универсальная навигация и production readiness не заявлены.
+
+
+## E2.6a — First Real FAST (candidate)
+
+Read-only local llama.cpp adapter, using E2.5a typed proposal coordinator and real Godot Raw. Model chooses retrieve_memory, lookup_raw_evidence or stop, without access to executors, credentials or hidden operator truth. Only exposed evidence IDs can be requested. A separate trace retains exact projected prompt, raw model reply, validation, latency and token counters. No retry/fallback. Eight matched trials (seed 7/8, Memory ON/OFF, STUB/FAST); transport completion is distinct from model quality. No navigation claim. Run with an explicitly launched loopback llama-server and model alias:
+
+```bash
+bash scripts/run_e26a_real_fast_gate.sh --godot "$GODOT_BIN" --base-url http://127.0.0.1:8085 --model Qwen3-0.6B-Q8_0 --model-file "$MODEL"
+```
+
+Model hash records the supplied local file, not remote-server cryptographic attestation. Model quality failures are evidence, not a reason to silently substitute the stub. No real model execution evidence at candidate creation.
