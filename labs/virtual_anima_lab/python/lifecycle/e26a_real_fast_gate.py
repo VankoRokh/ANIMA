@@ -13,7 +13,9 @@ from urllib.parse import urlsplit
 from pathlib import Path
 
 from anima.core.assembly import build_core
-from labs.virtual_anima_lab.python.cognition.local_fast import LocalFastEvidenceAdapter
+from labs.virtual_anima_lab.python.cognition.local_fast import (
+    LocalFastEvidenceAdapter, LocalFastChoiceAdapter,
+)
 from labs.virtual_anima_lab.python.cognition.coordinator import (
     E25LabCognitiveCoordinator, TwoStepEvidenceStub,
 )
@@ -38,7 +40,7 @@ def operator_truth(port, key):
         return client.call("inspect", auth=key)["data"]
 
 
-def case(binary: str, seed: int, root: Path, *, base_url, model):
+def case(binary: str, seed: int, root: Path, *, base_url, model, profile):
     port = _port()
     keys = tuple(secrets.token_urlsafe(32) for _ in range(3))
     logfile = (root / f"e26a-world-{seed}.log").open("w", encoding="utf-8")
@@ -85,8 +87,9 @@ def case(binary: str, seed: int, root: Path, *, base_url, model):
         for enabled in (True, False):
             for mode in ("STUB", "FAST"):
                 turn_id = f"{mode.lower()}_{seed}_{'on' if enabled else 'off'}"
+                adapter_type = LocalFastChoiceAdapter if profile == "choice" else LocalFastEvidenceAdapter
                 adapter = (TwoStepEvidenceStub() if mode == "STUB" else
-                           LocalFastEvidenceAdapter(base_url=base_url, model=model,
+                           adapter_type(base_url=base_url, model=model,
                                trace_path=root / f"{turn_id}-model-calls.jsonl"))
                 report = coordinator.run_turn(adapter, turn_id=turn_id,
                                                memory_enabled=enabled)
@@ -119,7 +122,16 @@ def case(binary: str, seed: int, root: Path, *, base_url, model):
                                     for o in report["outcomes"])) and
                     (mode == "STUB" or bool(calls) and all(c["valid"] for c in calls))
                 )
+                searched_crate = any(r["proposal"] is not None
+                                     and r["proposal"]["operation_kind"] == "retrieve_memory"
+                                     and "crate" in r["proposal"]["arguments"]["query"].lower()
+                                     and r["outcome"]["status"] == "COMPLETED" for r in trace)
                 result = {"seed": seed, "mode": mode, "memory_enabled": enabled,
+                          "profile": profile if mode == "FAST" else "stub",
+                          "searched_crate": searched_crate,
+                          "target_quality_pass": bool(success and (enabled or searched_crate)),
+                          "safe_stop_without_search": bool(not enabled and not rows and not proofs
+                              and report["status"] == "STOPPED" and not report["outcomes"]),
                           "turn_status": report["status"], "quality_pass": bool(success),
                           "operations": [o.get("operation_kind") for o in report["outcomes"]],
                           "remembered_crate": bool(rows), "verified_crate_source": bool(proofs),
@@ -149,6 +161,7 @@ def main():
     ap.add_argument("--model", default="Qwen3-0.6B-Q8_0")
     ap.add_argument("--model-file", type=Path, required=True)
     ap.add_argument("--evidence-dir", type=Path)
+    ap.add_argument("--profile", choices=("legacy", "choice"), default="legacy")
     args = ap.parse_args()
     url = urlsplit(args.base_url)
     if (url.scheme != "http" or url.hostname not in ("127.0.0.1", "::1")
@@ -163,8 +176,9 @@ def main():
         model_hash = hashlib.file_digest(stream, "sha256").hexdigest()
     out = args.evidence_dir or Path(tempfile.mkdtemp(prefix="anima-e26a-"))
     out.mkdir(parents=True, exist_ok=True)
+    require(not any(out.iterdir()), "evidence directory must be empty; preserve prior runs")
     print(f"Evidence directory: {out}", flush=True)
-    manifest = {"model_alias": args.model, "local_file": args.model_file.name,
+    manifest = {"profile": args.profile, "model_alias": args.model, "local_file": args.model_file.name,
                 "local_file_sha256": model_hash, "server_models": server_models,
                 "file_hash_not_attested_by_server": True,
                 "temperature": 0, "max_output_tokens": 256, "max_steps": 4}
@@ -172,12 +186,14 @@ def main():
     cases = []
     for seed in (7, 8):
         cases.extend(case(_binary(args.godot), seed, out,
-                          base_url=args.base_url, model=args.model))
+                          base_url=args.base_url, model=args.model, profile=args.profile))
     fast = [c for c in cases if c["mode"] == "FAST"]
     transport_ok = all(c["model_calls"] > 0 and
                        c["transport_successes"] == c["model_calls"] for c in fast)
     report = {"schema": "anima.e26a.real_fast_readonly/0.1",
               "status": "E2_6A_MODEL_RUN_COMPLETE" if transport_ok else "E2_6A_TRANSPORT_FAIL",
+              "profile": args.profile,
+              "fast_target_quality_passes": sum(c["target_quality_pass"] for c in fast),
               "fast_quality_passes": sum(c["quality_pass"] for c in fast),
               "fast_cases": len(fast), "cases": cases,
               "world_action_authority": False, "no_fallback": True,

@@ -528,3 +528,8 @@ bash scripts/run_e26a_real_fast_gate.sh --godot "$GODOT_BIN" --base-url http://1
 ```
 
 Model hash records the supplied local file, not remote-server cryptographic attestation. Model quality failures are evidence, not a reason to silently substitute the stub. No real model execution evidence at candidate creation.
+
+
+### E2.6a — alternative choice profile (candidate)
+
+Original legacy result (owner local run): transport 4/4; valid proposals 0/4; task quality 0/4. Replies mixed fields belonging to different operations, and no-memory cases invented source IDs. Keep legacy unchanged. Opt-in `--profile choice` offers a finite menu: search crate, search obstacle, inspect an exposed source handle, or stop. The wrapper binds the exact selection to typed arguments; no correction, retries or world authority. Short source aliases are per-call; the journal preserves their canonical mapping. This changes the model task to bounded candidate selection, not unrestricted query generation. The original quality metric remains for comparison, plus `fast_target_quality_passes` requires a completed crate search in the memory-off condition. Premature stop is safe but not proof of a completed search. Use a new empty evidence directory per run. No live model evidence for this candidate yet.
