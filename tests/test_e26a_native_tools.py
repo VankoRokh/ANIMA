@@ -211,3 +211,77 @@ def test_temporal_projection_binds_verified_source_to_latest_sample(tmp_path):
     assert [r["temporal_scope"] for r in projected["records"]] == [
         "historical_sample","latest_captured_sample","unverified"]
     assert "as_of_sample_id" not in result and "temporal_scope" not in result["records"][0]
+
+
+from labs.virtual_anima_lab.python.cognition.coordinator import _rank_memory_matches
+from labs.virtual_anima_lab.python.cognition.native_lab import _sample_seq_in_scope
+
+
+def test_ranked_retrieval_prefers_more_matching_terms_before_truncation():
+    other = {"entity_ref": "lab.obstacle.14f9"}
+    target = {"entity_ref": "lab.obstacle.shortcut"}
+    crate = {"entity_ref": "lab.item.crate"}
+    entities = [other, crate, target]
+    assert _rank_memory_matches(entities, "shortcut obstacle") == [target, other]
+    assert _rank_memory_matches(entities[::-1], "shortcut obstacle") == [target, other]
+    assert _rank_memory_matches(entities, "crate shortcut") == [crate, target]
+    assert _rank_memory_matches(entities, "elephant") == []
+    assert entities == [other, crate, target]
+
+
+@pytest.mark.parametrize("sample", ["worldobs:w:2:1", "worldobs:other:1:1",
+                                     "worldobs:w:1:4", "ev_a"])
+def test_compact_sample_scope_rejects_other_epochs_worlds_and_future(sample):
+    with pytest.raises(ValueError):
+        _sample_seq_in_scope(sample, "worldobs:w:1:3")
+
+
+def test_compact_empty_context_has_no_sample_id_authority(tmp_path):
+    ctx = {**context(), "latest_sample_id":"worldobs:w:1:3"}
+    fake = Fake(completion("lookup_raw_evidence", '{"event_ids":["worldobs:w:1:3"]}'))
+    a = NativeLabAdapter(base_url="http://127.0.0.1:8085", model="test",
+        trace_path=tmp_path/"calls.jsonl", task="find", transport=fake,
+        temporal=True, compact_temporal=True, canonical_sets=True)
+    assert a.propose(ctx, [], turn_id="t", step_index=0) == {"invalid_model_output":True}
+    prompt = json.loads(fake.requests[0]["messages"][1]["content"])
+    assert prompt["latest_sample_seq"] == 3 and prompt["observations"] == []
+    assert "worldobs:" not in fake.requests[0]["messages"][1]["content"]
+    assert not a.allowed_ids
+
+
+def test_compact_projection_retains_event_and_verified_sequence(tmp_path):
+    ctx = {**context(), "memory_enabled":True, "latest_sample_id":"worldobs:w:1:3",
+           "entities":[{"category":"item","entity_ref":"lab.item.crate",
+                        "current_observation":"not_observed","last_seen_event_id":"ev_a",
+                        "last_seen_sample":"worldobs:w:1:2"}]}
+    fake = Fake(completion("retrieve_memory", '{"query":"crate","top_k":1}'),
+                completion("lookup_raw_evidence", '{"event_ids":["ev_a"]}', call_id="id2"),
+                completion(content="Historical observation."))
+    a = NativeLabAdapter(base_url="http://127.0.0.1:8085", model="test",
+        trace_path=tmp_path/"calls.jsonl", task="find", transport=fake,
+        temporal=True, compact_temporal=True)
+    p = a.propose(ctx, [], turn_id="t", step_index=0)
+    result = {"kind":"working_world_memory_search", "strategy":"ranked_lexical_not_semantic_retrieval",
+              "records":[ctx["entities"][0]], "returned":1, "possible_matches":1,
+              "truncated":False,"memory_enabled":True}
+    o = {"proposal_id":p["proposal_id"],"operation_kind":p["operation_kind"],
+         "step_index":0,"status":"COMPLETED","result":result}
+    p2 = a.propose(ctx,[o],turn_id="t",step_index=1)
+    assert p2["arguments"] == {"event_ids":["ev_a"]}
+    raw = {"kind":"verified_raw_evidence","records":[
+        {"event_id":"ev_a","status":"verified_source_view","sample_id":"worldobs:w:1:2",
+         "sample_seq":2,"entities_observed":["lab.item.crate"]}]}
+    o2 = {"proposal_id":p2["proposal_id"],"operation_kind":p2["operation_kind"],
+          "step_index":1,"status":"COMPLETED","result":raw}
+    assert a.propose(ctx,[o,o2],turn_id="t",step_index=2) is None
+    prompt = json.loads(fake.requests[0]["messages"][1]["content"])
+    assert prompt["observations"][0]["last_seen_sample_seq"] == 2
+    search = json.loads(fake.requests[1]["messages"][-1]["content"])
+    assert search["records"][0]["last_seen_sample_seq"] == 2
+    proof = json.loads(fake.requests[2]["messages"][-1]["content"])
+    assert proof["as_of_sample_seq"] == 3
+    assert proof["records"][0]["temporal_scope"] == "historical_sample"
+    assert proof["records"][0]["event_id"] == "ev_a"
+    assert "sample_id" not in proof["records"][0]
+    assert raw["records"][0]["sample_id"] == "worldobs:w:1:2"
+    assert result["records"][0]["last_seen_sample"] == "worldobs:w:1:2"

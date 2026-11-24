@@ -61,8 +61,28 @@ def _sha(value: str) -> str:
     return hashlib.sha256(value.encode("utf-8")).hexdigest()
 
 
+def _rank_memory_matches(entities, query):
+    """Lexical candidate ranking, not semantic identity or proof.
+
+    Preserve the existing OR match scope; rank exact refs, then the number
+    of distinct matching terms, then complete token matches, then stable ref.
+    Never infer aliases or modify source records.
+    """
+    tokens = set(re.findall(r"[a-z0-9]{3,}", query.lower()))
+    candidates = []
+    for entity in entities:
+        ref = entity["entity_ref"].lower()
+        hits = {token for token in tokens if token in ref}
+        if hits:
+            words = set(re.findall(r"[a-z0-9]{3,}", ref))
+            candidates.append((
+                (-int(ref == query.strip().lower()), -len(hits),
+                 -len(tokens & words), entity["entity_ref"]), entity))
+    return [entity for _, entity in sorted(candidates, key=lambda pair: pair[0])]
+
+
 def _read_only_result(memory: E24WorkingMemory, *, kind: str,
-                      args: dict, memory_enabled: bool) -> dict:
+                      args: dict, memory_enabled: bool, ranked=False) -> dict:
     """Actual trusted service reads, never a model-generated outcome."""
     if kind == "retrieve_memory":
         model = memory.world_model(memory_enabled=memory_enabled)
@@ -73,9 +93,12 @@ def _read_only_result(memory: E24WorkingMemory, *, kind: str,
             entity for entity in model["entities"]
             if any(token in entity["entity_ref"].lower() for token in tokens)
         ]
+        if ranked:
+            matches = _rank_memory_matches(model["entities"], args["query"])
         return {
             "kind": "working_world_memory_search",
-            "strategy": "substring_baseline_not_semantic_retrieval",
+            "strategy": ("ranked_lexical_not_semantic_retrieval" if ranked
+                         else "substring_baseline_not_semantic_retrieval"),
             "records": matches[:args["top_k"]],
             "returned": min(len(matches), args["top_k"]),
             "possible_matches": len(matches),
@@ -121,7 +144,7 @@ def _read_only_result(memory: E24WorkingMemory, *, kind: str,
 class E25LabCognitiveCoordinator:
     """Only read-only lab cognition; no independent Core identity or executor."""
 
-    def __init__(self, memory: E24WorkingMemory, *, max_steps: int = 4):
+    def __init__(self, memory: E24WorkingMemory, *, max_steps: int = 4, ranked=False):
         if type(memory) is not E24WorkingMemory:
             raise TypeError("trusted E24WorkingMemory required")
         if type(max_steps) is not int or not 1 <= max_steps <= MAX_STEPS:
@@ -130,6 +153,9 @@ class E25LabCognitiveCoordinator:
             raise E25CognitionError("no connected CoreIngress")
         self._memory = memory
         self._max_steps = max_steps
+        if type(ranked) is not bool:
+            raise TypeError("ranked must be boolean")
+        self._ranked = ranked
         with closing(memory._connect()) as db:
             db.executescript(_SCHEMA)
 
@@ -296,6 +322,7 @@ class E25LabCognitiveCoordinator:
                 result = _read_only_result(
                     self._memory, kind=kind, args=proposal["arguments"],
                     memory_enabled=memory_enabled,
+                    **({"ranked": True} if self._ranked else {}),
                 )
                 output = {
                     "schema": "anima.lab.cognitive_outcome/0.1",
