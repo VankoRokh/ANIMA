@@ -81,17 +81,59 @@ class PolicyChoice:
     reason: str
     basis: str
     approach_finishes: bool = False
+    suspect_prior_sample: str | None = None
 
 
 class CrateInvestigationPolicy:
-    """Minimal deterministic policy; rules depend on real observation, not seed.
+    """Explicit baseline. Sensor and memory ONLY, no Godot designer truth.
 
-    Goal: obtain direct sight of the crate, then perform a verified forward
-    approach step while aligned. This is NOT a learned navigation strategy.
+    Historical bearing is projected through readback-confirmed *local* pose.
+    A missing target where it was expected creates only a SUSPECTED stale
+    hypothesis, never knowledge of the object's true new position.
     """
 
     @staticmethod
-    def propose(view: dict, memory: dict, pose: dict) -> PolicyChoice:
+    def _projection(remembered: dict, pose: dict) -> tuple[float, float, float] | None:
+        poses = {entry["sample_id"]: entry for entry in pose["poses"]}
+        past = poses.get(remembered["last_seen_sample"])
+        if past is None:
+            return None
+        current = pose["poses"][-1]
+        angle = math.radians(remembered["last_seen_view"]["bearing_mdeg"] / 1000)
+        distance = remembered["last_seen_view"]["range_milli_cells"] / 1000
+        h = past["relative_heading_quadrants"]
+        forward_axes = ((0, 1), (1, 0), (0, -1), (-1, 0))
+        right_axes = ((1, 0), (0, -1), (-1, 0), (0, 1))
+        fx, fy = forward_axes[h]
+        rx, ry = right_axes[h]
+        target_x = (past["local_right_steps"] +
+                    distance * (fx * math.cos(angle) + rx * math.sin(angle)))
+        target_y = (past["local_forward_steps"] +
+                    distance * (fy * math.cos(angle) + ry * math.sin(angle)))
+        dx = target_x - current["local_right_steps"]
+        dy = target_y - current["local_forward_steps"]
+        heading = current["relative_heading_quadrants"]
+        cf, cr = forward_axes[heading], right_axes[heading]
+        return (
+            dx * cf[0] + dy * cf[1],
+            dx * cr[0] + dy * cr[1],
+            math.hypot(dx, dy),
+        )
+
+    @staticmethod
+    def _possibly_occluded(view: dict, distance: float) -> bool:
+        # If another reported opaque cell is in front, NOT observing the
+        # old target is not evidence against its recorded position.
+        for row in view["readings"]:
+            if (row["category"] in ("surface", "obstacle")
+                    and abs(row["bearing_mdeg"]) <= 16_000
+                    and row["range_milli_cells"] < int((distance - 0.20) * 1000)):
+                return True
+        return False
+
+    @classmethod
+    def propose(cls, view: dict, memory: dict, pose: dict,
+                *, stale_sample_ids: frozenset[str] = frozenset()) -> PolicyChoice:
         crate = next((
             row for row in view["readings"]
             if row["entity_ref"] == "lab.item.crate"
@@ -105,10 +147,8 @@ class CrateInvestigationPolicy:
                 return PolicyChoice("world.turn", "left",
                                     "CRATE_VISIBLE_LEFT", "current_raw")
             near = crate["range_milli_cells"] <= 1550
-            return PolicyChoice(
-                "world.step", "forward",
-                "APPROACH_VISIBLE_CRATE", "current_raw", near,
-            )
+            return PolicyChoice("world.step", "forward",
+                                "APPROACH_VISIBLE_CRATE", "current_raw", near)
 
         if memory["memory_enabled"]:
             remembered = next((
@@ -116,47 +156,47 @@ class CrateInvestigationPolicy:
                 if entry["entity_ref"] == "lab.item.crate"
             ), None)
             if remembered is not None:
-                # Last-seen bearing is in a PREVIOUS viewpoint, not current.
-                # Project the remembered location through the locally
-                # reconstructed, readback-proven egocentric pose history.
-                poses = {p["sample_id"]: p for p in pose["poses"]}
-                old = poses.get(remembered["last_seen_sample"])
-                current = pose["poses"][-1]
-                if old is not None:
-                    angle = math.radians(
-                        remembered["last_seen_view"]["bearing_mdeg"] / 1000
+                if remembered["last_seen_sample"] in stale_sample_ids:
+                    # Keep the original Raw, but stop trusting its geometry.
+                    return PolicyChoice(
+                        "world.turn", "right", "SEARCH_AFTER_MEMORY_CONFLICT",
+                        "suspected_stale_hypothesis",
                     )
-                    distance = remembered["last_seen_view"]["range_milli_cells"] / 1000
-                    heading = old["relative_heading_quadrants"]
-                    forward_axes = ((0, 1), (1, 0), (0, -1), (-1, 0))
-                    right_axes = ((1, 0), (0, -1), (-1, 0), (0, 1))
-                    fx, fy = forward_axes[heading]
-                    rx, ry = right_axes[heading]
-                    target_x = (old["local_right_steps"] +
-                                distance * (fx * math.cos(angle) + rx * math.sin(angle)))
-                    target_y = (old["local_forward_steps"] +
-                                distance * (fy * math.cos(angle) + ry * math.sin(angle)))
-                    dx = target_x - current["local_right_steps"]
-                    dy = target_y - current["local_forward_steps"]
-                    if math.hypot(dx, dy) > 0.6:
-                        h = current["relative_heading_quadrants"]
-                        cf, cr = forward_axes[h], right_axes[h]
-                        fwd = dx * cf[0] + dy * cf[1]
-                        right = dx * cr[0] + dy * cr[1]
+                result = cls._projection(remembered, pose)
+                if result is not None:
+                    forward, right, distance = result
+                    if (forward > 0.7 and abs(right) <= 0.25
+                            and distance <= 2.0
+                            and not cls._possibly_occluded(view, distance)):
+                        # Looked where earlier evidence predicted a crate,
+                        # now not observed. This weakens the location
+                        # hypothesis, it does not prove the crate absent.
+                        return PolicyChoice(
+                            "world.turn", "right",
+                            "PRIOR_LOCATION_NOT_REOBSERVED",
+                            "suspected_stale_hypothesis", False,
+                            remembered["last_seen_sample"],
+                        )
+                    if distance > 0.6:
                         if right > 0.25:
-                            return PolicyChoice("world.turn", "right",
-                                                "CHECK_REMEMBERED_TARGET", "memory_hypothesis")
+                            return PolicyChoice(
+                                "world.turn", "right",
+                                "CHECK_REMEMBERED_TARGET", "memory_hypothesis",
+                            )
                         if right < -0.25:
-                            return PolicyChoice("world.turn", "left",
-                                                "CHECK_REMEMBERED_TARGET", "memory_hypothesis")
-                        if fwd < -0.25:
-                            return PolicyChoice("world.turn", "right",
-                                                "REORIENT_REMEMBERED_TARGET", "memory_hypothesis")
-                        # Don't walk blindly toward a target absent in current
-                        # sensor. Rotate and seek new direct evidence first.
+                            return PolicyChoice(
+                                "world.turn", "left",
+                                "CHECK_REMEMBERED_TARGET", "memory_hypothesis",
+                            )
+                        if forward < -0.25:
+                            return PolicyChoice(
+                                "world.turn", "right",
+                                "REORIENT_REMEMBERED_TARGET", "memory_hypothesis",
+                            )
+                    # Never step toward a historical target that is not
+                    # directly visible in a verified *current* view.
         return PolicyChoice("world.turn", "right",
                             "SEARCH_NEW_VIEW", "current_uncertainty")
-
 
 class VisualDecisionSession:
     """One-actor step engine. All external actions live in this trusted object."""
