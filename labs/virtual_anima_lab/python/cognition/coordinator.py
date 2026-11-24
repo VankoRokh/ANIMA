@@ -204,7 +204,9 @@ class E25LabCognitiveCoordinator:
     def run_turn(self, adapter: Any, *, turn_id: str,
                  memory_enabled: bool = True,
                  focus_refs: tuple[str, ...] = (),
-                 completion_requirement=None, resource_limits=None) -> dict:
+                 completion_requirement=None, resource_limits=None, project_result_claims=False) -> dict:
+        if type(project_result_claims) is not bool or (project_result_claims and (resource_limits is None or completion_requirement is None)):
+            raise ValueError('claim projection requires a shared resource budget and completion contract')
         if type(turn_id) is not str or _TURN_ID.fullmatch(turn_id) is None:
             raise ValueError("bounded safe turn_id required")
         if type(memory_enabled) is not bool:
@@ -444,7 +446,7 @@ class E25LabCognitiveCoordinator:
                 **({"model_calls_used":calls_used,"continuation_decisions":continuation_decisions}
                    if completion_requirement is not None else {}),
             }
-        return {
+        report = {
             "schema": "anima.lab.cognitive_turn/0.1",
             "turn_id": turn_id, "context_snapshot_id": ctx_id,
             "status": ("STEP_BUDGET_EXHAUSTED" if budget_stopped else
@@ -456,6 +458,27 @@ class E25LabCognitiveCoordinator:
             **({"model_calls_used":calls_used,"continuation_decisions":continuation_decisions}
                if completion_requirement is not None else {}),
         }
+        if project_result_claims:
+            from .claim_projection import project_claims
+            records = self.decision_records(turn_id)
+            evaluation = evaluate_completion(completion_requirement, report, records)
+            projection = {"status":"INFORMATION_INCOMPLETE","call":None}
+            if report["status"] != "STOPPED":
+                projection = {"status":"RESEARCH_NOT_STOPPED","call":None}
+            elif evaluation["information_requirement_satisfied"]:
+                if _sha(_json(self._memory.context_for_cognition(
+                        focus_refs=focus_refs,memory_enabled=memory_enabled))) != _sha(base):
+                    projection = {"status":"STALE_CONTEXT","call":None}
+                else:
+                    projection = project_claims(adapter, report, records, budget)
+                    if _sha(_json(self._memory.context_for_cognition(
+                            focus_refs=focus_refs,memory_enabled=memory_enabled))) != _sha(base):
+                        projection["status"] = "STALE_CONTEXT"
+                        if projection["call"] is not None:
+                            projection["call"]["valid"] = False
+            report["claim_projection"] = projection
+            report["resource_budget"] = budget.snapshot()
+        return report
 
     def decision_records(self, turn_id: str) -> list[dict]:
         if type(turn_id) is not str or _TURN_ID.fullmatch(turn_id) is None:
