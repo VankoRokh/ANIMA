@@ -36,10 +36,9 @@ def admitted_source_rows(record):
                 or row["sample_id"] != prefix + str(seq)
                 or row["source_ref"] != ctx["source_ref"]):
             continue
-        if is_latest:
-            if row["sample_id"] != latest:
-                continue
-        elif row["event_id"] not in p["arguments"]["event_ids"]:
+        if (is_latest or ctx.get("memory_enabled") is False) and row["sample_id"] != latest:
+            continue
+        if not is_latest and row["event_id"] not in p["arguments"]["event_ids"]:
             continue
         eligible.append(row)
     return tuple(eligible)
