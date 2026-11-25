@@ -239,9 +239,11 @@ def test_unknown_raw_event_not_created_by_model(tmp_path, monkeypatch):
             return prop(context, turn_id, "lookup_raw_evidence",
                         {"event_ids": ["ev_nonexistent"]})
     result = coord.run_turn(Raw(), turn_id="turn_unknown")
-    assert result["outcomes"][0]["result"]["records"][0] == {
-        "event_id": "ev_nonexistent", "status": "not_found",
-    }
+    outcome = result["outcomes"][0]
+    assert outcome["status"] == "REJECTED"
+    assert outcome["reason_code"] == "UNEXPOSED_EVIDENCE_ID"
+    assert outcome["execution_performed"] is False
+    assert "result" not in outcome
     assert len(mem._core.event_log.load_events()) == 3
 
 
@@ -352,3 +354,113 @@ def test_schema_feedback_and_model_stop_are_separate_from_objective(tmp_path,mon
     assert result["operation_gate_pass"]==(mode=="repair")
     assert not result["strict_operation_gate_pass"]
     assert len(mem._core.event_log.load_events())==3
+
+
+@pytest.mark.parametrize("enabled", [False, True])
+@pytest.mark.parametrize("sample_seq", [1, 2, 3])
+def test_ca03_alternative_adapter_only_reads_exposed_sources(
+    tmp_path, monkeypatch, enabled, sample_seq,
+):
+    from labs.virtual_anima_lab.python.cognition import coordinator as module
+    mem = memory(tmp_path, monkeypatch)
+    with sqlite3.connect(mem._file) as db:
+        event = db.execute(
+            "SELECT core_event_id FROM e24_raw WHERE sample_id=?",
+            (f"worldobs:{WORLD}:1:{sample_seq}",),
+        ).fetchone()[0]
+    reads = []
+    original = module._read_only_result
+    def tracked(*args, **kwargs):
+        reads.append(kwargs["kind"])
+        return original(*args, **kwargs)
+    monkeypatch.setattr(module, "_read_only_result", tracked)
+
+    class Adapter:
+        def propose(self, context, outcomes, *, turn_id, step_index):
+            return None if outcomes else prop(
+                context, turn_id, "lookup_raw_evidence", {"event_ids": [event]},
+            )
+
+    coord = E25LabCognitiveCoordinator(mem)
+    report = coord.run_turn(Adapter(), turn_id="ca03_scope", memory_enabled=enabled)
+    allowed = sample_seq == 3 or (sample_seq == 2 and enabled)
+    outcome = report["outcomes"][0]
+    trace = coord.decision_records("ca03_scope")[0]
+    if allowed:
+        assert reads == ["lookup_raw_evidence"]
+        assert outcome["status"] == "COMPLETED"
+        assert outcome["result"]["records"][0]["sample_seq"] == sample_seq
+        assert trace["admission"] == "ADMITTED"
+    else:
+        assert reads == []
+        assert outcome["reason_code"] == "UNEXPOSED_EVIDENCE_ID"
+        assert outcome["execution_performed"] is False
+        assert "result" not in outcome
+        assert trace["admission"] == "REJECTED"
+
+
+def test_ca03_mixed_exposed_and_hidden_ids_reject_entire_batch(tmp_path, monkeypatch):
+    from labs.virtual_anima_lab.python.cognition import coordinator as module
+    mem = memory(tmp_path, monkeypatch)
+    rows = mem.world_model()["entities"]
+    hidden = next(row["last_seen_event_id"] for row in rows if row["category"] == "item")
+    latest = next(row["last_seen_event_id"] for row in rows if row["category"] == "surface")
+    def no_read(*args, **kwargs):
+        pytest.fail("mixed authorized/unauthorized batch reached service")
+    monkeypatch.setattr(module, "_read_only_result", no_read)
+
+    class Adapter:
+        def propose(self, context, outcomes, *, turn_id, step_index):
+            return prop(context, turn_id, "lookup_raw_evidence",
+                        {"event_ids": [latest, hidden]})
+
+    coord = E25LabCognitiveCoordinator(mem)
+    out = coord.run_turn(Adapter(), turn_id="ca03_mixed", memory_enabled=False)
+    assert out["outcomes"][0]["reason_code"] == "UNEXPOSED_EVIDENCE_ID"
+    assert out["outcomes"][0]["execution_performed"] is False
+
+
+def test_ca03_latest_result_extends_only_current_turn(tmp_path, monkeypatch):
+    mem = memory(tmp_path, monkeypatch)
+    coord = E25LabCognitiveCoordinator(mem, latest_observation=True)
+    class Adapter:
+        def propose(self, context, outcomes, *, turn_id, step_index):
+            if not outcomes:
+                return prop(context, turn_id, "inspect_latest_observation", {})
+            if step_index == 1:
+                event = outcomes[0]["result"]["records"][0]["event_id"]
+                return prop(context, turn_id, "lookup_raw_evidence",
+                            {"event_ids": [event]}, proposal_id="pr2")
+            return None
+    out = coord.run_turn(Adapter(), turn_id="ca03_latest", memory_enabled=False)
+    assert out["status"] == "STOPPED"
+    assert [item["status"] for item in out["outcomes"]] == ["COMPLETED", "COMPLETED"]
+    assert out["outcomes"][1]["result"]["records"][0]["sample_seq"] == 3
+
+
+def test_ca03_forged_historical_service_result_cannot_be_exposed(tmp_path, monkeypatch):
+    from labs.virtual_anima_lab.python.cognition import coordinator as module
+    mem = memory(tmp_path, monkeypatch)
+    original = module._read_only_result
+    def bad_result(*args, **kwargs):
+        if kwargs["kind"] == "retrieve_memory":
+            return original(*args, **{**kwargs, "memory_enabled": True})
+        return original(*args, **kwargs)
+    monkeypatch.setattr(module, "_read_only_result", bad_result)
+    coord = E25LabCognitiveCoordinator(mem)
+    out = coord.run_turn(TwoStepEvidenceStub(), turn_id="ca03_bad_service",
+                         memory_enabled=False)
+    assert out["status"] == "REJECTED"
+    assert out["outcomes"][0]["reason_code"] == "SERVICE_REJECTED"
+    assert "result" not in out["outcomes"][0]
+
+
+def test_ca03_legacy_historical_off_journal_not_eligible_for_claim(tmp_path, monkeypatch):
+    from labs.virtual_anima_lab.python.cognition.source_binding import admitted_source_rows
+    mem = memory(tmp_path, monkeypatch)
+    coord = E25LabCognitiveCoordinator(mem)
+    coord.run_turn(TwoStepEvidenceStub(), turn_id="ca03_legacy")
+    record = coord.decision_records("ca03_legacy")[1]
+    assert admitted_source_rows(record)
+    record["context_snapshot"]["memory_enabled"] = False
+    assert not admitted_source_rows(record)
