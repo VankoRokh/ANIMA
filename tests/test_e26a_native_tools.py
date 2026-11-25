@@ -41,10 +41,11 @@ def test_registry_projection_and_new_tool_without_adapter_change():
                           effect_class="read_only", idempotency="repeat_safe")
     s, fake = session(completion("test_echo", '{"word":"hello"}'),
                       completion(content="Done"), registry=ToolRegistry([desc]))
-    got, args = s.next()
-    assert got is desc and args == {"word": "hello"}
+    call = s.next()
+    args = call.arguments
+    assert call.descriptor is desc and args == {"word": "hello"}
     assert fake.requests[0]["tools"][0]["function"]["parameters"] == schema
-    s.submit_result(got, args)
+    s.submit_result(call, args)
     assert s.next() is None
     messages = fake.requests[1]["messages"]
     assert messages[-1] == {"role":"tool","tool_call_id":"id1","content":'{"word":"hello"}'}
@@ -73,7 +74,7 @@ def test_native_nonstop_is_not_success():
 
 def test_native_pending_result_binding():
     s, _ = session(completion("retrieve_memory", '{"query":"crate","top_k":5}'))
-    d, _ = s.next()
+    d = s.next()
     with pytest.raises(ValueError):
         s.next()
     with pytest.raises(ValueError):
@@ -114,7 +115,7 @@ def test_required_only_first_then_auto():
     s = NativeToolSession(NativeToolCatalog(lab_registry()), model="test",
                           system_prompt="test", user_prompt="test", transport=fake,
                           first_tool_required=True)
-    descriptor, _ = s.next()
+    descriptor = s.next()
     result = {"kind":"working_world_memory_search",
               "strategy":"substring_baseline_not_semantic_retrieval",
               "records":[], "returned":0, "possible_matches":0,
@@ -156,7 +157,8 @@ def test_set_projection_keeps_canonical_contract_and_wire_log():
     fake = Fake(completion("lookup_raw_evidence", raw))
     s = NativeToolSession(catalog, model="test", system_prompt="test",
                           user_prompt="test", transport=fake)
-    d, args = s.next()
+    call = s.next()
+    d, args = call.descriptor, call.arguments
     assert args == {"event_ids":["ev_a","ev_b"]}
     assert s.calls[-1]["original_arguments"] == json.loads(raw)
     assert s.calls[-1]["arguments_normalized"]
@@ -290,7 +292,7 @@ def test_compact_projection_retains_event_and_verified_sequence(tmp_path):
 def test_native_denial_binds_tool_call_and_does_not_change_authority():
     s, fake = session(completion("lookup_raw_evidence", '{"event_ids":["ev_hidden"]}'),
                       completion(content="No evidence."))
-    d, _ = s.next()
+    d = s.next()
     with pytest.raises(ValueError):
         s.reject_pending(d, reason_code="OTHER")
     s.reject_pending(d, reason_code="UNEXPOSED_EVIDENCE_ID")
@@ -307,8 +309,8 @@ def test_known_argument_error_has_no_valid_result_path():
                 completion(content="Cannot continue."))
     s = NativeToolSession(NativeToolCatalog(lab_registry()), model="test",
         system_prompt="test",user_prompt="test",transport=fake,argument_feedback=True)
-    descriptor,args = s.next()
-    assert args is None and not s.calls[-1]["valid"]
+    descriptor = s.next()
+    assert descriptor.arguments is None and not s.calls[-1]["valid"]
     with pytest.raises(ValueError):
         s.submit_result(descriptor, {})
     with pytest.raises(ValueError):
@@ -332,3 +334,66 @@ def test_unknown_or_malformed_calls_remain_terminal_with_feedback(name,args):
     with pytest.raises(ValueError):
         s.next()
     assert s.terminal and s.pending is None
+
+
+def _search_result():
+    return {"kind":"working_world_memory_search",
+            "strategy":"substring_baseline_not_semantic_retrieval",
+            "records":[], "returned":0, "possible_matches":0,
+            "truncated":False, "memory_enabled":True}
+
+
+def test_ca04_old_call_cannot_resolve_new_same_tool():
+    s, fake = session(
+        completion("retrieve_memory", '{"query":"crate","top_k":1}', call_id="one"),
+        completion("retrieve_memory", '{"query":"elephant","top_k":1}', call_id="two"),
+        completion(content="Done"),
+    )
+    first = s.next()
+    s.submit_result(first, _search_result())
+    second = s.next()
+    assert first.descriptor is second.descriptor
+    assert first.call_id != second.call_id
+    assert first.arguments != second.arguments
+    before = list(s.messages)
+    with pytest.raises(ValueError, match="pending call"):
+        s.submit_result(first, _search_result())
+    with pytest.raises(ValueError, match="pending call"):
+        s.reject_pending(first, reason_code="UNEXPOSED_EVIDENCE_ID")
+    with pytest.raises(ValueError, match="pending call"):
+        s.submit_result(second.descriptor, _search_result())
+    assert s.pending is second and s.messages == before
+    s.submit_result(second, _search_result())
+    assert s.next() is None
+    assert fake.requests[-1]["messages"][-1]["tool_call_id"] == "two"
+
+
+def test_ca04_same_wire_id_other_session_and_copied_handle_rejected():
+    from dataclasses import replace
+    response = completion("retrieve_memory", '{"query":"crate","top_k":1}')
+    s, _ = session(response)
+    other, _ = session(response)
+    call = s.next()
+    foreign = other.next()
+    assert foreign.call_id == call.call_id
+    for invalid in (foreign, replace(call)):
+        with pytest.raises(ValueError, match="pending call"):
+            s.submit_result(invalid, _search_result())
+        with pytest.raises(ValueError, match="pending call"):
+            s.reject_pending(invalid, reason_code="UNEXPOSED_EVIDENCE_ID")
+        assert s.pending is call
+    s.submit_result(call, _search_result())
+
+
+def test_ca04_pending_arguments_are_detached_and_resolution_single_use():
+    s, _ = session(completion("retrieve_memory", '{"query":"crate","top_k":1}'))
+    call = s.next()
+    args = call.arguments
+    args["query"] = "elephant"
+    assert call.arguments["query"] == "crate"
+    assert s.calls[-1]["arguments"]["query"] == "crate"
+    s.reject_pending(call, reason_code="UNEXPOSED_EVIDENCE_ID")
+    with pytest.raises(ValueError, match="pending call"):
+        s.submit_result(call, _search_result())
+    with pytest.raises(ValueError, match="pending call"):
+        s.reject_pending(call, reason_code="UNEXPOSED_EVIDENCE_ID")

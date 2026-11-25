@@ -176,7 +176,7 @@ class NativeLabAdapter:
             raise ValueError("invalid native turn continuation")
         self._resuming = False
         if self.rejected_pending is not None:
-            descriptor, previous_step, reason_code = self.rejected_pending
+            call, previous_step, reason_code = self.rejected_pending
             outcome = outcomes[-1]
             if (outcome.get("step_index") != previous_step
                     or outcome.get("status") != "REJECTED"
@@ -184,10 +184,11 @@ class NativeLabAdapter:
                     or outcome.get("proposal_id") is not None
                     or outcome.get("execution_performed") is not False):
                 raise ValueError("rejection not bound to previous denied call")
-            self.session.reject_pending(descriptor, reason_code=reason_code)
+            self.session.reject_pending(call, reason_code=reason_code)
             self.rejected_pending = None
         if self.pending is not None:
-            descriptor, proposal_id, previous_step = self.pending
+            call, proposal_id, previous_step = self.pending
+            descriptor = call.descriptor
             outcome = outcomes[-1]
             if (outcome.get("proposal_id") != proposal_id
                     or outcome.get("operation_kind") != descriptor.name
@@ -229,7 +230,7 @@ class NativeLabAdapter:
                         entry.pop("last_seen_sample"), self.latest_sample_id)
                     projected.append(entry)
                 result = {**result, "records": projected}
-            self.session.submit_result(descriptor, result)
+            self.session.submit_result(call, result)
             if descriptor.name == "retrieve_memory":
                 self.allowed_ids.update(row["last_seen_event_id"] for row in result["records"]
                                         if "last_seen_event_id" in row)
@@ -241,7 +242,7 @@ class NativeLabAdapter:
             selected = self.session.next()
             if selected is None:
                 return None
-            descriptor, args = selected
+            descriptor, args = selected.descriptor, selected.arguments
             reason_code = None
             if args is None and self.session.pending_error == "INVALID_TOOL_ARGUMENTS":
                 reason_code = "INVALID_TOOL_ARGUMENTS"
@@ -253,7 +254,7 @@ class NativeLabAdapter:
                 record.setdefault("error", "unexposed evidence ID")
                 if self.error_feedback and not self.feedback_used:
                     self.feedback_used = True
-                    self.rejected_pending = (descriptor, step_index, reason_code)
+                    self.rejected_pending = (selected, step_index, reason_code)
                     record["feedback_eligible"] = True
                     return {"rejected_native_call": reason_code}
                 raise ValueError(record["error"])
@@ -263,7 +264,7 @@ class NativeLabAdapter:
                 "operation_kind": descriptor.name, "arguments": args,
                 "expected_information": "",
             }).as_dict()
-            self.pending = (descriptor, proposal["proposal_id"], step_index)
+            self.pending = (selected, proposal["proposal_id"], step_index)
             self.session.calls[-1]["proposal"] = proposal
             return proposal
         except (ValueError, TypeError, KeyError) as exc:

@@ -32,6 +32,8 @@ class ResourceBudget:
         self.calls = 0
         self.input_tokens = 0
         self.output_tokens = 0
+        self.input_usage_missing_calls = 0
+        self.output_usage_missing_calls = 0
         self.pending = False
         self.reason = None
 
@@ -66,15 +68,22 @@ class ResourceBudget:
         if not self.pending:
             raise ValueError("no model call reservation")
         self.pending = False
-        if type(record) is not dict:
+        a, b = (record.get("input_tokens"), record.get("output_tokens")) if type(record) is dict else (None, None)
+        input_known = type(a) is int and a >= 0
+        output_known = type(b) is int and b >= 0
+        if input_known:
+            self.input_tokens += a
+        else:
+            self.input_usage_missing_calls += 1
+        if output_known:
+            self.output_tokens += b
+        else:
+            self.output_usage_missing_calls += 1
+        # Preserve the existing terminal reason for missing usage. Reported
+        # counters are known subtotals, never estimates of unknown consumption.
+        if not input_known or not output_known:
             self.reason = "USAGE_UNAVAILABLE"
             return self.reason
-        a, b = record.get("input_tokens"), record.get("output_tokens")
-        if type(a) is not int or type(b) is not int or a < 0 or b < 0:
-            self.reason = "USAGE_UNAVAILABLE"
-            return self.reason
-        self.input_tokens += a
-        self.output_tokens += b
         if b > self.OUTPUT_RESERVATION or self.output_tokens > self.limits.max_reported_output_tokens:
             self.reason = "OUTPUT_USAGE_EXCEEDED"
         elif self.input_tokens > self.limits.max_reported_input_tokens:
@@ -88,6 +97,10 @@ class ResourceBudget:
                 "limits":asdict(self.limits),"reserved_calls":self.calls,
                 "reported_input_tokens":self.input_tokens,
                 "reported_output_tokens":self.output_tokens,
+                "input_usage_missing_calls":self.input_usage_missing_calls,
+                "output_usage_missing_calls":self.output_usage_missing_calls,
+                "usage_complete":not (self.pending or self.input_usage_missing_calls
+                                      or self.output_usage_missing_calls),
                 "elapsed_ms":self._elapsed(),"stop_reason":self.reason,
                 "reservation_pending":self.pending,
                 "input_and_elapsed_boundary_only":True,

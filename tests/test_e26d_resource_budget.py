@@ -87,3 +87,54 @@ def test_coordinator_budget_keeps_completed_evidence_and_blocks_new_reads(tmp_pa
         "call_limit":"MODEL_CALL_LIMIT","input_exceeded":"INPUT_USAGE_EXCEEDED","normal":None}[mode]
     assert len(mem._core.event_log.load_events())==3
     assert mem._core.memory_store.count()==0
+
+
+@pytest.mark.parametrize("record,known_input,known_output,missing_input,missing_output",[
+    (usage(123,None),123,0,0,1),
+    (usage(None,45),0,45,1,0),
+    (usage(True,0),0,0,1,0),
+    (usage(0,-1),0,0,0,1),
+    (usage(1.5,"4"),0,0,1,1),
+    (None,0,0,1,1),
+])
+def test_ca07_partial_usage_keeps_known_subtotals(
+    record,known_input,known_output,missing_input,missing_output,
+):
+    b=ResourceBudget(ResourceLimits())
+    assert b.reserve()
+    assert not b.snapshot()["usage_complete"]
+    assert b.settle(usage()) is None
+    assert b.snapshot()["usage_complete"]
+    assert b.reserve()
+    assert b.settle(record)=="USAGE_UNAVAILABLE"
+    snapshot=b.snapshot()
+    assert snapshot["reported_input_tokens"]==10+known_input
+    assert snapshot["reported_output_tokens"]==4+known_output
+    assert snapshot["input_usage_missing_calls"]==missing_input
+    assert snapshot["output_usage_missing_calls"]==missing_output
+    assert not snapshot["usage_complete"]
+    assert not snapshot["reservation_pending"]
+    assert not b.reserve()
+    assert b.calls==2
+    with pytest.raises(ValueError):
+        b.settle(record)
+
+
+def test_ca07_partial_usage_stops_coordinator_before_service(tmp_path,monkeypatch):
+    mem=memory(tmp_path,monkeypatch)
+    response=completion("retrieve_memory",'{"query":"crate","top_k":1}')
+    response["usage"]={"prompt_tokens":123}
+    transport=Fake(response)
+    adapter=NativeLabAdapter(base_url="http://127.0.0.1:8085",model="test",
+        trace_path=tmp_path/"calls.jsonl",task="Verify crate",transport=transport)
+    coord=E25LabCognitiveCoordinator(mem)
+    result=coord.run_turn(adapter,turn_id="partial_usage",
+        completion_requirement=CompletionRequirement("verified_observation",("lab.item.crate",)),
+        resource_limits=ResourceLimits())
+    assert result["status"]=="STEP_BUDGET_EXHAUSTED"
+    assert result["outcomes"]==[] and coord.decision_records("partial_usage")==[]
+    assert len(transport.requests)==1
+    budget=result["resource_budget"]
+    assert budget["reported_input_tokens"]==123 and budget["reported_output_tokens"]==0
+    assert budget["output_usage_missing_calls"]==1
+    assert not budget["usage_complete"] and budget["stop_reason"]=="USAGE_UNAVAILABLE"
