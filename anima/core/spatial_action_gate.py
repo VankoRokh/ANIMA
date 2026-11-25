@@ -18,11 +18,12 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Mapping
 
+from anima.agent.executor import SandboxHandler, SandboxToolError
 from anima.agent.tools import ToolRegistry
 from anima.core.assembly import CoreAssembly
 from anima.execution.contracts import ActionSpec, ExecutionAction, ExecutionReceipt, VerificationSpec, thaw
 from anima.execution.store import ExecutionStore
-from anima.execution.sandbox import SandboxExecutor
+from anima.execution.sandbox import SandboxExecutor, ExecutionRejectedError
 from anima.tasks.store import TaskStore
 
 
@@ -59,6 +60,96 @@ class PreparedSpatialAction:
     source_event_id: str
 
 
+class CoreSpatialSandboxExecutor(SandboxExecutor):
+    """Opt-in spatial effect boundary; legacy Stage6 stays unchanged.
+
+    New effects require an exact, scoped Gateway request in the owning process.
+    The forked handler checks the same request against persisted Core authority
+    immediately before dispatch. Read-only keyed reconciliation has no permit
+    and cannot retry an effect. This is not isolation against same-UID code.
+    """
+
+    def __init__(self, *, root, registry, store, handlers):
+        self._gateway = None
+        self._pending = None
+        guarded = {}
+        for key, handler in handlers.items():
+            if handler.reconcile is None or handler.replay_output is not None:
+                raise ValueError("spatial handlers require read-only keyed reconciliation")
+
+            def execute(root, arguments, operation_id, *, _key=key, _handler=handler):
+                try:
+                    prepared, proof = self._require_pending(operation_id)
+                    action = prepared.action
+                    if ((action.tool, action.tool_version) != _key
+                            or thaw(action.arguments) != arguments):
+                        raise CoreSpatialAdmissionError("spatial worker request mismatch")
+                    self._gateway._check_effect(prepared, proof=proof, status="executing")
+                except CoreSpatialAdmissionError as exc:
+                    raise SandboxToolError(
+                        "SPATIAL_ADMISSION_REQUIRED", str(exc), effect_possible=False,
+                    ) from exc
+                return _handler.execute(root, arguments, operation_id)
+
+            def reconcile(root, arguments, operation_id, *, _handler=handler):
+                outcome, output = _handler.reconcile(root, arguments, operation_id)
+                # Never let a reconciler authorize a new world effect.
+                return (outcome, output) if outcome == "succeeded" else ("unknown", None)
+
+            guarded[key] = SandboxHandler(execute=execute, reconcile=reconcile)
+        super().__init__(root=root, registry=registry, store=store, handlers=guarded)
+
+    def _bind_gateway(self, gateway):
+        if self._gateway is not None or gateway.executor is not self:
+            raise CoreSpatialAdmissionError("spatial executor already bound or mismatched")
+        self._gateway = gateway
+
+    def _require_pending(self, operation_id):
+        if self._gateway is None or self._pending is None:
+            raise CoreSpatialAdmissionError("fresh spatial Gateway admission required")
+        prepared, proof = self._pending
+        if prepared.operation_id != operation_id:
+            raise CoreSpatialAdmissionError("spatial admission operation mismatch")
+        return prepared, proof
+
+    def execute_admitted(self, gateway, prepared, *, proof):
+        if gateway is not self._gateway or self._pending is not None:
+            raise CoreSpatialAdmissionError("spatial Gateway authority mismatch or busy")
+        gateway.before_effect(prepared, proof=proof)
+        self._pending = (prepared, proof)
+        try:
+            return self.execute(prepared.action)
+        finally:
+            self._pending = None
+
+    def execute(self, action):
+        if not isinstance(action, ExecutionAction):
+            raise TypeError("spatial executor requires ExecutionAction")
+        operation = self.store.get_operation(action.operation_id)
+        if operation is None:
+            raise ExecutionRejectedError("missing spatial operation")
+        if operation["status"] == "prepared":
+            try:
+                prepared, proof = self._require_pending(action.operation_id)
+                if prepared.action.to_dict() != action.to_dict():
+                    raise CoreSpatialAdmissionError("spatial admission action mismatch")
+                self._gateway.before_effect(prepared, proof=proof)
+            except CoreSpatialAdmissionError as exc:
+                raise ExecutionRejectedError(str(exc)) from exc
+        else:
+            # Recovery can read an already attempted operation even after Goal
+            # cancellation. It must not create a new effect or complete a Task.
+            try:
+                saved = self.store.load_action(action.operation_id)
+                spec = self.store.load_verification_spec(action.operation_id)
+                if (saved.to_dict() != action.to_dict()
+                        or spec.criterion_kind != "world.egocentric_transition"):
+                    raise ValueError("not a persisted spatial intent")
+            except (ValueError, TypeError) as exc:
+                raise ExecutionRejectedError("invalid spatial recovery binding") from exc
+        return super().execute(action)
+
+
 class CoreSpatialActionGateway:
     """Guarded, source-backed Stage6 preparation.
 
@@ -78,8 +169,9 @@ class CoreSpatialActionGateway:
             raise CoreSpatialAdmissionError("CoreAssembly requires registered CoreIngress")
         if not isinstance(store, ExecutionStore) or not isinstance(registry, ToolRegistry):
             raise TypeError("Stage6 ExecutionStore and exact ToolRegistry required")
-        if not isinstance(executor, SandboxExecutor) or executor.store is not store or executor.registry is not registry:
-            raise CoreSpatialAdmissionError("Stage6 executor/store/registry identity mismatch")
+        if (not isinstance(executor, CoreSpatialSandboxExecutor)
+                or executor.store is not store or executor.registry is not registry):
+            raise CoreSpatialAdmissionError("guarded spatial executor/store/registry identity mismatch")
         if (type(allowed_capabilities) is not dict
                 or set(allowed_capabilities) != {"world.turn", "world.step"}):
             raise ValueError("trusted exact spatial allowlist required")
@@ -121,6 +213,7 @@ class CoreSpatialActionGateway:
             else TaskStore(core.data_dir / "tasks.db")
         )
         self.goals = core.internal_state.goals
+        executor._bind_gateway(self)
 
     def _raw(self, proof: SpatialSourceProof, *, require_latest: bool = True) -> dict:
         if not isinstance(proof, SpatialSourceProof):
@@ -304,11 +397,14 @@ class CoreSpatialActionGateway:
     def before_effect(self, prepared: PreparedSpatialAction,
                       *, proof: SpatialSourceProof) -> None:
         """Refuse execution if Goal, Task, Core pointer or plan was altered."""
+        self._check_effect(prepared, proof=proof, status="prepared")
+
+    def _check_effect(self, prepared, *, proof, status):
         if not isinstance(prepared, PreparedSpatialAction):
             raise CoreSpatialAdmissionError("prepared Stage6 action required")
         snap = self._raw(proof)
         action, spec = self._require_binding(
-            prepared, status="prepared",
+            prepared, status=status,
             error="Stage2/Stage6 binding drifted before effect",
         )
         if (proof.sample_id != prepared.pre_sample_id
@@ -319,15 +415,21 @@ class CoreSpatialActionGateway:
                 or snap["revision"] != action.arguments["expected_revision"]
                 or snap["tick"] != action.arguments["pre_tick"]
                 or snap["world_instance_id"] != action.arguments["world_instance_id"]
-                or snap["epoch"] != action.arguments["epoch"]):
+                or snap["epoch"] != action.arguments["epoch"]
+                or spec.parameters.get("world_instance_id") != snap["world_instance_id"]
+                or spec.parameters.get("epoch") != snap["epoch"]
+                or spec.parameters.get("expected_revision") != snap["revision"]
+                or spec.parameters.get("expected_tick") != snap["tick"]
+                or spec.parameters.get("action_type") != action.tool
+                or spec.parameters.get("direction") != action.arguments["direction"]
+                or self.capabilities.get(action.tool) != (action.tool, action.tool_version)):
             raise CoreSpatialAdmissionError("Stage2/Stage6 binding drifted before effect")
 
     def execute_once(
         self, prepared: PreparedSpatialAction, *, proof: SpatialSourceProof,
     ):
         """The only trusted Stage6 route into the world effect handler."""
-        self.before_effect(prepared, proof=proof)
-        return self.executor.execute(prepared.action)
+        return self.executor.execute_admitted(self, prepared, proof=proof)
 
     def finish_verified(
         self, prepared: PreparedSpatialAction, *,
@@ -419,5 +521,5 @@ class CoreSpatialActionGateway:
 
 __all__ = [
     "CoreSpatialActionGateway", "SpatialSourceProof", "PreparedSpatialAction",
-    "CoreSpatialAdmissionError",
+    "CoreSpatialAdmissionError", "CoreSpatialSandboxExecutor",
 ]

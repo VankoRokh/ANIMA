@@ -10,7 +10,7 @@ from __future__ import annotations
 from anima.agent.executor import SandboxHandler, SandboxToolError
 from anima.agent.tools import ToolDescriptor, ToolRegistry
 from anima.execution.store import ExecutionStore
-from anima.execution.sandbox import SandboxExecutor
+from anima.core.spatial_action_gate import CoreSpatialSandboxExecutor
 from labs.virtual_anima_lab.python.lab_client import LabClient, PROTOCOL_V2
 from .egocentric import EgocentricAction, VIEW_ACTION_SCHEMA
 from .e24_pose import _validate_receipt, E24PoseError
@@ -139,7 +139,6 @@ def _world_effect(kind: str, args: dict, op: str, *, port: int, key: str):
 
 def stage6_godot_executor(*, root, store: ExecutionStore,
                           port: int, executor_key: str):
-    from functools import partial
     registry = stage6_spatial_registry()
     handlers = {}
     for kind in ("world.turn", "world.step"):
@@ -163,7 +162,7 @@ def stage6_godot_executor(*, root, store: ExecutionStore,
         handlers[(kind, VERSION)] = SandboxHandler(
             execute=execute, reconcile=reconcile, replay_output=None,
         )
-    return registry, SandboxExecutor(
+    return registry, CoreSpatialSandboxExecutor(
         root=root, registry=registry, store=store, handlers=handlers,
     )
 
