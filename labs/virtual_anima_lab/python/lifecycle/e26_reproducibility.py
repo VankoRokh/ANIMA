@@ -97,7 +97,8 @@ def backend_snapshot(pid):
         raise ValueError("backend process changed during capture")
     return {"pid": pid, "process_start_ticks": started, "executable": binary,
             "executable_sha256": sha, "argv": argv,
-            "endpoint_process_attested": False, "environment_attested": False}
+            "endpoint_process_attested": False, "environment_attested": False,
+            "external_config_and_dynamic_libraries_attested": False}
 
 
 def runtime_manifest(*, git_sha, godot, backend, base_url, model, model_sha, variant, scenarios):
@@ -184,14 +185,14 @@ def verify_raw(fixture):
                 or row["sample_id"] != snap["sample_id"] or snap["sample_seq"] != index
                 or row["source_ref"] != snap["source_ref"] or row["source_ref"] != SOURCE
                 or not isinstance(event_id, str) or not event_id or event_id in events
+                or event["event_id"] != event_id
                 or event["source_ref"] != SOURCE or event["producer_ref"] != PRODUCER
                 or any(event[key] != expected[key] for key in
                        ("occurrence_id", "occurrence_version", "kind", "payload"))
                 or row["observation_outcome"]["outcome"].startswith("REJECTED_")
                 or row["dispatch_receipt"]["disposition"] != "forwarded"):
             raise ValueError("Raw/Core pointer mismatch")
-        # The ingress event includes event_id on current Core; validate if present.
-        for record in (event, row["observation_outcome"], row["dispatch_receipt"]):
+        for record in (row["observation_outcome"], row["dispatch_receipt"]):
             if "event_id" in record and record["event_id"] != event_id:
                 raise ValueError("Core event identity mismatch")
         events.add(event_id)
@@ -219,13 +220,14 @@ def freeze_call(call, aliases, index):
             "transport_ok": call["transport_ok"], "valid": call["valid"]}
 
 
-def export_case(root, seed, case_id, report, trace, calls, raw_fixture):
+def export_case(root, seed, case_id, report, trace, calls, raw_fixture, *, result=None):
     all_calls = list(calls)
     projection = report.get("claim_projection", {}).get("call")
     if projection is not None:
         all_calls.append(projection)
     fixture = {"schema": SCHEMA, "world_seed": seed, "case": case_id,
                "turn": report, "trace": trace, "model_calls": all_calls,
+               "result": result,
                "requests": [freeze_call(call, raw_fixture["aliases"], i)
                             for i, call in enumerate(all_calls)]}
     write_json(Path(root) / f"case-{seed}-{case_id}.json", fixture)
@@ -239,6 +241,8 @@ def verify_case(fixture, raw_fixture):
     if fixture["requests"] != expected:
         raise ValueError("request/response fixture mismatch")
     rows = {r["event_id"]: r for r in raw_fixture["samples"]}
+    if [r["outcome"] for r in fixture["trace"]] != fixture["turn"]["outcomes"]:
+        raise ValueError("journal/turn outcome mismatch")
     for record in fixture["trace"]:
         outcome = record["outcome"]
         if outcome["status"] != "COMPLETED" or outcome["operation_kind"] not in (
@@ -277,7 +281,9 @@ def verify_bundle(root):
         if not p.is_file() or p.is_symlink() or file_digest(p) != sha:
             raise ValueError("evidence checksum mismatch: " + name)
     manifest = read_json(root / "manifest.json")
-    if manifest["schema"] != SCHEMA or not manifest["complete"]:
+    if (manifest["schema"] != SCHEMA or manifest["complete"] is not True
+            or not re.fullmatch(r"[0-9a-f]{40}", manifest["git_sha"])
+            or not manifest["world_seeds"] or not manifest["scenarios"]):
         raise ValueError("incomplete experiment evidence")
     expected_cases = {(seed, c["id"]) for seed in manifest["world_seeds"]
                       for c in manifest["scenarios"]}
@@ -302,10 +308,16 @@ def verify_bundle(root):
 
 
 def replay_request(root, *, seed, case_id, index, transport):
+    if (type(seed) is not int or seed not in (7, 8)
+            or type(case_id) is not str or not re.fullmatch(r"C[0-9]{2}(?:_OFF|_ALT)?", case_id)
+            or type(index) is not int or index < 0):
+        raise ValueError("invalid replay identity or request index")
     verify_bundle(root)
     fixture = read_json(Path(root) / f"case-{seed}-{case_id}.json")
+    if index >= len(fixture["requests"]):
+        raise ValueError("invalid request index")
     request = fixture["requests"][index]
-    if type(index) is not int or index < 0 or request["index"] != index:
+    if request["index"] != index:
         raise ValueError("invalid request index")
     payload = json.loads(request["request_json"])
     if canonical(payload) != request["request_json"]:

@@ -91,3 +91,21 @@ def test_ca06_replay_does_not_accept_negative_index(tmp_path, monkeypatch):
     with pytest.raises(ValueError):
         r.replay_request(out, seed=7, case_id="C06", index=-1, transport=fake)
     assert fake.requests == []
+
+
+def test_ca05_journal_source_rechecked_against_raw(tmp_path, monkeypatch):
+    out, _, _ = make_bundle(tmp_path, monkeypatch)
+    raw = r.read_json(out / "raw-seed-7.json")
+    fixture = r.read_json(out / "case-7-C06.json")
+    source = fixture["trace"][1]["outcome"]["result"]["records"][0]
+    source["entities_observed"] = []
+    fixture["turn"]["outcomes"][1]["result"]["records"][0]["entities_observed"] = []
+    with pytest.raises(ValueError, match="journal source differs"):
+        r.verify_case(fixture, raw)
+
+
+def test_ca06_isolated_godot_copy_contains_only_tracked_files(tmp_path):
+    destination = r.isolated_godot_project(tmp_path / "project")
+    assert (destination / "project.godot").is_file()
+    assert (destination / "LifecycleWorld.gd").is_file()
+    assert not (destination / ".godot").exists()

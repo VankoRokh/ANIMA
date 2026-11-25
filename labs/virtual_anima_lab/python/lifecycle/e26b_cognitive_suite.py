@@ -210,7 +210,8 @@ def run_cases(memory, coordinator, root, seed, *, base_url, model, check_world, 
         (root / f"{turn_id}-result.json").write_text(
             json.dumps({"result":result, "turn":report, "trace":trace}, indent=2),
             encoding="utf-8")
-        reproducibility.export_case(evidence, seed, case["id"], report, trace, adapter.calls, raw_fixture)
+        reproducibility.export_case(evidence, seed, case["id"], report, trace, adapter.calls, raw_fixture,
+                                    result=result)
         # Preserve all evidence in the JSON files; do not duplicate full model payloads on stdout.
         results.append(result)
         print(json.dumps({k:result[k] for k in ("seed","case","variant","operation_gate_pass","turn_status","model_calls","latest_observation_reads")}
@@ -222,7 +223,6 @@ def run_cases(memory, coordinator, root, seed, *, base_url, model, check_world, 
 
 def main():
     from .e26a_real_fast_gate import case, require
-    from .world_smoke import _binary
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--godot", required=True)
     ap.add_argument("--base-url", default="http://127.0.0.1:8085")
