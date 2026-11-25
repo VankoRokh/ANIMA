@@ -6,12 +6,15 @@ integration path. No native Stage6, goal completion explicitly LAB-only.
 from __future__ import annotations
 
 import argparse
+from dataclasses import replace
 import http.client
 import json
 import sqlite3
 import tempfile
 import time
 from pathlib import Path
+
+from anima.core.spatial_action_gate import CoreSpatialAdmissionError, SpatialSourceProof
 
 from .visual_runner import launch, CONTROL_SCHEMA
 from .world_smoke import _binary
@@ -184,6 +187,80 @@ def one_case(binary, seed, root):
         logfile.close()
 
 
+def identity_negative_case(binary, root):
+    """CA-01 / L02: cancelled operation cannot borrow another active Goal/Task."""
+    session, service, process, logfile = launch(
+        godot=binary, seed=314159, headless=True,
+        report_dir=root / "ca01-l02", step_interval=0.25, core_stage6=True,
+    )
+    try:
+        with session.lock:
+            gate = session.core_gateway
+            record = session.memory.observe_and_record()
+            before = SpatialSourceProof(
+                sample_id=record.sample_id, core_event_id=record.core_event_id,
+                raw_json=session.memory.raw_evidence(record.sample_id).canonical_json,
+            )
+            second_goal = gate.core.internal_state.create_goal(
+                source="lab.visual", source_id="ca01-l02-second",
+                priority=1.0, description="Independent active goal",
+                success_criterion="Independent verified transition", reason="CA-01",
+            )
+            first = gate.prepare(
+                goal_id=session.core_goal_id, proof=before,
+                tool_kind="world.turn", direction="right", reason="CA-01 first",
+            )
+            second = gate.prepare(
+                goal_id=second_goal["id"], proof=before,
+                tool_kind="world.turn", direction="left", reason="CA-01 second",
+            )
+            gate.goals.transition_goal(
+                first.goal_id, to_status="cancelled", reason="L02 cancellation",
+            )
+            forged = replace(first, goal_id=second.goal_id, task_id=second.task_id)
+            for candidate in (first, forged):
+                try:
+                    gate.execute_once(candidate, proof=before)
+                except CoreSpatialAdmissionError:
+                    pass
+                else:
+                    raise AssertionError("CA-01 admitted cancelled action")
+            after_record = session.memory.observe_and_record()
+            a = json.loads(before.raw_json)
+            b = json.loads(session.memory.raw_evidence(
+                after_record.sample_id,
+            ).canonical_json)
+            require((a["world_instance_id"], a["epoch"], a["tick"], a["revision"])
+                    == (b["world_instance_id"], b["epoch"], b["tick"], b["revision"]),
+                    "CA-01 rejection changed world clocks")
+            require(b["sample_seq"] > a["sample_seq"], "missing fresh Raw")
+            require(gate.goals.get_goal(first.goal_id)["status"] == "cancelled",
+                    "cancelled Goal changed")
+            require(gate.goals.get_goal(second.goal_id)["status"] == "active",
+                    "unrelated Goal changed")
+            for candidate in (first, second):
+                require(gate.store.get_operation(candidate.operation_id)["status"]
+                        == "prepared", "rejected Operation changed")
+                require(gate.tasks.get_task(candidate.task_id).status == "active",
+                        "rejected Task changed")
+            return {
+                "seed": 314159, "result": "PASS",
+                "cancelled_action_rejected": True, "cross_wired_action_rejected": True,
+                "tick_delta": b["tick"] - a["tick"],
+                "revision_delta": b["revision"] - a["revision"],
+                "both_operations_prepared": True, "both_tasks_active": True,
+            }
+    finally:
+        service.stop()
+        process.terminate()
+        try:
+            process.wait(timeout=5)
+        except Exception:
+            process.kill()
+            process.wait(timeout=5)
+        logfile.close()
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--godot", default=None)
@@ -197,6 +274,7 @@ def main():
         "schema": "anima.e25c.core_stage6_visual_gate/0.1",
         "status": "E2_5C_CORE_STAGE6_VISUAL_PASS",
         "cases": [one_case(_binary(args.godot), seed, root) for seed in (7, 8)],
+        "identity_negative": identity_negative_case(_binary(args.godot), root),
     }
     (root / "e25b-result.json").write_text(
         json.dumps(result, sort_keys=True, indent=2, ensure_ascii=False),
