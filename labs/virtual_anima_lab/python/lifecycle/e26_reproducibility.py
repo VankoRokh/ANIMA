@@ -1,0 +1,363 @@
+"""E26 synthetic evidence and exact-request replay, never Core authority.
+
+Only explicit laboratory artifacts are exported. The local backend process
+metadata is operator-selected, not attestation of the HTTP peer or model file.
+Replay sends one frozen request, never dispatches a returned tool call.
+"""
+from __future__ import annotations
+
+import argparse
+import hashlib
+import json
+import os
+import platform
+import re
+import shutil
+import sqlite3
+import subprocess
+import sys
+from contextlib import closing
+from pathlib import Path
+
+from anima.agent.native_tools import canonical, LoopbackChatTransport
+from .egocentric import EgocentricView
+from .e24_working_memory import E24WorkingMemory, SOURCE, PRODUCER
+
+ROOT = Path(__file__).resolve().parents[4]
+SCHEMA = "anima.e26.reproducibility/0.1"
+
+
+def digest(data):
+    return hashlib.sha256(data.encode("utf-8")).hexdigest()
+
+
+def file_digest(path):
+    with Path(path).open("rb") as stream:
+        return hashlib.file_digest(stream, "sha256").hexdigest()
+
+
+def write_json(path, value):
+    # Exclusive creation: never overwrite an earlier run.
+    with Path(path).open("x", encoding="utf-8") as stream:
+        stream.write(canonical(value) + "\n")
+
+
+def read_json(path):
+    from anima.agent.native_tools import strict_json
+    return strict_json(Path(path).read_text(encoding="utf-8"))
+
+
+def git_snapshot():
+    def git(*args):
+        return subprocess.check_output(["git", *args], cwd=ROOT, text=True, timeout=15).strip()
+    sha = git("rev-parse", "HEAD")
+    if not re.fullmatch(r"[0-9a-f]{40}", sha) or git("status", "--porcelain", "--untracked-files=normal"):
+        raise ValueError("E26 evidence requires a clean Git worktree")
+    return sha
+
+
+def isolated_godot_project(destination):
+    """Copy only tracked Godot sources; imports/UIDs stay outside the worktree."""
+    prefix = "labs/virtual_anima_lab/godot/"
+    names = subprocess.check_output(
+        ["git", "ls-files", "-z", "--", prefix], cwd=ROOT,
+    ).decode("utf-8").split("\0")
+    destination = Path(destination)
+    for name in filter(None, names):
+        source = ROOT / name
+        relative = Path(name).relative_to(prefix)
+        if not source.is_file() or source.is_symlink():
+            raise ValueError("unsupported Godot source")
+        target = destination / relative
+        target.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(source, target)
+    if not (destination / "project.godot").is_file():
+        raise ValueError("missing tracked Godot project")
+    return destination
+
+
+def backend_snapshot(pid):
+    """Capture exact executable hash and argv from the selected Linux process."""
+    if type(pid) is not int or pid < 1:
+        raise ValueError("positive backend PID required")
+    proc = Path("/proc") / str(pid)
+    def start_marker():
+        return (proc / "stat").read_text().rpartition(")")[2].split()[19]
+    started = start_marker()
+    argv = (proc / "cmdline").read_bytes().decode("utf-8").rstrip("\0").split("\0")
+    if not argv or not argv[0]:
+        raise ValueError("backend command line unavailable")
+    # Never bundle common credential-bearing switches or environment contents.
+    if any(re.match(r"^--?[^=]*(?:api[-_]?key|token|password|secret|credential|auth)[^=]*(?:=|$)",
+                    arg, re.I) for arg in argv[1:]):
+        raise ValueError("credential-bearing backend argv must not be exported")
+    binary = os.readlink(proc / "exe")
+    sha = file_digest(proc / "exe")
+    if started != start_marker():
+        raise ValueError("backend process changed during capture")
+    return {"pid": pid, "process_start_ticks": started, "executable": binary,
+            "executable_sha256": sha, "argv": argv,
+            "endpoint_process_attested": False, "environment_attested": False}
+
+
+def runtime_manifest(*, git_sha, godot, backend, base_url, model, model_sha, variant, scenarios):
+    return {"schema": SCHEMA, "git_sha": git_sha, "git_clean_at_start": True,
+            "python": sys.version, "platform": platform.platform(),
+            "sqlite": sqlite3.sqlite_version,
+            "godot": {"version": subprocess.check_output([godot, "--headless", "--version"],
+                                                         text=True, timeout=15).strip(),
+                      "executable_sha256": file_digest(godot)},
+            "backend": backend, "base_url": base_url, "model_alias": model,
+            "local_model_sha256": model_sha, "file_hash_not_attested_by_server": True,
+            "variant": variant, "scenarios": scenarios, "world_seeds": [7, 8],
+            "identity_generation": "fresh_random_not_seeded",
+            "inference_seed": "not_explicitly_set_in_existing_profile",
+            "request_encoding": "canonical_json_utf8",
+            "response_encoding": "parsed_json_canonical_not_http_wire_bytes",
+            "scope": "synthetic_lab_only", "alias_authority": False,
+            "temperature": 0, "max_steps": 4, "max_output_tokens": 256}
+
+
+def alias_mapping(samples):
+    """Diagnostic-only stable aliases by first observation and relative geometry.
+
+    No change to Raw, Context, live model input or Core identities. Aliases
+    support comparison, not a guarantee of identical serialized prompt order.
+    """
+    mapping = {}
+    counts = {"surface": 0, "obstacle": 0}
+    for row in samples:
+        view = json.loads(row["raw_json"])
+        seq = view["sample_seq"]
+        mapping[row["event_id"]] = f"ev_sample_{seq:04d}"
+        mapping[view["world_instance_id"]] = "world_alias_0001"
+        mapping[view["sample_id"]] = f"worldobs:world_alias_0001:{view['epoch']}:{seq}"
+        mapping[row["raw_sha256"]] = f"raw_sha_sample_{seq:04d}"
+        readings = sorted(view["readings"], key=lambda r: (
+            r["category"], r["bearing_mdeg"], r["range_milli_cells"],
+            canonical(r["properties"]), r["entity_ref"],
+        ))
+        for reading in readings:
+            ref = reading["entity_ref"]
+            if re.fullmatch(r"lab\.(surface|obstacle)\.[a-f0-9]{24}", ref) and ref not in mapping:
+                kind = reading["category"]
+                counts[kind] += 1
+                mapping[ref] = f"lab.{kind}.alias_{counts[kind]:04d}"
+    if len(set(mapping.values())) != len(mapping):
+        raise ValueError("non-bijective diagnostic alias mapping")
+    return mapping
+
+
+def export_raw(memory, root, seed):
+    with closing(memory._connect()) as db:
+        rows = db.execute("SELECT sample_id,core_event_id,raw_sha256 FROM e24_raw ORDER BY sample_seq").fetchall()
+    samples = []
+    ingress = memory._core.core_events.ingress
+    for row in rows:
+        view = memory.raw_evidence(row["sample_id"])
+        event_id = row["core_event_id"]
+        samples.append({"sample_id": row["sample_id"], "event_id": event_id,
+                        "source_ref": SOURCE, "raw_json": view.canonical_json,
+                        "raw_sha256": row["raw_sha256"],
+                        "core_event": ingress.get_event(event_id),
+                        "observation_outcome": ingress.observation_outcome(event_id),
+                        "dispatch_receipt": ingress.dispatch_receipt(event_id)})
+    fixture = {"schema": SCHEMA, "world_seed": seed, "samples": samples,
+               "aliases": alias_mapping(samples)}
+    verify_raw(fixture)
+    write_json(Path(root) / f"raw-seed-{seed}.json", fixture)
+    return fixture
+
+
+def verify_raw(fixture):
+    if fixture["schema"] != SCHEMA or len(fixture["samples"]) != 3:
+        raise ValueError("expected three canonical synthetic Raw samples")
+    events, worlds = set(), set()
+    for index, row in enumerate(fixture["samples"], 1):
+        raw = row["raw_json"]
+        view = EgocentricView(json.loads(raw))
+        snap = view.as_dict()
+        event_id = row["event_id"]
+        expected = E24WorkingMemory._event(snap, row["raw_sha256"])
+        event = row["core_event"]
+        if (raw != view.canonical_json or digest(raw) != row["raw_sha256"]
+                or row["sample_id"] != snap["sample_id"] or snap["sample_seq"] != index
+                or row["source_ref"] != snap["source_ref"] or row["source_ref"] != SOURCE
+                or not isinstance(event_id, str) or not event_id or event_id in events
+                or event["source_ref"] != SOURCE or event["producer_ref"] != PRODUCER
+                or any(event[key] != expected[key] for key in
+                       ("occurrence_id", "occurrence_version", "kind", "payload"))
+                or row["observation_outcome"]["outcome"].startswith("REJECTED_")
+                or row["dispatch_receipt"]["disposition"] != "forwarded"):
+            raise ValueError("Raw/Core pointer mismatch")
+        # The ingress event includes event_id on current Core; validate if present.
+        for record in (event, row["observation_outcome"], row["dispatch_receipt"]):
+            if "event_id" in record and record["event_id"] != event_id:
+                raise ValueError("Core event identity mismatch")
+        events.add(event_id)
+        worlds.add((snap["world_instance_id"], snap["epoch"]))
+    if len(worlds) != 1 or fixture["aliases"] != alias_mapping(fixture["samples"]):
+        raise ValueError("invalid world or diagnostic alias mapping")
+    return len(events)
+
+
+def normalized_request_sha(request_json, aliases):
+    # Diagnostic string substitution only, not semantic or exact equivalence.
+    keys = sorted(aliases, key=len, reverse=True)
+    pattern = re.compile("|".join(map(re.escape, keys))) if keys else None
+    return digest(pattern.sub(lambda m: aliases[m.group()], request_json)
+                  if pattern else request_json)
+
+
+def freeze_call(call, aliases, index):
+    request = canonical(call["request"])
+    response = canonical(call["raw_response"]) if call.get("raw_response") is not None else None
+    return {"index": index, "phase": call.get("phase", "research"),
+            "request_json": request, "request_sha256": digest(request),
+            "diagnostic_alias_request_sha256": normalized_request_sha(request, aliases),
+            "response_json": response, "response_sha256": digest(response) if response is not None else None,
+            "transport_ok": call["transport_ok"], "valid": call["valid"]}
+
+
+def export_case(root, seed, case_id, report, trace, calls, raw_fixture):
+    all_calls = list(calls)
+    projection = report.get("claim_projection", {}).get("call")
+    if projection is not None:
+        all_calls.append(projection)
+    fixture = {"schema": SCHEMA, "world_seed": seed, "case": case_id,
+               "turn": report, "trace": trace, "model_calls": all_calls,
+               "requests": [freeze_call(call, raw_fixture["aliases"], i)
+                            for i, call in enumerate(all_calls)]}
+    write_json(Path(root) / f"case-{seed}-{case_id}.json", fixture)
+
+
+def verify_case(fixture, raw_fixture):
+    if fixture["schema"] != SCHEMA or fixture["world_seed"] != raw_fixture["world_seed"]:
+        raise ValueError("case fixture scope mismatch")
+    expected = [freeze_call(call, raw_fixture["aliases"], i)
+                for i, call in enumerate(fixture["model_calls"])]
+    if fixture["requests"] != expected:
+        raise ValueError("request/response fixture mismatch")
+    rows = {r["event_id"]: r for r in raw_fixture["samples"]}
+    for record in fixture["trace"]:
+        outcome = record["outcome"]
+        if outcome["status"] != "COMPLETED" or outcome["operation_kind"] not in (
+                "lookup_raw_evidence", "inspect_latest_observation"):
+            continue
+        for source in outcome["result"]["records"]:
+            if source["status"] != "verified_source_view":
+                continue
+            row = rows[source["event_id"]]
+            raw = json.loads(row["raw_json"])
+            if (source["sample_id"] != row["sample_id"]
+                    or source["raw_sha256"] != row["raw_sha256"]
+                    or source["source_ref"] != row["source_ref"]
+                    or source["sample_seq"] != raw["sample_seq"]
+                    or source["coverage"] != raw["coverage"]
+                    or source["entities_observed"] != [r["entity_ref"] for r in raw["readings"]]):
+                raise ValueError("journal source differs from canonical Raw")
+    return len(expected)
+
+
+def seal_bundle(root, manifest, *, complete):
+    root = Path(root)
+    write_json(root / "manifest.json", {**manifest, "complete": complete})
+    files = sorted(root.glob("*.json"))
+    write_json(root / "checksums.json", {p.name: file_digest(p) for p in files})
+
+
+def verify_bundle(root):
+    root = Path(root)
+    index = read_json(root / "checksums.json")
+    actual = {p.name for p in root.iterdir() if p.name != "checksums.json"}
+    if set(index) != actual or any(Path(name).name != name for name in index):
+        raise ValueError("evidence file set mismatch")
+    for name, sha in index.items():
+        p = root / name
+        if not p.is_file() or p.is_symlink() or file_digest(p) != sha:
+            raise ValueError("evidence checksum mismatch: " + name)
+    manifest = read_json(root / "manifest.json")
+    if manifest["schema"] != SCHEMA or not manifest["complete"]:
+        raise ValueError("incomplete experiment evidence")
+    expected_cases = {(seed, c["id"]) for seed in manifest["world_seeds"]
+                      for c in manifest["scenarios"]}
+    raw = {seed: read_json(root / f"raw-seed-{seed}.json") for seed in manifest["world_seeds"]}
+    if any(fixture["world_seed"] != seed for seed, fixture in raw.items()):
+        raise ValueError("Raw fixture seed mismatch")
+    count = sum(verify_raw(fixture) for fixture in raw.values())
+    requests = 0
+    actual_cases = set()
+    for path in root.glob("case-*.json"):
+        fixture = read_json(path)
+        key = (fixture["world_seed"], fixture["case"])
+        if key in actual_cases or path.name != f"case-{key[0]}-{key[1]}.json":
+            raise ValueError("duplicate or mismatched case fixture")
+        actual_cases.add(key)
+        requests += verify_case(fixture, raw[key[0]])
+    if expected_cases != actual_cases:
+        raise ValueError("missing or unexpected case fixtures")
+    return {"status": "E26_EVIDENCE_VERIFIED", "git_sha": manifest["git_sha"],
+            "raw_samples": count, "cases": len(actual_cases), "requests": requests,
+            "scope": "integrity_and_source_binding_not_backend_attestation"}
+
+
+def replay_request(root, *, seed, case_id, index, transport):
+    verify_bundle(root)
+    fixture = read_json(Path(root) / f"case-{seed}-{case_id}.json")
+    request = fixture["requests"][index]
+    if type(index) is not int or index < 0 or request["index"] != index:
+        raise ValueError("invalid request index")
+    payload = json.loads(request["request_json"])
+    if canonical(payload) != request["request_json"]:
+        raise ValueError("noncanonical request")
+    response = transport.complete(payload)
+    response_json = canonical(response)
+    original = json.loads(request["response_json"]) if request["response_json"] is not None else None
+    def choices(value):
+        return value.get("choices") if isinstance(value, dict) else None
+    return {"schema": SCHEMA, "mode": "EXACT_REQUEST_REPLAY_NO_SERVICE_DISPATCH",
+            "world_seed": seed, "case": case_id, "index": index,
+            "request_sha256": request["request_sha256"],
+            "original_response_sha256": request["response_sha256"],
+            "replay_response_sha256": digest(response_json), "replay_response_json": response_json,
+            "response_exact_equal": response_json == request["response_json"],
+            "choices_equal": original is not None and choices(original) is not None
+                             and choices(original) == choices(response),
+            "tool_dispatch_performed": False}
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    sub = parser.add_subparsers(dest="command", required=True)
+    verify = sub.add_parser("verify")
+    verify.add_argument("bundle", type=Path)
+    replay = sub.add_parser("replay")
+    replay.add_argument("bundle", type=Path)
+    replay.add_argument("--seed", type=int, choices=(7, 8), required=True)
+    replay.add_argument("--case", required=True, choices=("C01","C02","C03","C06","C09","C02_OFF","C03_ALT"))
+    replay.add_argument("--index", type=int, required=True)
+    replay.add_argument("--base-url", default="http://127.0.0.1:8085")
+    replay.add_argument("--backend-pid", type=int, required=True)
+    replay.add_argument("--output", type=Path, required=True)
+    args = parser.parse_args()
+    if args.command == "verify":
+        print(canonical(verify_bundle(args.bundle)))
+        return
+    if args.output.resolve().is_relative_to(args.bundle.resolve()):
+        parser.error("replay output must be outside frozen evidence")
+    if args.output.exists():
+        parser.error("replay output already exists")
+    backend = backend_snapshot(args.backend_pid)
+    original = read_json(args.bundle / "manifest.json")["backend"]
+    result = replay_request(args.bundle, seed=args.seed, case_id=args.case, index=args.index,
+                            transport=LoopbackChatTransport(args.base_url))
+    result["backend"] = backend
+    result["backend_executable_and_argv_equal"] = all(
+        backend[key] == original[key] for key in ("executable_sha256", "argv"))
+    result["backend_process_unchanged"] = backend_snapshot(args.backend_pid) == backend
+    write_json(args.output, result)
+    print(canonical({k: v for k,v in result.items() if k != "replay_response_json"}))
+
+
+if __name__ == "__main__":
+    main()

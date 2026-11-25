@@ -11,6 +11,9 @@ import json
 import tempfile
 import urllib.request
 from pathlib import Path
+import shutil
+
+from . import e26_reproducibility as reproducibility
 from urllib.parse import urlsplit
 
 from labs.virtual_anima_lab.python.cognition.native_lab import NativeLabAdapter
@@ -124,6 +127,8 @@ def run_cases(memory, coordinator, root, seed, *, base_url, model, check_world, 
         raise AssertionError("fixture requires remembered but not currently observed crate")
     if any("elephant" in ref.lower() for ref in historical):
         raise AssertionError("unknown entity fixture is invalid")
+    evidence = root / "reproducibility"
+    raw_fixture = reproducibility.export_raw(memory, evidence, seed)
     results = []
     for case in CASES:
         if selected_cases is not None and case["id"] not in selected_cases:
@@ -205,6 +210,7 @@ def run_cases(memory, coordinator, root, seed, *, base_url, model, check_world, 
         (root / f"{turn_id}-result.json").write_text(
             json.dumps({"result":result, "turn":report, "trace":trace}, indent=2),
             encoding="utf-8")
+        reproducibility.export_case(evidence, seed, case["id"], report, trace, adapter.calls, raw_fixture)
         # Preserve all evidence in the JSON files; do not duplicate full model payloads on stdout.
         results.append(result)
         print(json.dumps({k:result[k] for k in ("seed","case","variant","operation_gate_pass","turn_status","model_calls","latest_observation_reads")}
@@ -222,6 +228,8 @@ def main():
     ap.add_argument("--base-url", default="http://127.0.0.1:8085")
     ap.add_argument("--model", required=True)
     ap.add_argument("--model-file", type=Path, required=True)
+    ap.add_argument("--backend-pid", type=int, required=True,
+                    help="PID of the selected local llama-server process")
     ap.add_argument("--evidence-dir", type=Path)
     ap.add_argument("--variant", choices=("baseline", "set", "temporal", "combined", "compact", "ranked", "refined", "feedback", "feedback_probe", "continuation", "budgeted", "budget_probe", "claims", "claims_separated", "temporal_sources", "temporal_completion"), default="baseline")
     ap.add_argument("--case", action="append", choices=[c["id"] for c in CASES])
@@ -231,6 +239,9 @@ def main():
             or url.port is None or url.path not in ("", "/")
             or url.username or url.password or url.query or url.fragment):
         ap.error("loopback llama-server only")
+    git_sha = reproducibility.git_snapshot()
+    backend = reproducibility.backend_snapshot(args.backend_pid)
+    binary = str(Path(shutil.which(args.godot) or args.godot).resolve(strict=True))
     with urllib.request.urlopen(args.base_url.rstrip("/") + "/v1/models", timeout=10) as response:
         models = json.loads(response.read(65536))
     require(any(x.get("id") == args.model for x in models["data"]), "model alias mismatch")
@@ -239,19 +250,38 @@ def main():
     require(not any(out.iterdir()), "evidence directory must be empty")
     with args.model_file.open("rb") as stream:
         digest = hashlib.file_digest(stream, "sha256").hexdigest()
+    scenarios = [c for c in CASES if args.case is None or c["id"] in args.case]
+    manifest = reproducibility.runtime_manifest(git_sha=git_sha, godot=binary,
+        backend=backend, base_url=args.base_url, model=args.model, model_sha=digest,
+        variant=args.variant, scenarios=scenarios)
+    manifest["server_models"] = models
+    evidence = out / "reproducibility"
+    evidence.mkdir()
     (out / "model-manifest.json").write_text(json.dumps({
         "model_alias":args.model, "local_file":args.model_file.name,
         "local_file_sha256":digest, "server_models":models,
         "file_hash_not_attested_by_server":True, "profile":"native",
         "temperature":0, "max_steps":4, "max_output_tokens":256,
-        "variant":args.variant,
-        "scenarios":[c for c in CASES if args.case is None or c["id"] in args.case]}, indent=2), encoding="utf-8")
+        "variant":args.variant, "git_sha":git_sha, "backend":backend,
+        "scenarios":scenarios}, indent=2), encoding="utf-8")
     print(f"Evidence directory: {out}", flush=True)
     results = []
-    for seed in (7, 8):
-        results.extend(case(_binary(args.godot), seed, out, base_url=args.base_url,
-                            model=args.model, profile="native", suite=True,
-                            suite_variant=args.variant, suite_cases=args.case))
+    complete = False
+    try:
+        with tempfile.TemporaryDirectory(prefix="anima-e26-godot-") as project:
+            project_path = reproducibility.isolated_godot_project(project)
+            for seed in (7, 8):
+                results.extend(case(binary, seed, out, base_url=args.base_url,
+                                    model=args.model, profile="native", suite=True,
+                                    suite_variant=args.variant, suite_cases=args.case,
+                                    project_path=project_path))
+        require(reproducibility.git_snapshot() == git_sha, "Git snapshot changed")
+        require(reproducibility.backend_snapshot(args.backend_pid) == backend, "backend process changed")
+        require(reproducibility.file_digest(args.model_file) == digest, "local model file changed")
+        complete = True
+    finally:
+        reproducibility.seal_bundle(evidence, manifest, complete=complete)
+    print(json.dumps(reproducibility.verify_bundle(evidence)), flush=True)
     total = sum(r["operation_gate_pass"] for r in results)
     report = {"schema":"anima.e26b.cognitive_suite/0.1",
               "status":"E26B_OPERATION_GATE_PASS" if total == len(results)
