@@ -254,26 +254,72 @@ class CoreSpatialActionGateway:
             proof.sample_id, proof.core_event_id,
         )
 
+    def _require_binding(
+        self, prepared: PreparedSpatialAction, *, status: str, error: str,
+    ) -> tuple[ExecutionAction, VerificationSpec]:
+        """Resolve authority from the persisted operation, never outer DTO IDs.
+
+        Both boundaries share this check. The operation selects the Goal and
+        Task; the exact saved Action and Spec must agree with that identity.
+        This is a single-scheduler check, not a cross-database transaction.
+        """
+        if (not isinstance(prepared, PreparedSpatialAction)
+                or not isinstance(prepared.action, ExecutionAction)
+                or not isinstance(prepared.spec, VerificationSpec)
+                or type(prepared.operation_id) is not str
+                or not prepared.operation_id):
+            raise CoreSpatialAdmissionError(error)
+        try:
+            operation = self.store.get_operation(prepared.operation_id)
+            if operation is None or operation["status"] != status:
+                raise CoreSpatialAdmissionError(error)
+            action = self.store.load_action(operation["id"])
+            spec = self.store.load_verification_spec(operation["id"])
+            goal = self.goals.get_goal(operation["goal_id"])
+            task = self.tasks.get_task(operation["task_id"])
+        except (ValueError, TypeError) as exc:
+            raise CoreSpatialAdmissionError(error) from exc
+        if (
+            not (prepared.operation_id == operation["id"] == action.operation_id)
+            or not (prepared.goal_id == operation["goal_id"] == action.goal_id
+                    == spec.goal_id)
+            or not (prepared.task_id == operation["task_id"] == action.persistent_task_id)
+            or operation["action_id"] != action.public_id
+            or action.to_dict() != prepared.action.to_dict()
+            or spec != prepared.spec
+            or goal is None or goal["id"] != operation["goal_id"]
+            or goal["status"] != "active" or goal["source"] != "lab.visual"
+            or task is None or task.public_id != operation["task_id"]
+            or task.goal_id != operation["goal_id"]
+            or task.status != "active" or task.source != "core.spatial"
+            or task.source_id != operation["goal_id"]
+            or spec.criterion_kind != "world.egocentric_transition"
+            or spec.parameters.get("before_sample_id") != prepared.pre_sample_id
+            or spec.parameters.get("source_event_id") != prepared.source_event_id
+            or action.arguments.get("observation_id") != prepared.pre_sample_id
+        ):
+            raise CoreSpatialAdmissionError(error)
+        return action, spec
+
     def before_effect(self, prepared: PreparedSpatialAction,
                       *, proof: SpatialSourceProof) -> None:
         """Refuse execution if Goal, Task, Core pointer or plan was altered."""
         if not isinstance(prepared, PreparedSpatialAction):
             raise CoreSpatialAdmissionError("prepared Stage6 action required")
         snap = self._raw(proof)
-        goal = self.goals.get_goal(prepared.goal_id)
-        task = self.tasks.get_task(prepared.task_id)
-        operation = self.store.get_operation(prepared.operation_id)
-        stored_action = self.store.load_action(prepared.operation_id)
-        spec = self.store.load_verification_spec(prepared.operation_id)
-        if (goal is None or goal["status"] != "active"
-                or task is None or task.goal_id != prepared.goal_id
-                or task.status != "active" or task.source != "core.spatial"
-                or operation is None or operation["status"] != "prepared"
-                or stored_action.to_dict() != prepared.action.to_dict()
-                or spec != prepared.spec
-                or proof.sample_id != prepared.pre_sample_id
+        action, spec = self._require_binding(
+            prepared, status="prepared",
+            error="Stage2/Stage6 binding drifted before effect",
+        )
+        if (proof.sample_id != prepared.pre_sample_id
                 or proof.core_event_id != prepared.source_event_id
-                or snap["revision"] != prepared.action.to_dict()["arguments"]["expected_revision"]):
+                or spec.parameters.get("raw_sha256") != hashlib.sha256(
+                    proof.raw_json.encode("utf-8")
+                ).hexdigest()
+                or snap["revision"] != action.arguments["expected_revision"]
+                or snap["tick"] != action.arguments["pre_tick"]
+                or snap["world_instance_id"] != action.arguments["world_instance_id"]
+                or snap["epoch"] != action.arguments["epoch"]):
             raise CoreSpatialAdmissionError("Stage2/Stage6 binding drifted before effect")
 
     def execute_once(
@@ -304,17 +350,11 @@ class CoreSpatialActionGateway:
         after = self._raw(after_proof)
         if not isinstance(receipt, ExecutionReceipt) or not isinstance(readback, Mapping):
             raise CoreSpatialAdmissionError("typed Stage6 receipt and readback required")
-        operation = self.store.get_operation(prepared.operation_id)
-        task = self.tasks.get_task(prepared.task_id)
-        goal = self.goals.get_goal(prepared.goal_id)
-        stored_action = self.store.load_action(prepared.operation_id)
-        stored_spec = self.store.load_verification_spec(prepared.operation_id)
-        if (operation is None or operation["status"] != "succeeded"
-                or task is None or task.goal_id != prepared.goal_id
-                or task.status != "active" or goal is None or goal["status"] != "active"
-                or stored_action.to_dict() != prepared.action.to_dict()
-                or stored_spec != prepared.spec
-                or before_proof.sample_id != prepared.pre_sample_id
+        stored_action, stored_spec = self._require_binding(
+            prepared, status="succeeded",
+            error="Stage2/Stage6 identity changed after effect",
+        )
+        if (before_proof.sample_id != prepared.pre_sample_id
                 or before_proof.core_event_id != prepared.source_event_id):
             raise CoreSpatialAdmissionError("Stage2/Stage6 identity changed after effect")
         data = receipt.to_dict()
@@ -324,8 +364,8 @@ class CoreSpatialActionGateway:
                 or type(result) is not dict
                 or result.get("operation_id") != prepared.operation_id):
             raise CoreSpatialAdmissionError("Stage6 execution output not bound to intent")
-        spec = thaw(prepared.spec.parameters)
-        action_args = thaw(prepared.action.arguments)
+        spec = thaw(stored_spec.parameters)
+        action_args = thaw(stored_action.arguments)
         if (
             spec.get("before_sample_id") != before_proof.sample_id
             or spec.get("source_event_id") != before_proof.core_event_id
@@ -371,7 +411,7 @@ class CoreSpatialActionGateway:
         # At this point the *Task* represents one verified bounded attempt.
         # A subsequent Goal success still requires its own explicit criterion.
         self.tasks.transition_task(
-            prepared.task_id, "completed",
+            stored_action.persistent_task_id, "completed",
             reason="Core-backed Raw and world ledger corroborate Stage6 result: " + outcome,
         )
         return outcome

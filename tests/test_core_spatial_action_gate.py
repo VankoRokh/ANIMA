@@ -244,3 +244,111 @@ def test_wrong_core_goal_or_source_cannot_admit(tmp_path, monkeypatch):
             tool_kind="world.step", direction="forward", reason="attack",
         )
     assert store.list_operations(goal_id=other["id"]) == []
+
+
+# CA-01: neither admission nor finalization may trust caller-owned DTO IDs.
+def _second_prepared(core, gate, proof):
+    goal = core.internal_state.create_goal(
+        source="lab.visual", source_id="visual-test-case-second",
+        priority=1.0, description="Second independent Goal",
+        success_criterion="Second bounded action", reason="CA-01 regression",
+    )
+    return gate.prepare(
+        goal_id=goal["id"], proof=proof,
+        tool_kind="world.turn", direction="left", reason="second",
+    )
+
+
+def _cross_wire(first, second, field):
+    if field == "goal_task":
+        return replace(first, goal_id=second.goal_id, task_id=second.task_id)
+    return replace(first, **{field: getattr(second, field)})
+
+
+@pytest.mark.parametrize("field", [
+    "goal_id", "task_id", "operation_id", "action", "spec", "goal_task",
+])
+@pytest.mark.parametrize("cancelled", [False, True])
+def test_ca01_cross_wired_execution_never_dispatches(
+    tmp_path, monkeypatch, field, cancelled,
+):
+    core, mem, goal, store, gate, proof = prepare_env(tmp_path, monkeypatch)
+    first = gate.prepare(
+        goal_id=goal["id"], proof=proof,
+        tool_kind="world.turn", direction="right", reason="first",
+    )
+    second = _second_prepared(core, gate, proof)
+    if cancelled:
+        gate.goals.transition_goal(
+            first.goal_id, to_status="cancelled", reason="CA-01 cancel",
+        )
+    calls = []
+    monkeypatch.setattr(
+        type(gate.executor), "execute", lambda self, action: calls.append(action),
+    )
+    with pytest.raises(CoreSpatialAdmissionError, match="binding drifted"):
+        gate.execute_once(_cross_wire(first, second, field), proof=proof)
+    assert calls == []
+    for prepared in (first, second):
+        assert store.get_operation(prepared.operation_id)["status"] == "prepared"
+        assert gate.tasks.get_task(prepared.task_id).status == "active"
+    if not cancelled:
+        gate.execute_once(first, proof=proof)
+        assert calls == [first.action]
+
+
+@pytest.mark.parametrize("field", [
+    "goal_id", "task_id", "operation_id", "action", "spec", "goal_task",
+])
+@pytest.mark.parametrize("cancelled", [False, True])
+def test_ca01_cross_wired_finalization_never_completes_another_task(
+    tmp_path, monkeypatch, field, cancelled,
+):
+    core, mem, goal, store, gate, before = prepare_env(tmp_path, monkeypatch)
+    first = gate.prepare(
+        goal_id=goal["id"], proof=before,
+        tool_kind="world.turn", direction="right", reason="first",
+    )
+    second = _second_prepared(core, gate, before)
+    store.transition_operation(first.operation_id, "executing", reason="test start")
+    store.transition_operation(first.operation_id, "succeeded", reason="test success")
+    result = {
+        "operation_id": first.operation_id,
+        "status": "APPLIED", "effect_applied": True,
+        "revision": 1, "tick": 1, "event_id": "lifecycle_evt:1",
+        "reason": "ok",
+    }
+    receipt = ExecutionReceipt.create(
+        action=first.action, status="succeeded", output=result,
+        started_at="2026-11-24T00:00:00+00:00",
+        finished_at="2026-11-24T00:00:01+00:00",
+    )
+    record = mem.observe_and_record()
+    after = SpatialSourceProof(
+        sample_id=record.sample_id, core_event_id=record.core_event_id,
+        raw_json=mem.raw_evidence(record.sample_id).canonical_json,
+    )
+    if cancelled:
+        gate.goals.transition_goal(
+            first.goal_id, to_status="cancelled", reason="CA-01 cancel",
+        )
+    def finish(prepared):
+        return gate.finish_verified(
+            prepared, before_proof=before, after_proof=after,
+            receipt=receipt, readback=result,
+        )
+
+    with pytest.raises(CoreSpatialAdmissionError, match="identity changed after effect"):
+        finish(_cross_wire(first, second, field))
+    assert gate.tasks.get_task(first.task_id).status == "active"
+    assert gate.tasks.get_task(second.task_id).status == "active"
+    assert store.get_operation(first.operation_id)["status"] == "succeeded"
+    assert store.get_operation(second.operation_id)["status"] == "prepared"
+    if cancelled:
+        with pytest.raises(CoreSpatialAdmissionError, match="identity changed after effect"):
+            finish(first)
+        assert gate.tasks.get_task(first.task_id).status == "active"
+    else:
+        assert finish(first) == "VERIFIED_EFFECT"
+        assert gate.tasks.get_task(first.task_id).status == "completed"
+    assert gate.tasks.get_task(second.task_id).status == "active"
