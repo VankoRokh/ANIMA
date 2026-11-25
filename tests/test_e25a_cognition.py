@@ -464,3 +464,32 @@ def test_ca03_legacy_historical_off_journal_not_eligible_for_claim(tmp_path, mon
     assert admitted_source_rows(record)
     record["context_snapshot"]["memory_enabled"] = False
     assert not admitted_source_rows(record)
+
+
+def test_ca03_retrieval_expands_frozen_context_only_for_current_turn(tmp_path, monkeypatch):
+    mem = memory(tmp_path, monkeypatch)
+    original = type(mem).context_for_cognition
+
+    def restricted_context(self, **kwargs):
+        context = original(self, **kwargs)
+        # Simulate a bounded Context that did not expose the historical item.
+        context["entities"] = [r for r in context["entities"] if r["category"] == "surface"]
+        context["relations"] = []
+        context["observed_revisions"] = []
+        return context
+
+    monkeypatch.setattr(type(mem), "context_for_cognition", restricted_context)
+    coord = E25LabCognitiveCoordinator(mem)
+    out = coord.run_turn(TwoStepEvidenceStub(), turn_id="ca03_retrieval", memory_enabled=True)
+    assert out["status"] == "STOPPED"
+    assert [row["status"] for row in out["outcomes"]] == ["COMPLETED", "COMPLETED"]
+    event = out["outcomes"][0]["result"]["records"][0]["last_seen_event_id"]
+
+    class Adapter:
+        def propose(self, context, outcomes, *, turn_id, step_index):
+            return prop(context, turn_id, "lookup_raw_evidence", {"event_ids": [event]},
+                        proposal_id="new_turn_proposal")
+
+    rejected = coord.run_turn(Adapter(), turn_id="ca03_next_turn", memory_enabled=True)
+    assert rejected["outcomes"][0]["reason_code"] == "UNEXPOSED_EVIDENCE_ID"
+    assert rejected["outcomes"][0]["execution_performed"] is False

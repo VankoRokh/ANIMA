@@ -133,12 +133,14 @@ class _TurnSourcePolicy:
         if kind == "retrieve_memory":
             # Validate in a temporary mapping. Commit exposures only after the
             # outcome is size-checked, freshness-checked and journaled.
+            pending = dict(self._exposed)
             for row in result["records"]:
                 event, sample = row["last_seen_event_id"], row["last_seen_sample"]
                 self._check_scope(sample)
                 if (type(event) is not str or not event
-                        or self._exposed.get(event, sample) != sample):
+                        or pending.get(event, sample) != sample):
                     raise E25CognitionError("SOURCE_IDENTITY_MISMATCH")
+                pending[event] = sample
         elif kind in ("lookup_raw_evidence", "inspect_latest_observation"):
             rows = result["records"]
             expected = args.get("event_ids", [])
@@ -152,7 +154,10 @@ class _TurnSourcePolicy:
                     raise E25CognitionError("SOURCE_NOT_VERIFIED")
                 sample = row["sample_id"]
                 self._check_scope(sample)
-                if (row["source_ref"] != self._source
+                event = row["event_id"]
+                if (type(event) is not str or not event
+                        or self._exposed.get(event, sample) != sample
+                        or row["source_ref"] != self._source
                         or type(row["sample_seq"]) is not int
                         or row["sample_seq"] != self._sequence(sample)
                         or (kind == "inspect_latest_observation" and sample != self._latest)
