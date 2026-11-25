@@ -42,17 +42,18 @@ def operator_truth(port, key):
 
 
 def case(binary: str, seed: int, root: Path, *, base_url, model, profile, suite=False,
-         suite_variant="baseline", suite_cases=None):
+         suite_variant="baseline", suite_cases=None, project_path=None):
+    project = PROJECT if project_path is None else Path(project_path)
     port = _port()
     keys = tuple(secrets.token_urlsafe(32) for _ in range(3))
     logfile = (root / f"e26a-world-{seed}.log").open("w", encoding="utf-8")
     process = subprocess.Popen(
-        [binary, "--headless", "--path", str(PROJECT),
+        [binary, "--headless", "--path", str(project),
          "res://LifecycleWorld.tscn", "--",
          "--lifecycle-port", str(port), "--lifecycle-seed", str(seed),
          "--lifecycle-guarded", "--lifecycle-effects", "--lifecycle-ledger",
          "--lifecycle-egocentric", "--lifecycle-debug-ui"],
-        cwd=PROJECT, stdout=logfile, stderr=subprocess.STDOUT,
+        cwd=project, stdout=logfile, stderr=subprocess.STDOUT,
         env={**os.environ,
              "ANIMA_LIFECYCLE_OBSERVER_KEY": keys[0],
              "ANIMA_LIFECYCLE_EXECUTOR_KEY": keys[1],
