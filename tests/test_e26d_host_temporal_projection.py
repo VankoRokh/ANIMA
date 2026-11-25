@@ -115,3 +115,53 @@ def test_r6_unbound_report_rejected(tmp_path, monkeypatch):
     result = project_temporal_claims(coord, REQ, report)
     assert result["status"] == "SOURCE_INTEGRITY_FAILURE"
     assert not result["claims"] and result["answer"] is None
+
+
+@pytest.mark.parametrize("enabled", [False, True])
+def test_r6_suite_keeps_model_metrics_separate_from_host(tmp_path, monkeypatch, enabled):
+    from anima.agent.native_tools import LoopbackChatTransport
+    from labs.virtual_anima_lab.python.lifecycle import e26_reproducibility as evidence
+    from labs.virtual_anima_lab.python.lifecycle.egocentric import EgocentricView
+    from labs.virtual_anima_lab.python.lifecycle.e26b_cognitive_suite import run_cases
+    from tests import test_e25a_cognition as fixtures
+
+    def with_shortcut(seq, *, visible):
+        data = view(seq, visible=visible).as_dict()
+        if visible:
+            data["readings"].append({
+                "entity_ref":"lab.obstacle.shortcut", "category":"obstacle",
+                "bearing_mdeg":20000, "range_milli_cells":3000, "properties":{},
+            })
+        return EgocentricView(data)
+
+    monkeypatch.setattr(fixtures, "view", with_shortcut)
+    mem = memory(tmp_path/"core", monkeypatch)
+    entity = next(e for e in mem.world_model()["entities"] if e["entity_ref"] == ENTITY)
+    past = completion("lookup_raw_evidence", json.dumps({"event_ids":[entity["last_seen_event_id"]]}), call_id="past")
+    latest = completion("inspect_latest_observation", "{}", call_id="latest")
+    stop = completion(content="Unverified prose.")
+    transport = Fake(past, stop, latest, stop)
+    monkeypatch.setattr(LoopbackChatTransport, "complete", lambda self, payload: transport.complete(payload))
+    coord = E25LabCognitiveCoordinator(mem, max_steps=4, ranked=True, error_feedback=True, latest_observation=True)
+    out = tmp_path/"evidence"
+    out.mkdir()
+    (out/"reproducibility").mkdir()
+    result, = run_cases(mem, coord, out, 7, base_url="http://127.0.0.1:8085", model="test",
+        check_world=lambda: True, check_core=lambda: len(mem._core.event_log.load_events()) == 3,
+        variant="temporal_completion", selected_cases=["C06"], host_temporal_projection=enabled)
+    assert result["operation_gate_pass"] and result["strict_operation_gate_pass"]
+    assert result["information_completion"]["information_requirement_satisfied"]
+    assert result["total_model_calls"] == len(transport.requests) == 4
+    assert not result["claim_objective_pass"] and not result["temporal_claim_coverage"]
+    assert result["model_claims"]["format_status"] == "NO_ACCEPTED_FINAL"
+    if enabled:
+        assert result["claim_projection_status"] == "NOT_REQUESTED_HOST_PROFILE"
+        assert result["host_temporal_claim_pass"] is True
+        assert result["host_temporal_projection"]["status"] == "VERIFIED"
+    else:
+        assert result["claim_projection_status"] == "BUDGET_UNAVAILABLE"
+        assert "host_temporal_projection" not in result
+    raw = evidence.read_json(out/"reproducibility"/"raw-seed-7.json")
+    case = evidence.read_json(out/"reproducibility"/"case-7-C06.json")
+    assert case["result"] == result
+    assert evidence.verify_case(case, raw) == 4
