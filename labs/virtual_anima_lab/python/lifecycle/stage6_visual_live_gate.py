@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import argparse
 from dataclasses import replace
+from uuid import uuid4
 import http.client
 import json
 import sqlite3
@@ -15,6 +16,8 @@ import time
 from pathlib import Path
 
 from anima.core.spatial_action_gate import CoreSpatialAdmissionError, SpatialSourceProof
+from anima.execution.contracts import ActionSpec, ExecutionAction, thaw
+from anima.execution.sandbox import ExecutionRejectedError
 
 from .visual_runner import launch, CONTROL_SCHEMA
 from .world_smoke import _binary
@@ -261,6 +264,72 @@ def identity_negative_case(binary, root):
         logfile.close()
 
 
+def admission_negative_case(binary, root):
+    """CA-02 / L01: a persisted orphan intent is not spatial authority."""
+    session, service, process, logfile = launch(
+        godot=binary, seed=314159, headless=True,
+        report_dir=root / "ca02-l01", step_interval=0.25, core_stage6=True,
+    )
+    try:
+        with session.lock:
+            gate = session.core_gateway
+            record = session.memory.observe_and_record()
+            before = SpatialSourceProof(
+                sample_id=record.sample_id, core_event_id=record.core_event_id,
+                raw_json=session.memory.raw_evidence(record.sample_id).canonical_json,
+            )
+            valid = gate.prepare(
+                goal_id=session.core_goal_id, proof=before,
+                tool_kind="world.turn", direction="right", reason="CA-02 control",
+            )
+            candidate = ActionSpec(
+                candidate_id=valid.action.candidate_id, tool=valid.action.tool,
+                tool_version=valid.action.tool_version, arguments=thaw(valid.action.arguments),
+            )
+            orphan = ExecutionAction.from_spec(
+                candidate, registry=gate.registry, created_at=valid.action.created_at,
+                goal_id=valid.goal_id.rsplit("_", 1)[0] + "_" + str(uuid4()),
+                persistent_task_id=valid.task_id.rsplit("_", 1)[0] + "_" + str(uuid4()),
+            )
+            gate.store.create_operation(orphan, registry=gate.registry)
+            for action in (orphan, valid.action):
+                try:
+                    gate.executor.execute(action)
+                except ExecutionRejectedError:
+                    pass
+                else:
+                    raise AssertionError("CA-02 direct executor admitted effect")
+                require(gate.store.get_operation(action.operation_id)["status"]
+                        == "prepared", "rejected operation changed")
+            after = session.memory.observe_and_record()
+            a = json.loads(before.raw_json)
+            b = json.loads(session.memory.raw_evidence(after.sample_id).canonical_json)
+            require((a["world_instance_id"], a["epoch"], a["tick"], a["revision"])
+                    == (b["world_instance_id"], b["epoch"], b["tick"], b["revision"]),
+                    "CA-02 direct executor changed world clocks")
+            require(b["sample_seq"] > a["sample_seq"], "missing fresh Raw")
+            require(gate.goals.get_goal(orphan.goal_id) is None, "orphan Goal exists")
+            require(gate.tasks.get_task(orphan.persistent_task_id) is None, "orphan Task exists")
+            require(gate.tasks.get_task(valid.task_id).status == "active",
+                    "valid Task changed without admission")
+            return {
+                "seed": 314159, "result": "PASS",
+                "orphan_rejected": True, "direct_valid_intent_rejected": True,
+                "both_operations_prepared": True,
+                "tick_delta": b["tick"] - a["tick"],
+                "revision_delta": b["revision"] - a["revision"],
+            }
+    finally:
+        service.stop()
+        process.terminate()
+        try:
+            process.wait(timeout=5)
+        except Exception:
+            process.kill()
+            process.wait(timeout=5)
+        logfile.close()
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--godot", default=None)
@@ -275,6 +344,7 @@ def main():
         "status": "E2_5C_CORE_STAGE6_VISUAL_PASS",
         "cases": [one_case(_binary(args.godot), seed, root) for seed in (7, 8)],
         "identity_negative": identity_negative_case(_binary(args.godot), root),
+        "admission_negative": admission_negative_case(_binary(args.godot), root),
     }
     (root / "e25b-result.json").write_text(
         json.dumps(result, sort_keys=True, indent=2, ensure_ascii=False),

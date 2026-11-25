@@ -14,7 +14,10 @@ from anima.core.assembly import build_core
 from anima.core.spatial_action_gate import (
     CoreSpatialActionGateway, CoreSpatialAdmissionError, SpatialSourceProof,
 )
-from anima.execution.contracts import ExecutionReceipt, thaw
+from anima.agent.executor import SandboxToolError
+from anima.execution.contracts import ActionSpec, ExecutionAction, ExecutionReceipt, thaw
+from anima.execution.sandbox import ExecutionRejectedError, UncertainOperationError
+from uuid import uuid4
 from anima.execution.store import ExecutionStore
 from labs.virtual_anima_lab.python.lifecycle.e24_working_memory import (
     E24WorkingMemory, SOURCE, SUBJECT, PREDICATE,
@@ -352,3 +355,90 @@ def test_ca01_cross_wired_finalization_never_completes_another_task(
         assert finish(first) == "VERIFIED_EFFECT"
         assert gate.tasks.get_task(first.task_id).status == "completed"
     assert gate.tasks.get_task(second.task_id).status == "active"
+
+
+def _orphan_action(first, gate):
+    candidate = ActionSpec(
+        candidate_id=first.action.candidate_id, tool=first.action.tool,
+        tool_version=first.action.tool_version, arguments=thaw(first.action.arguments),
+    )
+    return ExecutionAction.from_spec(
+        candidate, registry=gate.registry,
+        goal_id=first.goal_id.rsplit("_", 1)[0] + "_" + str(uuid4()),
+        persistent_task_id=first.task_id.rsplit("_", 1)[0] + "_" + str(uuid4()),
+        created_at=first.action.created_at,
+    )
+
+
+@pytest.mark.parametrize("orphan", [True, False])
+def test_ca02_direct_executor_cannot_start_world_effect(tmp_path, monkeypatch, orphan):
+    core, mem, goal, store, gate, proof = prepare_env(tmp_path, monkeypatch)
+    first = gate.prepare(
+        goal_id=goal["id"], proof=proof, tool_kind="world.turn",
+        direction="right", reason="CA-02",
+    )
+    action = _orphan_action(first, gate) if orphan else first.action
+    if orphan:
+        store.create_operation(action, registry=gate.registry)
+    calls = []
+    monkeypatch.setattr(
+        type(gate.executor), "_run_worker",
+        lambda *args: calls.append(args),
+    )
+    with pytest.raises(ExecutionRejectedError, match="admission required"):
+        gate.executor.execute(action)
+    assert calls == []
+    assert store.get_operation(action.operation_id)["status"] == "prepared"
+
+
+def test_ca02_direct_handler_rejected_even_with_executing_ledger(tmp_path, monkeypatch):
+    core, mem, goal, store, gate, proof = prepare_env(tmp_path, monkeypatch)
+    first = gate.prepare(
+        goal_id=goal["id"], proof=proof, tool_kind="world.turn",
+        direction="right", reason="CA-02",
+    )
+    store.transition_operation(first.operation_id, "executing", reason="test bypass")
+    handler = gate.executor.handlers[(first.action.tool, first.action.tool_version)]
+    with pytest.raises(SandboxToolError) as exc:
+        handler.execute(str(gate.executor.root), thaw(first.action.arguments), first.operation_id)
+    assert exc.value.code == "SPATIAL_ADMISSION_REQUIRED"
+    assert exc.value.effect_possible is False
+
+
+@pytest.mark.parametrize("known", [True, False])
+def test_ca02_recovery_only_after_cancel_never_dispatches(tmp_path, monkeypatch, known):
+    from labs.virtual_anima_lab.python.lifecycle import stage6_world
+
+    core, mem, goal, store, gate, proof = prepare_env(tmp_path, monkeypatch)
+    first = gate.prepare(
+        goal_id=goal["id"], proof=proof, tool_kind="world.turn",
+        direction="right", reason="CA-02 recovery",
+    )
+    store.transition_operation(first.operation_id, "executing", reason="lost reply")
+    gate.goals.transition_goal(first.goal_id, to_status="cancelled", reason="cancel")
+    result = {
+        "operation_id": first.operation_id, "status": "APPLIED",
+        "effect_applied": True, "revision": 1, "tick": 1,
+        "event_id": "lifecycle_evt:1", "reason": "ok",
+    }
+    reads = []
+    def readback(*args, **kwargs):
+        reads.append(args)
+        if not known:
+            raise SandboxToolError("UNCERTAIN_OPERATION", "unknown", effect_possible=True)
+        return result
+
+    monkeypatch.setattr(stage6_world, "_read_back", readback)
+    def unexpected(*args):
+        pytest.fail("recovery started an effect worker")
+    monkeypatch.setattr(type(gate.executor), "_run_worker", unexpected)
+    if known:
+        assert gate.executor.execute(first.action).status == "succeeded"
+        assert store.get_operation(first.operation_id)["status"] == "succeeded"
+    else:
+        with pytest.raises(UncertainOperationError):
+            gate.executor.execute(first.action)
+        assert store.get_operation(first.operation_id)["status"] == "uncertain"
+    assert len(reads) == 1
+    assert gate.tasks.get_task(first.task_id).status == "active"
+    assert gate.goals.get_goal(first.goal_id)["status"] == "cancelled"
