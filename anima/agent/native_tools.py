@@ -9,9 +9,10 @@ import json
 import re
 import time
 import urllib.request
+from dataclasses import dataclass
 from urllib.parse import urlsplit
 
-from anima.agent.tools import ToolRegistry, validate_schema, validate_instance
+from anima.agent.tools import ToolDescriptor, ToolRegistry, validate_schema, validate_instance
 
 
 def strict_json(text):
@@ -136,6 +137,24 @@ class LoopbackChatTransport:
         return strict_json(raw.decode("utf-8"))
 
 
+@dataclass(frozen=True, slots=True, eq=False)
+class PendingNativeCall:
+    """One session-issued correlation handle, not permission to execute.
+
+    Identity (not descriptor or wire ID equality) binds resolution to the
+    exact pending call. Arguments are retained as immutable canonical JSON;
+    callers receive a detached copy. Handles are process-local, not recovery
+    credentials or proof that a service actually executed.
+    """
+    call_id: str
+    descriptor: ToolDescriptor
+    arguments_json: str | None
+
+    @property
+    def arguments(self):
+        return None if self.arguments_json is None else strict_json(self.arguments_json)
+
+
 class NativeToolSession:
     """One model conversation; caller submits only verified tool results."""
 
@@ -238,24 +257,24 @@ class NativeToolSession:
                     raise
                 descriptor = exc.descriptor
                 self.seen_ids.add(call_id)
-                self.pending = (call_id, descriptor)
+                self.pending = PendingNativeCall(call_id, descriptor, None)
                 self.pending_error = "INVALID_TOOL_ARGUMENTS"
                 self.messages.append({"role":"assistant", "content":content or "",
                                       "tool_calls":[call]})
                 record.update(valid=False, error=str(exc), tool_name=descriptor.name,
                               tool_call_id=call_id, error_code=self.pending_error,
                               original_arguments=strict_json(fn["arguments"]))
-                return descriptor, None
+                return self.pending
             original_args = strict_json(fn["arguments"])
             record.update(original_arguments=original_args,
                           arguments_normalized=original_args != args)
             self.seen_ids.add(call_id)
-            self.pending = (call_id, descriptor)
+            self.pending = PendingNativeCall(call_id, descriptor, canonical(args))
             self.messages.append({"role": "assistant", "content": content or "",
                                   "tool_calls": [call]})
             record.update(valid=True, tool_name=descriptor.name, arguments=args,
                           tool_call_id=call_id)
-            return descriptor, args
+            return self.pending
         except Exception as exc:
             self.terminal = True
             record["error"] = f"{type(exc).__name__}: {exc}"
@@ -264,31 +283,32 @@ class NativeToolSession:
             record["latency_ms"] = (time.perf_counter() - started) * 1000
             self.calls.append(record)
 
-    def submit_result(self, descriptor, result):
-        if (self.pending is None or self.pending[1] is not descriptor or self.terminal
-                or self.pending_error is not None):
-            raise ValueError("result does not bind valid pending tool")
-        descriptor.validate_output(result)
+    def submit_result(self, call: PendingNativeCall, result):
+        if (not isinstance(call, PendingNativeCall) or self.pending is not call
+                or self.terminal or self.pending_error is not None):
+            raise ValueError("result does not bind valid pending call")
+        call.descriptor.validate_output(result)
         content = canonical(result)
         if len(content.encode("utf-8")) > 16384:
             raise ValueError("tool result exceeds byte budget")
-        self.messages.append({"role": "tool", "tool_call_id": self.pending[0],
+        self.messages.append({"role": "tool", "tool_call_id": call.call_id,
                               "content": content})
         self.pending = None
 
 
-    def reject_pending(self, descriptor, *, reason_code):
+    def reject_pending(self, call: PendingNativeCall, *, reason_code):
         """Resolve a syntactically valid call with a trusted denial, not a result.
 
         Only the host may invoke this method after recording non-execution.
         Does not change the catalog, arguments, or source permissions.
         """
-        if self.pending is None or self.pending[1] is not descriptor or self.terminal:
-            raise ValueError("error does not bind pending tool")
+        if (not isinstance(call, PendingNativeCall) or self.pending is not call
+                or self.terminal):
+            raise ValueError("error does not bind pending call")
         expected = self.pending_error or "UNEXPOSED_EVIDENCE_ID"
         if reason_code != expected or reason_code not in RECOVERABLE_TOOL_ERRORS:
             raise ValueError("unsupported or mismatched recoverable rejection")
-        self.messages.append({"role": "tool", "tool_call_id": self.pending[0],
+        self.messages.append({"role": "tool", "tool_call_id": call.call_id,
             "content": canonical({"status": "rejected", "error_code": reason_code,
                                   "execution_performed": False,
                                   "message": RECOVERABLE_TOOL_ERRORS[reason_code]})})
