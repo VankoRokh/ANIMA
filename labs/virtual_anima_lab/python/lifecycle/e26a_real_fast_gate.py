@@ -42,7 +42,7 @@ def operator_truth(port, key):
 
 
 def case(binary: str, seed: int, root: Path, *, base_url, model, profile, suite=False,
-         suite_variant="baseline", suite_cases=None, project_path=None):
+         suite_variant="baseline", suite_cases=None, project_path=None, host_temporal_projection=False):
     project = PROJECT if project_path is None else Path(project_path)
     port = _port()
     keys = tuple(secrets.token_urlsafe(32) for _ in range(3))
@@ -93,6 +93,7 @@ def case(binary: str, seed: int, root: Path, *, base_url, model, profile, suite=
             from .e26b_cognitive_suite import run_cases
             return run_cases(memory, coordinator, root, seed, base_url=base_url, model=model,
                              variant=suite_variant, selected_cases=suite_cases,
+                             host_temporal_projection=host_temporal_projection,
                              check_world=lambda: operator_truth(port, keys[2]) == world_before,
                              check_core=lambda: len(instance.event_log.load_events()) == 3
                              and instance.memory_store.count() == 0

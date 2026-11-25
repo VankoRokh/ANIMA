@@ -119,7 +119,9 @@ from labs.virtual_anima_lab.python.cognition.resource_budget import ResourceLimi
 
 
 def run_cases(memory, coordinator, root, seed, *, base_url, model, check_world, check_core,
-              variant="baseline", selected_cases=None):
+              variant="baseline", selected_cases=None, host_temporal_projection=False):
+    if type(host_temporal_projection) is not bool or (host_temporal_projection and variant != "temporal_completion"):
+        raise ValueError("host temporal projection requires temporal_completion variant")
     historical = {r["entity_ref"]: r for r in memory.world_model()["entities"]}
     if not {CRATE, SHORTCUT} <= set(historical):
         raise AssertionError("fixture missing expected observed entities")
@@ -144,9 +146,14 @@ def run_cases(memory, coordinator, root, seed, *, base_url, model, check_world, 
         limits = (ResourceLimits() if variant in ("budgeted","claims","claims_separated","temporal_sources", "temporal_completion") else
                   ResourceLimits(max_calls=1) if variant == "budget_probe" else None)
         requirement = information_requirement(case, temporal_completion=variant == "temporal_completion")
+        use_host = host_temporal_projection and requirement.kind == "historical_and_latest_observation"
         report = coordinator.run_turn(adapter, turn_id=turn_id, memory_enabled=case["enabled"],
             completion_requirement=requirement if variant in ("continuation","budgeted","budget_probe","claims","claims_separated","temporal_sources", "temporal_completion") else None,
-            resource_limits=limits, project_result_claims=variant in ("claims_separated","temporal_sources", "temporal_completion"))
+            resource_limits=limits, project_result_claims=not use_host and variant in ("claims_separated","temporal_sources", "temporal_completion"))
+        if use_host:
+            from labs.virtual_anima_lab.python.cognition.host_temporal_projection import project_temporal_claims
+            report["host_temporal_projection"] = project_temporal_claims(coordinator, requirement, report)
+            report["claim_projection"] = {"status":"NOT_REQUESTED_HOST_PROFILE","call":None}
         trace = coordinator.decision_records(turn_id)
         world_ok, core_ok = check_world(), check_core()
         if not world_ok or not core_ok:
@@ -206,6 +213,9 @@ def run_cases(memory, coordinator, root, seed, *, base_url, model, check_world, 
             raise AssertionError("model call budget/accounting mismatch")
         if not case["enabled"] and CRATE in result["verified_entities"]:
             raise AssertionError("memory ablation exposed crate history")
+        if use_host:
+            result["host_temporal_projection"] = report["host_temporal_projection"]
+            result["host_temporal_claim_pass"] = report["host_temporal_projection"]["temporal_claim_coverage"]
         result["latest_observation_reads"] = sum(o["status"] == "COMPLETED" and o["operation_kind"] == "inspect_latest_observation" for o in report["outcomes"])
         (root / f"{turn_id}-result.json").write_text(
             json.dumps({"result":result, "turn":report, "trace":trace}, indent=2),
@@ -217,6 +227,8 @@ def run_cases(memory, coordinator, root, seed, *, base_url, model, check_world, 
         print(json.dumps({k:result[k] for k in ("seed","case","variant","operation_gate_pass","turn_status","model_calls","latest_observation_reads")}
             | {"information_satisfied":result["information_completion"]["information_requirement_satisfied"],
                "projection_status":result.get("claim_projection_status"),"claim_objective_pass":result.get("claim_objective_pass"),
+               "host_temporal_projection_status":result.get("host_temporal_projection",{}).get("status"),
+               "host_temporal_claim_pass":result.get("host_temporal_claim_pass"),
                "resource_budget":result.get("resource_budget")}), flush=True)
     return results
 
@@ -233,7 +245,11 @@ def main():
     ap.add_argument("--evidence-dir", type=Path)
     ap.add_argument("--variant", choices=("baseline", "set", "temporal", "combined", "compact", "ranked", "refined", "feedback", "feedback_probe", "continuation", "budgeted", "budget_probe", "claims", "claims_separated", "temporal_sources", "temporal_completion"), default="baseline")
     ap.add_argument("--case", action="append", choices=[c["id"] for c in CASES])
+    ap.add_argument("--host-temporal-projection", action="store_true",
+                    help="Replace only C06 model claim projection with verified deterministic host assertions")
     args = ap.parse_args()
+    if args.host_temporal_projection and args.variant != "temporal_completion":
+        ap.error("--host-temporal-projection requires --variant temporal_completion")
     url = urlsplit(args.base_url)
     if (url.scheme != "http" or url.hostname not in ("127.0.0.1", "::1")
             or url.port is None or url.path not in ("", "/")
@@ -255,6 +271,7 @@ def main():
         backend=backend, base_url=args.base_url, model=args.model, model_sha=digest,
         variant=args.variant, scenarios=scenarios)
     manifest["server_models"] = models
+    manifest["host_temporal_projection"] = args.host_temporal_projection
     evidence = out / "reproducibility"
     evidence.mkdir()
     (out / "model-manifest.json").write_text(json.dumps({
@@ -263,6 +280,7 @@ def main():
         "file_hash_not_attested_by_server":True, "profile":"native",
         "temperature":0, "max_steps":4, "max_output_tokens":256,
         "variant":args.variant, "git_sha":git_sha, "backend":backend,
+        "host_temporal_projection":args.host_temporal_projection,
         "scenarios":scenarios}, indent=2), encoding="utf-8")
     print(f"Evidence directory: {out}", flush=True)
     results = []
@@ -274,7 +292,7 @@ def main():
                 results.extend(case(binary, seed, out, base_url=args.base_url,
                                     model=args.model, profile="native", suite=True,
                                     suite_variant=args.variant, suite_cases=args.case,
-                                    project_path=project_path))
+                                    project_path=project_path, host_temporal_projection=args.host_temporal_projection))
         require(reproducibility.git_snapshot() == git_sha, "Git snapshot changed")
         require(reproducibility.backend_snapshot(args.backend_pid) == backend, "backend process changed")
         require(reproducibility.file_digest(args.model_file) == digest, "local model file changed")
@@ -306,6 +324,12 @@ def main():
               "temporal_cases":sum(r["information_completion"]["requirement"]["kind"] == "historical_and_latest_observation" for r in results),
               "temporal_information_passes":sum(r["information_completion"]["requirement"]["kind"] == "historical_and_latest_observation" and r["information_completion"]["information_requirement_satisfied"] for r in results),
               "temporal_claim_passes":sum(r.get("temporal_claim_coverage",False) for r in results),
+              "host_temporal_projection_enabled":args.host_temporal_projection,
+              "host_temporal_projection_cases":sum("host_temporal_projection" in r for r in results),
+              "host_temporal_projection_information_complete":sum(r.get("host_temporal_projection",{}).get("information_satisfied",False) for r in results),
+              "host_temporal_claim_passes":sum(r.get("host_temporal_claim_pass",False) for r in results),
+              "host_temporal_projection_status_counts":{status:sum(r.get("host_temporal_projection",{}).get("status") == status for r in results)
+                  for status in sorted({r["host_temporal_projection"]["status"] for r in results if "host_temporal_projection" in r})},
               "host_claim_probe_counts":{status:sum(p["status"] == status for r in results for p in r["host_claim_probes"])
                                          for status in ("VERIFIED","CONTRADICTED","UNSUPPORTED")},
               "semantic_review":"PENDING", "results":results}
