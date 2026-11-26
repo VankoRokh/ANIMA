@@ -13,6 +13,7 @@ import urllib.request
 from collections.abc import Mapping
 from dataclasses import dataclass
 
+from anima.agent.generation_termination import transport_termination
 from anima.agent.llm_planner import (
     DEFAULT_LLM_TIMEOUT_SECONDS,
     LLMCallRecord,
@@ -432,6 +433,7 @@ class SmallModelLLMPlanner(LLMPlanner):
         if not isinstance(result, LLMCallResult):
             raise TypeError("LLMTransport.complete() must return LLMCallResult")
         prompt_material = system_prompt + "\n" + user_prompt
+        wire, termination = transport_termination(self.transport, result.finish_reason)
         record = LLMCallRecord(
             provider=result.provider,
             model=result.model,
@@ -442,6 +444,8 @@ class SmallModelLLMPlanner(LLMPlanner):
             finish_reason=result.finish_reason,
             prompt_hash=_sha256_text(prompt_material),
             response_hash=_sha256_text(result.text),
+            wire_protocol=wire,
+            termination_status=termination,
         )
         self._call_history.append(record)
         if len(self._call_history) > MAX_LLM_CALL_HISTORY:
@@ -450,6 +454,7 @@ class SmallModelLLMPlanner(LLMPlanner):
         if len(self._prompt_metrics) > MAX_LLM_CALL_HISTORY:
             del self._prompt_metrics[:-MAX_LLM_CALL_HISTORY]
 
+        self._require_completed_generation(record)
         try:
             return parse_llm_planner_decision(result.text)
         except LLMPlannerError as error:

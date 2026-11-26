@@ -32,4 +32,17 @@ def classify_termination(reason, *, wire):
     return "UNKNOWN"
 
 
-__all__ = ["classify_termination"]
+def transport_termination(transport, reason):
+    """Bind terminal classification to a trusted transport declaration.
+
+    Custom transports must explicitly declare their wire protocol. Missing
+    or unsupported declarations never acquire authority from provider names
+    or from a plausible finish reason.
+    """
+    wire = getattr(transport, "wire_protocol", None)
+    if type(wire) is not str or wire not in ("llama_cpp_completion", "chat_completion"):
+        return None, "UNKNOWN"
+    return wire, classify_termination(reason, wire=wire)
+
+
+__all__ = ["classify_termination", "transport_termination"]

@@ -124,6 +124,8 @@ class LlamaCppSmallModelTransport(SmallModelOpenAICompatibleChatTransport):
     field constrains generated tokens before ANIMA performs its own strict parse.
     """
 
+    wire_protocol = "llama_cpp_completion"
+
     def __init__(
         self,
         *,
@@ -323,8 +325,6 @@ class LlamaCppSmallModelTransport(SmallModelOpenAICompatibleChatTransport):
             output_tokens = None
 
         finish_reason = document.get("stop_type")
-        if finish_reason is None and document.get("stop") is True:
-            finish_reason = "stop"
         if finish_reason is not None and not isinstance(finish_reason, str):
             finish_reason = str(finish_reason)
 

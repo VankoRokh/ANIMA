@@ -7,6 +7,7 @@ from abc import ABC, abstractmethod
 from collections.abc import Mapping
 from dataclasses import dataclass
 
+from anima.agent.generation_termination import transport_termination
 from anima.agent.planner import (
     MAX_PROPOSALS,
     PlannerAdapter,
@@ -127,11 +128,8 @@ class LLMCallResult:
             "LLMCallResult estimated_cost_usd",
         )
         finish_reason = self.finish_reason
-        if finish_reason is not None:
-            finish_reason = _require_text(
-                finish_reason,
-                "LLMCallResult finish_reason",
-            )
+        if finish_reason is not None and type(finish_reason) is not str:
+            raise ValueError("LLMCallResult finish_reason must be a string or None")
         object.__setattr__(self, "provider", provider)
         object.__setattr__(self, "model", model)
         object.__setattr__(self, "text", self.text.strip())
@@ -153,6 +151,8 @@ class LLMCallRecord:
     finish_reason: str | None
     prompt_hash: str
     response_hash: str
+    wire_protocol: str | None = None
+    termination_status: str = "UNKNOWN"
 
     @property
     def total_tokens(self):
@@ -172,11 +172,15 @@ class LLMCallRecord:
             "finish_reason": self.finish_reason,
             "prompt_hash": self.prompt_hash,
             "response_hash": self.response_hash,
+            "wire_protocol": self.wire_protocol,
+            "termination_status": self.termination_status,
         }
 
 
 class LLMTransport(ABC):
     """Provider boundary. It receives text prompts and returns one raw JSON response."""
+
+    wire_protocol = None  # custom transports must explicitly declare their wire
 
     @abstractmethod
     def complete(self, *, system_prompt, user_prompt, timeout_seconds):
@@ -185,6 +189,8 @@ class LLMTransport(ABC):
 
 class OpenAICompatibleChatTransport(LLMTransport):
     """Minimal stdlib transport for OpenAI-compatible chat/completions endpoints."""
+
+    wire_protocol = "chat_completion"
 
     def __init__(
         self,
@@ -502,6 +508,15 @@ class LLMPlanner(PlannerAdapter):
     def last_call(self):
         return self._call_history[-1] if self._call_history else None
 
+    @staticmethod
+    def _require_completed_generation(record):
+        if record.termination_status != "TEXT_COMPLETE":
+            raise LLMPlannerError(
+                f"generation not confirmed complete: {record.termination_status}; "
+                f"wire_protocol={record.wire_protocol!r}; "
+                f"response_hash={record.response_hash}"
+            )
+
     def _decide(self, request):
         system_prompt, user_prompt = build_llm_planner_prompts(request)
         result = self.transport.complete(
@@ -512,6 +527,7 @@ class LLMPlanner(PlannerAdapter):
         if not isinstance(result, LLMCallResult):
             raise TypeError("LLMTransport.complete() must return LLMCallResult")
         prompt_material = system_prompt + "\n" + user_prompt
+        wire, termination = transport_termination(self.transport, result.finish_reason)
         record = LLMCallRecord(
             provider=result.provider,
             model=result.model,
@@ -522,11 +538,14 @@ class LLMPlanner(PlannerAdapter):
             finish_reason=result.finish_reason,
             prompt_hash=_sha256_text(prompt_material),
             response_hash=_sha256_text(result.text),
+            wire_protocol=wire,
+            termination_status=termination,
         )
         self._call_history.append(record)
         if len(self._call_history) > MAX_LLM_CALL_HISTORY:
             del self._call_history[:-MAX_LLM_CALL_HISTORY]
 
+        self._require_completed_generation(record)
         try:
             return parse_llm_planner_decision(result.text)
         except LLMPlannerError as error:

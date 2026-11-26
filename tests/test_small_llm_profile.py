@@ -17,6 +17,8 @@ from anima.agent.small_llm import (
 
 
 class FakeTransport(LLMTransport):
+    wire_protocol = "chat_completion"
+
     def __init__(self, response):
         self.response = response
         self.calls = []

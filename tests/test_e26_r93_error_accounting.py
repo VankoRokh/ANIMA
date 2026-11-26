@@ -23,7 +23,7 @@ from tests.test_e26_r92_export_integrity import make_result_bundle, _reseal_muta
     ({"stop_type": "word", "stop": True}, "word", True),
     ({"stop_type": "limit", "stop": True}, "limit", False),
     ({"stop_type": "none", "stop": False}, "none", False),
-    ({"stop": True}, "stop", False),
+    ({"stop": True}, None, False),
     ({"stop": False}, None, False),
     ({"stop_type": 17}, "17", False),
 ])

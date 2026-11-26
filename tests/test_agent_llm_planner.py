@@ -31,6 +31,8 @@ from anima.internal_state.store import InternalStateStore
 
 
 class FakeTransport(LLMTransport):
+    wire_protocol = "chat_completion"
+
     def __init__(self, responses):
         self.responses = list(responses)
         self.calls = []

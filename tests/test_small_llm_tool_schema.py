@@ -21,6 +21,8 @@ from anima.agent.small_llm import (
 
 
 class StructuredFakeTransport(LLMTransport):
+    wire_protocol = "chat_completion"
+
     def __init__(self):
         self.response_schema = None
 
