@@ -121,12 +121,14 @@ def test_invalid_backend_result_is_terminal_and_still_raises_type_error():
 
 def test_successful_call_history_cannot_be_confused_with_attempt_history():
     class Transport:
+        wire_protocol = "chat_completion"
+
         def __init__(self): self.calls = 0
         def complete(self, **kwargs):
             self.calls += 1
             if self.calls == 2:
                 raise FastLLMTransportError("failed second attempt")
-            return FastLLMCallResult("fake", "fake-model", "answer", False, 0.)
+            return FastLLMCallResult("fake", "fake-model", "answer", False, 0., finish_reason="stop")
     transport = Transport()
     backend = FastLLMBackend(transport)
     pipeline = CognitivePipeline(backend=backend)
@@ -154,8 +156,10 @@ def test_invalid_candidate_is_a_completed_backend_call_with_output_validation_er
 
 def test_transport_metadata_is_not_success_until_fast_result_validation_passes():
     class InvalidTextTransport:
+        wire_protocol = "chat_completion"
+
         def complete(self, **kwargs):
-            return FastLLMCallResult("fake", "fake-model", "", False, 0.)
+            return FastLLMCallResult("fake", "fake-model", "", False, 0., finish_reason="stop")
     backend = FastLLMBackend(InvalidTextTransport())
     pipeline = CognitivePipeline(backend=backend)
     with pytest.raises(ValueError, match="response_text"):

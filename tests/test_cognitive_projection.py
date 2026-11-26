@@ -100,9 +100,11 @@ def test_projected_renderer_uses_only_view_and_backend_format_is_separate(monkey
     prompts = []
 
     class Transport:
+        wire_protocol = "chat_completion"
+
         def complete(self, **kwargs):
             prompts.append(kwargs["user_prompt"])
-            return FastLLMCallResult("fake", "model", "answer", False, 0.)
+            return FastLLMCallResult("fake", "model", "answer", False, 0., finish_reason="stop")
 
     backend = FastLLMBackend(Transport())
     backend.complete_projected(request)

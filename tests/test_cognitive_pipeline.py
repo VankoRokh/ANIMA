@@ -197,11 +197,13 @@ def test_event_requires_context_but_structured_path_does_not():
 
 def test_projected_llm_backend_uses_existing_transport_contract():
     class Transport:
+        wire_protocol = "chat_completion"
+
         def __init__(self):
             self.calls = []
         def complete(self, **kwargs):
             self.calls.append(kwargs)
-            return FastLLMCallResult("fake", "replacement-model", "answer", False, 1.)
+            return FastLLMCallResult("fake", "replacement-model", "answer", False, 1., finish_reason="stop")
     transport = Transport()
     backend = FastLLMBackend(transport)
     turn = CognitivePipeline(backend=backend).process_task(task(goal="explain observation"))

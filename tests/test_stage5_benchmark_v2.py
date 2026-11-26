@@ -18,7 +18,7 @@ def native(self, endpoint, payload, **kwargs):
     answer = ('CONTINUE' if view['operation'] == 'CHOOSE_ACTION' else
               'AMBER' if view['operation'] == 'QUERY_FACT' else
               'amber.' if 'bicycle' in view.get('input', '') else 'COBALT47.')
-    return {'content': answer, 'tokens_evaluated': 100, 'tokens_predicted': 4, 'stop': True}
+    return {'content': answer, 'tokens_evaluated': 100, 'tokens_predicted': 4, 'stop': True, 'stop_type': 'eos'}
 
 
 def run(monkeypatch, callback=native):
@@ -177,3 +177,28 @@ def test_v1_reference_uses_raw_fifty_run_denominator(tmp_path):
     result = bench.v1_reference(path)['SmolLM3']
     assert result['passes'] == 15 and result['total'] == 50 and result['errors'] == 10
     assert result['run_id'] == 'representative'
+
+
+@pytest.mark.parametrize("stop_type", ["limit", "none", None])
+def test_valid_benchmark_text_without_confirmed_termination_is_not_success(monkeypatch, stop_type):
+    def incomplete(self, endpoint, payload, **kwargs):
+        response = native(self, endpoint, payload, **kwargs)
+        if endpoint.endswith("/completion"):
+            if stop_type is None:
+                del response["stop_type"]
+            else:
+                response["stop_type"] = stop_type
+        return response
+
+    rows = run(monkeypatch, incomplete)
+    assert len(rows) == 8
+    assert all(row["passed"] for row in rows[:3])
+    for row in rows[3:]:
+        assert not row["passed"]
+        assert row["failure_classification"] == "MODEL_OUTPUT"
+        assert row["route"] == "COGNITIVE_REQUIRED"
+        assert row["backend_attempts"] == row["generation_requests"] == 1
+        assert row["successful_completions"] == 0
+        assert (row["input_tokens"], row["output_tokens"]) == (100, 4)
+        assert row["raw_model_response"] is not None
+        assert row["final_result"] is None
