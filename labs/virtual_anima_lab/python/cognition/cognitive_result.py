@@ -10,6 +10,7 @@ from .claim_verification import ObservationClaim, ObservationClaimVerifier
 from .completion import CompletionRequirement, evaluate_completion
 from .coordinator import E25LabCognitiveCoordinator, E25CognitionError
 from .source_binding import admitted_source_rows
+from .result_reasoning import build_reasoning
 from labs.virtual_anima_lab.python.lifecycle.e24_working_memory import E24MemoryError
 
 
@@ -37,7 +38,8 @@ def _bound_records(coordinator, report):
     return records
 
 
-def build_cognitive_result(coordinator, report, *, requirement=None):
+def build_cognitive_result(coordinator, report, *, requirement=None,
+                           research_calls=(), claim_phase=None):
     """Produce a detached, bounded result from a trusted completed turn.
 
     Requirement-directed observation claims only in this version. The
@@ -135,6 +137,10 @@ def build_cognitive_result(coordinator, report, *, requirement=None):
             }) else "INCOMPLETE")
         else:
             coverage = "NOT_APPLICABLE"
+    reasoning, model_claims, presentation = build_reasoning(
+        coordinator, report, completion, research_calls=research_calls,
+        claim_phase=claim_phase,
+    )
     return {
         "schema": SCHEMA,
         "identity": {
@@ -169,12 +175,15 @@ def build_cognitive_result(coordinator, report, *, requirement=None):
                 for event, data in sorted(sources.items())
             ],
             "facts": facts,
+            "model_claims": model_claims,
             "verdicts": deepcopy(verdicts),
             "integrity_status": integrity,
             "claim_coverage": coverage,
             "world_truth_authority": False,
             "knowledge_write": False,
         },
+        "reasoning": reasoning,
+        "presentation": presentation,
     }
 
 

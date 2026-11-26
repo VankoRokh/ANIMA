@@ -134,3 +134,108 @@ def test_foreign_or_incomplete_report_rejected(tmp_path, monkeypatch, corruption
         report["outcomes"].pop()
     with pytest.raises(ValueError):
         build_cognitive_result(coord, report)
+
+
+def _native_result_turn(tmp_path, monkeypatch, mode):
+    import json
+    from labs.virtual_anima_lab.python.cognition.native_lab import NativeLabAdapter
+    from tests.test_e26a_native_tools import Fake, completion
+    mem = memory(tmp_path / "core", monkeypatch)
+    entity = next(e for e in mem.world_model()["entities"] if e["entity_ref"] == CRATE)
+    event = entity["last_seen_event_id"]
+    item = {"entity_ref": CRATE, "predicate": "observed_in_sample", "value": True,
+            "event_id": event, "sample_seq": 2, "scope": "source_sample"}
+    answer = "The crate is visible right now."
+    responses = [completion("lookup_raw_evidence", json.dumps({"event_ids": [event]}),
+                            call_id="past")]
+    requirement = CompletionRequirement("verified_observation", (CRATE,))
+    if mode == "contradicted":
+        item["value"] = False
+    elif mode == "wrong_scope":
+        item["scope"] = "latest_captured_sample"
+    elif mode == "wrong_event":
+        item["event_id"] = "ev_unbound"
+    claims = [] if mode == "empty" else [item]
+    text = json.dumps({"answer": answer, "claims": claims})
+    if mode in ("plain", "invalid", "truncated"):
+        text = answer if mode != "truncated" else '{"answer":"The crate'
+    if mode == "arithmetic":
+        responses = []
+        requirement = CompletionRequirement("no_service_read")
+        text = json.dumps({"answer": "2 plus 2 equals 5.", "claims": []})
+    elif mode == "empty_search":
+        responses = [completion("retrieve_memory", '{"query":"elephant","top_k":3}')]
+        requirement = CompletionRequirement("empty_search", query="elephant")
+        text = json.dumps({"answer": "Elephants do not exist.", "claims": []})
+    responses.append(completion(content=text, finish="length" if mode == "truncated" else "stop"))
+    transport = Fake(*responses)
+    adapter = NativeLabAdapter(base_url="http://127.0.0.1:8085", model="test",
+        task="Research", trace_path=tmp_path / "calls.jsonl", transport=transport,
+        temporal=True, compact_temporal=True, model_claims=mode != "plain")
+    coord = E25LabCognitiveCoordinator(mem)
+    report = coord.run_turn(adapter, turn_id="result_native")
+    return mem, coord, report, adapter, transport, requirement, text
+
+
+@pytest.mark.parametrize("mode,status,coverage", [
+    ("correct_claim_wrong_prose", "ALL_CLAIMS_VERIFIED", "COMPLETE"),
+    ("contradicted", "CLAIMS_NOT_ALL_VERIFIED", "INCOMPLETE"),
+    ("wrong_scope", "CLAIMS_NOT_ALL_VERIFIED", "INCOMPLETE"),
+    ("wrong_event", "CLAIMS_NOT_ALL_VERIFIED", "INCOMPLETE"),
+    ("empty", "NO_CLAIMS", "INCOMPLETE"),
+    ("invalid", "INVALID", "INCOMPLETE"),
+    ("plain", "NOT_REQUESTED", "NOT_ASSESSED"),
+    ("truncated", "NO_ACCEPTED_FINAL", "INCOMPLETE"),
+    ("arithmetic", "NO_CLAIMS", "NOT_APPLICABLE"),
+    ("empty_search", "NO_CLAIMS", "NOT_APPLICABLE"),
+])
+def test_r92_model_output_and_host_facts_are_independent(tmp_path, monkeypatch, mode, status, coverage):
+    mem, coord, report, adapter, transport, req, text = _native_result_turn(tmp_path, monkeypatch, mode)
+    calls_before = deepcopy(adapter.calls)
+    report_before = deepcopy(report)
+    count = len(transport.requests)
+    result = build_cognitive_result(coord, report, requirement=req,
+        research_calls=adapter.calls, claim_phase=None if mode == "plain" else "research")
+    assert adapter.calls == calls_before and report == report_before
+    assert len(transport.requests) == count
+    evidence = result["evidence"]
+    model = evidence["model_claims"]
+    assert model["status"] == status and model["coverage"] == coverage
+    assert model["free_text_verified"] is False
+    attempt, = result["reasoning"]["model_text_attempts"]
+    assert attempt["original_text"] == text and attempt["authority"] == "UNVERIFIED"
+    assert result["presentation"]["whole_answer_verified"] is False
+    assert result["presentation"]["semantic_review"] == "NOT_PERFORMED"
+    if mode == "truncated":
+        assert attempt["protocol_status"] == "INTERMEDIATE_OR_UNACCEPTED"
+        assert result["presentation"]["model_text"] is None
+        assert result["execution"]["turn_status"] == "REJECTED"
+    else:
+        assert attempt["protocol_status"] == "ACCEPTED_FINAL"
+        assert result["presentation"]["model_text_authority"] == "UNVERIFIED"
+    if mode in ("arithmetic", "empty_search"):
+        assert not evidence["facts"]
+    else:
+        fact, = evidence["facts"]
+        assert fact["origin"] == "DETERMINISTIC_HOST"
+        assert fact["verdict"]["claim"]["scope"] == "source_sample"
+        assert fact["verdict"]["claim"]["value"] is True
+    if mode == "correct_claim_wrong_prose":
+        candidate, = model["verified_candidates"]
+        assert candidate["origin"] == "MODEL_CANDIDATE_VERIFIED"
+        assert result["presentation"]["model_text"] == "The crate is visible right now."
+    else:
+        assert not model["verified_candidates"]
+    assert mem._core.memory_store.count() == 0
+    assert len(mem._core.event_log.load_events()) == 3
+
+
+@pytest.mark.parametrize("field,value", [
+    ("turn_id", "foreign"), ("context_snapshot_id", "ctx_foreign"), ("model_call_index", 99),
+])
+def test_r92_foreign_native_record_cannot_be_attached(tmp_path, monkeypatch, field, value):
+    _, coord, report, adapter, _, req, _ = _native_result_turn(tmp_path, monkeypatch, "plain")
+    calls = deepcopy(adapter.calls)
+    calls[-1][field] = value
+    with pytest.raises(ValueError, match="does not bind cognitive result"):
+        build_cognitive_result(coord, report, requirement=req, research_calls=calls)
