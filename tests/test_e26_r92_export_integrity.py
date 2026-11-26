@@ -50,6 +50,19 @@ def make_result_bundle(tmp_path, monkeypatch):
     return root, manifest, transport
 
 
+def _reseal_mutated_fixture(root, path, fixture, manifest):
+    # Only disposable pytest fixtures are deliberately mutated. Keep the
+    # production exclusive-create contract intact, including the manifest.
+    path.unlink()
+    evidence.write_json(path, fixture)
+    (root / "checksums.json").unlink()
+    (root / "manifest.json").unlink()
+    evidence.seal_bundle(root, manifest, complete=True)
+    index = evidence.read_json(root / "checksums.json")
+    assert set(index) == {p.name for p in root.iterdir() if p.name != "checksums.json"}
+    assert all(evidence.file_digest(root / name) == sha for name, sha in index.items())
+
+
 @pytest.mark.parametrize("fault", [
     "foreign_fact", "wrong_scope", "wrong_value", "fake_model_verdict",
     "promoted_prose", "rewritten_prose", "false_coverage", "missing_result",
@@ -83,9 +96,7 @@ def test_resealed_result_inconsistency_rejected(tmp_path, monkeypatch, fault):
         aggregate["information_completion"]["information_requirement_satisfied"] = False
     elif fault == "changed_model_metric":
         aggregate["model_claims"]["free_text_verified"] = True
-    evidence.write_json(path, fixture)
-    (root / "checksums.json").unlink()
-    evidence.seal_bundle(root, manifest, complete=True)
+    _reseal_mutated_fixture(root, path, fixture, manifest)
     with pytest.raises(ValueError, match="cognitive result"):
         evidence.verify_bundle(root)
     assert len(transport.requests) == 2
@@ -97,8 +108,6 @@ def test_legacy_export_without_result_remains_readable(tmp_path, monkeypatch):
     fixture = evidence.read_json(path)
     del fixture["result"]["cognitive_result"]
     del manifest["cognitive_result_schema"]
-    evidence.write_json(path, fixture)
-    (root / "checksums.json").unlink()
-    evidence.seal_bundle(root, manifest, complete=True)
+    _reseal_mutated_fixture(root, path, fixture, manifest)
     assert evidence.verify_bundle(root)["requests"] == 2
     assert len(transport.requests) == 2
