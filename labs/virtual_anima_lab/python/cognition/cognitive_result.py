@@ -8,10 +8,10 @@ from copy import deepcopy
 
 from .claim_verification import ObservationClaim, ObservationClaimVerifier
 from .completion import CompletionRequirement, evaluate_completion
-from .coordinator import E25LabCognitiveCoordinator, E25CognitionError
+from .coordinator import E25LabCognitiveCoordinator
 from .source_binding import admitted_source_rows
 from .result_reasoning import build_reasoning
-from labs.virtual_anima_lab.python.lifecycle.e24_working_memory import E24MemoryError
+from .model_claims import evaluate_model_claims
 
 
 SCHEMA = "anima.lab.cognitive_result/0.1"
@@ -51,6 +51,16 @@ def build_cognitive_result(coordinator, report, *, requirement=None,
     if requirement is not None and type(requirement) is not CompletionRequirement:
         raise TypeError("trusted completion requirement required")
     records = _bound_records(coordinator, report)
+    return _project_result(
+        report, records, requirement=requirement, research_calls=research_calls,
+        claim_phase=claim_phase, verify=ObservationClaimVerifier(coordinator).verify,
+        evaluate_claims=lambda calls: evaluate_model_claims(coordinator, report, calls),
+    )
+
+
+def _project_result(report, records, *, requirement, research_calls, claim_phase,
+                    verify, evaluate_claims):
+    """Internal shared projection over already checked sources and records."""
     operations = []
     searches = []
     sources = {}
@@ -106,10 +116,9 @@ def build_cognitive_result(coordinator, report, *, requirement=None,
 
     completion = evaluate_completion(requirement, report, records) if requirement else None
     facts, verdicts = [], []
-    verifier = ObservationClaimVerifier(coordinator)
     for key in sorted(candidates):
         claim = candidates[key]
-        verdict = verifier.verify(report["turn_id"], claim)
+        verdict = verify(report["turn_id"], claim)
         entry = {"origin": "DETERMINISTIC_HOST", "verdict": verdict}
         verdicts.append(entry)
         if verdict["status"] == "VERIFIED" and claim.event_id not in conflicts:
@@ -138,8 +147,8 @@ def build_cognitive_result(coordinator, report, *, requirement=None,
         else:
             coverage = "NOT_APPLICABLE"
     reasoning, model_claims, presentation = build_reasoning(
-        coordinator, report, completion, research_calls=research_calls,
-        claim_phase=claim_phase,
+        report, completion, research_calls=research_calls,
+        claim_phase=claim_phase, evaluate_claims=evaluate_claims,
     )
     return {
         "schema": SCHEMA,

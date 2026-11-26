@@ -285,6 +285,8 @@ def main():
     manifest = reproducibility.runtime_manifest(git_sha=git_sha, godot=binary,
         backend=backend, base_url=args.base_url, model=args.model, model_sha=digest,
         variant=args.variant, scenarios=scenarios)
+    from labs.virtual_anima_lab.python.cognition.cognitive_result import SCHEMA as RESULT_SCHEMA
+    manifest["cognitive_result_schema"] = RESULT_SCHEMA
     manifest["server_models"] = models
     manifest["host_temporal_projection"] = args.host_temporal_projection
     evidence = out / "reproducibility"

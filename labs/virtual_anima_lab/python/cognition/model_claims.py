@@ -37,6 +37,14 @@ def parse_final(text):
 
 
 def evaluate_model_claims(coordinator, report, calls):
+    return _evaluate_model_claims(
+        report, calls,
+        lambda: coordinator.decision_records(report["turn_id"]),
+        lambda turn, claim: ObservationClaimVerifier(coordinator).verify(turn, claim),
+    )
+
+
+def _evaluate_model_claims(report, calls, get_records, verify):
     result = {"schema":"anima.lab.model_claims/0.1", "format_status":"NO_ACCEPTED_FINAL",
               "answer":None, "claims":[], "verdicts":[],
               "verified_positive_entities":[], "free_text_verified":False,
@@ -52,14 +60,13 @@ def evaluate_model_claims(coordinator, report, calls):
         result["format_status"] = "INVALID"
         return result
     result.update(format_status="VALID", answer=obj["answer"], claims=obj["claims"])
-    records = coordinator.decision_records(report["turn_id"])
+    records = get_records()
     # Resolve only through admitted source results in this turn; never query
     # the database to discover a source ID supplied by the model.
     sources = {}
     for rec in records:
         for row in admitted_source_rows(rec):
             sources.setdefault((row["event_id"],row["sample_seq"]),set()).add(row["sample_id"])
-    verifier = ObservationClaimVerifier(coordinator)
     for item in obj["claims"]:
         ids = sources.get((item["event_id"],item["sample_seq"]),set())
         if len(ids) != 1:
@@ -67,7 +74,7 @@ def evaluate_model_claims(coordinator, report, calls):
         else:
             claim = ObservationClaim(item["entity_ref"],item["predicate"],item["value"],
                                      item["event_id"],next(iter(ids)),item["scope"])
-            verdict = verifier.verify(report["turn_id"],claim)
+            verdict = verify(report["turn_id"],claim)
         result["verdicts"].append({"submitted_claim":item,**verdict})
     result["verified_positive_entities"] = sorted({
         v["submitted_claim"]["entity_ref"] for v in result["verdicts"]

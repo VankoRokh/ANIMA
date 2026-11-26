@@ -49,59 +49,72 @@ class ObservationClaimVerifier:
         self._coordinator = coordinator
         self._memory = coordinator._memory
 
-    def verify(self, turn_id, claim):
-        if type(claim) is not ObservationClaim:
-            raise TypeError("typed claim required")
-        def verdict(status, reason, actual=None):
-            return {"schema":"anima.lab.observation_claim_verdict/0.1",
-                    "turn_id":turn_id,"claim":{
-                        "entity_ref":claim.entity_ref,"predicate":claim.predicate,
-                        "value":claim.value,"event_id":claim.event_id,
-                        "sample_id":claim.sample_id,"scope":claim.scope},
-                    "status":status,"reason_code":reason,"observed_value":actual,
-                    "world_truth_authority":False,"knowledge_write":False}
-        records = self._coordinator.decision_records(turn_id)
-        eligible = []
-        for record in records:
-            eligible.extend((row,record["context_snapshot"]) for row in admitted_source_rows(record)
-                if row["event_id"] == claim.event_id)
-        if not eligible:
-            return verdict("UNSUPPORTED","SOURCE_NOT_VERIFIED_IN_TURN")
-        row, ctx = eligible[0]
-        if any(r != row or c != ctx for r,c in eligible):
-            return verdict("UNSUPPORTED","INCONSISTENT_SOURCE_READS")
-        if row["sample_id"] != claim.sample_id:
-            return verdict("UNSUPPORTED","SAMPLE_ID_MISMATCH")
-        if claim.scope == "latest_captured_sample" and claim.sample_id != ctx["latest_sample_id"]:
-            return verdict("UNSUPPORTED","HISTORICAL_SOURCE_NOT_LATEST")
+    def _load_view(self, claim):
         # Resolve the same event to the same sample, not arbitrary model IDs.
         with closing(self._memory._connect()) as db:
             binding = db.execute("SELECT core_event_id FROM e24_raw WHERE sample_id=?",
                                  (claim.sample_id,)).fetchone()
         if binding is None or binding["core_event_id"] != claim.event_id:
-            return verdict("UNSUPPORTED","RAW_EVENT_BINDING_MISMATCH")
+            return None, "RAW_EVENT_BINDING_MISMATCH"
         try:
-            view = self._memory.raw_evidence(claim.sample_id)
+            return self._memory.raw_evidence(claim.sample_id), None
         except (E24MemoryError, ValueError, TypeError):
-            return verdict("UNSUPPORTED","RAW_INTEGRITY_FAILURE")
-        data = view.as_dict()
-        if (hashlib.sha256(view.canonical_json.encode("utf-8")).hexdigest() != row["raw_sha256"]
-                or data["sample_id"] != row["sample_id"]
-                or data["sample_seq"] != row["sample_seq"]
-                or data["source_ref"] != row["source_ref"]
-                or [r["entity_ref"] for r in data["readings"]] != row["entities_observed"]):
-            return verdict("UNSUPPORTED","RAW_RESULT_MISMATCH")
-        reading = next((r for r in data["readings"] if r["entity_ref"] == claim.entity_ref),None)
-        if claim.predicate == "observed_in_sample":
-            actual = reading is not None
-        elif reading is None:
-            return verdict("UNSUPPORTED","ENTITY_NOT_OBSERVED")
-        elif claim.predicate == "owner_status":
-            if "owner" not in reading["properties"]:
-                return verdict("UNSUPPORTED","PROPERTY_NOT_OBSERVED")
-            actual = reading["properties"]["owner"]["status"]
-        else:
-            actual = reading[claim.predicate]
-        return verdict("VERIFIED" if actual == claim.value else "CONTRADICTED",
-                       "MATCHES_CAPTURED_SAMPLE" if actual == claim.value else "VALUE_MISMATCH",
-                       actual)
+            return None, "RAW_INTEGRITY_FAILURE"
+
+    def verify(self, turn_id, claim):
+        if type(claim) is not ObservationClaim:
+            raise TypeError("typed claim required")
+        return _verify_captured_claim(
+            turn_id, claim, self._coordinator.decision_records(turn_id), self._load_view,
+        )
+
+
+def _verify_captured_claim(turn_id, claim, records, load_view):
+    """Shared predicate verification; loader supplies an already bound Raw view."""
+    if type(claim) is not ObservationClaim:
+        raise TypeError("typed claim required")
+    def verdict(status, reason, actual=None):
+        return {"schema":"anima.lab.observation_claim_verdict/0.1",
+                "turn_id":turn_id,"claim":{
+                    "entity_ref":claim.entity_ref,"predicate":claim.predicate,
+                    "value":claim.value,"event_id":claim.event_id,
+                    "sample_id":claim.sample_id,"scope":claim.scope},
+                "status":status,"reason_code":reason,"observed_value":actual,
+                "world_truth_authority":False,"knowledge_write":False}
+    eligible = []
+    for record in records:
+        eligible.extend((row,record["context_snapshot"]) for row in admitted_source_rows(record)
+            if row["event_id"] == claim.event_id)
+    if not eligible:
+        return verdict("UNSUPPORTED","SOURCE_NOT_VERIFIED_IN_TURN")
+    row, ctx = eligible[0]
+    if any(r != row or c != ctx for r,c in eligible):
+        return verdict("UNSUPPORTED","INCONSISTENT_SOURCE_READS")
+    if row["sample_id"] != claim.sample_id:
+        return verdict("UNSUPPORTED","SAMPLE_ID_MISMATCH")
+    if claim.scope == "latest_captured_sample" and claim.sample_id != ctx["latest_sample_id"]:
+        return verdict("UNSUPPORTED","HISTORICAL_SOURCE_NOT_LATEST")
+    view, failure = load_view(claim)
+    if failure is not None:
+        return verdict("UNSUPPORTED", failure)
+    data = view.as_dict()
+    if (hashlib.sha256(view.canonical_json.encode("utf-8")).hexdigest() != row["raw_sha256"]
+            or data["sample_id"] != row["sample_id"]
+            or data["sample_seq"] != row["sample_seq"]
+            or data["source_ref"] != row["source_ref"]
+            or [r["entity_ref"] for r in data["readings"]] != row["entities_observed"]):
+        return verdict("UNSUPPORTED","RAW_RESULT_MISMATCH")
+    reading = next((r for r in data["readings"] if r["entity_ref"] == claim.entity_ref),None)
+    if claim.predicate == "observed_in_sample":
+        actual = reading is not None
+    elif reading is None:
+        return verdict("UNSUPPORTED","ENTITY_NOT_OBSERVED")
+    elif claim.predicate == "owner_status":
+        if "owner" not in reading["properties"]:
+            return verdict("UNSUPPORTED","PROPERTY_NOT_OBSERVED")
+        actual = reading["properties"]["owner"]["status"]
+    else:
+        actual = reading[claim.predicate]
+    return verdict("VERIFIED" if actual == claim.value else "CONTRADICTED",
+                   "MATCHES_CAPTURED_SAMPLE" if actual == claim.value else "VALUE_MISMATCH",
+                   actual)

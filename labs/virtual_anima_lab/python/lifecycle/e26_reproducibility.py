@@ -494,7 +494,8 @@ def _verify_native_chain(fixture, scenario=None, *, required=False):
             raise ValueError("claim projection identity mismatch")
 
 
-def verify_case(fixture, raw_fixture, *, scenario=None, require_native=False):
+def verify_case(fixture, raw_fixture, *, scenario=None, require_native=False,
+                require_cognitive_result=False, variant=None):
     if fixture["schema"] != SCHEMA or fixture["world_seed"] != raw_fixture["world_seed"]:
         raise ValueError("case fixture scope mismatch")
     expected = [freeze_call(call, raw_fixture["aliases"], i)
@@ -529,6 +530,12 @@ def verify_case(fixture, raw_fixture, *, scenario=None, require_native=False):
                     or source["coverage"] != raw["coverage"]
                     or source["entities_observed"] != [r["entity_ref"] for r in raw["readings"]]):
                 raise ValueError("journal source differs from canonical Raw")
+    aggregate = fixture.get("result")
+    if require_cognitive_result or (type(aggregate) is dict and "cognitive_result" in aggregate):
+        from .e26_result_verification import verify_exported_result
+        verify_raw(raw_fixture)
+        verify_exported_result(fixture, raw_fixture, scenario=scenario, variant=variant,
+                               required=require_cognitive_result)
     return len(expected)
 
 
@@ -564,6 +571,11 @@ def verify_bundle(root):
                    for c in scenarios)
             or len({c["id"] for c in scenarios}) != len(scenarios)):
         raise ValueError("invalid or duplicate manifest experiment identity")
+    result_schema = manifest.get("cognitive_result_schema")
+    if result_schema is not None:
+        from ..cognition.cognitive_result import SCHEMA as RESULT_SCHEMA
+        if result_schema != RESULT_SCHEMA:
+            raise ValueError("unsupported cognitive result schema")
     expected_cases = {(seed, c["id"]) for seed in manifest["world_seeds"]
                       for c in manifest["scenarios"]}
     scenario_by_id = {c["id"]: c for c in scenarios}
@@ -588,7 +600,9 @@ def verify_bundle(root):
         if key not in expected_cases:
             raise ValueError("unexpected case identity")
         requests += verify_case(fixture, raw[key[0]], scenario=scenario_by_id[key[1]],
-                                require_native="variant" in manifest or fixture.get("result") is not None)
+                                require_native="variant" in manifest or fixture.get("result") is not None,
+                                require_cognitive_result=result_schema is not None,
+                                variant=manifest.get("variant"))
     if expected_cases != actual_cases:
         raise ValueError("missing or unexpected case fixtures")
     return {"status": "E26_EVIDENCE_VERIFIED", "git_sha": manifest["git_sha"],

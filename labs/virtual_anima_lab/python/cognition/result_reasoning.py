@@ -6,7 +6,7 @@ attestation. No model calls, tool dispatch, writes or semantic prose grader.
 """
 from copy import deepcopy
 
-from .model_claims import evaluate_model_claims, temporal_claim_coverage
+from .model_claims import temporal_claim_coverage
 
 
 def _text_attempt(call, report, *, phase, index, terminal):
@@ -46,7 +46,7 @@ def _text_attempt(call, report, *, phase, index, terminal):
     }
 
 
-def build_reasoning(coordinator, report, completion, *, research_calls=(), claim_phase=None):
+def build_reasoning(report, completion, *, evaluate_claims, research_calls=(), claim_phase=None):
     """Return reasoning, model-claim assessment and separate presentation.
 
     claim_phase is a trusted profile choice, not inferred from arbitrary
@@ -94,9 +94,7 @@ def build_reasoning(coordinator, report, completion, *, research_calls=(), claim
     coverage = "NOT_ASSESSED"
     verified = []
     if claim_phase is not None:
-        evaluation = evaluate_model_claims(
-            coordinator, report, [selected_call] if selected_call is not None else [],
-        )
+        evaluation = evaluate_claims([selected_call] if selected_call is not None else [])
         if evaluation["format_status"] != "VALID":
             status = evaluation["format_status"]
         elif not evaluation["claims"]:
