@@ -153,6 +153,15 @@ def test_r6_suite_keeps_model_metrics_separate_from_host(tmp_path, monkeypatch, 
     assert result["information_completion"]["information_requirement_satisfied"]
     assert result["total_model_calls"] == len(transport.requests) == 4
     assert not result["claim_objective_pass"] and not result["temporal_claim_coverage"]
+    cognitive = result["cognitive_result"]
+    assert cognitive["evidence"]["claim_coverage"] == "COMPLETE"
+    assert cognitive["evidence"]["model_claims"]["coverage"] == "INCOMPLETE"
+    assert cognitive["presentation"]["whole_answer_verified"] is False
+    assert cognitive["presentation"]["model_text"] == "Unverified prose."
+    assert cognitive["reasoning"]["projection_status"] == (
+        "NOT_REQUESTED_HOST_PROFILE" if enabled else "BUDGET_UNAVAILABLE")
+    assert [a["protocol_status"] for a in cognitive["reasoning"]["model_text_attempts"]] == [
+        "INTERMEDIATE_OR_UNACCEPTED", "ACCEPTED_FINAL"]
     assert result["model_claims"]["format_status"] == "NO_ACCEPTED_FINAL"
     if enabled:
         assert result["claim_projection_status"] == "NOT_REQUESTED_HOST_PROFILE"

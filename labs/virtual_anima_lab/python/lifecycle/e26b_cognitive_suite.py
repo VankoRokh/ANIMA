@@ -19,6 +19,7 @@ from urllib.parse import urlsplit
 from labs.virtual_anima_lab.python.cognition.native_lab import NativeLabAdapter
 from labs.virtual_anima_lab.python.cognition.completion import CompletionRequirement, evaluate_completion
 from labs.virtual_anima_lab.python.cognition.claim_verification import ObservationClaim, ObservationClaimVerifier
+from labs.virtual_anima_lab.python.cognition.cognitive_result import build_cognitive_result
 
 CRATE = "lab.item.crate"
 SHORTCUT = "lab.obstacle.shortcut"
@@ -186,12 +187,19 @@ def run_cases(memory, coordinator, root, seed, *, base_url, model, check_world, 
         result["continuation_decisions"] = report.get("continuation_decisions", [])
         result["continued"] = any(x["decision"] == "CONTINUE" for x in result["continuation_decisions"])
         result["resource_budget"] = report.get("resource_budget")
-        if variant in ("claims","claims_separated","temporal_sources", "temporal_completion"):
-            from labs.virtual_anima_lab.python.cognition.model_claims import evaluate_model_claims
+        # Additive result, separate from historical scoring and Host-profile
+        # diagnostics. Reuse the new claim assessment for the old metric.
+        claim_phase = ("research" if variant == "claims" else
+                       "claim_projection" if variant in (
+                           "claims_separated", "temporal_sources", "temporal_completion") else None)
+        cognitive_result = build_cognitive_result(
+            coordinator, report, requirement=requirement,
+            research_calls=adapter.calls, claim_phase=claim_phase,
+        )
+        result["cognitive_result"] = cognitive_result
+        if claim_phase is not None:
             projection = report.get("claim_projection", {"status":"RESEARCH_NOT_STOPPED","call":None})
-            claim_calls = adapter.calls if variant == "claims" else (
-                [projection["call"]] if projection["status"] == "GENERATED" else [])
-            evaluation = evaluate_model_claims(coordinator, report, claim_calls)
+            evaluation = cognitive_result["evidence"]["model_claims"]["evaluation"]
             if variant in ("claims_separated","temporal_sources", "temporal_completion"):
                 result["claim_projection_status"] = projection["status"]
                 result["claim_projection_call"] = projection["call"]
@@ -217,6 +225,8 @@ def run_cases(memory, coordinator, root, seed, *, base_url, model, check_world, 
             result["host_temporal_projection"] = report["host_temporal_projection"]
             result["host_temporal_claim_pass"] = report["host_temporal_projection"]["temporal_claim_coverage"]
         result["latest_observation_reads"] = sum(o["status"] == "COMPLETED" and o["operation_kind"] == "inspect_latest_observation" for o in report["outcomes"])
+        if not check_world() or not check_core():
+            raise AssertionError("read-only invariant changed during result construction")
         (root / f"{turn_id}-result.json").write_text(
             json.dumps({"result":result, "turn":report, "trace":trace}, indent=2),
             encoding="utf-8")
@@ -229,7 +239,12 @@ def run_cases(memory, coordinator, root, seed, *, base_url, model, check_world, 
                "projection_status":result.get("claim_projection_status"),"claim_objective_pass":result.get("claim_objective_pass"),
                "host_temporal_projection_status":result.get("host_temporal_projection",{}).get("status"),
                "host_temporal_claim_pass":result.get("host_temporal_claim_pass"),
-               "resource_budget":result.get("resource_budget")}), flush=True)
+               "resource_budget":result.get("resource_budget"),
+               "cognitive_result_information":cognitive_result["information"]["status"],
+               "cognitive_result_host_coverage":cognitive_result["evidence"]["claim_coverage"],
+               "cognitive_result_model_claims":cognitive_result["evidence"]["model_claims"]["status"],
+               "cognitive_result_model_coverage":cognitive_result["evidence"]["model_claims"]["coverage"],
+               "whole_answer_verified":cognitive_result["presentation"]["whole_answer_verified"]}), flush=True)
     return results
 
 
@@ -332,6 +347,19 @@ def main():
                   for status in sorted({r["host_temporal_projection"]["status"] for r in results if "host_temporal_projection" in r})},
               "host_claim_probe_counts":{status:sum(p["status"] == status for r in results for p in r["host_claim_probes"])
                                          for status in ("VERIFIED","CONTRADICTED","UNSUPPORTED")},
+              "cognitive_result_summary": {
+                  "cases": sum("cognitive_result" in r for r in results),
+                  "information_status_counts": {
+                      status: sum(r["cognitive_result"]["information"]["status"] == status for r in results)
+                      for status in sorted({r["cognitive_result"]["information"]["status"] for r in results})},
+                  "host_coverage_counts": {
+                      status: sum(r["cognitive_result"]["evidence"]["claim_coverage"] == status for r in results)
+                      for status in sorted({r["cognitive_result"]["evidence"]["claim_coverage"] for r in results})},
+                  "model_claim_status_counts": {
+                      status: sum(r["cognitive_result"]["evidence"]["model_claims"]["status"] == status for r in results)
+                      for status in sorted({r["cognitive_result"]["evidence"]["model_claims"]["status"] for r in results})},
+                  "whole_answer_verification": "NOT_PERFORMED",
+              },
               "semantic_review":"PENDING", "results":results}
     (out / "e26b-results.json").write_text(json.dumps(report, indent=2), encoding="utf-8")
     print(json.dumps({k:v for k,v in report.items() if k != "results"},indent=2), flush=True)

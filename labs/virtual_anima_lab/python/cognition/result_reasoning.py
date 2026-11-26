@@ -57,6 +57,15 @@ def build_reasoning(coordinator, report, completion, *, research_calls=(), claim
         raise ValueError("unknown model claim phase")
     if type(research_calls) not in (tuple, list):
         raise TypeError("native research call sequence required")
+    if research_calls or claim_phase is not None:
+        if ("model_calls_used" in report
+                and report["model_calls_used"] != len(research_calls)):
+            raise ValueError("research call count does not bind cognitive result")
+        budget = report.get("resource_budget")
+        if budget is not None:
+            projection_count = int(report.get("claim_projection", {}).get("call") is not None)
+            if budget["reserved_calls"] != len(research_calls) + projection_count:
+                raise ValueError("reserved call count does not bind cognitive result")
     attempts = []
     for index, call in enumerate(research_calls):
         attempt = _text_attempt(call, report, phase="research", index=index,
@@ -135,6 +144,10 @@ def build_reasoning(coordinator, report, completion, *, research_calls=(), claim
     presentation = {
         "model_text": model_text,
         "model_text_authority": "UNVERIFIED",
+        "projection_text": (evaluation["answer"] if claim_phase == "claim_projection"
+                            and evaluation["format_status"] == "VALID" else
+                            projection["original_text"] if projection else None),
+        "projection_text_authority": "UNVERIFIED",
         "verified_data_path": "evidence.facts",
         "verified_model_claims_path": "evidence.model_claims.verified_candidates",
         "semantic_review": "NOT_PERFORMED",

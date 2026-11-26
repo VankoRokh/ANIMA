@@ -74,6 +74,14 @@ def test_r92_legacy_gate_does_not_establish_prose_correctness(
     assert evaluation["free_text_verified"] is False
     assert evaluation["task_completion"] == "NOT_ESTABLISHED"
     assert result["semantic_review"] == "PENDING"
+    cognitive = result["cognitive_result"]
+    assert cognitive["information"]["status"] == "SATISFIED"
+    assert cognitive["presentation"]["model_text"] == wrong_answer
+    assert cognitive["presentation"]["model_text_authority"] == "UNVERIFIED"
+    assert cognitive["presentation"]["whole_answer_verified"] is False
+    assert cognitive["evidence"]["model_claims"]["evaluation"] == evaluation
+    assert cognitive["evidence"]["model_claims"]["coverage"] == (
+        "COMPLETE" if case_id == "C01" else "NOT_APPLICABLE")
     if case_id == "C01":
         assert len(evaluation["verdicts"]) == 1
         assert evaluation["verdicts"][0]["status"] == "VERIFIED"
