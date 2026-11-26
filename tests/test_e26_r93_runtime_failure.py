@@ -120,7 +120,8 @@ def test_atomic_planner_failure_rolls_back_both_transitions(tmp_path):
 def test_planner_failure_rejects_wrong_step_owner(tmp_path):
     _, _, loop, run, _ = _build_loop(tmp_path, [])
     store = loop.store
-    other = store.create_run(goal_id=run["goal_id"], planner="test", planner_version="1")
+    from uuid import uuid4
+    other = store.create_run(goal_id=f"goal_{uuid4()}", planner="test", planner_version="1")
     store.transition_run(other["id"], "running", reason="test")
     step = store.create_step(run_id=other["id"])
     with pytest.raises(ValueError, match="matching running Run"):
