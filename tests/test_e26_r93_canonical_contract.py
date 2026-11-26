@@ -94,6 +94,12 @@ def test_canonical_native_completion_requires_explicit_termination(
         else:
             # Existing FAST/DEEP history is explicitly successful calls only.
             assert not consumer.call_history
+            record, = consumer.rejected_generation_history
+            assert record["wire_protocol"] == "llama_cpp_completion"
+            assert record["finish_reason"] == metadata.get("stop_type")
+            assert (record["input_tokens"], record["output_tokens"]) == (20, 8)
+            assert record["termination_status"] in ("INCOMPLETE", "UNKNOWN")
+            assert "text" not in record
     assert len(calls) == 2
 
 
@@ -170,3 +176,72 @@ def test_planner_custom_transport_declares_wire(planner_type, wire, finish, expe
     assert record.total_tokens == 28
     assert "text" not in record.to_dict() and "prompt" not in record.to_dict()
     assert len(record.response_hash) == 64
+
+
+@pytest.mark.parametrize("role", ["fast", "deep"])
+@pytest.mark.parametrize("wire,finish,expected", [
+    ("chat_completion", "stop", "TEXT_COMPLETE"),
+    ("llama_cpp_completion", "eos", "TEXT_COMPLETE"),
+    ("chat_completion", "eos", "UNKNOWN"),
+    ("llama_cpp_completion", "stop", "UNKNOWN"),
+    (None, "stop", "UNKNOWN"),
+    ("unsupported", "stop", "UNKNOWN"),
+    ("chat_completion", " stop ", "UNKNOWN"),
+    ("chat_completion", "", "UNKNOWN"),
+    ("chat_completion", "length", "INCOMPLETE"),
+    ("llama_cpp_completion", "limit", "INCOMPLETE"),
+])
+def test_cognitive_custom_transport_declares_wire(role, wire, finish, expected):
+    from anima.cognition.llm_transport import LLMCallResult
+
+    class Custom:
+        wire_protocol = wire
+
+        def complete(self, **kwargs):
+            return LLMCallResult(provider="llama.cpp", model="test", text="private diagnostic text",
+                                 thinking=False, latency_ms=1, input_tokens=20,
+                                 output_tokens=8, finish_reason=finish)
+
+    backend = FastLLMBackend(Custom()) if role == "fast" else DeepLLMBackend(Custom())
+    request = fast_request() if role == "fast" else routed_request()
+    if expected == "TEXT_COMPLETE":
+        backend.complete(request)
+        assert len(backend.call_history) == 1
+        assert not backend.rejected_generation_history
+    else:
+        error_type = FastLLMModelOutputError if role == "fast" else LLMModelOutputError
+        with pytest.raises(error_type, match="generation not confirmed complete"):
+            backend.complete(request)
+        assert not backend.call_history
+        record, = backend.rejected_generation_history
+        assert record["finish_reason"] == finish
+        assert record["termination_status"] == expected
+        assert record["wire_protocol"] == (wire if wire in ("chat_completion", "llama_cpp_completion") else None)
+        assert (record["input_tokens"], record["output_tokens"]) == (20, 8)
+        assert "text" not in record and "private diagnostic text" not in repr(record)
+
+
+@pytest.mark.parametrize("role", ["fast", "deep"])
+def test_rejected_generation_metadata_is_bounded(role):
+    from anima.cognition.llm_transport import LLMCallResult, MAX_REJECTED_GENERATION_HISTORY
+
+    class Custom:
+        wire_protocol = "chat_completion"
+        count = 0
+
+        def complete(self, **kwargs):
+            self.count += 1
+            return LLMCallResult("test", "test", "partial", False, 1,
+                                 input_tokens=self.count, finish_reason="length")
+
+    backend = FastLLMBackend(Custom()) if role == "fast" else DeepLLMBackend(Custom())
+    request = fast_request() if role == "fast" else routed_request()
+    error_type = FastLLMModelOutputError if role == "fast" else LLMModelOutputError
+    for _ in range(MAX_REJECTED_GENERATION_HISTORY + 2):
+        with pytest.raises(error_type):
+            backend.complete(request)
+    assert not backend.call_history
+    assert len(backend.rejected_generation_history) == MAX_REJECTED_GENERATION_HISTORY
+    assert backend.rejected_generation_history[0]["input_tokens"] == 3
+    assert backend.rejected_generation_history[-1]["input_tokens"] == MAX_REJECTED_GENERATION_HISTORY + 2
+    assert all("text" not in record for record in backend.rejected_generation_history)

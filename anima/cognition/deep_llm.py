@@ -9,7 +9,10 @@ of the DEEP contract and can be replaced without changing routing/proposals.
 from dataclasses import dataclass
 import json
 
-from .llm_transport import LLMCallResult, LlamaCppTransport, TextTransport
+from .llm_transport import (
+    LLMCallResult, LlamaCppTransport, TextTransport, LLMModelOutputError,
+    require_completed_generation,
+)
 from .proposals import CognitiveProposal, RoutedCognitiveRequest
 from .routing import CognitiveRole
 
@@ -111,6 +114,7 @@ class DeepLLMBackend:
         self.timeout_seconds = float(timeout_seconds)
         # Successful model calls only. Attempts/failures remain dispatcher/trace concerns.
         self.call_history = []
+        self.rejected_generation_history = []
 
     def complete(self, request):
         if not isinstance(request, RoutedCognitiveRequest):
@@ -126,6 +130,10 @@ class DeepLLMBackend:
         )
         if not isinstance(call, LLMCallResult):
             raise TypeError("DEEP text transport must return the shared LLM call result")
+        require_completed_generation(
+            self.transport, call, error_cls=LLMModelOutputError,
+            rejected_history=self.rejected_generation_history,
+        )
         proposal = CognitiveProposal.respond(call.text)
         self.call_history.append(call)
         return proposal

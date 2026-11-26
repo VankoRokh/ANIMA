@@ -13,6 +13,8 @@ from anima.cognition.fast_llm import (
 
 
 class StubTransport:
+    wire_protocol = "chat_completion"
+
     def __init__(self, text="Ответ FAST"):
         self.text = text
         self.calls = []
@@ -52,6 +54,7 @@ class RecordingLlamaCppTransport(LlamaCppFastTransport):
             "tokens_evaluated": 31,
             "tokens_predicted": 7,
             "stop": True,
+            "stop_type": "eos",
         }
 
 

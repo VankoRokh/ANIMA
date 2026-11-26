@@ -12,6 +12,8 @@ from anima.tasks.store import TaskStore
 
 
 class StubTransport:
+    wire_protocol = "chat_completion"
+
     def __init__(self, text="Newer evidence supports B.", model="SmolLM3-3B-Q8_0"):
         self.text = text
         self.model = model
@@ -25,6 +27,7 @@ class StubTransport:
             text=self.text,
             thinking=False,
             latency_ms=3.0,
+            finish_reason="stop",
         )
 
 

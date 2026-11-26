@@ -15,7 +15,7 @@ def fake_native(self, endpoint, payload, *, timeout_seconds):
         return {"prompt": json.dumps(payload["messages"])}
     view = json.loads(json.loads(payload["prompt"])[1]["content"].split("TASK_VIEW:\n", 1)[1])
     answer = "CONTINUE" if view["operation"] == "CHOOSE_ACTION" else smoke.MARKER
-    return {"content": answer, "tokens_evaluated": 20, "tokens_predicted": 3, "stop": True}
+    return {"content": answer, "tokens_evaluated": 20, "tokens_predicted": 3, "stop": True, "stop_type": "eos"}
 
 
 def factory(failure):

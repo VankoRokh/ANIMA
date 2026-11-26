@@ -238,10 +238,11 @@ def test_legacy_request_consuming_backend_keeps_nonnullable_contract():
 
 def test_llm_backend_explicitly_supports_both_request_capabilities():
     class Transport:
+        wire_protocol = "chat_completion"
         def __init__(self): self.prompts = []
         def complete(self, **kwargs):
             self.prompts.append(kwargs["user_prompt"])
-            return FastLLMCallResult("fake", "replacement", "answer", False, 0.)
+            return FastLLMCallResult("fake", "replacement", "answer", False, 0., finish_reason="stop")
     transport = Transport()
     backend = FastLLMBackend(transport)
     assert isinstance(backend, ProjectedFastBackend)

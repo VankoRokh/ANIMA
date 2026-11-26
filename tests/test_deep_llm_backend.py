@@ -17,6 +17,8 @@ from anima.cognition.routing import CognitiveRole
 
 
 class StubTransport:
+    wire_protocol = "chat_completion"
+
     def __init__(self, *, text="Evidence remains conflicting.", model="stub-deep"):
         self.text = text
         self.model = model

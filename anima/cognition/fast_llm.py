@@ -14,6 +14,7 @@ from .llm_transport import (
     LlamaCppTransport,
     TextTransport,
     final_answer,
+    require_completed_generation,
 )
 
 
@@ -143,6 +144,7 @@ class FastLLMBackend:
         self.timeout_seconds = float(timeout_seconds)
         # Metadata for successful completions only; never an attempted-call counter.
         self.call_history = []
+        self.rejected_generation_history = []
 
     def complete(self, request):
         if not isinstance(request, FastRequest):
@@ -163,6 +165,10 @@ class FastLLMBackend:
         )
         if not isinstance(call, LLMCallResult):
             raise TypeError("FAST LLM transport must return FastLLMCallResult")
+        require_completed_generation(
+            self.transport, call, error_cls=FastLLMModelOutputError,
+            rejected_history=self.rejected_generation_history,
+        )
         result = FastResult(response_text=call.text)
         self.call_history.append(call)
         return result

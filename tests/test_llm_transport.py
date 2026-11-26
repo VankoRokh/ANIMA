@@ -31,6 +31,7 @@ class RecordingSharedTransport(LlamaCppTransport):
             "tokens_evaluated": 21,
             "tokens_predicted": 4,
             "stop": True,
+            "stop_type": "eos",
         }
 
 

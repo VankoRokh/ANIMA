@@ -13,6 +13,8 @@ from typing import Protocol, runtime_checkable
 import urllib.error
 import urllib.request
 
+from anima.agent.generation_termination import transport_termination
+
 
 _THINK_BLOCK = re.compile(r"<think>.*?</think>", re.IGNORECASE | re.DOTALL)
 
@@ -27,7 +29,10 @@ class LLMModelOutputError(LLMTransportError):
 
 @dataclass(frozen=True)
 class LLMCallResult:
-    """Provider-neutral observable metadata for one successful model call."""
+    """Provider-neutral text and metadata returned by a transport.
+
+    A returned call is not necessarily an accepted cognitive result.
+    """
 
     provider: str
     model: str
@@ -56,10 +61,38 @@ class LLMCallResult:
 
 @runtime_checkable
 class TextTransport(Protocol):
-    """Provider-neutral text-generation boundary used by cognitive adapters."""
+    """Provider-neutral text-generation boundary used by cognitive adapters.
+
+    Implementations must explicitly declare wire_protocol for admission.
+    Structural compatibility alone is not evidence of completed generation.
+    """
 
     def complete(self, *, system_prompt, user_prompt, timeout_seconds):
         ...
+
+
+MAX_REJECTED_GENERATION_HISTORY = 64
+
+
+def require_completed_generation(transport, call, *, error_cls, rejected_history):
+    """Reject before adapting text; retain bounded metadata, not raw output.
+
+    Successful-only histories remain separate. This accounts for returned
+    call records, not transport failures that produced no call result.
+    """
+    wire, status = transport_termination(transport, call.finish_reason)
+    if status == "TEXT_COMPLETE":
+        return
+    rejected_history.append({
+        **call.to_dict(),
+        "wire_protocol": wire,
+        "termination_status": status,
+    })
+    if len(rejected_history) > MAX_REJECTED_GENERATION_HISTORY:
+        del rejected_history[:-MAX_REJECTED_GENERATION_HISTORY]
+    raise error_cls(
+        f"generation not confirmed complete: {status}; wire_protocol={wire!r}"
+    )
 
 
 def probability(value, label):
@@ -117,6 +150,7 @@ class LlamaCppTransport:
     while the HTTP/template/completion mechanics remain shared.
     """
 
+    wire_protocol = "llama_cpp_completion"
     transport_error_cls = LLMTransportError
     model_output_error_cls = LLMModelOutputError
     role_label = "LLM"
@@ -304,8 +338,6 @@ class LlamaCppTransport:
             output_tokens = None
 
         finish_reason = document.get("stop_type")
-        if finish_reason is None and document.get("stop") is True:
-            finish_reason = "stop"
         if finish_reason is not None and not isinstance(finish_reason, str):
             finish_reason = str(finish_reason)
 
