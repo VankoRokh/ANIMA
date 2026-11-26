@@ -1,6 +1,6 @@
 # ANIMA v0.2 — E2.6 R9: реестр находок и план исправлений
 
-**Дата:** 26 ноября 2026. **Статус:** Research / R9.1 owner-validated; independent re-audit pending. R9.2 purpose owner-approved; laboratory contract design recorded, implementation pending.
+**Дата:** 26 ноября 2026. **Статус:** Research / R9.1 owner-validated; independent re-audit pending. R9.2 owner-validated; R9.3 terminal-contract RED tests prepared.
 **Baseline:** `508851d458cf759902aa35c9ae140780fb29c4a0`. Рабочая ветка `work/v02-e26-r9-remediation`.
 **Источник:** независимый отчёт `ANIMA-E26-R8-Independent-Reaudit-RU.md`, 25 ноября 2026, §§4, 6, 9–15; архив `ANIMA-E26-R8-Independent-Reproduction.zip`. Первичные файлы предоставлены владельцем вне данного snapshot; этот документ не заменяет их.
 **Вердикт R8:** CONDITIONAL PASS только для продолжения ограниченной лабораторной работы. Закрытие E2.6, перенос в canonical assembly и расширение model-facing authority — BLOCKED.
@@ -135,3 +135,51 @@ Reused pure Core envelope validation, extracted shared TurnSourcePolicy, native 
 Concrete first-version field names may follow existing contracts, not a replacement canonical IR. No new Core module, schema migration, universal semantic grader, new prompt or expanded tool list at this step. The model can reason freely, while machine consumers must explicitly select verified data instead of treating all text as evidence.
 
 R9.2.1 reproducer: [characterization tests](../../tests/test_e26_r92_result_characterization.py). A PASS here confirms a known limitation of the old metric, not remediation or semantic correctness. The assertions intentionally describe the historical scoring boundary; they are not tests that expect a new API before implementation.
+
+
+## 7. R9.2 — локальная валидация, 26 ноября 2026
+
+**Implementation snapshot:** `e15da95a606eb03fa2f0b100a943e7bb90ba2b20`. **OWNER_VALIDATED / READY_FOR_INDEPENDENT_REAUDIT.** Не закрывает E2.6, не предоставляет canonical authority.
+
+| Шаг | Snapshot | Owner evidence |
+| --- | --- | --- |
+| Design / characterization | `f58089868df165eaa3ad973ece5be01d73eb6cae` | 3 passed; legacy metric limitations reproduced |
+| Deterministic result | `126018eb8072a2eca1b553dd1002ee66fc31ef9a` | 16 targeted, 246 cognitive passed |
+| Reasoning separation | `22ee023dfef582d959f00b8d331a2aa00883b60d` | 29 targeted, 259 cognitive passed |
+| Suite / projection | `65c5034a37b968c6864a69930e235c36e1dadd79` | 38 targeted, 268 cognitive passed |
+| Offline reconstruction | `bd5f3f0adc8761f32b12d7b027a784ea050f8fac` | 12 fixture preparation failures (exclusive create), 38 passed |
+| Fixture correction / final | `e15da95a606eb03fa2f0b100a943e7bb90ba2b20` | 12 export tests, 50 targeted, 280 cognitive, 2799 full passed (111.55 s); checks PASS, 203 pages / 1403 links, Python 3.14.4 |
+
+50 additional tests relative to R9.1. Shared verification/projection logic reconstructs Cognitive Result from frozen Raw, journal and model-call records. All 11 resealed result mutations rejected; legacy export compatibility confirmed. No model calls or writes added by result construction. Production exclusive-create contract preserved.
+
+### Real model experiment
+
+Qwen3-4B-Q4_K_M / llama.cpp, 4096 context, existing temporal_completion profile, seeds 7 and 8, four-call limit, max output 256, temperature 0. Two separate runs, not paired exact-input experiments. Owner-provided reports `e26b-results(9).json` (Control) and `e26b-results(10).json` (Host).
+
+| Metric | Control | Host |
+| --- | ---: | ---: |
+| Cognitive Results | 14 | 14 |
+| Operation gate / information satisfied | 11 | 9 |
+| Host claim coverage complete (8 applicable per profile) | 7 | 5 |
+| Host claim coverage incomplete | 1 | 3 |
+| Model structured nonempty all-verified cases | 3 | 3 |
+| Model verified claims | 5 | 5 |
+| Model no accepted final for claim phase | 7 | 7 |
+| Model empty claim sets | 4 | 4 |
+| Temporal information complete | 1 | 1 |
+| Legacy host temporal projection verified | n/a | 1 |
+| Frozen requests | 48 | 45 |
+
+Both operation gates FAIL. This does not negate result construction: partial facts, missing requirements and original model text remain separate, whole_answer_verified stays false. Free prose semantics are not established by the typed verifier. C06 seed 7 lacks historical verification despite latest-sample read; C01 has ambiguous owner/absence interpretation. Redundant cross-tool reads, early stop and model selection remain R9.4 questions. No evidence that a fresh Host run is causally superior/inferior. Separate deterministic construction cost not measured.
+
+### Evidence record
+
+Owner CLI output: both R9.2 bundles verified at implementation SHA, 14 cases and 6 Raw each, 48/45 requests. All four historical bundles listed in section 5 reverified (32 cases, 24 Raw, 107 requests). Total 6 bundles, 60 cases, 36 Raw, 200 requests. Archive `ANIMA-E26-R92-Evidence.tar.gz` reported SHA-256 `5a197c471d6604e7e0a929002b467811257b5b7573305938e60a1363478bcfca`. Archive bytes and owner logs not independently verified in this review. Scope remains integrity_and_source_binding_not_backend_attestation. Fresh real inference performed by owner; independent replay and audit pending. R9-Q01 mitigated within typed laboratory boundary, not universal semantic verification; R9-Q05 model behavior remains PARTIAL. No persistence, learning or expanded execution authority.
+
+## 8. R9.3 — terminal contract investigation
+
+R8-N02: valid structured JSON is not evidence that generation terminated normally. Legacy and Choice decode response.text without checking response.finish_reason. Native chat and separate Claim Projection already require protocol-specific finish reasons. llama.cpp /completion transport preserves stop_type but currently synthesizes stop from stop=true when stop_type is missing; this is ambiguous, not proof of EOS. Keep distinct wire protocols; do not accept a native tool call merely because a text completion is terminal.
+
+Sequence: reproduce R8-N02 through actual lab adapters and coordinator (valid stop and read proposal, incomplete/unknown/missing finish reason); then inspect native completion metadata and existing transport/planner consumers before agreeing explicit mapping. Reuse common typed terminal validation only where contracts agree, retain original reason and reported usage even for rejected outputs. Do not alter prompts, budgets, tool permissions, or historical evidence to obtain parity. Preserve canonical planner compatibility or explicitly scope/document any behavior change after checking existing tests. Unknown/missing reasons must not be silently treated as successful lab termination. Independent assessment remains R9.5.
+
+RED tests: [adapter terminal contract](../../tests/test_e26_r93_terminal_contract.py). Synthetic responses only; successful eos/word controls and negative limit/length/unknown/missing reasons. No new implementation in this commit.
