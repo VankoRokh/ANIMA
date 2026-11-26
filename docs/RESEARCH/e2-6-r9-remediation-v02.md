@@ -1,6 +1,6 @@
 # ANIMA v0.2 — E2.6 R9: реестр находок и план исправлений
 
-**Дата:** 26 ноября 2026. **Статус:** Research / R9.1 owner-validated; independent re-audit pending. R9.2 owner-validated; R9.3 terminal-contract RED tests prepared.
+**Дата:** 26 ноября 2026. **Статус:** Research / R9.1 owner-validated; independent re-audit pending. R9.2 owner-validated; R9.3 laboratory targeted checks PASS; canonical contract extension owner-approved, RED prepared.
 **Baseline:** `508851d458cf759902aa35c9ae140780fb29c4a0`. Рабочая ветка `work/v02-e26-r9-remediation`.
 **Источник:** независимый отчёт `ANIMA-E26-R8-Independent-Reaudit-RU.md`, 25 ноября 2026, §§4, 6, 9–15; архив `ANIMA-E26-R8-Independent-Reproduction.zip`. Первичные файлы предоставлены владельцем вне данного snapshot; этот документ не заменяет их.
 **Вердикт R8:** CONDITIONAL PASS только для продолжения ограниченной лабораторной работы. Закрытие E2.6, перенос в canonical assembly и расширение model-facing authority — BLOCKED.
@@ -183,3 +183,33 @@ R8-N02: valid structured JSON is not evidence that generation terminated normall
 Sequence: reproduce R8-N02 through actual lab adapters and coordinator (valid stop and read proposal, incomplete/unknown/missing finish reason); then inspect native completion metadata and existing transport/planner consumers before agreeing explicit mapping. Reuse common typed terminal validation only where contracts agree, retain original reason and reported usage even for rejected outputs. Do not alter prompts, budgets, tool permissions, or historical evidence to obtain parity. Preserve canonical planner compatibility or explicitly scope/document any behavior change after checking existing tests. Unknown/missing reasons must not be silently treated as successful lab termination. Independent assessment remains R9.5.
 
 RED tests: [adapter terminal contract](../../tests/test_e26_r93_terminal_contract.py). Synthetic responses only; successful eos/word controls and negative limit/length/unknown/missing reasons. No new implementation in this commit.
+
+
+### R9.3 laboratory implementation and owner validation
+
+| Step | Snapshot | Owner evidence |
+| --- | --- | --- |
+| RED | `dad4d58b8e862ecc975a3bfafc4151d0f48e2035` | 16 expected failures, 8 positive controls passed |
+| Shared classifier / Legacy and Choice | `55f57d1eebd79f165e5c440814a0be7708ad1023` | 53 targeted, 333 cognitive, 10 transport tests passed |
+| Native / Projection / offline consumers | `9714d1d17b7d00e3a088148b7a01e976dc024fea` | 80 targeted, 360 cognitive passed |
+| Resource and error accounting | `dfc7cad95282330afa87150a3bc1a55dce59a6e4` | 31 new, 111 targeted, 391 cognitive passed; project checks PASS (203 pages, 1404 links, 457 Python files, Python 3.14.4) |
+
+R8-N02 mitigated in the tested laboratory profiles; independent closure pending. Termination classification distinguishes native /completion (eos/word, limit/none) from chat/completions (stop/tool_calls, length/content_filter). Unknown/missing reasons fail closed. Diagnostic field is optional for historical archives; resealed contradictory metadata rejected in targeted tests. Existing ResourceBudget preserves known usage, including rejected calls; no budget/prompt/authority changes. Full regression, historical archive recheck and real backend gate still pending.
+
+## 9. R9.3-C — Canonical Generation Contracts (owner-approved 26 November 2026)
+
+Owner decision: every LLM consumer must establish normal generation termination according to an explicit trusted wire contract before accepting a cognitive or action proposal. Rejected/incomplete output may be retained as diagnostic material with reported usage, not as established Knowledge or executable proposal. No automatic retry, continuation, parking, new model authority or canonical Cognitive Result integration in this extension. Preserve existing privacy boundaries for raw text and existing role-specific error contracts; diagnostic retention does not imply permanent raw logging or exposing hidden reasoning.
+
+C1 inspection at `dfc7cad95282330afa87150a3bc1a55dce59a6e4`: `anima/agent/llm_planner.py` and `anima/agent/small_llm.py` record finish_reason then parse a valid JSON decision without checking termination. `anima/cognition/fast_llm.py` and `anima/cognition/deep_llm.py` create FastResult / CognitiveProposal from returned text without checking termination. Two distinct LLMCallResult contracts exist; do not merge them merely because their names match. Native llama.cpp transports synthesize stop from stop=true without stop_type; this does not establish normal native termination. Some historical transport fixtures omit stop_type. Custom transport fixtures frequently use stop. Explicit wire declaration and fixture compatibility must be assessed, not infer protocol from model/provider or finish_reason. AgentLoop and RecoverableAgentLoop create Step before planner.plan; the latter also creates a recovery journal entry. Resulting failure/recovery behavior needs executable characterization; no confirmed runtime state defect yet.
+
+| Step | Acceptance |
+| --- | --- |
+| C1 | Inventory existing consumers, transport contracts, metadata and failure boundaries |
+| C2 | RED via real transport implementations with synthetic wire replies: valid text/JSON plus incomplete/ambiguous terminal reason, positive controls; runtime failure characterization separately |
+| C3 | Explicit wire identity at trusted transport boundary; shared classifier; preserve original reason, no ambiguous fallback accepted; document compatibility for custom transports |
+| C4 | Planner and SmallModelPlanner reject before parsing/admission; preserve call metadata and existing error type; no implicit cannot_progress |
+| C5 | FAST and DEEP reject before producing result/proposal; preserve existing successful-only history contract and assess separate bounded diagnostics without raw reasoning exposure |
+| C6 | Verify Runtime/Recovery and cognitive dispatch error paths; no action/effect on rejected proposal; use existing failure transitions where possible. Any required lifecycle redesign needs separate owner review |
+| C7 | Targeted and full regression, project checks, historical bundle recheck and real backend gate; independent assessment in R9.5 |
+
+C2 initial reproducer: [canonical terminal contract](../../tests/test_e26_r93_canonical_contract.py). 28 native and 12 chat cases, expected 30 failures and 10 positive controls before remediation. Tests do not execute external actions or real inference. Preserve baseline implementation in this RED commit.
