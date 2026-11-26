@@ -114,6 +114,46 @@ class AdmissionResult:
     reason_code: str | None = None
 
 
+def validate_event_envelope(raw, registration):
+    """Pure canonical envelope validation; return record, payload JSON, fingerprint or None.
+
+    A successful result does not admit an event or grant source authority.
+    """
+    if type(raw) is not dict or set(raw) != {
+        "contract", "occurrence_id", "occurrence_version", "kind", "payload"
+    }:
+        return None
+    if raw["contract"] != CONTRACT:
+        return None
+    occurrence_id = raw["occurrence_id"]
+    if not isinstance(occurrence_id, str) or not 1 <= len(occurrence_id) <= 128:
+        return None
+    if (type(raw["occurrence_version"]) is not int
+            or not 1 <= raw["occurrence_version"] <= 2**63 - 1):
+        return None
+    if raw["kind"] not in registration.allowed_kinds or type(raw["payload"]) is not dict:
+        return None
+    if not _json_safe(raw["payload"]):
+        return None
+    try:
+        payload = _canonical(raw["payload"])
+        if len(payload.encode("utf-8")) > MAX_PAYLOAD_BYTES:
+            return None
+        record = {
+            "contract": CONTRACT,
+            "source_ref": registration.source_ref,
+            "producer_ref": registration.producer_ref,
+            "occurrence_id": occurrence_id,
+            "occurrence_version": raw["occurrence_version"],
+            "kind": raw["kind"],
+            "payload": json.loads(payload),
+        }
+        fingerprint = hashlib.sha256(_canonical(record).encode("utf-8")).hexdigest()
+    except (TypeError, ValueError, RecursionError, OverflowError):
+        return None
+    return record, payload, fingerprint
+
+
 class CoreIngress:
     """Admission uses a system-owned SourceRegistration registry.
 
@@ -193,41 +233,8 @@ class CoreIngress:
                 self._audit(connection, received_at, source_ref, reason)
         return AdmissionResult("REJECTED", None, reason)
 
-    @staticmethod
-    def _validated(raw, registration):
-        if type(raw) is not dict or set(raw) != {
-            "contract", "occurrence_id", "occurrence_version", "kind", "payload"
-        }:
-            return None
-        if raw["contract"] != CONTRACT:
-            return None
-        occurrence_id = raw["occurrence_id"]
-        if not isinstance(occurrence_id, str) or not 1 <= len(occurrence_id) <= 128:
-            return None
-        if (type(raw["occurrence_version"]) is not int
-                or not 1 <= raw["occurrence_version"] <= 2**63 - 1):
-            return None
-        if raw["kind"] not in registration.allowed_kinds or type(raw["payload"]) is not dict:
-            return None
-        if not _json_safe(raw["payload"]):
-            return None
-        try:
-            payload = _canonical(raw["payload"])
-            if len(payload.encode("utf-8")) > MAX_PAYLOAD_BYTES:
-                return None
-            record = {
-                "contract": CONTRACT,
-                "source_ref": registration.source_ref,
-                "producer_ref": registration.producer_ref,
-                "occurrence_id": occurrence_id,
-                "occurrence_version": raw["occurrence_version"],
-                "kind": raw["kind"],
-                "payload": json.loads(payload),
-            }
-            fingerprint = hashlib.sha256(_canonical(record).encode("utf-8")).hexdigest()
-        except (TypeError, ValueError, RecursionError, OverflowError):
-            return None
-        return record, payload, fingerprint
+    # Compatibility for existing internal callers; the contract is shared.
+    _validated = staticmethod(validate_event_envelope)
 
     def admit(self, raw, *, source_ref):
         """Return ACCEPTED / ALREADY_SEEN / IDENTITY_CONFLICT / REJECTED.
@@ -427,4 +434,5 @@ class CoreIngress:
         return row["n"]
 
 
-__all__ = ["AdmissionResult", "CONTRACT", "CoreIngress", "SourceRegistration"]
+__all__ = ["AdmissionResult", "CONTRACT", "CoreIngress", "SourceRegistration",
+           "validate_event_envelope"]

@@ -238,3 +238,31 @@ def test_r91_native_call_chain(tmp_path, monkeypatch, defect):
     _refresh_calls(root, case)
     _replace_json(path, case)
     _assert_semantic_rejection(root)
+
+
+def test_r91_shared_source_policy_snapshot_is_detached(tmp_path, monkeypatch):
+    from labs.virtual_anima_lab.python.cognition.source_policy import TurnSourcePolicy
+    mem = memory(tmp_path / "core", monkeypatch)
+    context = mem.context_for_cognition(memory_enabled=True)
+    policy = TurnSourcePolicy(context)
+    before = policy.exposed_bindings()
+    assert before
+    snapshot = policy.exposed_bindings()
+    snapshot.clear()
+    snapshot["ev_forged"] = context["latest_sample_id"]
+    assert policy.exposed_bindings() == before
+    assert not policy.permits(["ev_forged"])
+
+
+def test_r91_shared_ingress_validation_matches_persisted_fingerprint(tmp_path, monkeypatch):
+    from anima.core.ingress import validate_event_envelope
+    from labs.virtual_anima_lab.python.lifecycle.e24_working_memory import (
+        E24WorkingMemory, vision_source_registration,
+    )
+    mem = memory(tmp_path / "core", monkeypatch)
+    raw = r.export_raw(mem, tmp_path, 7)
+    for row in raw["samples"]:
+        envelope = E24WorkingMemory._event(r.strict_json(row["raw_json"]), row["raw_sha256"])
+        checked = validate_event_envelope(envelope, vision_source_registration())
+        assert checked is not None
+        assert checked[2] == row["core_event"]["content_sha256"]

@@ -21,10 +21,10 @@ from pathlib import Path
 
 from anima.agent.native_tools import canonical, strict_json, NativeToolCatalog, LoopbackChatTransport
 from .egocentric import EgocentricView
-from anima.core.ingress import CoreIngress
+from anima.core.ingress import validate_event_envelope
 from ..cognition.contracts import CognitiveStepProposal
 from ..cognition.native_lab import lab_registry
-from ..cognition.coordinator import E25CognitionError, _TurnSourcePolicy
+from ..cognition.source_policy import E25CognitionError, TurnSourcePolicy
 from .e24_working_memory import (
     E24WorkingMemory, SOURCE, PRODUCER, vision_source_registration,
 )
@@ -200,7 +200,7 @@ def verify_raw(fixture):
             raise ValueError("Raw/Core pointer mismatch")
         # Reuse the actual ingress envelope/fingerprint contract. This is
         # pure validation, not admission, a database write or attestation.
-        checked = CoreIngress._validated(expected, vision_source_registration())
+        checked = validate_event_envelope(expected, vision_source_registration())
         if checked is None or event["content_sha256"] != checked[2]:
             raise ValueError("Core event fingerprint mismatch")
         for record in (row["observation_outcome"], row["dispatch_receipt"]):
@@ -271,11 +271,11 @@ def _verify_journal_scope(fixture, rows):
             or context["coverage"] != latest["coverage"]
             or type(context["memory_enabled"]) is not bool):
         raise ValueError("Context/Raw scope mismatch")
-    policy = _TurnSourcePolicy(context)
+    policy = TurnSourcePolicy(context)
 
     def verify_exposed():
         # Check even references that are never requested by the model.
-        for event, sample in policy._exposed.items():
+        for event, sample in policy.exposed_bindings().items():
             if event not in rows or rows[event]["sample_id"] != sample:
                 raise ValueError("Context/Raw event identity mismatch")
 
