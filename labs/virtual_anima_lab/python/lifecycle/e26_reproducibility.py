@@ -19,6 +19,7 @@ import sys
 from contextlib import closing
 from pathlib import Path
 
+from anima.agent.generation_termination import classify_termination
 from anima.agent.native_tools import canonical, strict_json, NativeToolCatalog, LoopbackChatTransport
 from .egocentric import EgocentricView
 from anima.core.ingress import validate_event_envelope
@@ -350,6 +351,19 @@ def _verify_native_chain(fixture, scenario=None, *, required=False):
             or projections != ([] if projection is None else [projection])
             or calls != research + projections):
         raise ValueError("invalid model call phase correspondence")
+    # Older archives lack the additive diagnostic. When present it must
+    # agree with the actual wire response, including rejected calls.
+    for call in calls:
+        if "termination_status" not in call:
+            continue
+        raw = call.get("raw_response")
+        choices = raw.get("choices") if type(raw) is dict else None
+        if type(choices) is not list or len(choices) != 1 or type(choices[0]) is not dict:
+            raise ValueError("terminal diagnostic lacks wire choice")
+        reason = choices[0].get("finish_reason")
+        if (call.get("finish_reason") != reason
+                or call["termination_status"] != classify_termination(reason, wire="chat_completion")):
+            raise ValueError("terminal diagnostic mismatch")
     native = required or any(call.get("profile") == "native" for call in research)
     if not native:
         return
@@ -417,7 +431,8 @@ def _verify_native_chain(fixture, scenario=None, *, required=False):
                 raise ValueError("native wire terminal mismatch")
             wire_calls = message.get("tool_calls", [])
             if proposal is not None:
-                if (finish != "tool_calls" or type(wire_calls) is not list
+                if (classify_termination(finish, wire="chat_completion") != "TOOL_CALL_COMPLETE"
+                        or type(wire_calls) is not list
                         or len(wire_calls) != 1):
                     raise ValueError("native proposal lacks complete wire call")
                 wire = wire_calls[0]
@@ -470,7 +485,8 @@ def _verify_native_chain(fixture, scenario=None, *, required=False):
                     matched.add(step)
                 else:
                     raise ValueError("native proposal not bound to journal")
-            elif (finish != "stop" or wire_calls or type(message.get("content")) is not str
+            elif (classify_termination(finish, wire="chat_completion") != "TEXT_COMPLETE"
+                  or wire_calls or type(message.get("content")) is not str
                   or not message["content"].strip()
                   or call.get("final_text") != message["content"]):
                 raise ValueError("native stop response mismatch")
@@ -481,7 +497,7 @@ def _verify_native_chain(fixture, scenario=None, *, required=False):
         raise ValueError("journal proposal without native call")
     if turn["status"] == "STOPPED" and (not research or not research[-1]["valid"]
             or research[-1].get("proposal") is not None
-            or research[-1].get("finish_reason") != "stop"
+            or classify_termination(research[-1].get("finish_reason"), wire="chat_completion") != "TEXT_COMPLETE"
             or terminal_unadmitted):
         raise ValueError("stopped turn lacks native terminal response")
     if projection is not None:

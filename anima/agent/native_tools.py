@@ -12,6 +12,7 @@ import urllib.request
 from dataclasses import dataclass
 from urllib.parse import urlsplit
 
+from anima.agent.generation_termination import classify_termination
 from anima.agent.tools import ToolDescriptor, ToolRegistry, validate_schema, validate_instance
 
 
@@ -219,9 +220,13 @@ class NativeToolSession:
             if type(choices) is not list or len(choices) != 1:
                 raise ValueError("exactly one completion choice required")
             choice = choices[0]
-            msg = choice["message"]
-            finish = choice["finish_reason"]
+            if type(choice) is not dict:
+                raise ValueError("invalid completion choice")
+            finish = choice.get("finish_reason")
             record["finish_reason"] = finish
+            termination = classify_termination(finish, wire="chat_completion")
+            record["termination_status"] = termination
+            msg = choice["message"]
             if msg.get("role") != "assistant":
                 raise ValueError("invalid completion role")
             calls = msg.get("tool_calls", [])
@@ -233,12 +238,12 @@ class NativeToolSession:
             if not calls:
                 if require_tool:
                     raise ValueError("required first tool call missing")
-                if finish != "stop" or not content or not content.strip():
+                if termination != "TEXT_COMPLETE" or not content or not content.strip():
                     raise ValueError("no explicit completed assistant response")
                 self.terminal = True
                 record.update(valid=True, final_text=content)
                 return None
-            if finish != "tool_calls" or len(calls) != 1:
+            if termination != "TOOL_CALL_COMPLETE" or len(calls) != 1:
                 raise ValueError("expected one complete native tool call")
             call = calls[0]
             if set(call) != {"id", "type", "function"} or call["type"] != "function":

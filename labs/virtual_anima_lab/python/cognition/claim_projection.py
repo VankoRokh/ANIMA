@@ -1,6 +1,7 @@
 """Separate read-only result projection; shares the original turn budget."""
 import time
 
+from anima.agent.generation_termination import classify_termination
 from anima.agent.native_tools import canonical
 from .model_claims import CLAIM_INSTRUCTION
 from .source_binding import admitted_source_rows
@@ -56,10 +57,14 @@ def project_claims(adapter, report, records, budget):
         if type(choices) is not list or len(choices)!=1:
             raise ValueError("exactly one choice required")
         choice = choices[0]
+        if type(choice) is not dict:
+            raise ValueError("invalid completion choice")
+        record["finish_reason"] = choice.get("finish_reason")
+        termination = classify_termination(record["finish_reason"], wire="chat_completion")
+        record["termination_status"] = termination
         msg = choice["message"]
-        record["finish_reason"] = choice["finish_reason"]
         if (msg.get("role")!="assistant" or msg.get("tool_calls",[])!=[]
-                or record["finish_reason"]!="stop" or type(msg.get("content")) is not str
+                or termination != "TEXT_COMPLETE" or type(msg.get("content")) is not str
                 or not msg["content"].strip()):
             raise ValueError("expected completed text-only result")
         record.update(valid=True,final_text=msg["content"])

@@ -92,3 +92,76 @@ def test_unknown_wire_not_inferred():
     from anima.agent.generation_termination import classify_termination
     with pytest.raises(ValueError, match="unsupported generation wire protocol"):
         classify_termination("stop", wire="unknown")
+
+
+@pytest.mark.parametrize("kind", ["text", "tool"])
+@pytest.mark.parametrize("finish", ["stop", "tool_calls", "length", "content_filter",
+                                    "eos", "word", "limit", "unknown", None])
+def test_native_terminal_parity(kind, finish):
+    from tests.test_e26a_native_tools import completion, session
+    from anima.agent.generation_termination import classify_termination
+    response = (completion(content="Done") if kind == "text" else
+                completion("retrieve_memory", '{"query":"crate","top_k":3}'))
+    if finish is None:
+        del response["choices"][0]["finish_reason"]
+    else:
+        response["choices"][0]["finish_reason"] = finish
+    native, transport = session(response)
+    accepted = (kind, finish) in (("text", "stop"), ("tool", "tool_calls"))
+    if accepted:
+        result = native.next()
+        assert (result is None) == (kind == "text")
+    else:
+        with pytest.raises(ValueError):
+            native.next()
+        assert native.pending is None
+    call, = native.calls
+    assert call["valid"] is accepted
+    assert call["transport_ok"] is True
+    assert call["finish_reason"] == finish
+    assert call["termination_status"] == classify_termination(finish, wire="chat_completion")
+    assert call["raw_response"] == response
+    assert (call["input_tokens"], call["output_tokens"]) == (10, 4)
+    assert len(transport.requests) == 1
+
+
+@pytest.mark.parametrize("finish", ["stop", "tool_calls", "length", "content_filter",
+                                    "eos", "word", "limit", "unknown", None])
+def test_projection_terminal_parity(tmp_path, monkeypatch, finish):
+    from labs.virtual_anima_lab.python.cognition.completion import CompletionRequirement
+    from labs.virtual_anima_lab.python.cognition.native_lab import NativeLabAdapter
+    from labs.virtual_anima_lab.python.cognition.resource_budget import ResourceLimits
+    from labs.virtual_anima_lab.python.cognition.cognitive_result import build_cognitive_result
+    from anima.agent.generation_termination import classify_termination
+    from tests.test_e26a_native_tools import completion, Fake
+    mem = memory(tmp_path / "core", monkeypatch)
+    original = completion(content="4")
+    response = completion(content='{"answer":"4","claims":[]}')
+    if finish is None:
+        del response["choices"][0]["finish_reason"]
+    else:
+        response["choices"][0]["finish_reason"] = finish
+    transport = Fake(original, response)
+    adapter = NativeLabAdapter(base_url="http://127.0.0.1:8085", model="test",
+                               task="2+2", trace_path=tmp_path / "native.jsonl", transport=transport)
+    coord = E25LabCognitiveCoordinator(mem)
+    req = CompletionRequirement("no_service_read")
+    report = coord.run_turn(adapter, turn_id="terminal_projection",
+                            completion_requirement=req, resource_limits=ResourceLimits(),
+                            project_result_claims=True)
+    projection = report["claim_projection"]
+    call = projection["call"]
+    assert projection["status"] == ("GENERATED" if finish == "stop" else "INVALID_RESPONSE")
+    assert call["valid"] is (finish == "stop")
+    assert call["transport_ok"] is True and call["raw_response"] == response
+    assert call["finish_reason"] == finish
+    assert call["termination_status"] == classify_termination(finish, wire="chat_completion")
+    assert (call["input_tokens"], call["output_tokens"]) == (10, 4)
+    result = build_cognitive_result(coord, report, requirement=req,
+                                    research_calls=adapter.calls, claim_phase="claim_projection")
+    assert result["presentation"]["model_text"] == "4"
+    assert result["presentation"]["projection_text"] == ("4" if finish == "stop" else None)
+    assert result["presentation"]["whole_answer_verified"] is False
+    assert len(transport.requests) == report["resource_budget"]["reserved_calls"] == 2
+    assert not coord.decision_records("terminal_projection")
+    assert len(mem._core.event_log.load_events()) == 3

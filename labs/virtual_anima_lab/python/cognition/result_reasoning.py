@@ -6,6 +6,7 @@ attestation. No model calls, tool dispatch, writes or semantic prose grader.
 """
 from copy import deepcopy
 
+from anima.agent.generation_termination import classify_termination
 from .model_claims import temporal_claim_coverage
 
 
@@ -33,7 +34,8 @@ def _text_attempt(call, report, *, phase, index, terminal):
     text = message["content"]
     accepted = (terminal and report["status"] == "STOPPED"
                 and call.get("transport_ok") is True and call.get("valid") is True
-                and choice.get("finish_reason") == call.get("finish_reason") == "stop"
+                and choice.get("finish_reason") == call.get("finish_reason")
+                and classify_termination(choice.get("finish_reason"), wire="chat_completion") == "TEXT_COMPLETE"
                 and text == call.get("final_text") and bool(text.strip())
                 and call.get("proposal") is None)
     return {

@@ -1,4 +1,5 @@
 """Experimental final claim wire format, not a completion or Knowledge gate."""
+from anima.agent.generation_termination import classify_termination
 from anima.agent.native_tools import strict_json
 from .claim_verification import ObservationClaim, ObservationClaimVerifier
 from .source_binding import admitted_source_rows
@@ -50,7 +51,8 @@ def _evaluate_model_claims(report, calls, get_records, verify):
               "verified_positive_entities":[], "free_text_verified":False,
               "task_completion":"NOT_ESTABLISHED"}
     if (report["status"] != "STOPPED" or not calls or not calls[-1].get("valid")
-            or not calls[-1].get("transport_ok") or calls[-1].get("finish_reason") != "stop"
+            or not calls[-1].get("transport_ok")
+            or classify_termination(calls[-1].get("finish_reason"), wire="chat_completion") != "TEXT_COMPLETE"
             or calls[-1].get("turn_id") != report["turn_id"]
             or calls[-1].get("context_snapshot_id") != report["context_snapshot_id"]):
         return result
