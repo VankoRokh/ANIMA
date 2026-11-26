@@ -213,3 +213,18 @@ C1 inspection at `dfc7cad95282330afa87150a3bc1a55dce59a6e4`: `anima/agent/llm_pl
 | C7 | Targeted and full regression, project checks, historical bundle recheck and real backend gate; independent assessment in R9.5 |
 
 C2 initial reproducer: [canonical terminal contract](../../tests/test_e26_r93_canonical_contract.py). 28 native and 12 chat cases, expected 30 failures and 10 positive controls before remediation. Tests do not execute external actions or real inference. Preserve baseline implementation in this RED commit.
+
+
+### Canonical validation progress
+
+| Step | Snapshot | Owner evidence |
+| --- | --- | --- |
+| C2 RED | `9c80993e608954f30d61d7175a427101be8486ad` | 30 expected failures, 10 passed |
+| C3/C4 | `71f7bacd658e8506f43ceb061e821609af97902c` | 46 Planner targeted passed, 14 deselected; 42 Planner/transport regression; 111 laboratory targeted |
+| C5 | `29255ace5c8497352c81111cbb83db914aef0f8f` | 82 canonical targeted, 78 FAST/DEEP regression, 193 R9.3 targeted; project checks PASS (203 pages, 1405 links, 458 Python files) |
+
+Trusted transports explicitly declare wire_protocol; unknown declarations fail closed. Planner records terminal metadata before parsing; FAST/DEEP preserve successful-only call_history and retain at most 64 rejected returned-call metadata records without raw text. Missing native stop_type is no longer synthesized as stop. Custom transports must declare their wire and report the actual terminal reason. Earlier exceptions before a call result is available remain outside this rejected-generation history.
+
+### C6 — controlled Planner failure
+
+Existing AgentStore permits planning -> failed and running -> failed and requires terminal steps/operations before terminal Run. No new state or retry/parking policy is required for an ordinary controlled Planner failure. Current AgentLoop and RecoverableAgentLoop call planner.plan before Choice without a handler; source inspection indicates an exception can leave Step planning and Run running. Existing recovery abandons an active pre-selection Step then continues, appropriate for a crash but not an intentionally failed Run. RED: [runtime failure tests](../../tests/test_e26_r93_runtime_failure.py). Eight cases (baseline/recoverable x length/missing reason/invalid JSON/typed transport error) require failed Step and Run, unchanged Goal, no operation, no effect, no synthetic PlannerTurn, no retry on reopened terminal Run. Expected eight failures before implementation. Do not conflate a controlled error with arbitrary programming exceptions or crashes. Atomicity across the two terminal transitions and crash-boundary handling need separate inspection; no claim of general recovery correctness.
