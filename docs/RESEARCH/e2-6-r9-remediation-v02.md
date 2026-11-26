@@ -1,6 +1,6 @@
 # ANIMA v0.2 — E2.6 R9: реестр находок и план исправлений
 
-**Дата:** 26 ноября 2026. **Статус:** Research / R9.0 recorded; implementation and acceptance pending.
+**Дата:** 26 ноября 2026. **Статус:** Research / R9.1 owner-validated; independent re-audit pending. R9.2 design pending.
 **Baseline:** `508851d458cf759902aa35c9ae140780fb29c4a0`. Рабочая ветка `work/v02-e26-r9-remediation`.
 **Источник:** независимый отчёт `ANIMA-E26-R8-Independent-Reaudit-RU.md`, 25 ноября 2026, §§4, 6, 9–15; архив `ANIMA-E26-R8-Independent-Reproduction.zip`. Первичные файлы предоставлены владельцем вне данного snapshot; этот документ не заменяет их.
 **Вердикт R8:** CONDITIONAL PASS только для продолжения ограниченной лабораторной работы. Закрытие E2.6, перенос в canonical assembly и расширение model-facing authority — BLOCKED.
@@ -75,4 +75,33 @@ Existing code to inspect/reuse:
 
 Implementation sequence: (1) reproduce independent R8 negatives on baseline; (2) map shared canonical invariants without executing services or replaying LLM; (3) reuse/extract pure validation as appropriate, do not duplicate trusted policy; (4) verify Core content fingerprint, Context hash and scope, proposal/turn/step/outcome/admission identity, requested/exposed sources and Memory OFF, phase/request/proposal correspondence, manifest uniqueness; (5) reject resealed inconsistent copies, verify unchanged valid archives and frozen trajectories; (6) regression/project checks. Check actual archive compatibility before deciding any schema migration. No rewriting historical evidence to obtain PASS.
 
-Acceptance does not require signatures, external attestation or new authority. No production changes or dependency additions without review of their necessity. R9.1 is not yet implemented or accepted.
+Acceptance does not require signatures, external attestation or new authority. No production changes or dependency additions without review of their necessity. The preceding paragraph describes the original R9.1 design gate; see the dated validation record below.
+
+
+## 5. R9.1 — локальная валидация, 26 ноября 2026
+
+**Проверенный implementation snapshot:** `4d2e3c8739f58848cc636979be3078bf5c8b8125`. Рабочая ветка R9, не новый релиз. **Статус:** OWNER_VALIDATED / READY_FOR_INDEPENDENT_REAUDIT. R8-N01 не объявляется независимо закрытым; CA-05 сохраняет исходные ограничения, CA-06 не переоценивается.
+
+| Шаг | Snapshot | Owner evidence |
+| --- | --- | --- |
+| R9.0 | `7ebcb9dfec814fba89e8686004086b4bb4651090` | Project checks PASS |
+| RED-1 | `a254eed4aba4a7cf74f96673a7d4e694593bbc48` | 7 expected DID NOT RAISE, 9 passed |
+| GREEN-1 | `b79c9c1fbcd61226434e7f5636d9aac32a28a841` | 16 passed |
+| RED-2 | `5ffd3689e5c8062cbfc3acb5cf2a12cff1466b57` | 7 expected DID NOT RAISE, 21 passed |
+| GREEN-2 | `736a4a9f85a60c8773b188e5e721d585a4333027` | 28 targeted, 228 cognitive regression passed |
+| Shared contracts | `97c2a1a3e99da2b5ea739dcf0442baafbb5db23b` | 230 cognitive regression passed; project checks PASS (203 pages, 1400 links); historical bundle verification below |
+| Full regression, initial | `97c2a1a3e99da2b5ea739dcf0442baafbb5db23b` | 6 documentation failures, 2742 passed; bounded source snapshot omitted four documented VAL link targets |
+| Full regression, corrected | `4d2e3c8739f58848cc636979be3078bf5c8b8125` | 2749 passed in 107.29s, Python 3.14.4; source snapshot allowlist corrected and exclusion regression added |
+
+22 tests added relative to R8 (21 evidence/contract tests and one documentation snapshot test). All 14 reproduced inconsistent export cases rejected in targeted tests. The four R5/R6/R7 bundles passed the stricter verifier without requiring schema migration, according to owner-provided CLI outputs:
+
+| Bundle | Source snapshot | Cases | Raw | Requests |
+| --- | --- | ---: | ---: | ---: |
+| R5 | `08efa20ab20e0aaa7fafd0d65cd309b845d8cb5b` | 2 | 6 | 8 |
+| R6 | `508851d458cf759902aa35c9ae140780fb29c4a0` | 2 | 6 | 7 |
+| R7 Control | `508851d458cf759902aa35c9ae140780fb29c4a0` | 14 | 6 | 45 |
+| R7 Host | `508851d458cf759902aa35c9ae140780fb29c4a0` | 14 | 6 | 47 |
+
+Reused pure Core envelope validation, extracted shared TurnSourcePolicy, native catalog argument decoding and journal source binding. Added checks of scope, admission, proposal identity, model-call correspondence and declared bundle membership. No new dependency or model authority. Existing export schema preserved. Reproducers: [R9.1 evidence tests](../../tests/test_e26_r91_evidence_integrity.py), [snapshot tests](../../tests/test_source_tree.py).
+
+**Limitations:** owner outputs, not independent execution by this reviewer; final archive external SHA-256 output not supplied; no fresh inference or complete replay performed in R9.1; verification scope remains `integrity_and_source_binding_not_backend_attestation`. A consistently fabricated archive is not authenticated by these checks. Native call metadata and semantic correctness of prose are separate questions. Final project check on the documentation-only follow-up commit remains pending. R9.5 independently tests closure and additional bypasses.
