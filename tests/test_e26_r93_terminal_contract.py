@@ -25,7 +25,7 @@ class StructuredResponse:
 
 @pytest.mark.parametrize("profile", ["legacy", "choice"])
 @pytest.mark.parametrize("operation", ["stop", "read"])
-@pytest.mark.parametrize("finish", ["eos", "word", "limit", "length", "unknown", None])
+@pytest.mark.parametrize("finish", ["eos", "word", "limit", "length", "unknown", None, "none", "stop", "tool_calls"])
 def test_structured_adapter_requires_completed_generation(tmp_path, monkeypatch,
                                                           profile, operation, finish):
     mem = memory(tmp_path / "core", monkeypatch)
@@ -48,6 +48,9 @@ def test_structured_adapter_requires_completed_generation(tmp_path, monkeypatch,
     assert trace["input_tokens"] == 20 and trace["output_tokens"] == 8
     assert trace["raw_response"] == transport.text
     records = coord.decision_records("terminal_contract")
+    assert trace["termination_status"] == (
+        "TEXT_COMPLETE" if finish in ("eos", "word") else
+        "INCOMPLETE" if finish in ("limit", "none") else "UNKNOWN")
     if finish in ("eos", "word"):
         assert trace["valid"] is True
         if operation == "stop":
@@ -60,3 +63,32 @@ def test_structured_adapter_requires_completed_generation(tmp_path, monkeypatch,
         assert not any(r["outcome"]["status"] == "COMPLETED" for r in records)
     assert len(mem._core.event_log.load_events()) == 3
     assert mem._core.memory_store.count() == 0
+
+
+@pytest.mark.parametrize("wire,reason,expected", [
+    ("llama_cpp_completion", "eos", "TEXT_COMPLETE"),
+    ("llama_cpp_completion", "word", "TEXT_COMPLETE"),
+    ("llama_cpp_completion", "limit", "INCOMPLETE"),
+    ("llama_cpp_completion", "none", "INCOMPLETE"),
+    ("llama_cpp_completion", "stop", "UNKNOWN"),
+    ("chat_completion", "stop", "TEXT_COMPLETE"),
+    ("chat_completion", "tool_calls", "TOOL_CALL_COMPLETE"),
+    ("chat_completion", "length", "INCOMPLETE"),
+    ("chat_completion", "content_filter", "INCOMPLETE"),
+    ("chat_completion", "eos", "UNKNOWN"),
+    ("chat_completion", "word", "UNKNOWN"),
+    ("chat_completion", "limit", "UNKNOWN"),
+    ("chat_completion", None, "UNKNOWN"),
+    ("llama_cpp_completion", True, "UNKNOWN"),
+    ("llama_cpp_completion", " eos ", "UNKNOWN"),
+    ("chat_completion", "STOP", "UNKNOWN"),
+])
+def test_termination_mapping_is_wire_specific(wire, reason, expected):
+    from anima.agent.generation_termination import classify_termination
+    assert classify_termination(reason, wire=wire) == expected
+
+
+def test_unknown_wire_not_inferred():
+    from anima.agent.generation_termination import classify_termination
+    with pytest.raises(ValueError, match="unsupported generation wire protocol"):
+        classify_termination("stop", wire="unknown")

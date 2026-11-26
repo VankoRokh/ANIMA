@@ -6,6 +6,7 @@ from pathlib import Path
 from urllib.parse import urlsplit
 
 from anima.agent.llama_cpp_transport import LlamaCppSmallModelTransport
+from anima.agent.generation_termination import classify_termination
 from .contracts import SCHEMA, CognitiveStepProposal
 
 SYSTEM = (
@@ -134,6 +135,12 @@ class LocalFastEvidenceAdapter:
             trace.update(transport_ok=True, raw_response=response.text,
                          latency_ms=response.latency_ms, input_tokens=response.input_tokens,
                          output_tokens=response.output_tokens, finish_reason=response.finish_reason)
+            trace["termination_status"] = classify_termination(
+                response.finish_reason, wire="llama_cpp_completion",
+            )
+            if trace["termination_status"] != "TEXT_COMPLETE":
+                trace["error"] = "generation not confirmed complete"
+                return {"invalid_model_output": True}
             try:
                 proposal = _decode(response.text, allowed_ids, turn_id=turn_id,
                                    step_index=step_index,
@@ -248,6 +255,12 @@ class LocalFastChoiceAdapter(LocalFastEvidenceAdapter):
             trace.update(transport_ok=True, raw_response=response.text,
                          latency_ms=response.latency_ms, input_tokens=response.input_tokens,
                          output_tokens=response.output_tokens, finish_reason=response.finish_reason)
+            trace["termination_status"] = classify_termination(
+                response.finish_reason, wire="llama_cpp_completion",
+            )
+            if trace["termination_status"] != "TEXT_COMPLETE":
+                trace["error"] = "generation not confirmed complete"
+                return {"invalid_model_output": True}
             try:
                 proposal = _decode_choice(response.text, choices, turn_id=turn_id,
                                           step_index=step_index,
