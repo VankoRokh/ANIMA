@@ -1,6 +1,6 @@
 # ANIMA v0.2 — E2.6 R9: реестр находок и план исправлений
 
-**Дата:** 26 ноября 2026. **Статус:** Research / R9.1 owner-validated; independent re-audit pending. R9.2 owner-validated; R9.3 laboratory targeted checks PASS; canonical contract extension owner-approved, RED prepared.
+**Дата:** 27 ноября 2026. **Статус:** Research / R9.1–R9.3 owner-validated in documented scope; independent re-audit pending. R9.3 owner evidence packaging pending; R9.4 not started.
 **Baseline:** `508851d458cf759902aa35c9ae140780fb29c4a0`. Рабочая ветка `work/v02-e26-r9-remediation`.
 **Источник:** независимый отчёт `ANIMA-E26-R8-Independent-Reaudit-RU.md`, 25 ноября 2026, §§4, 6, 9–15; архив `ANIMA-E26-R8-Independent-Reproduction.zip`. Первичные файлы предоставлены владельцем вне данного snapshot; этот документ не заменяет их.
 **Вердикт R8:** CONDITIONAL PASS только для продолжения ограниченной лабораторной работы. Закрытие E2.6, перенос в canonical assembly и расширение model-facing authority — BLOCKED.
@@ -251,3 +251,28 @@ At `40d0d2ed71a2effbbc6d8eed8e91a5a8327a79a0`: 68 affected tests, 3019 full test
 Canonical Native owner probe: all four roles accepted eos at 256-token budget, rejected limit at one-token budget with typed errors and reported usage; no executor. Canonical Chat default-template probe: all four responses length, two empty contents at 256 tokens rejected before call record construction (1883 input, 512 output tokens not represented in Planner history). Explicit enable_thinking=false probe: all four had nonempty content and zero reported reasoning characters; three length responses rejected by termination gate; SmallPlanner stop with 160 output tokens rejected for missing rationale_summary. No accepted real Chat Planner turn yet; no contract violation observed. Synthetic positive Chat coverage remains valid. Do not infer that default-template reasoning was confirmed from the original probe, which did not record reasoning length. Do not change production prompts, budgets or schema for a model-quality result.
 
 C7 diagnostic RED: [early-response diagnostics tests](../../tests/test_e26_r93_early_response_diagnostics.py) exercise six canonical role/wire combinations, empty/whitespace/null output and completed-but-empty output, plus unfinished inline reasoning on FAST/DEEP. Existing typed error boundaries and success histories must remain unchanged. Preserve only reported resource and terminal metadata, character counts and role/provider/model identity in a bounded per-transport rejected_response_history; propagate the corresponding metadata on the typed exception (generation_diagnostic). No synthetic LLMCallResult, text retention, automatic retry, durable memory, or resource-budget authority. A response without a usable envelope or before generation is not an observed completed call; missing metadata must not be fabricated. RED expected 26 failures; pending owner execution. Boundedness, malformed usage and no-generation controls to be tested before closing. Independent audit remains R9.5.
+
+
+### R9.3 — итог локальной валидации, 27 ноября 2026
+
+**Проверенный snapshot:** `cadd7888bdf0d29badc4f99149e37b3be7c7f30c`. **Статус:** OWNER_VALIDATED в пределах проверенных контрактов; independent closure R8-N02 pending R9.5. Это не новый релиз, не закрытие E2.6 и не разрешение на расширение model-facing authority.
+
+| Проверка | Результат владельца |
+| --- | --- |
+| Early Response Diagnostics RED, `cdba6a34cc6ee24eec25ed4cd99459a69e659343` | 26 failed (0.56 s), expected |
+| Early Response Diagnostics GREEN | 59 passed (0.35 s) |
+| R9.3 targeted | 276 passed (5.40 s) |
+| Transport regression | 85 passed (0.76 s) |
+| Full regression | 3078 passed (118.88 s), +279 relative to R9.2 |
+| Project checks | PASS, 203 pages, 1408 links, 461 Python files, Python 3.14.4 |
+| Real early rejection — Planner / SmallPlanner | 2/2, zero diagnostic failures |
+
+The shared diagnostic helper resides in generation_termination.py. Generic and compact Chat Planner transports reuse the same response decoder. Native Planner and shared FAST/DEEP text transport retain metadata before propagating existing typed content errors. The bounded per-transport history retains up to 64 entries; exception diagnostics are detached copies. Invalid token counters are unknown, not zero. Pre-generation failures do not manufacture records. The new diagnostics do not store raw response or reasoning text fields, do not synthesize an accepted call, and do not introduce retry or memory writes.
+
+Real final probe: Qwen3-4B-Q4_K_M, loopback llama.cpp, default template, 256-token limit. Planner: length / INCOMPLETE, 1160 input and 256 output tokens, zero content characters, 1084 reasoning characters, latency 8215.02 ms. SmallPlanner: length / INCOMPLETE, 727 input and 256 output tokens, zero content characters, 1045 reasoning characters, latency 4227.40 ms. Both raised LLMTransportError; call history empty; exactly one rejected response record each, matching exception metadata and observed backend counters. This confirms thinking-only output in the final default-template probe, not the unrecorded reasoning field of every earlier call. No accepted proposal or executor use. Reported counters are not independently measured resource usage.
+
+Earlier owner evidence at `40d0d2ed71a2effbbc6d8eed8e91a5a8327a79a0` remains bound to that snapshot: six historical bundles (60 cases, 36 Raw samples, 200 requests) and two new native bundles (28 cases, 12 Raw samples, 91 requests) verified. Legacy/Choice 24 real calls; Canonical Native 8 calls, four accepted and four rejected; Canonical Chat two probes of four calls each, all rejected. These are distinct experiments, not a single final-snapshot end-to-end validation. No positive canonical Chat Planner result on Qwen3 was demonstrated. The final snapshot full regression supplies synthetic positive coverage and regression evidence, not a new full real-backend replay.
+
+**Residual scope:** process-local diagnostic history, no durable/global resource accounting, malformed or unavailable response envelopes may lack counters, no guarantees against malicious backend metadata, no independent execution or backend attestation. The final-snapshot archive recheck and packaging are pending; source logs under owner's `/tmp/anima-r93-BKi2Gj` have not been independently inspected or archived by this reviewer. Preserve original artifacts, including failures; do not replace them with summaries or claim hashes not yet computed. Prior unresolved R9-Q/E/L findings remain open. Independent assessment should probe inconsistent terminal flags, alternative response paths and diagnostic coverage beyond tested content failures.
+
+**Resume point — R9.4:** package local R9.3 evidence and verify the existing bundles under the final tested code, record archive SHA-256; then plan causal evaluation before new implementation. Priorities: information sufficiency, repeated operations, incremental information gain, retrieval quality, reuse of deterministic resolution, and matched-input evaluation (CA-06 and R9-E01/E02). Preserve R9.2 hybrid result and R9.3 terminal contracts, existing roadmap and read-only lab authority. No new development started in R9.4. R9.5 independent re-audit remains mandatory.
