@@ -1,6 +1,6 @@
 # ANIMA v0.2 — E2.6 R9: реестр находок и план исправлений
 
-**Дата:** 26 ноября 2026. **Статус:** Research / R9.1 owner-validated; independent re-audit pending. R9.2 design pending.
+**Дата:** 26 ноября 2026. **Статус:** Research / R9.1 owner-validated; independent re-audit pending. R9.2 purpose owner-approved; laboratory contract design recorded, implementation pending.
 **Baseline:** `508851d458cf759902aa35c9ae140780fb29c4a0`. Рабочая ветка `work/v02-e26-r9-remediation`.
 **Источник:** независимый отчёт `ANIMA-E26-R8-Independent-Reaudit-RU.md`, 25 ноября 2026, §§4, 6, 9–15; архив `ANIMA-E26-R8-Independent-Reproduction.zip`. Первичные файлы предоставлены владельцем вне данного snapshot; этот документ не заменяет их.
 **Вердикт R8:** CONDITIONAL PASS только для продолжения ограниченной лабораторной работы. Закрытие E2.6, перенос в canonical assembly и расширение model-facing authority — BLOCKED.
@@ -104,4 +104,34 @@ Acceptance does not require signatures, external attestation or new authority. N
 
 Reused pure Core envelope validation, extracted shared TurnSourcePolicy, native catalog argument decoding and journal source binding. Added checks of scope, admission, proposal identity, model-call correspondence and declared bundle membership. No new dependency or model authority. Existing export schema preserved. Reproducers: [R9.1 evidence tests](../../tests/test_e26_r91_evidence_integrity.py), [snapshot tests](../../tests/test_source_tree.py).
 
-**Limitations:** owner outputs, not independent execution by this reviewer; final archive external SHA-256 output not supplied; no fresh inference or complete replay performed in R9.1; verification scope remains `integrity_and_source_binding_not_backend_attestation`. A consistently fabricated archive is not authenticated by these checks. Native call metadata and semantic correctness of prose are separate questions. Final project check on the documentation-only follow-up commit remains pending. R9.5 independently tests closure and additional bypasses.
+**Limitations:** owner outputs, not independent execution by this reviewer; final archive external SHA-256 output not supplied; no fresh inference or complete replay performed in R9.1; verification scope remains `integrity_and_source_binding_not_backend_attestation`. A consistently fabricated archive is not authenticated by these checks. Native call metadata and semantic correctness of prose are separate questions. Final project check on documentation-only snapshot `85266f44eee89be2b467bb387f0fc98ae6099053`: owner PASS, 203 pages / 1402 local links, Python 3.14.4. R9.5 independently tests closure and additional bypasses.
+
+
+## 6. R9.2.0 — Hybrid Cognitive Result (лабораторный контракт, проект)
+
+Владелец согласовал назначение: результат отдельного когнитивного цикла, пригодный для оценки качества обработки и будущего повторного использования. Это не полный журнал, не Knowledge, не автоматически успешная Task и не новая исполнительная authority. Срез должен существовать и при неполной информации, отказе, исчерпании бюджета. R9.2 не реализует persistence, межцикловую передачу, обучение или самостоятельные цели.
+
+### Разделение ответственности
+
+- Decision Journal хранит ход операций; Cognitive Result содержит смысловое резюме и ссылки на этот журнал; Evaluation отдельно сравнивает результат с требованиями испытания. Не подмешивать скрытые fixture answers в модель или подтверждённые факты.
+- Identity: turn_id / context_snapshot_id; при наличии — frozen source scope. Execution: исходный turn status, выполненные/отклонённые операции, существующий resource budget. Не превращать STOPPED или STEP_BUDGET_EXHAUSTED в Task completion.
+- Information: существующий CompletionRequirement / evaluate_completion; хранить requirement, observed coverage и missing entities/requirements. Это относительная достаточность для явно заданного вопроса, не глобальная полнота знания. Если требования нет, NOT_ASSESSED, а не PASS.
+- Evidence: только проверенные typed claims с origin (MODEL_CANDIDATE_VERIFIED или DETERMINISTIC_HOST), event/sample identity, temporal scope и verdict. Проверенные и отклонённые кандидаты разделены; не удалять отрицательные verdicts. Использовать ObservationClaimVerifier, admitted_source_rows, temporal_claim_coverage и host projection, не копировать их алгоритмы. Host формирует утверждения только из уже допущенных источников; не инициирует новый research read. Повторные canonical integrity reads отдельно от acquisition.
+- Reasoning: сохранять точный исходный research final и, если был, projection final, их фазу, turn/context и статус. Любой свободный текст модели имеет authority UNVERIFIED; гипотеза/интерпретация/предложение не становятся fact даже при наличии корректных соседних claims. В первой версии не обещать надёжное извлечение таких категорий из произвольной прозы и не добавлять обязательный inference. Явные структурированные гипотезы — будущий опциональный контракт.
+- Presentation: проверенные утверждения доступны отдельно от model prose. Host text только из успешно проверенных утверждений с точным capture scope; не маркировать произвольную прозу VERIFIED. Не маскировать ошибочный ответ модели заменой Host text в model metrics. Никакой verified whole-answer semantic PASS из typed coverage.
+- Evaluation: independently report operation gate, information status, typed claim format, verdict status, coverage, and free-text review. Empty claim set = NO_CLAIMS (observation-required case fails coverage) or NOT_APPLICABLE (no observation assertion required); never blanket verified semantics. Empty search proves only bounded search outcome, not nonexistence. A no-service-read case does not prove arithmetic correctness. Existing legacy metrics remain for historical comparisons; new fields explicitly scope their meaning.
+
+### Порядок и критерии
+
+| Шаг | Scope |
+| --- | --- |
+| R9.2.1 | Characterization on unchanged R9.1 implementation: false prose + correct claims, empty claims + false absence, wrong arithmetic + no tools; preserve historical metrics and show their semantic boundary |
+| R9.2.2 | Add narrow versioned laboratory result builder, using trusted coordinator/report/journal, no arbitrary imported verdict as authority; typed fact/unknown basis; no additional model calls |
+| R9.2.3 | Separate original research/projection text, verification and coverage; model prose never automatically VERIFIED, no vacuous success; keep partial/rejected/budget outcomes distinct |
+| R9.2.4 | Reuse host temporal projection and existing model claim evaluation, without changing historic metrics or scoring model as if it produced Host facts; optional projection uses existing budget |
+| R9.2.5 | Contract and integration tests: supported/unsupported/contradicted/empty claims, scope errors, false prose, missing evidence, wrong arithmetic, foreign turn/context, stale sources, stop-only, budget/rejection; no writes/no new authority; old bundles remain readable |
+| R9.2.6 | Local real-model experiment, project checks and full regression. Report separately what was measured and what remains NOT_VERIFIED |
+
+Concrete first-version field names may follow existing contracts, not a replacement canonical IR. No new Core module, schema migration, universal semantic grader, new prompt or expanded tool list at this step. The model can reason freely, while machine consumers must explicitly select verified data instead of treating all text as evidence.
+
+R9.2.1 reproducer: [characterization tests](../../tests/test_e26_r92_result_characterization.py). A PASS here confirms a known limitation of the old metric, not remediation or semantic correctness. The assertions intentionally describe the historical scoring boundary; they are not tests that expect a new API before implementation.
