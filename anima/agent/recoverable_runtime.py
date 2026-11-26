@@ -4,6 +4,7 @@ from uuid import uuid4
 from anima.agent.contracts import Action, VerificationSpec
 from anima.agent.executor import UncertainOperationError, action_request_hash, operation_kind
 from anima.agent.recovery import AgentRecoveryJournal
+from anima.agent.llm_planner import LLMPlannerError, LLMTransportError
 from anima.agent.runtime import (
     AgentLoop,
     AgentLoopResult,
@@ -367,7 +368,10 @@ class RecoverableAgentLoop(AgentLoop):
                 turn_results=turns,
                 max_steps=max_steps,
             )
-            planner_turn = self.planner.plan(request)
+            try:
+                planner_turn = self.planner.plan(request)
+            except (LLMPlannerError, LLMTransportError) as error:
+                return self._finish_planner_failure(run, step, verification_spec, turns, error)
             self.recovery_journal.save_planner_turn(step["id"], planner_turn)
             self._checkpoint(
                 "after_planner_persisted",

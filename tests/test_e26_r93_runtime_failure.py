@@ -57,6 +57,10 @@ def test_controlled_planner_failure_closes_run_without_effect(
     steps = store.list_steps(run_id=run["id"])
     assert len(steps) == 1 and steps[0]["status"] == "failed"
     assert store.get_run(run["id"])["status"] == "failed"
+    assert steps[0]["terminal_reason"] == reason
+    assert result.run["terminal_reason"] == reason
+    assert store.list_step_transitions(steps[0]["id"])[-1]["reason"] == reason
+    assert store.list_run_transitions(run["id"])[-1]["reason"] == reason
     assert store.list_operations(run_id=run["id"]) == []
     assert dict(loop.goal_store.get_goal(run["goal_id"])) == goal_before
     if fault == "transport_error":
@@ -81,3 +85,71 @@ def test_controlled_planner_failure_closes_run_without_effect(
         assert reopened_store.list_operations(run_id=run["id"]) == []
         assert list(sandbox.iterdir()) == []
         assert len(requests) == 1
+
+
+def test_atomic_planner_failure_rolls_back_both_transitions(tmp_path):
+    import sqlite3
+    _, _, loop, run, _ = _build_loop(tmp_path, [])
+    store = loop.store
+    step = store.create_step(run_id=run["id"])
+    before_run = store.get_run(run["id"])
+    before_step = store.get_step(step["id"])
+    run_trace = store.list_run_transitions(run["id"])
+    step_trace = store.list_step_transitions(step["id"])
+    # SQLite fault occurs after the Step write, on the Run journal insert.
+    with store.transaction() as connection:
+        connection.execute("""
+            CREATE TRIGGER reject_failure_transition BEFORE INSERT ON agent_run_transitions
+            WHEN NEW.to_status = 'failed'
+            BEGIN SELECT RAISE(ABORT, 'synthetic transaction failure'); END
+        """)
+    with pytest.raises(sqlite3.IntegrityError, match="synthetic transaction failure"):
+        store.fail_planning_run(run["id"], step["id"], reason="planner_output_rejected")
+    assert store.get_run(run["id"]) == before_run
+    assert store.get_step(step["id"]) == before_step
+    assert store.list_run_transitions(run["id"]) == run_trace
+    assert store.list_step_transitions(step["id"]) == step_trace
+    with store.transaction() as connection:
+        connection.execute("DROP TRIGGER reject_failure_transition")
+    assert store.fail_planning_run(run["id"], step["id"], reason="planner_output_rejected")["status"] == "failed"
+    assert store.get_step(step["id"])["status"] == "failed"
+    with pytest.raises(ValueError):
+        store.fail_planning_run(run["id"], step["id"], reason="planner_output_rejected")
+
+
+def test_planner_failure_rejects_wrong_step_owner(tmp_path):
+    _, _, loop, run, _ = _build_loop(tmp_path, [])
+    store = loop.store
+    other = store.create_run(goal_id=run["goal_id"], planner="test", planner_version="1")
+    store.transition_run(other["id"], "running", reason="test")
+    step = store.create_step(run_id=other["id"])
+    with pytest.raises(ValueError, match="matching running Run"):
+        store.fail_planning_run(run["id"], step["id"], reason="planner_output_rejected")
+    assert store.get_run(run["id"])["status"] == "running"
+    assert store.get_run(other["id"])["status"] == "running"
+    assert store.get_step(step["id"])["status"] == "planning"
+
+
+@pytest.mark.parametrize("recoverable", [False, True])
+def test_unexpected_exception_is_not_reclassified_as_model_failure(tmp_path, monkeypatch, recoverable):
+    sandbox, planner, baseline, run, spec = _build_loop(tmp_path, [])
+    loop = baseline
+    if recoverable:
+        loop = RecoverableAgentLoop(
+            store=baseline.store, registry=baseline.registry,
+            planner=planner, choice=baseline.choice,
+            executor=baseline.executor, verifier=baseline.verifier,
+            verification_bridge=baseline.verification_bridge,
+        )
+
+    def crash(**kwargs):
+        raise RuntimeError("unexpected implementation failure")
+
+    monkeypatch.setattr(planner.transport, "complete", crash)
+    with pytest.raises(RuntimeError, match="unexpected implementation failure"):
+        loop.run(run["id"], spec, max_steps=4)
+    assert loop.store.get_run(run["id"])["status"] == "running"
+    step, = loop.store.list_steps(run_id=run["id"])
+    assert step["status"] == "planning"
+    assert not loop.store.list_operations(run_id=run["id"])
+    assert not list(sandbox.iterdir())

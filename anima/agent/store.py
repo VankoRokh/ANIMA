@@ -541,6 +541,12 @@ class AgentStore:
         return [self._row_to_run_transition(row) for row in rows]
 
     def transition_run(self, public_id, to_status, *, reason, timestamp=None):
+        with self.transaction() as connection:
+            self._transition_run(connection, public_id, to_status,
+                                     reason=reason, timestamp=timestamp)
+        return self.get_run(public_id)
+
+    def _transition_run(self, connection, public_id, to_status, *, reason, timestamp=None):
         _validate_run_id(public_id)
         _validate_run_status(to_status)
         _validate_non_empty_string(reason, "AgentRun transition reason")
@@ -548,80 +554,78 @@ class AgentStore:
         _validate_timestamp(timestamp, "AgentRun transition timestamp")
         transition_id = f"{AGENT_RUN_TRANSITION_ID_PREFIX}{uuid4()}"
 
-        with self.transaction() as connection:
-            row = connection.execute(
-                "SELECT * FROM agent_runs WHERE public_id = ?",
+        row = connection.execute(
+            "SELECT * FROM agent_runs WHERE public_id = ?",
+            (public_id,),
+        ).fetchone()
+        if row is None:
+            raise ValueError(f"Unknown AgentRun: {public_id}")
+
+        from_status = row["status"]
+        if to_status not in ALLOWED_RUN_TRANSITIONS[from_status]:
+            raise ValueError(
+                f"Invalid AgentRun transition: {from_status} -> {to_status}"
+            )
+
+        if to_status in TERMINAL_RUN_STATUSES:
+            active_step = connection.execute(
+                """
+                SELECT public_id FROM agent_steps
+                WHERE run_id = ?
+                  AND status IN (
+                    'planning', 'planned', 'selected', 'executing',
+                    'executed', 'observed', 'verified'
+                  )
+                LIMIT 1
+                """,
                 (public_id,),
             ).fetchone()
-            if row is None:
-                raise ValueError(f"Unknown AgentRun: {public_id}")
-
-            from_status = row["status"]
-            if to_status not in ALLOWED_RUN_TRANSITIONS[from_status]:
+            if active_step is not None:
                 raise ValueError(
-                    f"Invalid AgentRun transition: {from_status} -> {to_status}"
+                    "Cannot terminate AgentRun with a non-terminal AgentStep"
                 )
 
-            if to_status in TERMINAL_RUN_STATUSES:
-                active_step = connection.execute(
-                    """
-                    SELECT public_id FROM agent_steps
-                    WHERE run_id = ?
-                      AND status IN (
-                        'planning', 'planned', 'selected', 'executing',
-                        'executed', 'observed', 'verified'
-                      )
-                    LIMIT 1
-                    """,
-                    (public_id,),
-                ).fetchone()
-                if active_step is not None:
-                    raise ValueError(
-                        "Cannot terminate AgentRun with a non-terminal AgentStep"
-                    )
-
-                active_operation = connection.execute(
-                    """
-                    SELECT public_id FROM agent_operations
-                    WHERE run_id = ?
-                      AND status IN ('prepared', 'executing', 'uncertain')
-                    LIMIT 1
-                    """,
-                    (public_id,),
-                ).fetchone()
-                if active_operation is not None:
-                    raise ValueError(
-                        "Cannot terminate AgentRun with a non-terminal AgentOperation"
-                    )
-
-            terminal_reason = (
-                reason.strip() if to_status in TERMINAL_RUN_STATUSES else None
-            )
-            connection.execute(
+            active_operation = connection.execute(
                 """
-                UPDATE agent_runs
-                SET status = ?, terminal_reason = ?, updated_at = ?
-                WHERE public_id = ?
+                SELECT public_id FROM agent_operations
+                WHERE run_id = ?
+                  AND status IN ('prepared', 'executing', 'uncertain')
+                LIMIT 1
                 """,
-                (to_status, terminal_reason, timestamp, public_id),
-            )
-            connection.execute(
-                """
-                INSERT INTO agent_run_transitions(
-                    public_id, run_id, timestamp, from_status, to_status, reason
-                ) VALUES (?, ?, ?, ?, ?, ?)
-                """,
-                (
-                    transition_id,
-                    public_id,
-                    timestamp,
-                    from_status,
-                    to_status,
-                    reason.strip(),
-                ),
-            )
+                (public_id,),
+            ).fetchone()
+            if active_operation is not None:
+                raise ValueError(
+                    "Cannot terminate AgentRun with a non-terminal AgentOperation"
+                )
 
-        return self.get_run(public_id)
+        terminal_reason = (
+            reason.strip() if to_status in TERMINAL_RUN_STATUSES else None
+        )
+        connection.execute(
+            """
+            UPDATE agent_runs
+            SET status = ?, terminal_reason = ?, updated_at = ?
+            WHERE public_id = ?
+            """,
+            (to_status, terminal_reason, timestamp, public_id),
+        )
+        connection.execute(
+            """
+            INSERT INTO agent_run_transitions(
+                public_id, run_id, timestamp, from_status, to_status, reason
+            ) VALUES (?, ?, ?, ?, ?, ?)
+            """,
+            (
+                transition_id,
+                public_id,
+                timestamp,
+                from_status,
+                to_status,
+                reason.strip(),
+            ),
+        )
+
 
     def create_step(
         self,
@@ -737,6 +741,12 @@ class AgentStore:
         return [self._row_to_step_transition(row) for row in rows]
 
     def transition_step(self, public_id, to_status, *, reason, timestamp=None):
+        with self.transaction() as connection:
+            self._transition_step(connection, public_id, to_status,
+                                     reason=reason, timestamp=timestamp)
+        return self.get_step(public_id)
+
+    def _transition_step(self, connection, public_id, to_status, *, reason, timestamp=None):
         _validate_step_id(public_id)
         _validate_step_status(to_status)
         _validate_non_empty_string(reason, "AgentStep transition reason")
@@ -744,63 +754,89 @@ class AgentStore:
         _validate_timestamp(timestamp, "AgentStep transition timestamp")
         transition_id = f"{AGENT_STEP_TRANSITION_ID_PREFIX}{uuid4()}"
 
-        with self.transaction() as connection:
-            row = connection.execute(
-                "SELECT * FROM agent_steps WHERE public_id = ?",
+        row = connection.execute(
+            "SELECT * FROM agent_steps WHERE public_id = ?",
+            (public_id,),
+        ).fetchone()
+        if row is None:
+            raise ValueError(f"Unknown AgentStep: {public_id}")
+
+        from_status = row["status"]
+        if to_status not in ALLOWED_STEP_TRANSITIONS[from_status]:
+            raise ValueError(
+                f"Invalid AgentStep transition: {from_status} -> {to_status}"
+            )
+
+        if to_status in TERMINAL_STEP_STATUSES:
+            active_operation = connection.execute(
+                """
+                SELECT public_id FROM agent_operations
+                WHERE step_id = ?
+                  AND status IN ('prepared', 'executing', 'uncertain')
+                LIMIT 1
+                """,
                 (public_id,),
             ).fetchone()
-            if row is None:
-                raise ValueError(f"Unknown AgentStep: {public_id}")
-
-            from_status = row["status"]
-            if to_status not in ALLOWED_STEP_TRANSITIONS[from_status]:
+            if active_operation is not None:
                 raise ValueError(
-                    f"Invalid AgentStep transition: {from_status} -> {to_status}"
+                    "Cannot terminate AgentStep with a non-terminal AgentOperation"
                 )
 
-            if to_status in TERMINAL_STEP_STATUSES:
-                active_operation = connection.execute(
-                    """
-                    SELECT public_id FROM agent_operations
-                    WHERE step_id = ?
-                      AND status IN ('prepared', 'executing', 'uncertain')
-                    LIMIT 1
-                    """,
-                    (public_id,),
-                ).fetchone()
-                if active_operation is not None:
-                    raise ValueError(
-                        "Cannot terminate AgentStep with a non-terminal AgentOperation"
-                    )
+        terminal_reason = (
+            reason.strip() if to_status in TERMINAL_STEP_STATUSES else None
+        )
+        connection.execute(
+            """
+            UPDATE agent_steps
+            SET status = ?, terminal_reason = ?, updated_at = ?
+            WHERE public_id = ?
+            """,
+            (to_status, terminal_reason, timestamp, public_id),
+        )
+        connection.execute(
+            """
+            INSERT INTO agent_step_transitions(
+                public_id, step_id, timestamp, from_status, to_status, reason
+            ) VALUES (?, ?, ?, ?, ?, ?)
+            """,
+            (
+                transition_id,
+                public_id,
+                timestamp,
+                from_status,
+                to_status,
+                reason.strip(),
+            ),
+        )
 
-            terminal_reason = (
-                reason.strip() if to_status in TERMINAL_STEP_STATUSES else None
-            )
-            connection.execute(
-                """
-                UPDATE agent_steps
-                SET status = ?, terminal_reason = ?, updated_at = ?
-                WHERE public_id = ?
-                """,
-                (to_status, terminal_reason, timestamp, public_id),
-            )
-            connection.execute(
-                """
-                INSERT INTO agent_step_transitions(
-                    public_id, step_id, timestamp, from_status, to_status, reason
-                ) VALUES (?, ?, ?, ?, ?, ?)
-                """,
-                (
-                    transition_id,
-                    public_id,
-                    timestamp,
-                    from_status,
-                    to_status,
-                    reason.strip(),
-                ),
-            )
 
-        return self.get_step(public_id)
+    def fail_planning_run(self, run_id, step_id, *, reason):
+        """Atomically fail an ordinary pre-selection attempt, never a Goal.
+
+        Reuse normal transition validation. No operation may belong to the
+        failed planning step; previous terminal steps are left unchanged.
+        """
+        _validate_run_id(run_id)
+        _validate_step_id(step_id)
+        _validate_non_empty_string(reason, "Planner failure reason")
+        timestamp = _now()
+        with self.transaction() as connection:
+            run = connection.execute(
+                "SELECT status FROM agent_runs WHERE public_id = ?", (run_id,),
+            ).fetchone()
+            step = connection.execute(
+                "SELECT run_id, status FROM agent_steps WHERE public_id = ?", (step_id,),
+            ).fetchone()
+            if (run is None or run["status"] != "running" or step is None
+                    or step["run_id"] != run_id or step["status"] != "planning"):
+                raise ValueError("Planner failure requires matching running Run and planning Step")
+            if connection.execute(
+                "SELECT 1 FROM agent_operations WHERE step_id = ? LIMIT 1", (step_id,),
+            ).fetchone() is not None:
+                raise ValueError("Planner failure cannot close a Step with an operation")
+            self._transition_step(connection, step_id, "failed", reason=reason, timestamp=timestamp)
+            self._transition_run(connection, run_id, "failed", reason=reason, timestamp=timestamp)
+        return self.get_run(run_id)
 
     def create_operation(
         self,

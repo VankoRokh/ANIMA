@@ -8,6 +8,7 @@ from anima.agent.choice_adapter import CandidateHistoryEntry, ProposalChoiceCoor
 from anima.agent.contracts import Action, Observation, VerificationSpec
 from anima.agent.executor import SandboxExecutor, action_request_hash, operation_kind
 from anima.agent.planner import PlannerAdapter, PlannerRequest
+from anima.agent.llm_planner import LLMPlannerError, LLMTransportError
 from anima.agent.store import AgentStore
 from anima.agent.tools import ToolRegistry
 from anima.agent.verification import (
@@ -326,6 +327,21 @@ class AgentLoop:
             stop_reason="planner_cannot_progress",
         )
 
+    def _finish_planner_failure(self, run, step, verification_spec, turns, error):
+        # Only typed model/transport failures reach this boundary. Do not
+        # persist model text, provider error bodies or arbitrary exceptions.
+        reason = ("planner_transport_failure" if isinstance(error, LLMTransportError)
+                  else "planner_output_rejected")
+        final_run = self.store.fail_planning_run(run["id"], step["id"], reason=reason)
+        goal = self.goal_store.get_goal(run["goal_id"])
+        return AgentLoopResult(
+            run=MappingProxyType(dict(final_run)),
+            goal=MappingProxyType(dict(goal)),
+            verification_spec=verification_spec,
+            turns=tuple(turns),
+            stop_reason=reason,
+        )
+
     def run(self, run_id, verification_spec, *, max_steps=8):
         self._validate_step_limit(max_steps)
         if not isinstance(verification_spec, VerificationSpec):
@@ -412,7 +428,10 @@ class AgentLoop:
                 turn_results=turns,
                 max_steps=max_steps,
             )
-            planner_turn = self.planner.plan(request)
+            try:
+                planner_turn = self.planner.plan(request)
+            except (LLMPlannerError, LLMTransportError) as error:
+                return self._finish_planner_failure(run, step, verification_spec, turns, error)
             self.store.transition_step(
                 step["id"],
                 "planned",
