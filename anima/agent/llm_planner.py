@@ -7,7 +7,9 @@ from abc import ABC, abstractmethod
 from collections.abc import Mapping
 from dataclasses import dataclass
 
-from anima.agent.generation_termination import transport_termination
+from anima.agent.generation_termination import (
+    transport_termination, record_rejected_response,
+)
 from anima.agent.planner import (
     MAX_PROPOSALS,
     PlannerAdapter,
@@ -226,6 +228,7 @@ class OpenAICompatibleChatTransport(LLMTransport):
         self.api_key = api_key
         self.extra_headers = dict(extra_headers)
         self.request_json_object = request_json_object
+        self.rejected_response_history = []
         self.input_cost_per_million = _optional_non_negative_number(
             input_cost_per_million,
             "input_cost_per_million",
@@ -309,25 +312,44 @@ class OpenAICompatibleChatTransport(LLMTransport):
             raise LLMTransportError(f"LLM transport failed: {error}") from error
         latency_ms = (time.perf_counter() - started) * 1000.0
 
+        return self._decode_chat_response(raw, latency_ms)
+
+    def _decode_chat_response(self, raw, latency_ms):
         try:
             document = json.loads(raw.decode("utf-8"))
             choice = document["choices"][0]
-            text = choice["message"]["content"]
+            message = choice["message"]
+            if not isinstance(choice, dict) or not isinstance(message, dict):
+                raise TypeError("invalid completion choice or message")
         except (UnicodeDecodeError, json.JSONDecodeError, KeyError, IndexError, TypeError) as error:
             raise LLMTransportError(
                 "LLM endpoint returned an unsupported chat/completions response"
             ) from error
-        if not isinstance(text, str) or not text.strip():
-            raise LLMTransportError("LLM endpoint returned empty message content")
 
-        usage = document.get("usage") or {}
+        text = message.get("content")
+        usage = document.get("usage")
+        if not isinstance(usage, dict):
+            usage = {}
         input_tokens = usage.get("prompt_tokens")
         output_tokens = usage.get("completion_tokens")
+        finish_reason = choice.get("finish_reason")
+        if not isinstance(text, str) or not text.strip():
+            error = LLMTransportError(
+                "LLM endpoint returned empty message content" if "content" in message
+                else "LLM endpoint returned an unsupported chat/completions response"
+            )
+            raise record_rejected_response(
+                self, error, provider=self.provider, model=self.model,
+                latency_ms=latency_ms, finish_reason=finish_reason,
+                input_tokens=input_tokens, output_tokens=output_tokens,
+                content=text, reasoning_content=message.get("reasoning_content"),
+                reason_code="UNUSABLE_CONTENT",
+            )
+
         if not isinstance(input_tokens, int) or isinstance(input_tokens, bool):
             input_tokens = None
         if not isinstance(output_tokens, int) or isinstance(output_tokens, bool):
             output_tokens = None
-        finish_reason = choice.get("finish_reason")
         if finish_reason is not None and not isinstance(finish_reason, str):
             finish_reason = str(finish_reason)
 
@@ -338,10 +360,7 @@ class OpenAICompatibleChatTransport(LLMTransport):
             latency_ms=latency_ms,
             input_tokens=input_tokens,
             output_tokens=output_tokens,
-            estimated_cost_usd=self._estimated_cost(
-                input_tokens,
-                output_tokens,
-            ),
+            estimated_cost_usd=self._estimated_cost(input_tokens, output_tokens),
             finish_reason=finish_reason,
         )
 

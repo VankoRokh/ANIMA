@@ -45,4 +45,46 @@ def transport_termination(transport, reason):
     return wire, classify_termination(reason, wire=wire)
 
 
-__all__ = ["classify_termination", "transport_termination"]
+MAX_REJECTED_RESPONSE_HISTORY = 64
+
+
+def reported_token_count(value):
+    """Only backend-reported non-negative integer counters are evidence."""
+    return value if type(value) is int and value >= 0 else None
+
+
+def record_rejected_response(transport, error, *, provider, model, latency_ms,
+                             finish_reason, input_tokens, output_tokens,
+                             content, reasoning_content, reason_code):
+    """Attach metadata to an existing typed error; never retain response text.
+
+    Only call after a generation response envelope was received. The history
+    is process-local and does not grant authority or imply complete accounting.
+    """
+    wire, status = transport_termination(transport, finish_reason)
+    record = {
+        "provider": provider,
+        "model": model,
+        "wire_protocol": wire,
+        "finish_reason": finish_reason if type(finish_reason) is str and len(finish_reason) <= 64 else None,
+        "termination_status": status,
+        "input_tokens": reported_token_count(input_tokens),
+        "output_tokens": reported_token_count(output_tokens),
+        "latency_ms": latency_ms,
+        "content_chars": len(content) if isinstance(content, str) else 0,
+        "reasoning_chars": len(reasoning_content) if isinstance(reasoning_content, str) else 0,
+        "reason_code": reason_code,
+    }
+    history = transport.rejected_response_history
+    history.append(record)
+    if len(history) > MAX_REJECTED_RESPONSE_HISTORY:
+        del history[:-MAX_REJECTED_RESPONSE_HISTORY]
+    # A caller may modify its exception metadata without rewriting history.
+    error.generation_diagnostic = dict(record)
+    return error
+
+
+__all__ = [
+    "classify_termination", "transport_termination", "reported_token_count",
+    "record_rejected_response", "MAX_REJECTED_RESPONSE_HISTORY",
+]

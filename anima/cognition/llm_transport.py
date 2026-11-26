@@ -13,7 +13,7 @@ from typing import Protocol, runtime_checkable
 import urllib.error
 import urllib.request
 
-from anima.agent.generation_termination import transport_termination
+from anima.agent.generation_termination import transport_termination, record_rejected_response
 
 
 _THINK_BLOCK = re.compile(r"<think>.*?</think>", re.IGNORECASE | re.DOTALL)
@@ -198,6 +198,7 @@ class LlamaCppTransport:
         self.top_p = probability(top_p, "top_p")
         self.min_p = probability(min_p, "min_p")
         self.api_key = api_key
+        self.rejected_response_history = []
 
     @property
     def server_root(self):
@@ -323,12 +324,23 @@ class LlamaCppTransport:
 
         raw_text = document.get("content")
         separate_reasoning = document.get("reasoning_content")
-        final_text, reasoning_chars = final_answer(
-            raw_text,
-            separate_reasoning=separate_reasoning,
-            error_cls=self.model_output_error_cls,
-            role_label=self.role_label,
-        )
+        try:
+            final_text, reasoning_chars = final_answer(
+                raw_text,
+                separate_reasoning=separate_reasoning,
+                error_cls=self.model_output_error_cls,
+                role_label=self.role_label,
+            )
+        except self.model_output_error_cls as error:
+            record_rejected_response(
+                self, error, provider="llama.cpp", model=self.model,
+                latency_ms=latency_ms, finish_reason=document.get("stop_type"),
+                input_tokens=document.get("tokens_evaluated"),
+                output_tokens=document.get("tokens_predicted"),
+                content=raw_text, reasoning_content=separate_reasoning,
+                reason_code="UNUSABLE_FINAL_ANSWER",
+            )
+            raise
 
         input_tokens = document.get("tokens_evaluated")
         output_tokens = document.get("tokens_predicted")

@@ -17,6 +17,7 @@ import urllib.error
 import urllib.request
 
 from anima.agent.llm_planner import LLMCallResult, LLMTransportError
+from anima.agent.generation_termination import record_rejected_response
 from anima.agent.small_llm import SmallModelOpenAICompatibleChatTransport
 
 
@@ -315,7 +316,15 @@ class LlamaCppSmallModelTransport(SmallModelOpenAICompatibleChatTransport):
 
         text = document.get("content")
         if not isinstance(text, str) or not text.strip():
-            raise LLMTransportError("llama.cpp /completion returned empty content")
+            raise record_rejected_response(
+                self, LLMTransportError("llama.cpp /completion returned empty content"),
+                provider=self.provider, model=self.model, latency_ms=latency_ms,
+                finish_reason=document.get("stop_type"),
+                input_tokens=document.get("tokens_evaluated"),
+                output_tokens=document.get("tokens_predicted"),
+                content=text, reasoning_content=document.get("reasoning_content"),
+                reason_code="UNUSABLE_CONTENT",
+            )
 
         input_tokens = document.get("tokens_evaluated")
         output_tokens = document.get("tokens_predicted")

@@ -540,44 +540,7 @@ class SmallModelOpenAICompatibleChatTransport(OpenAICompatibleChatTransport):
             raise LLMTransportError(f"LLM transport failed: {error}") from error
         latency_ms = (time.perf_counter() - started) * 1000.0
 
-        try:
-            document = json.loads(raw.decode("utf-8"))
-            choice = document["choices"][0]
-            text = choice["message"]["content"]
-        except (
-            UnicodeDecodeError,
-            json.JSONDecodeError,
-            KeyError,
-            IndexError,
-            TypeError,
-        ) as error:
-            raise LLMTransportError(
-                "LLM endpoint returned an unsupported chat/completions response"
-            ) from error
-        if not isinstance(text, str) or not text.strip():
-            raise LLMTransportError("LLM endpoint returned empty message content")
-
-        usage = document.get("usage") or {}
-        input_tokens = usage.get("prompt_tokens")
-        output_tokens = usage.get("completion_tokens")
-        if not isinstance(input_tokens, int) or isinstance(input_tokens, bool):
-            input_tokens = None
-        if not isinstance(output_tokens, int) or isinstance(output_tokens, bool):
-            output_tokens = None
-        finish_reason = choice.get("finish_reason")
-        if finish_reason is not None and not isinstance(finish_reason, str):
-            finish_reason = str(finish_reason)
-
-        return LLMCallResult(
-            provider=self.provider,
-            model=self.model,
-            text=text,
-            latency_ms=latency_ms,
-            input_tokens=input_tokens,
-            output_tokens=output_tokens,
-            estimated_cost_usd=self._estimated_cost(input_tokens, output_tokens),
-            finish_reason=finish_reason,
-        )
+        return self._decode_chat_response(raw, latency_ms)
 
 
 __all__ = [
