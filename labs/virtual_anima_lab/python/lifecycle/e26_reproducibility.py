@@ -19,10 +19,11 @@ import sys
 from contextlib import closing
 from pathlib import Path
 
-from anima.agent.native_tools import canonical, LoopbackChatTransport
+from anima.agent.native_tools import canonical, strict_json, NativeToolCatalog, LoopbackChatTransport
 from .egocentric import EgocentricView
 from anima.core.ingress import CoreIngress
 from ..cognition.contracts import CognitiveStepProposal
+from ..cognition.native_lab import lab_registry
 from ..cognition.coordinator import E25CognitionError, _TurnSourcePolicy
 from .e24_working_memory import (
     E24WorkingMemory, SOURCE, PRODUCER, vision_source_registration,
@@ -334,7 +335,166 @@ def _verify_journal_scope(fixture, rows):
         verify_exposed()
 
 
-def verify_case(fixture, raw_fixture):
+def _verify_native_chain(fixture, scenario=None, *, required=False):
+    """Bind native call evidence to its service journal, without inference.
+
+    Historical generic/stub fixtures have no native-call contract. Do not
+    interpret their opaque recorded requests as proof of model causality.
+    """
+    turn, trace = fixture["turn"], fixture["trace"]
+    calls = fixture["model_calls"]
+    projection = turn.get("claim_projection", {}).get("call")
+    research = [call for call in calls if call.get("phase", "research") == "research"]
+    projections = [call for call in calls if call.get("phase") == "claim_projection"]
+    if (len(research) + len(projections) != len(calls)
+            or projections != ([] if projection is None else [projection])
+            or calls != research + projections):
+        raise ValueError("invalid model call phase correspondence")
+    native = required or any(call.get("profile") == "native" for call in research)
+    if not native:
+        return
+    if any(call.get("profile") != "native" for call in research):
+        raise ValueError("mixed or missing native call profile")
+    if not research and (trace or turn["status"] == "STOPPED"):
+        raise ValueError("missing native research calls")
+    if "model_calls_used" in turn and turn["model_calls_used"] != len(research):
+        raise ValueError("research call count mismatch")
+    if "resource_budget" in turn and turn["resource_budget"]["reserved_calls"] != len(calls):
+        raise ValueError("reserved call count mismatch")
+    result = fixture.get("result")
+    if result is not None:
+        if (result["model_calls"] != len(research)
+                or result["turn_status"] != turn["status"]
+                or result.get("total_model_calls", len(calls)) != len(calls)):
+            raise ValueError("case result call count/status mismatch")
+
+    matched = set()
+    last_step = -1
+    terminal_unadmitted = False
+    seen_wire_ids = set()
+    initial_messages = None
+    for index, call in enumerate(research):
+        step = call["step_index"]
+        if (call["turn_id"] != turn["turn_id"]
+                or call["context_snapshot_id"] != turn["context_snapshot_id"]
+                or type(call["model_call_index"]) is not int
+                or call["model_call_index"] != index
+                or type(step) is not int or step < 0 or step > len(trace)
+                or step < last_step or step > last_step + 1):
+            raise ValueError("native call identity or step mismatch")
+        last_step = step
+        messages = call["request"]["messages"]
+        if (type(messages) is not list or len(messages) < 2
+                or messages[0]["role"] != "system" or messages[1]["role"] != "user"):
+            raise ValueError("invalid native request context")
+        if initial_messages is None:
+            initial_messages = messages[:2]
+        elif canonical(messages[:2]) != canonical(initial_messages):
+            raise ValueError("native initial context changed")
+        prompt = strict_json(messages[1]["content"])
+        if (type(prompt["memory_enabled"]) is not bool
+                or (scenario is not None and "enabled" in scenario
+                    and prompt["memory_enabled"] is not scenario["enabled"])
+                or (trace and prompt["memory_enabled"]
+                    is not trace[0]["context_snapshot"]["memory_enabled"])
+                or (scenario is not None and "task" in scenario
+                    and prompt["task"] != scenario["task"])):
+            raise ValueError("native prompt scenario mismatch")
+        record = trace[step] if step < len(trace) else None
+        proposal = call.get("proposal")
+        if type(call["valid"]) is not bool or type(call["transport_ok"]) is not bool:
+            raise ValueError("invalid native call flags")
+        if call["valid"]:
+            if not call["transport_ok"]:
+                raise ValueError("valid call without transport success")
+            choices = call["raw_response"]["choices"]
+            if type(choices) is not list or len(choices) != 1:
+                raise ValueError("invalid native response choices")
+            choice = choices[0]
+            message = choice["message"]
+            finish = choice["finish_reason"]
+            if message["role"] != "assistant" or finish != call["finish_reason"]:
+                raise ValueError("native wire terminal mismatch")
+            wire_calls = message.get("tool_calls", [])
+            if proposal is not None:
+                if (finish != "tool_calls" or type(wire_calls) is not list
+                        or len(wire_calls) != 1):
+                    raise ValueError("native proposal lacks complete wire call")
+                wire = wire_calls[0]
+                fn = wire["function"]
+                wire_id = wire["id"]
+                if (wire["type"] != "function" or wire_id != call["tool_call_id"]
+                        or not isinstance(wire_id, str) or not re.fullmatch(r"[A-Za-z0-9_-]{1,128}", wire_id)
+                        or wire_id in seen_wire_ids):
+                    raise ValueError("native wire identity mismatch")
+                seen_wire_ids.add(wire_id)
+                # Reuse the native registry and original bounds-before-dedup
+                # decoder rather than inventing a second normalization rule.
+                names = {item["function"]["name"] for item in call["request"]["tools"]}
+                temporal = call["temporal"]
+                compact = call["compact_temporal"]
+                sets = call["canonical_sets"]
+                if any(type(flag) is not bool for flag in (temporal, compact, sets)):
+                    raise ValueError("invalid native profile flags")
+                catalog = NativeToolCatalog(
+                    lab_registry(temporal=temporal, compact_temporal=compact,
+                                 latest_observation="inspect_latest_observation" in names),
+                    set_arguments={("lookup_raw_evidence", "1"): ("event_ids",)} if sets else None,
+                )
+                if canonical(call["request"]["tools"]) != canonical(catalog.definitions()):
+                    raise ValueError("native advertised tool catalog mismatch")
+                descriptor, arguments = catalog.decode(fn["name"], fn["arguments"])
+                typed = CognitiveStepProposal(proposal).as_dict()
+                original = strict_json(fn["arguments"])
+                if (typed["turn_id"] != turn["turn_id"]
+                        or typed["context_snapshot_id"] != turn["context_snapshot_id"]
+                        or typed["proposal_id"] != f'pr_{turn["turn_id"]}_{step}'
+                        or typed["operation_kind"] != descriptor.name
+                        or call["tool_name"] != descriptor.name
+                        or canonical(typed["arguments"]) != canonical(arguments)
+                        or canonical(call["arguments"]) != canonical(arguments)
+                        or canonical(call["original_arguments"]) != canonical(original)
+                        or call["arguments_normalized"] is not (original != arguments)):
+                    raise ValueError("native wire/proposal arguments mismatch")
+                if record is not None and record["proposal"] == typed and step not in matched:
+                    matched.add(step)
+                elif (index == len(research) - 1 and record is None
+                        and turn["status"] == "STEP_BUDGET_EXHAUSTED"
+                        and turn.get("resource_budget", {}).get("stop_reason") in (
+                            "USAGE_UNAVAILABLE", "OUTPUT_USAGE_EXCEEDED",
+                            "INPUT_USAGE_EXCEEDED", "ELAPSED_LIMIT")):
+                    terminal_unadmitted = True
+                elif (index == len(research) - 1 and record is not None
+                        and record["proposal"] is None and record["admission"] == "REJECTED"
+                        and record["reason_code"] == "STALE_CONTEXT"):
+                    matched.add(step)
+                else:
+                    raise ValueError("native proposal not bound to journal")
+            elif (finish != "stop" or wire_calls or type(message.get("content")) is not str
+                  or not message["content"].strip()
+                  or call.get("final_text") != message["content"]):
+                raise ValueError("native stop response mismatch")
+        elif proposal is not None:
+            raise ValueError("invalid native call contains admitted proposal")
+    if any(record["proposal"] is not None and i not in matched
+           for i, record in enumerate(trace)):
+        raise ValueError("journal proposal without native call")
+    if turn["status"] == "STOPPED" and (not research or not research[-1]["valid"]
+            or research[-1].get("proposal") is not None
+            or research[-1].get("finish_reason") != "stop"
+            or terminal_unadmitted):
+        raise ValueError("stopped turn lacks native terminal response")
+    if projection is not None:
+        if (projection["turn_id"] != turn["turn_id"]
+                or projection["context_snapshot_id"] != turn["context_snapshot_id"]
+                or projection["model_call_index"] != len(research)
+                or turn["status"] != "STOPPED"
+                or projection.get("proposal") is not None
+                or "tools" in projection["request"]):
+            raise ValueError("claim projection identity mismatch")
+
+
+def verify_case(fixture, raw_fixture, *, scenario=None, require_native=False):
     if fixture["schema"] != SCHEMA or fixture["world_seed"] != raw_fixture["world_seed"]:
         raise ValueError("case fixture scope mismatch")
     expected = [freeze_call(call, raw_fixture["aliases"], i)
@@ -346,6 +506,10 @@ def verify_case(fixture, raw_fixture):
         raise ValueError("journal/turn outcome mismatch")
     try:
         _verify_journal_scope(fixture, rows)
+        if scenario is not None and "enabled" in scenario and fixture["trace"]:
+            if fixture["trace"][0]["context_snapshot"]["memory_enabled"] is not scenario["enabled"]:
+                raise ValueError("journal scenario memory mode mismatch")
+        _verify_native_chain(fixture, scenario, required=require_native)
     except (E25CognitionError, KeyError, TypeError) as exc:
         raise ValueError("journal source policy mismatch") from exc
     for record in fixture["trace"]:
@@ -402,6 +566,13 @@ def verify_bundle(root):
         raise ValueError("invalid or duplicate manifest experiment identity")
     expected_cases = {(seed, c["id"]) for seed in manifest["world_seeds"]
                       for c in manifest["scenarios"]}
+    scenario_by_id = {c["id"]: c for c in scenarios}
+    if any("enabled" in c and type(c["enabled"]) is not bool for c in scenarios):
+        raise ValueError("invalid scenario memory mode")
+    expected_names = ({"manifest.json"} | {f"raw-seed-{seed}.json" for seed in seeds}
+                      | {f"case-{seed}-{case}.json" for seed, case in expected_cases})
+    if set(index) != expected_names:
+        raise ValueError("unexpected or missing declared evidence members")
     raw = {seed: read_json(root / f"raw-seed-{seed}.json") for seed in manifest["world_seeds"]}
     if any(fixture["world_seed"] != seed for seed, fixture in raw.items()):
         raise ValueError("Raw fixture seed mismatch")
@@ -414,7 +585,10 @@ def verify_bundle(root):
         if key in actual_cases or path.name != f"case-{key[0]}-{key[1]}.json":
             raise ValueError("duplicate or mismatched case fixture")
         actual_cases.add(key)
-        requests += verify_case(fixture, raw[key[0]])
+        if key not in expected_cases:
+            raise ValueError("unexpected case identity")
+        requests += verify_case(fixture, raw[key[0]], scenario=scenario_by_id[key[1]],
+                                require_native="variant" in manifest or fixture.get("result") is not None)
     if expected_cases != actual_cases:
         raise ValueError("missing or unexpected case fixtures")
     return {"status": "E26_EVIDENCE_VERIFIED", "git_sha": manifest["git_sha"],
