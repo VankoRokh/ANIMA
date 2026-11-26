@@ -55,6 +55,10 @@ _EXP009_DOC_SOURCES = frozenset({
 _VAL_DOC_SOURCES = frozenset({
     Path("labs/virtual_anima_lab/README.md"),
     Path("labs/virtual_anima_lab/python/core_port.py"),
+    Path("labs/virtual_anima_lab/python/lifecycle/e26_reproducibility.py"),
+    Path("labs/virtual_anima_lab/python/cognition/coordinator.py"),
+    Path("labs/virtual_anima_lab/python/cognition/contracts.py"),
+    Path("labs/virtual_anima_lab/python/cognition/source_binding.py"),
 })
 
 # These are never source subdirectories, even when a filename looks like source.

@@ -152,3 +152,31 @@ def test_git_manifest_reads_dirty_worktree_and_pending_files_without_staging(tmp
     assert (tmp_path / "copy/README.md").read_text() == head + "\nUncommitted fixture edit.\n"
     assert (tmp_path / "copy/anima/pending_closure_module.py").exists()
     assert not (tmp_path / "copy/anima/ignored.py").exists()
+
+
+def test_r91_documented_val_sources_are_copied_without_other_lab_files(tmp_path):
+    root = tmp_path / "source"
+    prefix = "labs/virtual_anima_lab/python/"
+    documented = (
+        "lifecycle/e26_reproducibility.py",
+        "cognition/coordinator.py",
+        "cognition/contracts.py",
+        "cognition/source_binding.py",
+    )
+    excluded = (
+        "cognition/unreferenced.py",
+        "lifecycle/logs/capture.py",
+        "lifecycle/private/notes.py",
+    )
+    for name in documented + excluded:
+        write(root, prefix + name, "# " + name + "\n")
+    destination = tmp_path / "copy"
+    copied = set(copy_source_tree(root, destination))
+    for name in documented:
+        path = Path(prefix + name)
+        assert path in copied
+        assert (destination / path).read_bytes() == (root / path).read_bytes()
+    for name in excluded:
+        path = Path(prefix + name)
+        assert path not in copied
+        assert not (destination / path).exists()
