@@ -21,7 +21,12 @@ from pathlib import Path
 
 from anima.agent.native_tools import canonical, LoopbackChatTransport
 from .egocentric import EgocentricView
-from .e24_working_memory import E24WorkingMemory, SOURCE, PRODUCER
+from anima.core.ingress import CoreIngress
+from ..cognition.contracts import CognitiveStepProposal
+from ..cognition.coordinator import E25CognitionError, _TurnSourcePolicy
+from .e24_working_memory import (
+    E24WorkingMemory, SOURCE, PRODUCER, vision_source_registration,
+)
 
 ROOT = Path(__file__).resolve().parents[4]
 SCHEMA = "anima.e26.reproducibility/0.1"
@@ -192,6 +197,11 @@ def verify_raw(fixture):
                 or row["observation_outcome"]["outcome"].startswith("REJECTED_")
                 or row["dispatch_receipt"]["disposition"] != "forwarded"):
             raise ValueError("Raw/Core pointer mismatch")
+        # Reuse the actual ingress envelope/fingerprint contract. This is
+        # pure validation, not admission, a database write or attestation.
+        checked = CoreIngress._validated(expected, vision_source_registration())
+        if checked is None or event["content_sha256"] != checked[2]:
+            raise ValueError("Core event fingerprint mismatch")
         for record in (row["observation_outcome"], row["dispatch_receipt"]):
             if "event_id" in record and record["event_id"] != event_id:
                 raise ValueError("Core event identity mismatch")
@@ -233,6 +243,97 @@ def export_case(root, seed, case_id, report, trace, calls, raw_fixture, *, resul
     write_json(Path(root) / f"case-{seed}-{case_id}.json", fixture)
 
 
+def _verify_journal_scope(fixture, rows):
+    """Recheck the exported decision chain using the runtime source policy.
+
+    No service calls, inference or database discovery. The Raw fixture is the
+    only available event/sample identity inventory. This establishes internal
+    consistency, not the historical authenticity of a fully rewritten bundle.
+    """
+    turn = fixture["turn"]
+    trace = fixture["trace"]
+    if turn["status"] not in ("STOPPED", "REJECTED", "STEP_BUDGET_EXHAUSTED"):
+        raise ValueError("invalid cognitive turn status")
+    if not trace:
+        return
+    context = trace[0]["context_snapshot"]
+    context_id = context["context_snapshot_id"]
+    base = {key: value for key, value in context.items() if key != "context_snapshot_id"}
+    if (context_id != "ctx_" + digest(canonical(base))
+            or context_id != turn["context_snapshot_id"]):
+        raise ValueError("Context fingerprint mismatch")
+    samples = {row["sample_id"]: json.loads(row["raw_json"]) for row in rows.values()}
+    latest = samples.get(context["latest_sample_id"])
+    if (latest is None or context["world_instance_id"] != latest["world_instance_id"]
+            or context["epoch"] != latest["epoch"]
+            or context["source_ref"] != latest["source_ref"]
+            or context["coverage"] != latest["coverage"]
+            or type(context["memory_enabled"]) is not bool):
+        raise ValueError("Context/Raw scope mismatch")
+    policy = _TurnSourcePolicy(context)
+
+    def verify_exposed():
+        # Check even references that are never requested by the model.
+        for event, sample in policy._exposed.items():
+            if event not in rows or rows[event]["sample_id"] != sample:
+                raise ValueError("Context/Raw event identity mismatch")
+
+    verify_exposed()
+    proposal_ids = set()
+    for index, record in enumerate(trace):
+        outcome = record["outcome"]
+        if (record["turn_id"] != turn["turn_id"]
+                or type(record["step_index"]) is not int or record["step_index"] != index
+                or type(outcome["step_index"]) is not int or outcome["step_index"] != index
+                or canonical(record["context_snapshot"]) != canonical(context)
+                or record["admission"] not in ("ADMITTED", "REJECTED")
+                or outcome["status"] not in ("COMPLETED", "REJECTED")
+                or (record["admission"] == "REJECTED" and outcome["status"] != "REJECTED")):
+            raise ValueError("journal turn/admission identity mismatch")
+        proposal = record["proposal"]
+        if proposal is None:
+            if (record["admission"] != "REJECTED"
+                    or outcome["proposal_id"] is not None
+                    or "result" in outcome):
+                raise ValueError("missing typed proposal")
+            continue
+        proposal = CognitiveStepProposal(proposal).as_dict()
+        kind = proposal["operation_kind"]
+        args = proposal["arguments"]
+        proposal_id = proposal["proposal_id"]
+        if (proposal["turn_id"] != turn["turn_id"]
+                or proposal["context_snapshot_id"] != context_id
+                or proposal_id in proposal_ids
+                or outcome["proposal_id"] != proposal_id
+                or outcome.get("operation_kind") != kind):
+            raise ValueError("journal proposal identity mismatch")
+        proposal_ids.add(proposal_id)
+        if record["admission"] == "ADMITTED":
+            if (record["reason_code"] != "POLICY_READ_ONLY"
+                    or kind == "inspect_goal_status"
+                    or (kind == "lookup_raw_evidence" and not policy.permits(args["event_ids"]))):
+                raise ValueError("journal admission outside source policy")
+        if outcome["status"] != "COMPLETED":
+            if "result" in outcome:
+                raise ValueError("rejected outcome contains result")
+            continue
+        if outcome["reason_code"] != "VERIFIED_SERVICE_READ":
+            raise ValueError("invalid completed service outcome")
+        result = outcome["result"]
+        if kind in ("lookup_raw_evidence", "inspect_latest_observation"):
+            if result["kind"] != "verified_raw_evidence":
+                raise ValueError("invalid Raw evidence kind")
+        elif kind == "retrieve_memory":
+            if (result["kind"] != "working_world_memory_search"
+                    or result["memory_enabled"] is not context["memory_enabled"]
+                    or result["returned"] != len(result["records"])
+                    or len(result["records"]) > args["top_k"]):
+                raise ValueError("invalid Retrieval result")
+        policy.check_result(kind, args, result)
+        policy.record_completed(kind, result)
+        verify_exposed()
+
+
 def verify_case(fixture, raw_fixture):
     if fixture["schema"] != SCHEMA or fixture["world_seed"] != raw_fixture["world_seed"]:
         raise ValueError("case fixture scope mismatch")
@@ -243,6 +344,10 @@ def verify_case(fixture, raw_fixture):
     rows = {r["event_id"]: r for r in raw_fixture["samples"]}
     if [r["outcome"] for r in fixture["trace"]] != fixture["turn"]["outcomes"]:
         raise ValueError("journal/turn outcome mismatch")
+    try:
+        _verify_journal_scope(fixture, rows)
+    except (E25CognitionError, KeyError, TypeError) as exc:
+        raise ValueError("journal source policy mismatch") from exc
     for record in fixture["trace"]:
         outcome = record["outcome"]
         if outcome["status"] != "COMPLETED" or outcome["operation_kind"] not in (
@@ -285,6 +390,16 @@ def verify_bundle(root):
             or not re.fullmatch(r"[0-9a-f]{40}", manifest["git_sha"])
             or not manifest["world_seeds"] or not manifest["scenarios"]):
         raise ValueError("incomplete experiment evidence")
+    seeds = manifest["world_seeds"]
+    scenarios = manifest["scenarios"]
+    if (type(seeds) is not list or any(type(seed) is not int for seed in seeds)
+            or len(set(seeds)) != len(seeds)
+            or type(scenarios) is not list
+            or any(type(c) is not dict or type(c.get("id")) is not str
+                   or not re.fullmatch(r"C[0-9]{2}(?:_OFF|_ALT)?", c["id"])
+                   for c in scenarios)
+            or len({c["id"] for c in scenarios}) != len(scenarios)):
+        raise ValueError("invalid or duplicate manifest experiment identity")
     expected_cases = {(seed, c["id"]) for seed in manifest["world_seeds"]
                       for c in manifest["scenarios"]}
     raw = {seed: read_json(root / f"raw-seed-{seed}.json") for seed in manifest["world_seeds"]}
