@@ -318,3 +318,8 @@ I-event: 120/560 pairs меняют tool choice; I-tool: 480/480 operations/argu
 [Протокол и отчёт](e2-6-r944-controlled-evaluation-v02.md): experimental T-fresh runner и offline paired cluster evaluator; baseline/r943 profiles остаются неизменными. Design фиксируется до fresh inference; compatibility/held-out и presentation/completeness оцениваются раздельно.
 
 R9.4.4 execution завершён: 560 paired repetitions / 1120 trajectories / 3060 received requests, 0 transport failures. Cost снизился, completeness non-regression не подтверждён (control-7-C03: 20/20 A complete, 0/20 B); общий benefit gate INCONCLUSIVE. R944-F01/F02 сохранены без remediation/reruns. R9-Q02/F04 остаётся PARTIAL; R9.5 не начинался.
+
+
+## 16. R9.4.5a — Targeted Root Cause Analysis
+
+[Технический отчёт](e2-6-r945a-targeted-root-cause-v02.md) разделяет CONFIRMED/HYPOTHESIS/NOT_ASSESSED для R944-F01/F02. Ranking/records F01 совпадают; model-visible strategy и IDs остаются confounded. Baseline continuation bound тоже завершает тот же two-stop sequence; cost savings в основном сокращают final/projection. Typed facts и unverified prose не смешиваются. Remediation A–D и ограниченный NOT-RUN diagnostic представлены для отдельного review; runtime/prompt/model/budget/authority не изменены. Findings OPEN, r943/0.1 не принят как stable, R9.5 не начинался.
