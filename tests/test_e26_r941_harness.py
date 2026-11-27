@@ -257,3 +257,15 @@ def test_prepared_q_runner_uses_frozen_requests_and_records_runtime(tmp_path,mon
     assert len(wire.requests) == 20
     assert failed["summaries"][0]["repetitions"][0]["status"] == "TRANSPORT_FAILED"
     assert len(failed["summaries"][0]["repetitions"]) == 1
+
+
+def test_id_comparison_maps_structured_claims_but_preserves_answer_prose():
+    claim={"entity_ref":"lab.item.crate","predicate":"observed_in_sample","value":True,
+           "event_id":"original","sample_seq":2,"scope":"source_sample"}
+    left=completion(content=json.dumps({"answer":"Captured only","claims":[claim]}))
+    right=completion(content=json.dumps({"answer":"Captured only","claims":[{**claim,"event_id":"variant"}]}))
+    result=h.compare_id_responses(left,right,"I-event",{"original":"variant"})
+    assert result["parsed_operations_content_equal"] is True
+    assert result["choices_equal"] is False
+    changed=completion(content=json.dumps({"answer":"Different prose","claims":[{**claim,"event_id":"variant"}]}))
+    assert h.compare_id_responses(left,changed,"I-event",{"original":"variant"})["parsed_operations_content_equal"] is False

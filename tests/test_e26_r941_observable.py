@@ -290,3 +290,31 @@ def test_claim_projection_has_fact_gain_but_no_new_acquisition(tmp_path,monkeypa
     assert got["prefixes"][-1]["gain"]["verified_facts"] == 1
     with pytest.raises(ValueError,match="projection call count"):
         measure_turn(coord,report,baseline_sha=BASELINE,case_id="incomplete",requirement=OBS,calls=adapter.calls)
+
+
+def test_c12_generated_attempt_before_journal_is_not_lost(tmp_path,monkeypatch):
+    from labs.virtual_anima_lab.python.cognition.native_lab import NativeLabAdapter
+    from labs.virtual_anima_lab.python.cognition.coordinator import E25LabCognitiveCoordinator
+    from labs.virtual_anima_lab.python.cognition.resource_budget import ResourceLimits
+    from tests.test_e26a_native_tools import Fake
+    mem=memory(tmp_path,monkeypatch)
+    context=mem.context_for_cognition()
+    reply=lookup(crate_event(mem),"over-budget")
+    reply["usage"]["prompt_tokens"]=8193
+    adapter=NativeLabAdapter(base_url="http://127.0.0.1:8085",model="test",trace_path=tmp_path/"calls.jsonl",task="Check",
+        transport=Fake(reply),temporal=True,compact_temporal=True,latest_observation=True)
+    coord=E25LabCognitiveCoordinator(mem)
+    report=coord.run_turn(adapter,turn_id="c12",completion_requirement=OBS,resource_limits=ResourceLimits())
+    assert coord.decision_records("c12") == []
+    got=measure_turn(coord,report,baseline_sha=BASELINE,case_id="C12",requirement=OBS,calls=adapter.calls,
+        frozen_context={**context,"context_snapshot_id":report["context_snapshot_id"]})
+    final=got["prefixes"][-1]
+    assert final["acquisition"]["attempts"] == 1
+    assert final["acquisition"]["journaled_attempts"] == 0
+    assert len(final["acquisition"]["unrecorded_generated_proposals"]) == 1
+    assert final["acquisition"]["completed"] == 0
+    assert final["evidence"]["unique_sources"] == 0
+    assert final["verification"]["raw_rereads"] == 0
+    assert final["resources"]["research"]["known_input_tokens"] == 8193
+    assert final["legacy_repeated_proposals"] == 0
+    assert report["resource_budget"]["stop_reason"] == "INPUT_USAGE_EXCEEDED"

@@ -14,6 +14,7 @@ from anima.agent.native_tools import canonical
 from .cognitive_result import _bound_records
 from .claim_verification import ObservationClaim, ObservationClaimVerifier, _verify_captured_claim
 from .completion import CompletionRequirement, evaluate_completion
+from .contracts import CognitiveStepProposal
 from .model_claims import _evaluate_model_claims
 from .source_binding import admitted_source_rows
 from .source_policy import TurnSourcePolicy
@@ -293,6 +294,24 @@ def measure_turn(coordinator, report, *, baseline_sha, case_id, requirement=None
                     if verdict["status"] != "VERIFIED":
                         raise MeasurementIntegrityError("INCONSISTENT_SOURCE: " + verdict["reason_code"])
                     evidence[identity] = {kind}
+        journaled_attempts = attempts
+        recorded_proposals = {canonical(r["proposal"]) for r in prefix if r["proposal"]}
+        unrecorded = []
+        for index, call in enumerate(calls[:call_size]):
+            if _phase(call) != "research" or call.get("proposal") is None:
+                continue
+            proposal = CognitiveStepProposal(call["proposal"]).as_dict()
+            if (proposal["turn_id"] != report["turn_id"]
+                    or proposal["context_snapshot_id"] != report["context_snapshot_id"]):
+                raise ValueError("generated proposal does not bind turn/context")
+            if canonical(proposal) not in recorded_proposals:
+                # ResourceBudget may reject the returned call BEFORE journal
+                # admission. Count the observed proposal, never fabricate an
+                # admission/outcome or a completed service operation for it.
+                attempts += 1
+                counts[proposal["operation_kind"]] += 1
+                unrecorded.append({"call_index":index,"proposal_id":proposal["proposal_id"],
+                    "operation_kind":proposal["operation_kind"],"admission":"NOT_RECORDED"})
         # Requirement-directed fact projection reuses the existing verifier, but
         # never its final-journal lookup. No future rows can satisfy a prefix.
         if requirement and requirement.kind in ("verified_observation", "historical_and_latest_observation"):
@@ -339,7 +358,8 @@ def measure_turn(coordinator, report, *, baseline_sha, case_id, requirement=None
                     if verdict["status"] == "VERIFIED":
                         model_fact_keys.add(canonical(verdict["claim"]))
         facts.update(model_fact_keys)
-        provisional = {**report, "status": "STEP_BUDGET_EXHAUSTED", "outcomes": report["outcomes"][:size]}
+        provisional = {"turn_id":report["turn_id"],"context_snapshot_id":report["context_snapshot_id"],
+                       "status":"STEP_BUDGET_EXHAUSTED","outcomes":report["outcomes"][:size]}
         completion = evaluate_completion(requirement, provisional, prefix) if requirement else None
         if completion:
             completion = {k: v for k, v in completion.items() if k not in ("model_stopped", "turn_status")}
@@ -360,7 +380,8 @@ def measure_turn(coordinator, report, *, baseline_sha, case_id, requirement=None
         prefixes.append({"operation_prefix": size, "call_prefix": call_size if calls_known else None,
             "record_indices": list(range(size)), "call_indices": list(range(call_size)),
             "acquisition": {"attempts": attempts, "completed": completed, "rejected": rejected,
-                            "attempts_by_kind": dict(counts),
+                            "attempts_by_kind": dict(counts), "journaled_attempts":journaled_attempts,
+                            "unrecorded_generated_proposals":unrecorded,
                             "untyped_rejections":sum(r["proposal"] is None for r in prefix),
                             "attempts_assessment":"PARTIAL" if any(r["proposal"] is None for r in prefix) else "COMPLETE"},
             "exposure": {"initial_host_bindings": exposed_initial,
@@ -370,7 +391,7 @@ def measure_turn(coordinator, report, *, baseline_sha, case_id, requirement=None
             "evidence": {"identities": [list(e) for e in sorted(evidence)], "unique_sources": len(evidence),
                          "unique_event_ids": len(by_event), "unique_samples": len(by_sample),
                          "unique_content_hashes": len({r["raw_sha256"] for r in by_event.values()})},
-            "legacy_repeated_proposals": attempts - len({canonical([r["proposal"]["operation_kind"],r["proposal"]["arguments"]]) for r in prefix if r["proposal"]}),
+            "legacy_repeated_proposals": journaled_attempts - len({canonical([r["proposal"]["operation_kind"],r["proposal"]["arguments"]]) for r in prefix if r["proposal"]}),
             "redundancy": {"eligible_rows": occurrences, "same_tool": same, "cross_tool": cross,
                            "ratio": (same + cross) / occurrences if occurrences else None},
             "verified_fact_count": len(facts), "verified_fact_keys": sorted(facts),
@@ -396,13 +417,12 @@ def measure_turn(coordinator, report, *, baseline_sha, case_id, requirement=None
     sufficient = next((p for p in prefixes if first_sufficient and
                        (p["operation_prefix"],p["call_prefix"] or 0) == first_sufficient),None)
     after = [c for c in calls[first_sufficient[1]:] if _phase(c) == "research"] if first_sufficient and calls_known else []
-    later_records = records[first_sufficient[0]:] if first_sufficient else []
     assessed = requirement is not None
     sufficiency = {
         "status":"NOT_ASSESSED" if not assessed else "REACHED" if sufficient else "NOT_REACHED",
         "first_operation_prefix":first_sufficient[0] if first_sufficient else None,
         "first_call_prefix":first_sufficient[1] if first_sufficient and calls_known else None,
-        "research_calls_after":sum(bool(r["proposal"]) for r in later_records) if assessed and calls_known else None,
+        "research_calls_after":sum(c.get("proposal") is not None for c in after) if assessed and calls_known else None,
         "research_model_calls_after":len(after) if assessed and calls_known else None,
         "presentation_calls_after":sum(_text_stop(c) for c in after) if assessed and calls_known else None,
         "service_reads_after":final["acquisition"]["completed"] - sufficient["acquisition"]["completed"] if sufficient else 0 if assessed else None,

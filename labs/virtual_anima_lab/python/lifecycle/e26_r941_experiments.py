@@ -209,9 +209,18 @@ def response_signature(response, *, inverse_mapping=None, arm=None):
                 arguments_status = "UNPARSED"
             operations.append({"name":function.get("name"),"arguments":mapped(arguments),
                                "arguments_status":arguments_status})
+        content = message.get("content")
+        content_format = "EXACT_TEXT"
+        try:
+            from ..cognition.model_claims import parse_final
+            structured = parse_final(content)
+            content = mapped(structured)
+            content_format = "TYPED_CLAIMS_JSON"
+        except (ValueError, TypeError, KeyError, UnicodeError):
+            pass
         choices.append({"finish_reason":choice.get("finish_reason"),
                         "termination":classify_termination(choice.get("finish_reason"),wire="chat_completion"),
-                        "operations":operations,"content":message.get("content"),
+                        "operations":operations,"content":content,"content_format":content_format,
                         "reasoning_content":message.get("reasoning_content")})
     return choices
 
