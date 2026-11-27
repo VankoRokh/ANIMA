@@ -120,3 +120,23 @@ def test_nested_clusters_equal_weight_not_independent_contexts():
     result=interval(cluster_differences(rows,'x'))
     assert result['clusters']==2 and result['ci95']==[0,0]
     assert interval([]) is None
+
+
+@pytest.mark.parametrize('response',[{'choices':[],'usage':{'prompt_tokens':10,'completion_tokens':1}},[{'bad':'response'}]])
+def test_malformed_terminal_is_preserved_not_harness_crash(tmp_path,monkeypatch,response):
+    e,_=entry(tmp_path,monkeypatch)
+    result=t.trajectory(e,'r943/0.1',tmp_path/'malformed',Fake(response))
+    assert result['metrics']['model_calls']==1
+    assert result['metrics']['status'] in ('REJECTED','STEP_BUDGET_EXHAUSTED')
+    assert result['exchanges'][0]['response']==response
+    assert result['metrics']['terminal_calls'][0]['valid'] is False
+
+
+def test_policy_outcome_divergence_precedes_next_request():
+    response=completion(content='same')
+    exchange={'request':{},'request_sha256':t.h._sha({}),'response':response,'response_sha256':t.h._sha(response)}
+    a={'exchanges':[exchange],'context':{},'readonly':{},'journals_by_call':{1:[{'status':'COMPLETED'}]}}
+    b={**a,'journals_by_call':{1:[{'status':'REJECTED'}]}}
+    result=t.compare(a,b)
+    assert result['matched_decision_prefix']==0
+    assert result['first_divergence']=={'index':0,'kind':'JOURNAL_OUTCOME','a_request':t.h._sha({}),'b_request':t.h._sha({})}

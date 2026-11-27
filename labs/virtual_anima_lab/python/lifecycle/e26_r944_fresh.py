@@ -115,6 +115,18 @@ def _readonly(memory):
     return {'events':h._sha(memory._core.event_log.load_events()),'knowledge_count':memory._core.memory_store.count(),'execution':memory._core.core_execution}
 
 
+def terminal_call(call):
+    response=call.get('raw_response');choices=response.get('choices') if isinstance(response,dict) else None
+    choice=choices[0] if isinstance(choices,list) and choices and isinstance(choices[0],dict) else {}
+    return {'valid':call.get('valid'),'finish_reason':choice.get('finish_reason'),
+            'input_tokens':call.get('input_tokens'),'output_tokens':call.get('output_tokens')}
+
+
+def decision_signature(response):
+    try:return h.response_signature(response)
+    except (AttributeError,TypeError,ValueError,IndexError):return {'unparseable_response_sha256':h._sha(response)}
+
+
 def trajectory(entry,profile,output,transport,*,check=lambda:None):
     if profile not in PROFILES.values():raise ValueError('unregistered arm')
     root=h._new_output(output)
@@ -171,10 +183,10 @@ def trajectory(entry,profile,output,transport,*,check=lambda:None):
             'model_calls':len(wire.exchanges),'usage':final['resources'],'verification_cost':cost,'continuation':measured['continuation'],
             'premature_stop':measured['premature_stop'],'accepted_final':report['status']=='STOPPED','presentation':result['presentation'],
             'status':report['status'],'control_reason':report.get('control',{}).get('reason'),'outcomes':[r['outcome']['status'] for r in records],
-            'terminal_calls':[{'valid':c.get('valid'),'finish_reason':(c.get('raw_response') or {}).get('choices',[{}])[0].get('finish_reason'),'input_tokens':c.get('input_tokens'),'output_tokens':c.get('output_tokens')} for c in all_calls],
+            'terminal_calls':[terminal_call(c) for c in all_calls],
             'wire_failures':wire.failures,'safety':'CHECKED_NO_VIOLATION','semantic_prose_quality':'NOT_ASSESSED','retrieval_quality':'NOT_ASSESSED_NO_FROZEN_LABELS_FOR_ADAPTIVE_QUERIES','rejected_duplicates_with_missing_path':'NOT_ASSESSED_NOT_A_SEMANTIC_PATH_ORACLE'}
         f.write_json(root/'metrics.json',metrics)
-        return {'metrics':metrics,'exchanges':wire.exchanges,'context':context,'readonly':before,'raw_sha256':entry['raw_sha256']}
+        return {'metrics':metrics,'exchanges':wire.exchanges,'context':context,'readonly':before,'raw_sha256':entry['raw_sha256'],'journals_by_call':{p['call_prefix']:records[:p['operation_prefix']] for p in measured['prefixes']}}
     except Exception as error:
         f.write_json(root/'harness-failure.json',{'type':type(error).__name__,'message':str(error),'wire':wire.exchanges})
         raise
@@ -185,13 +197,14 @@ def compare(a,b):
     for i in range(max(len(a['exchanges']),len(b['exchanges']))):
         aa=a['exchanges'][i] if i<len(a['exchanges']) else None;bb=b['exchanges'][i] if i<len(b['exchanges']) else None
         same_request=aa is not None and bb is not None and aa['request']==bb['request']
-        same_decision=aa is not None and bb is not None and h.response_signature(aa.get('response',{}))==h.response_signature(bb.get('response',{}))
-        if first is None and same_request and same_decision:decision+=1
+        same_decision=aa is not None and bb is not None and decision_signature(aa.get('response',{}))==decision_signature(bb.get('response',{}))
+        same_journal=a.get('journals_by_call',{}).get(i+1)==b.get('journals_by_call',{}).get(i+1)
+        if first is None and same_request and same_decision and same_journal:decision+=1
         same_exact=same_request and aa.get('response_sha256')==bb.get('response_sha256')
         if first_exact is None:
             if same_exact:exact+=1
             else:first_exact={'index':i,'kind':'WIRE_BYTES_OR_LENGTH'}
-        if first is None and not (same_request and same_decision):first={'index':i,'kind':'TRAJECTORY_LENGTH' if aa is None or bb is None else 'REQUEST' if not same_request else 'RESPONSE_DECISION','a_request':aa.get('request_sha256') if aa else None,'b_request':bb.get('request_sha256') if bb else None}
+        if first is None and not (same_request and same_decision and same_journal):first={'index':i,'kind':'TRAJECTORY_LENGTH' if aa is None or bb is None else 'REQUEST' if not same_request else 'RESPONSE_DECISION' if not same_decision else 'JOURNAL_OUTCOME','a_request':aa.get('request_sha256') if aa else None,'b_request':bb.get('request_sha256') if bb else None}
     if (a['context']!=b['context'] or a.get('raw_sha256')!=b.get('raw_sha256')
             or any(a['readonly'].get(k)!=b['readonly'].get(k) for k in ('knowledge_count','execution'))):raise ValueError('PAIR_INITIAL_STATE_MISMATCH')
     return {'initial_request_equal':bool(a['exchanges'] and b['exchanges'] and a['exchanges'][0]['request']==b['exchanges'][0]['request']),
