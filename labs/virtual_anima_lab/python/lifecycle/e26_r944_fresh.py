@@ -127,8 +127,12 @@ def decision_signature(response):
     except (AttributeError,TypeError,ValueError,IndexError):return {'unparseable_response_sha256':h._sha(response)}
 
 
-def trajectory(entry,profile,output,transport,*,check=lambda:None):
-    if profile not in PROFILES.values():raise ValueError('unregistered arm')
+def trajectory(entry,profile,output,transport,*,check=lambda:None,experiment_contract=SCHEMA,measurement_baseline=BASELINE):
+    # Legacy calls retain the original profiles and serialized artifacts.
+    if experiment_contract==SCHEMA:allowed=tuple(PROFILES.values())
+    elif experiment_contract=='anima.lab.r945c_execution/0.1':allowed=('baseline','r945/0.1')
+    else:raise ValueError('unknown experimental contract')
+    if profile not in allowed:raise ValueError('unregistered arm')
     root=h._new_output(output)
     for kind in ('case','raw'):
         if f.file_digest(entry[kind+'_path'])!=entry[kind+'_sha256']:raise ValueError('frozen source changed')
@@ -157,12 +161,19 @@ def trajectory(entry,profile,output,transport,*,check=lambda:None):
             f.write_json(root/'result.json',result);f.write_json(root/'turn.json',report)
             all_calls=adapter.calls+([report['claim_projection']['call']] if report.get('claim_projection',{}).get('call') is not None else [])
             stack[-1]='offline_measurement'
-            measured=measure_turn(coord,report,baseline_sha=BASELINE,case_id=entry['id'],requirement=req,calls=all_calls,frozen_context=context,claim_phase='claim_projection')
+            measured=measure_turn(coord,report,baseline_sha=measurement_baseline,case_id=entry['id'],requirement=req,calls=all_calls,frozen_context=context,claim_phase='claim_projection')
             f.write_json(root/'observable.json',measured)
             stack[-1]='offline_export_verification'
-            f.export_case(root,entry['seed'],entry['case'],report,records,adapter.calls,raw)
+            aggregate=None
+            if experiment_contract=='anima.lab.r945c_execution/0.1':
+                aggregate={'variant':'temporal_completion','case':entry['case'],'seed':entry['seed'],
+                    'memory_enabled':enabled,'task':entry['scenario']['task'],'model_calls':len(adapter.calls),
+                    'total_model_calls':len(all_calls),'turn_status':report['status'],'cognitive_result':result,
+                    'information_completion':result['information']['completion'],
+                    'model_claims':result['evidence']['model_claims']['evaluation']}
+            f.export_case(root,entry['seed'],entry['case'],report,records,adapter.calls,raw,result=aggregate)
             exported=f.read_json(root/f"case-{entry['seed']}-{entry['case']}.json")
-            f.verify_case(exported,raw,require_native=True)
+            f.verify_case(exported,raw,require_native=True,require_cognitive_result=experiment_contract=='anima.lab.r945c_execution/0.1')
         if before!=_readonly(memory) or memory.context_for_cognition(memory_enabled=enabled)!=base:raise ValueError('READ_ONLY_OR_CONTEXT_CHANGED')
         if len(all_calls)!=len(wire.exchanges) or len(all_calls)>4:raise ValueError('CALL_ACCOUNTING_MISMATCH')
         if result['execution']['task_completion']!='NOT_ESTABLISHED':raise ValueError('FALSE_TASK_SUCCESS')
