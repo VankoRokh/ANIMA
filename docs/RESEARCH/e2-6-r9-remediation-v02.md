@@ -1,6 +1,6 @@
 # ANIMA v0.2 — E2.6 R9: реестр находок и план исправлений
 
-**Дата:** 27 ноября 2026. **Статус:** Research / R9.1–R9.3 owner-validated in documented scope; independent re-audit pending. R9.3 Recovery owner results recorded in R9.4.0 report; independent archive audit pending. R9.4.0 reviewed; R9.4.1a offline observable state/harness implemented; R9.4.1b fresh experiments and R9.4.2 policy changes not started.
+**Дата:** 27 ноября 2026. **Статус:** Research / R9.1–R9.3 owner-validated in documented scope; independent re-audit pending. R9.3 Recovery owner results recorded in R9.4.0 report; independent archive audit pending. R9.4.0 reviewed; R9.4.1a offline observable state/harness implemented; R9.4.1b baseline model experiments recorded; R9.4.2 policy changes not started.
 **Исходный baseline реестра:** `508851d458cf759902aa35c9ae140780fb29c4a0`. Рабочая ветка `work/v02-e26-r9-remediation`.
 **Источник:** независимый отчёт `ANIMA-E26-R8-Independent-Reaudit-RU.md`, 25 ноября 2026, §§4, 6, 9–15; архив `ANIMA-E26-R8-Independent-Reproduction.zip`. Первичные файлы предоставлены владельцем вне данного snapshot; этот документ не заменяет их.
 **Вердикт R8:** CONDITIONAL PASS только для продолжения ограниченной лабораторной работы. Закрытие E2.6, перенос в canonical assembly и расширение model-facing authority — BLOCKED.
@@ -294,3 +294,10 @@ R9-Q02/Q03/Q04, CA-06 и R9-E01/E02 остаются открыты в преж�
 На baseline `0cde809a9d0f5495d93706a25a9dbe404cc48515` реализованы offline versioned measurement sidecar, host-owned prefix coverage/availability view и isolated H/Q/I/T-recorded harness. Контракты, exact C01–C14 expectations, RED/GREEN/regression, archive SHA-256 и команды R9.4.1b находятся в [отчёте этапа](e2-6-r941a-observable-v02.md). Owner originals и historical completion/metrics сохраняются; измеритель не входит в policy/model context.
 
 R9-Q02/Q03/Q04, CA-06 и R9-E01/E02 не закрываются измерениями. Continuation/stop/Retrieval/prompts/model/budgets/tool permissions, R9.2 Hybrid Result и R9.3 terminal contracts не изменены. **Resume point:** R9.4.1b — controlled baseline H/Q/I/T experiments по замороженному manifest; массовые fresh inference в R9.4.1a не запускаются. R9.4.2/R9.4.3 не реализованы; independent re-audit остаётся R9.5.
+
+
+## 12. R9.4.1b — Baseline Model Experiments, 27 ноября 2026
+
+На execution baseline `d34b472e51cdddf6f8700f0d521d4df65e8b4216` выполнены serial Q/I matrix: 2640 planned/attempted/received, 0 failed, no dispatch/retries. T-recorded 28/28, 93 exact requests; H0/H1 4 fixed journals, acquisition/research text/source bindings неизменны. В [техническом отчёте](e2-6-r941b-baseline-model-experiments-v02.md) находятся per-context results, hashes/choices/typed arguments/prose/terminal endpoints, resource costs, immutability, archive SHA и предложения R9.4.2.
+
+I-event: 120/560 pairs меняют tool choice; I-tool: 480/480 operations/arguments совпали, 5 prose differences также наблюдаются внутри exact original repetitions. I-turn остаётся UNSUPPORTED. Это single-request baseline, не T-fresh и не causal policy benefit; прежние finding/quality gate statuses не закрываются. Реализация, model/prompts/budgets/permissions/Retrieval/continuation не менялись; R9.4.2/R9.4.3 не реализованы. Owner originals неизменны, independent R9.5 audit остаётся отдельным этапом.
