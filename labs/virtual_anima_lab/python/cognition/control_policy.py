@@ -90,7 +90,7 @@ def verify_control(report,records):
     marker=report['control']
     try:
         profile=marker['profile']
-        if marker['schema']!='anima.lab.cognitive_control/0.1' or profile not in ('r942/0.1','r942/0.2'):
+        if marker['schema']!='anima.lab.cognitive_control/0.1' or profile not in ('r942/0.1','r942/0.2','r943/0.1'):
             raise ValueError('unknown control profile')
         raw=marker['state']['completion']['requirement']
         req=CompletionRequirement(raw['kind'],tuple(raw['entities']),raw['query'])

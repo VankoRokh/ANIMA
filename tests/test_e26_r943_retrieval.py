@@ -20,7 +20,8 @@ def test_r02_resealed_control_negatives(tmp_path,monkeypatch,mutation):
  f.export_case(out,7,'C01',report,records,adapter.calls,raw)
  fixture=f.read_json(out/'case-7-C01.json')
  if mutation=='sufficient':
-  fixture['turn']['control']['state']['completion']['requirement']['entities']=['lab.item.unseen']
+  from labs.virtual_anima_lab.python.cognition.completion import CompletionRequirement
+  fixture['turn']['control']['state']=c.state(CompletionRequirement('verified_observation',('lab.item.unseen',)),records[0]['context_snapshot'],records)
  elif mutation=='redundant':fixture['turn']['control']['reason']='REDUNDANT_OPERATION'
  elif mutation=='unavailable':fixture['turn']['control']['reason']='SOURCE_UNAVAILABLE'
  else:fixture['turn']['control']['state']['gain_key']=[999,999,999]
@@ -39,3 +40,58 @@ def test_new_ranking_exact_and_multi_terms():
  # than repeated-letter opaque suffix; lexical fallback remains explicit.
  assert rank(rows,'obstacle')[0]['entity_ref']=='lab.obstacle.shortcut'
  assert _rank_memory_matches(rows,'obstacle')[0]['entity_ref']=='lab.obstacle.aaa'
+
+def test_r01_actual_search_semantics(tmp_path,monkeypatch):
+ from labs.virtual_anima_lab.python.cognition.coordinator import _read_only_result
+ mem=memory(tmp_path,monkeypatch)
+ assert _read_only_result(mem,kind='retrieve_memory',args={'query':'ßcrate','top_k':1},memory_enabled=True,ranked=True)['returned']==1
+ assert _read_only_result(mem,kind='retrieve_memory',args={'query':'sscrate','top_k':1},memory_enabled=True,ranked=True)['returned']==0
+ view={'completed_operations':[['retrieve_memory',{'query':'ßcrate','top_k':1}]]}
+ proposal={'operation_kind':'retrieve_memory','arguments':{'query':'sscrate','top_k':1}}
+ assert c.redundant(OBS,{},view,proposal,profile='r942/0.1')
+ assert not c.redundant(OBS,{},view,proposal,profile='r942/0.2')
+
+@pytest.mark.parametrize('enabled',[False,True])
+def test_profile_scope_and_metadata(tmp_path,monkeypatch,enabled):
+ from labs.virtual_anima_lab.python.cognition.coordinator import _read_only_result
+ mem=memory(tmp_path,monkeypatch)
+ result=_read_only_result(mem,kind='retrieve_memory',args={'query':'crate','top_k':1},memory_enabled=enabled,retrieval_profile='r943/0.1')
+ assert result['returned']==int(enabled)
+ assert result['strategy'].startswith('r943/0.1')
+ assert result['possible_matches']>=result['returned']
+ if enabled:assert result['records'][0]['last_seen_event_id']==crate_event(mem)
+
+def test_runtime_never_imports_evaluator():
+ from pathlib import Path
+ for name in ('retrieval_policy.py','control_policy.py'):
+  text=Path('labs/virtual_anima_lab/python/cognition',name).read_text()
+  assert 'evaluator' not in text and 'held-out' not in text
+
+def test_profiles_on_identical_frozen_raw_and_requests(tmp_path,monkeypatch):
+ from labs.virtual_anima_lab.python.lifecycle.e26_r941_experiments import rebuild_raw
+ from labs.virtual_anima_lab.python.cognition.coordinator import E25LabCognitiveCoordinator
+ from labs.virtual_anima_lab.python.cognition.native_lab import NativeLabAdapter
+ from labs.virtual_anima_lab.python.cognition.resource_budget import ResourceLimits
+ from labs.virtual_anima_lab.python.cognition.completion import evaluate_completion
+ from tests.test_e26a_native_tools import Fake
+ from pathlib import Path
+ origin=memory(tmp_path/'origin',monkeypatch)
+ raw=f.export_raw(origin,tmp_path/'origin',7)
+ stats={};requests=[]
+ for profile in ('baseline','r943/0.1'):
+  mem=rebuild_raw(raw,tmp_path/profile/'stores')
+  event=next(e['last_seen_event_id'] for e in mem.world_model()['entities'] if e['entity_ref']=='lab.item.crate')
+  wire=Fake(*[lookup(event,str(i)) for i in range(4)])
+  adapter=NativeLabAdapter(base_url='http://127.0.0.1:8085',model='test',trace_path=tmp_path/profile/'calls.jsonl',task='Verify crate',transport=wire,temporal=True,compact_temporal=True,latest_observation=True)
+  coord=E25LabCognitiveCoordinator(mem,ranked=True,latest_observation=True,policy_profile=profile)
+  report=coord.run_turn(adapter,turn_id='paired',completion_requirement=OBS,resource_limits=ResourceLimits())
+  records=coord.decision_records('paired')
+  from labs.virtual_anima_lab.python.cognition.source_binding import admitted_source_rows
+  rows=[r for rec in records for r in admitted_source_rows(rec)]
+  stats[profile]={'completed':len(records),'redundant_acquisition':len(rows)-len({r['event_id'] for r in rows}),
+     'completeness':evaluate_completion(OBS,report,records)['information_requirement_satisfied']}
+  requests.append(wire.requests[0])
+ assert requests[0]==requests[1]
+ assert stats['baseline']['redundant_acquisition']==3 and stats['r943/0.1']['redundant_acquisition']==0
+ assert stats['baseline']['completeness'] and stats['r943/0.1']['completeness']
+ (tmp_path/'paired-metrics.json').write_text(json.dumps(stats))

@@ -71,3 +71,5 @@
 R9.4.1b: [Baseline Model Experiments — Q/I/H/T-recorded](e2-6-r941b-baseline-model-experiments-v02.md), real-model baseline на неизменённой policy; 2640 received, controlled ID sensitivity и limitations зафиксированы.
 
 R9.4.2: [Cognitive Control Policy](e2-6-r942-cognitive-control-v02.md), opt-in versioned read-only laboratory control; baseline replay preserved.
+
+R9.4.3: [Retrieval Efficiency и R942 targeted hardening](e2-6-r943-retrieval-efficiency-v02.md), versioned lexical profiles и separate held-out offline metrics.

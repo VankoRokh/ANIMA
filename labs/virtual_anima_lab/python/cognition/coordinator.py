@@ -80,7 +80,7 @@ def _rank_memory_matches(entities, query):
 
 
 def _read_only_result(memory: E24WorkingMemory, *, kind: str,
-                      args: dict, memory_enabled: bool, ranked=False, latest_sample_id=None) -> dict:
+                      args: dict, memory_enabled: bool, ranked=False, latest_sample_id=None, retrieval_profile="baseline") -> dict:
     """Actual trusted service reads, never a model-generated outcome."""
     if kind == "retrieve_memory":
         model = memory.world_model(memory_enabled=memory_enabled)
@@ -93,9 +93,15 @@ def _read_only_result(memory: E24WorkingMemory, *, kind: str,
         ]
         if ranked:
             matches = _rank_memory_matches(model["entities"], args["query"])
+        if retrieval_profile == "r943/0.1":
+            from .retrieval_policy import rank
+            matches = rank(model["entities"],args["query"])
+        elif retrieval_profile != "baseline":
+            raise ValueError("unknown retrieval profile")
         return {
             "kind": "working_world_memory_search",
-            "strategy": ("ranked_lexical_not_semantic_retrieval" if ranked
+            "strategy": ("r943/0.1_lexical_coverage_opaque_id_tiebreak" if retrieval_profile=="r943/0.1" else
+                         "ranked_lexical_not_semantic_retrieval" if ranked
                          else "substring_baseline_not_semantic_retrieval"),
             "records": matches[:args["top_k"]],
             "returned": min(len(matches), args["top_k"]),
@@ -163,7 +169,7 @@ class E25LabCognitiveCoordinator:
                  error_feedback=False, latest_observation=False, policy_profile="baseline"):
         if type(latest_observation) is not bool:
             raise TypeError("latest_observation must be boolean")
-        if policy_profile not in ("baseline","r942/0.1","r942/0.2"):
+        if policy_profile not in ("baseline","r942/0.1","r942/0.2","r943/0.1"):
             raise ValueError("unknown cognitive control profile")
         self._policy_profile = policy_profile
         self._latest_observation = latest_observation
@@ -476,6 +482,7 @@ class E25LabCognitiveCoordinator:
                 result = _read_only_result(
                     self._memory, kind=kind, args=proposal["arguments"],
                     memory_enabled=memory_enabled,
+                    **({"retrieval_profile":"r943/0.1"} if self._policy_profile=="r943/0.1" else {}),
                     **({"ranked": True} if self._ranked else {}),
                     **({"latest_sample_id": context["latest_sample_id"]}
                        if kind == "inspect_latest_observation" else {}),

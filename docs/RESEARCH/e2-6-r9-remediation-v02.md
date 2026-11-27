@@ -306,3 +306,8 @@ I-event: 120/560 pairs меняют tool choice; I-tool: 480/480 operations/argu
 ## 13. R9.4.2 — Cognitive Control Policy
 
 [Отчёт R9.4.2](e2-6-r942-cognitive-control-v02.md) фиксирует opt-in r942/0.1 в существующем lab coordinator: information sufficiency, availability-aware bounded continuation и source/tool-aware redundancy. Baseline-compatible default сохранён; historical assertions и scoring не изменены. New system termination не model stop/Task success. R9.4.3/T-fresh/canonical integration не реализованы; causal fresh policy evaluation остаётся R9.4.4. Новых prompts, generation budgets, tool permissions или Knowledge writes нет. Scope synthetic/recorded validation не закрывает generalized model-quality findings или R9.5 independent audit.
+
+
+## 14. R9.4.3 — Retrieval Efficiency
+
+[Отчёт](e2-6-r943-retrieval-efficiency-v02.md) фиксирует separate R942-R01/R02 hardening и r943/0.1 lexical retrieval: corrected query equivalence, semantic control-marker verification, explainable structural tie-break. Прежние profiles/evidence/metrics сохраняются. Offline control/held-out metrics не объявляются устранением recovery model-selection failure или causal fresh policy benefit. R9.4.4/T-fresh и canonical authority integration не реализованы.
