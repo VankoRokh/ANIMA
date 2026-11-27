@@ -1,6 +1,6 @@
 # ANIMA v0.2 — E2.6 R9: реестр находок и план исправлений
 
-**Дата:** 27 ноября 2026. **Статус:** Research / R9.1–R9.3 owner-validated in documented scope; independent re-audit pending. R9.3 Recovery owner results recorded in R9.4.0 report; independent archive audit pending. R9.4.0 characterization/design recorded; R9.4.1–R9.4.4 implementation not started.
+**Дата:** 27 ноября 2026. **Статус:** Research / R9.1–R9.3 owner-validated in documented scope; independent re-audit pending. R9.3 Recovery owner results recorded in R9.4.0 report; independent archive audit pending. R9.4.0 reviewed; R9.4.1a offline observable state/harness implemented; R9.4.1b fresh experiments and R9.4.2 policy changes not started.
 **Исходный baseline реестра:** `508851d458cf759902aa35c9ae140780fb29c4a0`. Рабочая ветка `work/v02-e26-r9-remediation`.
 **Источник:** независимый отчёт `ANIMA-E26-R8-Independent-Reaudit-RU.md`, 25 ноября 2026, §§4, 6, 9–15; архив `ANIMA-E26-R8-Independent-Reproduction.zip`. Первичные файлы предоставлены владельцем вне данного snapshot; этот документ не заменяет их.
 **Вердикт R8:** CONDITIONAL PASS только для продолжения ограниченной лабораторной работы. Закрытие E2.6, перенос в canonical assembly и расширение model-facing authority — BLOCKED.
@@ -287,3 +287,10 @@ Earlier owner evidence at `40d0d2ed71a2effbbc6d8eed8e91a5a8327a79a0` remains bou
 Host projection не инициирует acquisition; повторные Raw reads для integrity нужно считать отдельно. Пары Native Control/Host из Recovery не являются matched-input causal experiment. Existing replay_request повторяет один exact request без service dispatch; full recorded/fresh trajectory replay остаётся отдельным запланированным опытом. Нужны explicit tool-call-ID policy, request order, cache и backend configuration.
 
 R9-Q02/Q03/Q04, CA-06 и R9-E01/E02 остаются открыты в прежней области; критерии не смягчены. Historical metrics и frozen evidence не изменены. No model/prompt/budget/tool permission changes, Knowledge writes или canonical integration. **Resume point:** рассмотреть результаты characterization и протокол; только затем начинать R9.4.1. Граница этой работы — R9.4.0, исправления не реализованы. Проверки текущего этапа и их граница записаны в §7 отчёта; independent re-audit остаётся R9.5.
+
+
+## 11. R9.4.1a — Observable Cognitive State, 27 ноября 2026
+
+На baseline `0cde809a9d0f5495d93706a25a9dbe404cc48515` реализованы offline versioned measurement sidecar, host-owned prefix coverage/availability view и isolated H/Q/I/T-recorded harness. Контракты, exact C01–C14 expectations, RED/GREEN/regression, archive SHA-256 и команды R9.4.1b находятся в [отчёте этапа](e2-6-r941a-observable-v02.md). Owner originals и historical completion/metrics сохраняются; измеритель не входит в policy/model context.
+
+R9-Q02/Q03/Q04, CA-06 и R9-E01/E02 не закрываются измерениями. Continuation/stop/Retrieval/prompts/model/budgets/tool permissions, R9.2 Hybrid Result и R9.3 terminal contracts не изменены. **Resume point:** R9.4.1b — controlled baseline H/Q/I/T experiments по замороженному manifest; массовые fresh inference в R9.4.1a не запускаются. R9.4.2/R9.4.3 не реализованы; independent re-audit остаётся R9.5.

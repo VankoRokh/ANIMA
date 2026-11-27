@@ -171,3 +171,8 @@ Core обязан продолжать жизненный цикл без LLM. �
 ## R9.4.0 — управление циклом: текущая исследовательская граница
 
 На baseline `5448e8ee8b09a3ad8d079896d85367201ed13d5a` подготовлены [инвентаризация, characterization, метрики и контролируемый протокол R9.4.0](e2-6-r940-characterization-v02.md). [Реестр R9](e2-6-r9-remediation-v02.md) сохраняет прежние finding IDs и исторические результаты. Зафиксированные ограничения sufficiency/continuation/redundancy/availability относятся к изолированному read-only lab loop; они не означают разрешение на изменение canonical coordinator. Реализация R9.4.1–R9.4.4 начинается только после рассмотрения characterization и протокола. Hybrid Cognitive Result, source binding и terminal contracts R9.3 сохранены; PASS воспроизводителя не закрывает дефект.
+
+
+## R9.4.1a — наблюдаемый срез без policy effect
+
+После review R9.4.0 реализован [offline observable state и experimental harness](e2-6-r941a-observable-v02.md). Source exposure, acquisitions, verified identities/facts, coverage, availability, continuation и costs измеряются раздельно по проверенным prefixes. Sidecar не поступает в policy или model context; canonical coordinator, completion contracts и действующий цикл не меняются. Реальные массовые baseline experiments подготовлены для R9.4.1b, изменения continuation/Retrieval остаются за границей R9.4.1a.
