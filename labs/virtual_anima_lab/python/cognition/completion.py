@@ -58,6 +58,10 @@ def evaluate_completion(requirement, report, records):
     if len(records) != len(outcomes):
         raise ValueError("incomplete decision trace")
     verified = {}
+    # Preserve historical verdicts; corrected profiles share Retrieval's key.
+    query_key = _query_key
+    if report.get("control", {}).get("profile") in ("r942/0.2", "r943/0.1"):
+        from .retrieval_policy import query_key
     empty_queries = set()
     completed_reads = 0
     historical = {}
@@ -102,7 +106,7 @@ def evaluate_completion(requirement, report, records):
                 raise ValueError("unexpected search result")
             if (result["records"] == [] and result["returned"] == 0
                     and result["possible_matches"] == 0 and result["truncated"] is False):
-                empty_queries.add(_query_key(proposal["arguments"]["query"]))
+                empty_queries.add(query_key(proposal["arguments"]["query"]))
 
     missing = []
     temporal_details = {}
@@ -129,7 +133,7 @@ def evaluate_completion(requirement, report, records):
         satisfied = not missing
         reason = "VERIFIED_TARGET_OBSERVATIONS" if satisfied else "REQUIRED_SOURCE_NOT_VERIFIED"
     elif requirement.kind == "empty_search":
-        satisfied = _query_key(requirement.query) in empty_queries
+        satisfied = query_key(requirement.query) in empty_queries
         reason = "EMPTY_SEARCH_CONFIRMED" if satisfied else "REQUIRED_EMPTY_SEARCH_NOT_CONFIRMED"
     else:
         # Denied attempts are not service reads but are tracked separately.

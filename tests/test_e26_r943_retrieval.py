@@ -95,3 +95,16 @@ def test_profiles_on_identical_frozen_raw_and_requests(tmp_path,monkeypatch):
  assert stats['baseline']['redundant_acquisition']==3 and stats['r943/0.1']['redundant_acquisition']==0
  assert stats['baseline']['completeness'] and stats['r943/0.1']['completeness']
  (tmp_path/'paired-metrics.json').write_text(json.dumps(stats))
+
+
+def test_r01_empty_search_requirement_uses_profile_query_semantics(tmp_path,monkeypatch):
+ from labs.virtual_anima_lab.python.cognition.completion import CompletionRequirement,evaluate_completion
+ from tests.test_e26a_native_tools import completion
+ mem=memory(tmp_path,monkeypatch)
+ _,report,records,_,_=execute(tmp_path,mem,[completion('retrieve_memory','{"query":"sscrate","top_k":1}',call_id='empty'),completion(content='done')],req=CompletionRequirement('empty_search',query='sscrate'))
+ req=CompletionRequirement('empty_search',query='ßcrate')
+ assert evaluate_completion(req,report,records)['information_requirement_satisfied']
+ for profile in ('r942/0.2','r943/0.1'):
+  versioned={**report,'control':{**report['control'],'profile':profile}}
+  assert not evaluate_completion(req,versioned,records)['information_requirement_satisfied']
+  assert not c.state(req,records[0]['context_snapshot'],records,profile)['completion']['information_requirement_satisfied']

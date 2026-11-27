@@ -19,7 +19,7 @@ REASONS=('INFORMATION_SUFFICIENT','SOURCE_UNAVAILABLE','REDUNDANT_OPERATION','NO
 def state(requirement,context,records,profile=PROFILE):
     report={'turn_id':records[0]['turn_id'] if records else 'unused',
             'context_snapshot_id':context['context_snapshot_id'],
-            'status':'STEP_BUDGET_EXHAUSTED','outcomes':[r['outcome'] for r in records]}
+            'control':{'profile':profile},'status':'STEP_BUDGET_EXHAUSTED','outcomes':[r['outcome'] for r in records]}
     completion=evaluate_completion(requirement,report,records)
     rows={};lookups=set();searches=set();operations=[]
     for record in records:
