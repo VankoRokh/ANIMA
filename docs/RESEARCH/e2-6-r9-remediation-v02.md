@@ -328,3 +328,5 @@ R9.4.4 execution завершён: 560 paired repetitions / 1120 trajectories / 
 ## 17. R9.4.5b — Targeted Remediation
 
 [Отчёт и frozen design](e2-6-r945b-targeted-remediation-v02.md): diagnostic до runtime изменений, затем separate A/B/D commits. C/verification optimization и R9.5 не входят в этап; R9.4.5c full fresh пока не запускается.
+
+R945b: diagnostic80/80 без dispatch; A/B/D реализованы только opt-in r945/0.1. Final full3238 PASS, targeted684, focused79, historical28/93 MATCHED. Real F01/F02 fix не заявлен; plan R945c v2 NOT_RUN, C/I/O optimization deferred.
