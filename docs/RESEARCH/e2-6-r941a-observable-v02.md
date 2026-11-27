@@ -173,7 +173,7 @@ Backend не перезапускается и generation settings не изме
 
 ## 7. RED/GREEN и проверки
 
-Результаты и изолированные fixtures сохраняются под постоянным evidence root. `red-observable.log`/`red-harness.log` — ожидаемые initial collection failures отсутствующих новых модулей. Промежуточные GREEN attempts и исправления harness semantics сохранены, historical characterization assertions не менялись. `green-5.log`: **41 passed / 5.72 s**; после него добавлен cross-class-ID regression test. `targeted-1.log`: **621 passed / 50.29 s** до последующих negative/control tests. `synthetic-final-2.log`: **44 passed / 6.16 s** на текущей реализации, включая Fake-only проверку подготовленного Q runner и отказ при backend restart. Первый clean full regression на `8616639373b815b8998ecddaede4ff0867a1e368`: **3139 passed / 248.16 s**, project checks PASS (205 pages, 1452 links, 465 Python files, 21 Bash files). Затем расширен только offline measurement ledger для typed model fact gain и усилены trace-count guards: `red-prefix-facts.log` — 3 failed / 27 passed; `synthetic-final-3.log` — **48 passed / 6.52 s**. Historical cycle/policy code не менялся. На clean `f9f6a87e27724f0bc166b56ea0865ee31549e99d`: **3143 passed / 262.51 s**, targeted **628 passed / 66.10 s**, project checks PASS; T-recorded 28/28 и H 4 journals повторно без divergence. Затем добавлены C12 generated-before-journal accounting и structured-claim inverse mapping controls: `red-c12-and-structured.log` — 2 failed / 48 passed; `synthetic-final-4.log` — **50 passed / 6.80 s**. Окончательные snapshot/full regression, повторный inventory и clean commit записываются ниже после исполнения.
+Результаты и изолированные fixtures сохраняются под постоянным evidence root. `red-observable.log`/`red-harness.log` — ожидаемые initial collection failures отсутствующих новых модулей. Промежуточные GREEN attempts и исправления harness semantics сохранены, historical characterization assertions не менялись. `green-5.log`: **41 passed / 5.72 s**; после него добавлен cross-class-ID regression test. `targeted-1.log`: **621 passed / 50.29 s** до последующих negative/control tests. `synthetic-final-2.log`: **44 passed / 6.16 s** на текущей реализации, включая Fake-only проверку подготовленного Q runner и отказ при backend restart. Первый clean full regression на `8616639373b815b8998ecddaede4ff0867a1e368`: **3139 passed / 248.16 s**, project checks PASS (205 pages, 1452 links, 465 Python files, 21 Bash files). Затем расширен только offline measurement ledger для typed model fact gain и усилены trace-count guards: `red-prefix-facts.log` — 3 failed / 27 passed; `synthetic-final-3.log` — **48 passed / 6.52 s**. Historical cycle/policy code не менялся. На clean `f9f6a87e27724f0bc166b56ea0865ee31549e99d`: **3143 passed / 262.51 s**, targeted **628 passed / 66.10 s**, project checks PASS; T-recorded 28/28 и H 4 journals повторно без divergence. Затем добавлены C12 generated-before-journal accounting и structured-claim inverse mapping controls: `red-c12-and-structured.log` — 2 failed / 48 passed; `synthetic-final-4.log` — **50 passed / 6.80 s**. Окончательные результаты code snapshot приведены в §8; последующий commit меняет только этот отчёт.
 
 Повторяемые команды (новый basetemp/output для каждого прогона):
 
@@ -188,3 +188,38 @@ git diff --check
 ```
 
 Implementation commit определяется `git log -1 --format=%H -- labs/virtual_anima_lab/python/cognition/observable.py labs/virtual_anima_lab/python/lifecycle/e26_r941_experiments.py`. Финальный documentation result commit определяется `git log -1 --format=%H -- docs/RESEARCH/e2-6-r941a-observable-v02.md`; самоссылочный hash в текст не подставляется. Остановка — R9.4.1a; новые реальные model experiments и policy changes остаются следующими отдельными этапами.
+
+
+## 8. Окончательная проверка R9.4.1a
+
+**Code snapshot:** `c1f1b0f7aa5c66c60c34398ba7fe7c98b41972d2`, clean worktree во время regression/replay. После него меняется только этот отчёт; implementation/tests bytes сохраняются. Final documentation commit SHA доступен через приведённый выше `git log`, окончательная clean-tree receipt — во внешнем `validation-final.json`.
+
+| Проверка | Результат на code snapshot | Evidence file под постоянным root |
+| --- | --- | --- |
+| Synthetic positive/negative controls | **50 passed / 6.80 s** | `synthetic-final-4.log` |
+| E2.6 + E2.5a + canonical coordinator | **630 passed / 66.64 s** | `targeted-c1f1b0f.log` |
+| Full regression | **3145 passed / 261.64 s** | `full-c1f1b0f.log` |
+| Project checks | **PASS**: 205 pages, 1452 local links, 465 checked Python files, 21 Bash files | `project-check-c1f1b0f.log` |
+| T-recorded / Control | **14/14 MATCHED, 47 exact generated requests**, full journal/budget/result matched | `c1f1b0f-control-T-recorded/summary.json` |
+| T-recorded / Host | **14/14 MATCHED, 46 exact generated requests**, full journal/budget/result matched | `c1f1b0f-host-T-recorded/summary.json` |
+| Fixed-journal H0/H1 | **4 journals**, identical hybrid result/research; Host VERIFIED=3, INFORMATION_INCOMPLETE=1; 24 non-temporal NOT_APPLICABLE | `c1f1b0f-control-H/`, `c1f1b0f-host-H/` |
+| Owner evidence immutability | **MATCHED_BEFORE_INVENTORY**: 7 archives, 8 bundles, 206 Recovery files; 88 cases / 48 Raw / 293 requests | `evidence-after-c1f1b0f.json` |
+| Frozen R9.4.1b plans/maps/held-out inputs | **MATCHED** SHA-256; fresh Q/I **NOT_RUN** | `r941b-run-index.json` |
+| Final documentation/source snapshots | **39 passed / 7.66 s**, project checks повторно PASS | `docs-final.log`, `project-check-doc-final.log` |
+
+Для трёх достаточных temporal journals H0 и H1 result construction выполняют по 2 Raw rereads; H1 дополнительно 2 Host rereads и 6 context integrity row checks (nested I/O раздельно). Для Control C06/7 result construction — 1 reread, Host остаётся INFORMATION_INCOMPLETE без нового evidence. Acquisition/unique identities, model text, completion и research calls H0/H1 совпадают. Это не доказательство улучшения research или semantic prose. Timing T-recorded — локальный replay diagnostic, не latency реального inference.
+
+Финальная проверка diff относительно baseline: существующие `anima/`, config, coordinator, Native adapter, CompletionRequirement/evaluate_completion, Raw/Memory/Retrieval, ResourceBudget, prompts, Hybrid Result, generation contracts и characterization assertions не менялись. Production policy не импортирует sidecar/evaluator. Единственная правка существующего test infrastructure — два точных lab-source пути в bounded documentation snapshot allowlist. Historical bundles и scoring не переписаны.
+
+Замороженные контрольные SHA-256:
+
+| Artifact | SHA-256 |
+| --- | --- |
+| `evidence-inventory-before.json` | `484e987084dfb80743afb9ab7b64550b8a9d862cd87cc6bb1599fbe43cd337cd` |
+| `evidence-after-c1f1b0f.json` | `d8007e29e3a73ea9f479e9c5e075ec1988582203c48f019c8055fcae2d5e2f90` |
+| `plan-control-v2/run-manifest.json` | `4c68f727c6ca242078d3fded72b43939999f6e98b540b7af8a9d1b168e79addd` |
+| `plan-host-v2/run-manifest.json` | `8c582f5b3cc98e02314ba8dd8b273a692e6018d9cd273430965a45f3da6a9ebf` |
+| `held-out-inputs.json` | `d1f6734503f92f8c39f0f53d1e06dc975b40232cedbf764c92229be39901c75a` |
+| `r941b-run-index.json` | `cf1e289f34256091c80f73d6331be6036bfb6b46a8a80796c94c75dec28dda2a` |
+
+**Граница остановки соблюдена:** R9.4.1a завершён в лабораторной observable/tooling области. R9.4.1b fresh matrix (2640 planned requests) подготовлена, но не запускалась; R9.4.2/R9.4.3, canonical integration, Knowledge writes, retries и новые полномочия не реализованы. R9.5 independent audit остаётся отдельным этапом.
