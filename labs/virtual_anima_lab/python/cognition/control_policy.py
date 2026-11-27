@@ -90,8 +90,14 @@ def verify_control(report,records):
     marker=report['control']
     try:
         profile=marker['profile']
-        if marker['schema']!='anima.lab.cognitive_control/0.1' or profile not in ('r942/0.1','r942/0.2','r943/0.1'):
+        if marker['schema']!='anima.lab.cognitive_control/0.1' or profile not in ('r942/0.1','r942/0.2','r943/0.1','r945/0.1'):
             raise ValueError('unknown control profile')
+        if profile == 'r945/0.1':
+            from .retrieval_representation import journal_metadata
+            for record in records:
+                if record['outcome']['status']=='COMPLETED' and record['proposal']['operation_kind']=='retrieve_memory':
+                    expected_metadata=journal_metadata(record['proposal']['arguments'],record['outcome']['result'])
+                    if record['outcome'].get('retrieval_metadata')!=expected_metadata:raise ValueError('retrieval metadata mismatch')
         raw=marker['state']['completion']['requirement']
         req=CompletionRequirement(raw['kind'],tuple(raw['entities']),raw['query'])
         if not records:

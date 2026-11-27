@@ -60,7 +60,7 @@ def evaluate_completion(requirement, report, records):
     verified = {}
     # Preserve historical verdicts; corrected profiles share Retrieval's key.
     query_key = _query_key
-    if report.get("control", {}).get("profile") in ("r942/0.2", "r943/0.1"):
+    if report.get("control", {}).get("profile") in ("r942/0.2", "r943/0.1", "r945/0.1"):
         from .retrieval_policy import query_key
     empty_queries = set()
     completed_reads = 0

@@ -169,7 +169,7 @@ class E25LabCognitiveCoordinator:
                  error_feedback=False, latest_observation=False, policy_profile="baseline"):
         if type(latest_observation) is not bool:
             raise TypeError("latest_observation must be boolean")
-        if policy_profile not in ("baseline","r942/0.1","r942/0.2","r943/0.1"):
+        if policy_profile not in ("baseline","r942/0.1","r942/0.2","r943/0.1","r945/0.1"):
             raise ValueError("unknown cognitive control profile")
         self._policy_profile = policy_profile
         self._latest_observation = latest_observation
@@ -248,6 +248,8 @@ class E25LabCognitiveCoordinator:
         controlled = self._policy_profile != "baseline"
         if controlled and (completion_requirement is None or resource_limits is None):
             raise ValueError("controlled profile requires completion contract and ResourceBudget")
+        if self._policy_profile == "r945/0.1":
+            adapter.configure_host_profile(self._policy_profile)
         if controlled:
             from . import control_policy
         control_reason = None
@@ -482,7 +484,7 @@ class E25LabCognitiveCoordinator:
                 result = _read_only_result(
                     self._memory, kind=kind, args=proposal["arguments"],
                     memory_enabled=memory_enabled,
-                    **({"retrieval_profile":"r943/0.1"} if self._policy_profile=="r943/0.1" else {}),
+                    **({"retrieval_profile":"r943/0.1"} if self._policy_profile in ("r943/0.1","r945/0.1") else {}),
                     **({"ranked": True} if self._ranked else {}),
                     **({"latest_sample_id": context["latest_sample_id"]}
                        if kind == "inspect_latest_observation" else {}),
@@ -494,6 +496,9 @@ class E25LabCognitiveCoordinator:
                     "step_index": step, "proposal_id": proposal["proposal_id"],
                     "operation_kind": kind, "result": result,
                 }
+                if self._policy_profile == "r945/0.1" and kind == "retrieve_memory":
+                    from .retrieval_representation import journal_metadata
+                    output["retrieval_metadata"] = journal_metadata(proposal["arguments"],result)
                 if len(_json(output).encode("utf-8")) > MAX_RESULT_BYTES:
                     raise E25CognitionError("OUTCOME_BUDGET_EXCEEDED")
                 if controlled and kind in ("lookup_raw_evidence","inspect_latest_observation"):

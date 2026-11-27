@@ -101,6 +101,7 @@ class NativeLabAdapter:
             raise ValueError("latest observation requires compact temporal projection")
         if type(model_claims) is not bool or (model_claims and not compact_temporal):
             raise ValueError('model claims require compact temporal projection')
+        self._host_result_profile = "baseline"
         self.model_claims = model_claims
         if type(error_feedback) is not bool:
             raise TypeError("error_feedback must be boolean")
@@ -127,6 +128,11 @@ class NativeLabAdapter:
         self.allowed_ids = set()
         self.binding = None
         self._resuming = False
+
+    def configure_host_profile(self, profile):
+        if profile != 'r945/0.1' or self.session is not None or self.calls:
+            raise ValueError('host result profile must bind before first call')
+        self._host_result_profile = profile
 
     def resume_after_stop(self, *, turn_id, context_snapshot_id, feedback):
         if (self.binding != (turn_id, context_snapshot_id) or self.session is None
@@ -230,6 +236,9 @@ class NativeLabAdapter:
                         entry.pop("last_seen_sample"), self.latest_sample_id)
                     projected.append(entry)
                 result = {**result, "records": projected}
+            if self._host_result_profile == 'r945/0.1' and descriptor.name == 'retrieve_memory':
+                from .retrieval_representation import model_search_view
+                result = model_search_view(result)
             self.session.submit_result(call, result)
             if descriptor.name == "retrieve_memory":
                 self.allowed_ids.update(row["last_seen_event_id"] for row in result["records"]
