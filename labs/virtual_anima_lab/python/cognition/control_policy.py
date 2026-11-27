@@ -9,9 +9,14 @@ from .source_policy import E25CognitionError
 from anima.agent.native_tools import canonical
 
 PROFILE='r942/0.1'
+
+def search_key(query,profile):
+    if profile=='r942/0.1':return ' '.join(query.casefold().split())
+    from .retrieval_policy import query_key
+    return query_key(query)
 REASONS=('INFORMATION_SUFFICIENT','SOURCE_UNAVAILABLE','REDUNDANT_OPERATION','NO_SERVICE_READ_VIOLATION')
 
-def state(requirement,context,records):
+def state(requirement,context,records,profile=PROFILE):
     report={'turn_id':records[0]['turn_id'] if records else 'unused',
             'context_snapshot_id':context['context_snapshot_id'],
             'status':'STEP_BUDGET_EXHAUSTED','outcomes':[r['outcome'] for r in records]}
@@ -22,7 +27,7 @@ def state(requirement,context,records):
         if not p or o['status']!='COMPLETED':continue
         operations.append([p['operation_kind'],p['arguments']])
         if p['operation_kind']=='retrieve_memory':
-            searches.add(canonical([' '.join(p['arguments']['query'].casefold().split()),p['arguments']['top_k'],o['result']]))
+            searches.add(canonical([search_key(p['arguments']['query'],profile),p['arguments']['top_k'],o['result']]))
         for row in admitted_source_rows(record):
             if row['event_id'] in rows and rows[row['event_id']]!=row:
                 raise E25CognitionError('INCONSISTENT_SOURCE_READS')
@@ -61,11 +66,11 @@ def termination(requirement,view):
     if view['recoverability']=='UNAVAILABLE':return 'SOURCE_UNAVAILABLE'
     return None
 
-def redundant(requirement,context,view,proposal):
+def redundant(requirement,context,view,proposal,profile=PROFILE):
     kind,args=proposal['operation_kind'],proposal['arguments']
     if kind=='retrieve_memory':
-        key=[' '.join(args['query'].casefold().split()),args['top_k']]
-        return any(k==kind and [' '.join(a['query'].casefold().split()),a['top_k']]==key for k,a in view['completed_operations'])
+        key=[search_key(args['query'],profile),args['top_k']]
+        return any(k==kind and [search_key(a['query'],profile),a['top_k']]==key for k,a in view['completed_operations'])
     if kind=='lookup_raw_evidence':
         if not all(e in view['rows'] for e in args['event_ids']):return False
         # C14: same identity can newly meet the lookup-only requirement.
@@ -78,3 +83,39 @@ def redundant(requirement,context,view,proposal):
     # Belief reads and other tools may expose different predicates with the
     # same source ID. No identity-only veto across different semantics.
     return False
+
+def verify_control(report,records):
+    """Consistency of checked imported metadata, NOT archive authenticity."""
+    from .completion import CompletionRequirement
+    marker=report['control']
+    try:
+        profile=marker['profile']
+        if marker['schema']!='anima.lab.cognitive_control/0.1' or profile not in ('r942/0.1','r942/0.2'):
+            raise ValueError('unknown control profile')
+        raw=marker['state']['completion']['requirement']
+        req=CompletionRequirement(raw['kind'],tuple(raw['entities']),raw['query'])
+        if not records:
+            # No scope is attested by an empty journal. Accept only a
+            # non-system terminal with no asserted acquisitions; completion
+            # prerequisites can still be checked without inventing Context.
+            evaluation=evaluate_completion(req,report,records)
+            for k,v in marker['state']['completion'].items():
+                if k in evaluation and v!=evaluation[k]:raise ValueError('control completion mismatch')
+            if report['status']=='RESEARCH_TERMINATED' or marker['state']['identities'] or marker['state']['rows']:
+                raise ValueError('control lacks checked scope')
+            return
+        ctx=records[0]['context_snapshot']
+        expected=state(req,ctx,records,profile)
+        if canonical(marker['state'])!=canonical(expected):raise ValueError('control state mismatch')
+        reason=marker['reason']
+        if report['status']=='RESEARCH_TERMINATED':
+            if reason=='REDUNDANT_OPERATION':
+                last=records[-1]
+                if (last['admission']!='REJECTED' or last['outcome']['status']!='REJECTED'
+                        or last['outcome']['reason_code']!='POLICY_NO_GAIN' or not last['proposal']
+                        or not redundant(req,ctx,state(req,ctx,records[:-1],profile),last['proposal'],profile)):
+                    raise ValueError('control redundancy not established')
+            elif termination(req,expected)!=reason:raise ValueError('control termination contradiction')
+        elif reason is not None:raise ValueError('control reason on non-system terminal')
+    except (KeyError,TypeError,ValueError) as error:
+        raise ValueError('invalid control marker: '+str(error)) from error

@@ -553,6 +553,9 @@ def verify_case(fixture, raw_fixture, *, scenario=None, require_native=False,
         verify_raw(raw_fixture)
         verify_exported_result(fixture, raw_fixture, scenario=scenario, variant=variant,
                                required=require_cognitive_result)
+    if fixture['turn'].get('control') is not None:
+        from ..cognition.control_policy import verify_control
+        verify_control(fixture['turn'],fixture['trace'])
     return len(expected)
 
 

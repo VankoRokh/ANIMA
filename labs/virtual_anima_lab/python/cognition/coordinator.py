@@ -163,7 +163,7 @@ class E25LabCognitiveCoordinator:
                  error_feedback=False, latest_observation=False, policy_profile="baseline"):
         if type(latest_observation) is not bool:
             raise TypeError("latest_observation must be boolean")
-        if policy_profile not in ("baseline","r942/0.1"):
+        if policy_profile not in ("baseline","r942/0.1","r942/0.2"):
             raise ValueError("unknown cognitive control profile")
         self._policy_profile = policy_profile
         self._latest_observation = latest_observation
@@ -239,7 +239,7 @@ class E25LabCognitiveCoordinator:
             from .native_lab import NativeLabAdapter
             if type(completion_requirement) is not CompletionRequirement or type(adapter) is not NativeLabAdapter:
                 raise TypeError("continuation requires trusted requirement and native adapter")
-        controlled = self._policy_profile == "r942/0.1"
+        controlled = self._policy_profile != "baseline"
         if controlled and (completion_requirement is None or resource_limits is None):
             raise ValueError("controlled profile requires completion contract and ResourceBudget")
         if controlled:
@@ -249,7 +249,7 @@ class E25LabCognitiveCoordinator:
         policy_verification_candidates = 0
         def control_metadata():
             if not controlled:return {}
-            current = control_policy.state(completion_requirement,context,self.decision_records(turn_id))
+            current = control_policy.state(completion_requirement,context,self.decision_records(turn_id),profile=self._policy_profile)
             return {"control":{"schema":"anima.lab.cognitive_control/0.1",
                     "profile":self._policy_profile,"reason":control_reason,"state":current,
                     "remaining_calls":0 if budget is not None and budget.check_next() else max(0,self._max_steps-calls_used),
@@ -293,7 +293,7 @@ class E25LabCognitiveCoordinator:
             if _sha(_json(checked)) != _sha(base):
                 raise E25CognitionError("context changed during cognitive turn")
             if controlled and outcomes:
-                current = control_policy.state(completion_requirement,context,self.decision_records(turn_id))
+                current = control_policy.state(completion_requirement,context,self.decision_records(turn_id),profile=self._policy_profile)
                 control_reason = control_policy.termination(completion_requirement,current)
                 if control_reason:break
             if budget is not None and not budget.reserve():
@@ -365,7 +365,7 @@ class E25LabCognitiveCoordinator:
                         reason = ('CONTINUE' if remaining and not continuation_decisions
                                   else 'BUDGET_EXHAUSTED' if not remaining else 'CONTINUATION_LIMIT')
                         if controlled:
-                            current = control_policy.state(completion_requirement,context,self.decision_records(turn_id))
+                            current = control_policy.state(completion_requirement,context,self.decision_records(turn_id),profile=self._policy_profile)
                             if current['recoverability']=='UNAVAILABLE':reason='SOURCE_UNAVAILABLE'
                             elif not remaining:reason='BUDGET_EXHAUSTED'
                             elif last_stop_gain is not None and current['gain_key']==last_stop_gain:reason='NO_CONTINUATION_GAIN'
@@ -448,8 +448,8 @@ class E25LabCognitiveCoordinator:
                 admissible = False
                 reason = "UNEXPOSED_EVIDENCE_ID"
             if controlled and admissible:
-                current = control_policy.state(completion_requirement,context,self.decision_records(turn_id))
-                if control_policy.redundant(completion_requirement,context,current,proposal):
+                current = control_policy.state(completion_requirement,context,self.decision_records(turn_id),profile=self._policy_profile)
+                if control_policy.redundant(completion_requirement,context,current,proposal,profile=self._policy_profile):
                     admissible=False
                     reason="POLICY_NO_GAIN"
                     control_reason="REDUNDANT_OPERATION"
@@ -523,7 +523,7 @@ class E25LabCognitiveCoordinator:
                 break
             sources.record_completed(kind, result)
             if controlled:
-                current=control_policy.state(completion_requirement,context,self.decision_records(turn_id))
+                current=control_policy.state(completion_requirement,context,self.decision_records(turn_id),profile=self._policy_profile)
                 control_reason=control_policy.termination(completion_requirement,current)
                 if control_reason:break
         else:
