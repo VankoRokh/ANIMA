@@ -23,6 +23,7 @@ from anima.agent.generation_termination import classify_termination
 from anima.agent.native_tools import canonical, strict_json, NativeToolCatalog, LoopbackChatTransport
 from .egocentric import EgocentricView
 from anima.core.ingress import validate_event_envelope
+from ..cognition.turn_status import valid_turn_status
 from ..cognition.contracts import CognitiveStepProposal
 from ..cognition.native_lab import lab_registry
 from ..cognition.source_policy import E25CognitionError, TurnSourcePolicy
@@ -254,7 +255,7 @@ def _verify_journal_scope(fixture, rows):
     """
     turn = fixture["turn"]
     trace = fixture["trace"]
-    if turn["status"] not in ("STOPPED", "REJECTED", "STEP_BUDGET_EXHAUSTED"):
+    if not valid_turn_status(turn):
         raise ValueError("invalid cognitive turn status")
     if not trace:
         return

@@ -4,6 +4,7 @@ Trusted in-process coordinator/report only; imported verdicts, model prose
 and hidden fixture answers are not sources of authority. No new research
 reads, inference, persistence or execution. Verification may re-read Raw.
 """
+from .turn_status import valid_turn_status
 from copy import deepcopy
 
 from .claim_verification import ObservationClaim, ObservationClaimVerifier
@@ -21,7 +22,7 @@ def _bound_records(coordinator, report):
     if type(coordinator) is not E25LabCognitiveCoordinator:
         raise TypeError("trusted lab coordinator required")
     if (report["schema"] != "anima.lab.cognitive_turn/0.1"
-            or report["status"] not in ("STOPPED", "REJECTED", "STEP_BUDGET_EXHAUSTED")
+            or not valid_turn_status(report)
             or report["lab_admission_only"] is not True
             or report["model_executive_authority"] is not False):
         raise ValueError("trusted laboratory turn report required")

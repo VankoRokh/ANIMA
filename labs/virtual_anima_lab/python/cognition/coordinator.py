@@ -160,9 +160,12 @@ class E25LabCognitiveCoordinator:
     """Only read-only lab cognition; no independent Core identity or executor."""
 
     def __init__(self, memory: E24WorkingMemory, *, max_steps: int = 4, ranked=False,
-                 error_feedback=False, latest_observation=False):
+                 error_feedback=False, latest_observation=False, policy_profile="baseline"):
         if type(latest_observation) is not bool:
             raise TypeError("latest_observation must be boolean")
+        if policy_profile not in ("baseline","r942/0.1"):
+            raise ValueError("unknown cognitive control profile")
+        self._policy_profile = policy_profile
         self._latest_observation = latest_observation
         if type(memory) is not E24WorkingMemory:
             raise TypeError("trusted E24WorkingMemory required")
@@ -236,6 +239,23 @@ class E25LabCognitiveCoordinator:
             from .native_lab import NativeLabAdapter
             if type(completion_requirement) is not CompletionRequirement or type(adapter) is not NativeLabAdapter:
                 raise TypeError("continuation requires trusted requirement and native adapter")
+        controlled = self._policy_profile == "r942/0.1"
+        if controlled and (completion_requirement is None or resource_limits is None):
+            raise ValueError("controlled profile requires completion contract and ResourceBudget")
+        if controlled:
+            from . import control_policy
+        control_reason = None
+        last_stop_gain = None
+        policy_verification_candidates = 0
+        def control_metadata():
+            if not controlled:return {}
+            current = control_policy.state(completion_requirement,context,self.decision_records(turn_id))
+            return {"control":{"schema":"anima.lab.cognitive_control/0.1",
+                    "profile":self._policy_profile,"reason":control_reason,"state":current,
+                    "remaining_calls":0 if budget is not None and budget.check_next() else max(0,self._max_steps-calls_used),
+                    "policy_verification_candidates":policy_verification_candidates,
+                    "verification_io":"SERVICE_CONTEXT_AND_ADDITIONAL_POLICY_SOURCE_VERIFICATION",
+                    "measurement_sidecar_in_hot_path":False}}
         with closing(self._memory._connect()) as db:
             if db.execute("SELECT 1 FROM e25_cognitive_trace WHERE turn_id=?",
                           (turn_id,)).fetchone():
@@ -272,6 +292,10 @@ class E25LabCognitiveCoordinator:
             )
             if _sha(_json(checked)) != _sha(base):
                 raise E25CognitionError("context changed during cognitive turn")
+            if controlled and outcomes:
+                current = control_policy.state(completion_requirement,context,self.decision_records(turn_id))
+                control_reason = control_policy.termination(completion_requirement,current)
+                if control_reason:break
             if budget is not None and not budget.reserve():
                 budget_stopped = True
                 break
@@ -340,6 +364,13 @@ class E25LabCognitiveCoordinator:
                             budget.reason = budget.check_next()
                         reason = ('CONTINUE' if remaining and not continuation_decisions
                                   else 'BUDGET_EXHAUSTED' if not remaining else 'CONTINUATION_LIMIT')
+                        if controlled:
+                            current = control_policy.state(completion_requirement,context,self.decision_records(turn_id))
+                            if current['recoverability']=='UNAVAILABLE':reason='SOURCE_UNAVAILABLE'
+                            elif not remaining:reason='BUDGET_EXHAUSTED'
+                            elif last_stop_gain is not None and current['gain_key']==last_stop_gain:reason='NO_CONTINUATION_GAIN'
+                            else:reason='CONTINUE'
+                            last_stop_gain=current['gain_key']
                         decision = {'decision':reason,'model_calls_used':calls_used,
                                     'model_calls_remaining':remaining,
                                     'reason_code':evaluation['reason_code'],
@@ -361,7 +392,7 @@ class E25LabCognitiveCoordinator:
                 break
             # Only the opt-in, trusted native adapter can request this bounded
             # non-execution continuation. It still consumes one turn step.
-            if (self._error_feedback and not feedback_used and type(raw) is dict
+            if (self._error_feedback and not controlled and not feedback_used and type(raw) is dict
                     and set(raw) == {"rejected_native_call"}
                     and raw["rejected_native_call"] in ("UNEXPOSED_EVIDENCE_ID", "INVALID_TOOL_ARGUMENTS")):
                 from .native_lab import NativeLabAdapter
@@ -416,6 +447,13 @@ class E25LabCognitiveCoordinator:
                     and not sources.permits(proposal["arguments"]["event_ids"])):
                 admissible = False
                 reason = "UNEXPOSED_EVIDENCE_ID"
+            if controlled and admissible:
+                current = control_policy.state(completion_requirement,context,self.decision_records(turn_id))
+                if control_policy.redundant(completion_requirement,context,current,proposal):
+                    admissible=False
+                    reason="POLICY_NO_GAIN"
+                    control_reason="REDUNDANT_OPERATION"
+            checked_prior = self.decision_records(turn_id) if controlled else None
             self._record(
                 turn=turn_id, step=step, context=frozen,
                 proposal_id=proposal["proposal_id"], op=kind,
@@ -451,6 +489,22 @@ class E25LabCognitiveCoordinator:
                 }
                 if len(_json(output).encode("utf-8")) > MAX_RESULT_BYTES:
                     raise E25CognitionError("OUTCOME_BUDGET_EXCEEDED")
+                if controlled and kind in ("lookup_raw_evidence","inspect_latest_observation"):
+                    from .claim_verification import ObservationClaim, ObservationClaimVerifier, _verify_captured_claim
+                    from .source_binding import admitted_source_rows
+                    prospective={"turn_id":turn_id,"step_index":step,"context_snapshot":context,
+                                 "proposal":proposal,"admission":"ADMITTED","outcome":output}
+                    prior=checked_prior
+                    # Current journal row is intentionally pending until source
+                    # verification succeeds; read only finalized prior rows.
+                    verifier=ObservationClaimVerifier(self)
+                    for row in admitted_source_rows(prospective):
+                        entity=next(iter(row["entities_observed"]),"control.empty_sample")
+                        claim=ObservationClaim(entity,"observed_in_sample",bool(row["entities_observed"]),row["event_id"],row["sample_id"])
+                        policy_verification_candidates += 1
+                        verdict=_verify_captured_claim(turn_id,claim,prior+[prospective],verifier._load_view)
+                        if verdict["status"]!="VERIFIED":
+                            raise E25CognitionError("CONTROL_SOURCE_INTEGRITY_REJECTED")
                 verified_context = self._memory.context_for_cognition(
                     focus_refs=focus_refs, memory_enabled=memory_enabled,
                 )
@@ -468,12 +522,17 @@ class E25LabCognitiveCoordinator:
             if output["status"] != "COMPLETED":
                 break
             sources.record_completed(kind, result)
+            if controlled:
+                current=control_policy.state(completion_requirement,context,self.decision_records(turn_id))
+                control_reason=control_policy.termination(completion_requirement,current)
+                if control_reason:break
         else:
             # Explicit budget exhaustion, no free-running cognitive loop.
             return {
                 "schema": "anima.lab.cognitive_turn/0.1",
                 "turn_id": turn_id, "context_snapshot_id": ctx_id,
                 "status": "STEP_BUDGET_EXHAUSTED", "outcomes": outcomes,
+                **control_metadata(),
                 **({"resource_budget":budget.snapshot()} if budget is not None else {}),
                 "lab_admission_only": True,
                 "model_executive_authority": False,
@@ -483,10 +542,12 @@ class E25LabCognitiveCoordinator:
         report = {
             "schema": "anima.lab.cognitive_turn/0.1",
             "turn_id": turn_id, "context_snapshot_id": ctx_id,
-            "status": ("STEP_BUDGET_EXHAUSTED" if budget_stopped else
+            "status": ("RESEARCH_TERMINATED" if control_reason else
+                       "STEP_BUDGET_EXHAUSTED" if budget_stopped else
                        "STOPPED" if model_stopped else "REJECTED"),
             **({"resource_budget":budget.snapshot()} if budget is not None else {}),
             "outcomes": outcomes,
+            **control_metadata(),
             "lab_admission_only": True,
             "model_executive_authority": False,
             **({"model_calls_used":calls_used,"continuation_decisions":continuation_decisions}

@@ -301,3 +301,8 @@ R9-Q02/Q03/Q04, CA-06 и R9-E01/E02 не закрываются измерени
 На execution baseline `d34b472e51cdddf6f8700f0d521d4df65e8b4216` выполнены serial Q/I matrix: 2640 planned/attempted/received, 0 failed, no dispatch/retries. T-recorded 28/28, 93 exact requests; H0/H1 4 fixed journals, acquisition/research text/source bindings неизменны. В [техническом отчёте](e2-6-r941b-baseline-model-experiments-v02.md) находятся per-context results, hashes/choices/typed arguments/prose/terminal endpoints, resource costs, immutability, archive SHA и предложения R9.4.2.
 
 I-event: 120/560 pairs меняют tool choice; I-tool: 480/480 operations/arguments совпали, 5 prose differences также наблюдаются внутри exact original repetitions. I-turn остаётся UNSUPPORTED. Это single-request baseline, не T-fresh и не causal policy benefit; прежние finding/quality gate statuses не закрываются. Реализация, model/prompts/budgets/permissions/Retrieval/continuation не менялись; R9.4.2/R9.4.3 не реализованы. Owner originals неизменны, independent R9.5 audit остаётся отдельным этапом.
+
+
+## 13. R9.4.2 — Cognitive Control Policy
+
+[Отчёт R9.4.2](e2-6-r942-cognitive-control-v02.md) фиксирует opt-in r942/0.1 в существующем lab coordinator: information sufficiency, availability-aware bounded continuation и source/tool-aware redundancy. Baseline-compatible default сохранён; historical assertions и scoring не изменены. New system termination не model stop/Task success. R9.4.3/T-fresh/canonical integration не реализованы; causal fresh policy evaluation остаётся R9.4.4. Новых prompts, generation budgets, tool permissions или Knowledge writes нет. Scope synthetic/recorded validation не закрывает generalized model-quality findings или R9.5 independent audit.

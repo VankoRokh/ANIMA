@@ -419,13 +419,13 @@ def _stable(value):
 
 def recorded_trajectory(fixture, raw, *, output, task, requirement, max_steps,
                         adapter_flags=None, coordinator_flags=None, resource_limits=None,
-                        project_result_claims=False, host_profile=False, claim_phase=None):
+                        project_result_claims=False, host_profile=False, claim_phase=None, policy_profile="baseline"):
     frozen.verify_case(fixture, raw)
     root = _new_output(output)
     frozen.write_json(root / "original-fixture.json", fixture)
     frozen.write_json(root / "original-raw.json", raw)
     memory = rebuild_raw(raw, root / "stores")
-    coordinator = E25LabCognitiveCoordinator(memory, max_steps=max_steps, **(coordinator_flags or {}))
+    coordinator = E25LabCognitiveCoordinator(memory, max_steps=max_steps, policy_profile=policy_profile, **(coordinator_flags or {}))
     original = fixture["turn"]
     readonly_before = {"events":_sha(memory._core.event_log.load_events()),
                        "memory_count":memory._core.memory_store.count()}

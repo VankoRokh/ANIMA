@@ -4,6 +4,7 @@ Consumes the trusted lab coordinator report and decision_records (not model
 text or arbitrary imported evidence). No execution, retries, knowledge writes,
 or inference of claims. This is not a canonical Core Goal/Task completion gate.
 """
+from .turn_status import valid_turn_status
 from dataclasses import dataclass
 from .source_binding import admitted_source_rows
 
@@ -51,7 +52,7 @@ def evaluate_completion(requirement, report, records):
     if type(requirement) is not CompletionRequirement:
         raise TypeError("trusted completion requirement required")
     status = report["status"]
-    if status not in ("STOPPED", "REJECTED", "STEP_BUDGET_EXHAUSTED"):
+    if not valid_turn_status(report):
         raise ValueError("unknown turn status")
     outcomes = report["outcomes"]
     if len(records) != len(outcomes):

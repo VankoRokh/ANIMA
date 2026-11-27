@@ -59,6 +59,8 @@ _VAL_DOC_SOURCES = frozenset({
     Path("labs/virtual_anima_lab/python/cognition/coordinator.py"),
     Path("labs/virtual_anima_lab/python/cognition/contracts.py"),
     Path("labs/virtual_anima_lab/python/cognition/source_binding.py"),
+    Path("labs/virtual_anima_lab/python/cognition/control_policy.py"),
+    Path("labs/virtual_anima_lab/python/cognition/turn_status.py"),
     Path("labs/virtual_anima_lab/python/cognition/observable.py"),
     Path("labs/virtual_anima_lab/python/lifecycle/e26_r941_experiments.py"),
     # R9.4.0 inventory links; preserve bounded documentation snapshots.
