@@ -333,4 +333,4 @@ R945b: diagnostic80/80 без dispatch; A/B/D реализованы тольк�
 
 ## 18. R9.4.5c — Confirmatory Evaluation
 
-[Approved design, versioned experimental contracts and results](e2-6-r945c-confirmatory-evaluation-v02.md). A=baseline/B=r945/0.1,560 pairs; runtime unchanged, legacy replay retained. Readiness precedes fresh inference; no remediation or automatic adoption.
+[Approved design, versioned experimental contracts and results](e2-6-r945c-confirmatory-evaluation-v02.md). A=baseline/B=r945/0.1,560 pairs; runtime unchanged, legacy replay retained. Завершены560/560 pairs и1120 trajectories,3060 model calls. Completeness non-regression FAIL; focused F01 не устранён, broad F02 OPEN. r945/0.1 остаётся opt-in, stable adoption не рекомендован; runtime не изменён.
