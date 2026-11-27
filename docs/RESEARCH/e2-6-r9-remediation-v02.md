@@ -1,7 +1,7 @@
 # ANIMA v0.2 — E2.6 R9: реестр находок и план исправлений
 
-**Дата:** 27 ноября 2026. **Статус:** Research / R9.1–R9.3 owner-validated in documented scope; independent re-audit pending. R9.3 owner evidence packaging pending; R9.4 not started.
-**Baseline:** `508851d458cf759902aa35c9ae140780fb29c4a0`. Рабочая ветка `work/v02-e26-r9-remediation`.
+**Дата:** 27 ноября 2026. **Статус:** Research / R9.1–R9.3 owner-validated in documented scope; independent re-audit pending. R9.3 Recovery owner results recorded in R9.4.0 report; independent archive audit pending. R9.4.0 characterization/design recorded; R9.4.1–R9.4.4 implementation not started.
+**Исходный baseline реестра:** `508851d458cf759902aa35c9ae140780fb29c4a0`. Рабочая ветка `work/v02-e26-r9-remediation`.
 **Источник:** независимый отчёт `ANIMA-E26-R8-Independent-Reaudit-RU.md`, 25 ноября 2026, §§4, 6, 9–15; архив `ANIMA-E26-R8-Independent-Reproduction.zip`. Первичные файлы предоставлены владельцем вне данного snapshot; этот документ не заменяет их.
 **Вердикт R8:** CONDITIONAL PASS только для продолжения ограниченной лабораторной работы. Закрытие E2.6, перенос в canonical assembly и расширение model-facing authority — BLOCKED.
 
@@ -276,3 +276,14 @@ Earlier owner evidence at `40d0d2ed71a2effbbc6d8eed8e91a5a8327a79a0` remains bou
 **Residual scope:** process-local diagnostic history, no durable/global resource accounting, malformed or unavailable response envelopes may lack counters, no guarantees against malicious backend metadata, no independent execution or backend attestation. The final-snapshot archive recheck and packaging are pending; source logs under owner's `/tmp/anima-r93-BKi2Gj` have not been independently inspected or archived by this reviewer. Preserve original artifacts, including failures; do not replace them with summaries or claim hashes not yet computed. Prior unresolved R9-Q/E/L findings remain open. Independent assessment should probe inconsistent terminal flags, alternative response paths and diagnostic coverage beyond tested content failures.
 
 **Resume point — R9.4:** package local R9.3 evidence and verify the existing bundles under the final tested code, record archive SHA-256; then plan causal evaluation before new implementation. Priorities: information sufficiency, repeated operations, incremental information gain, retrieval quality, reuse of deterministic resolution, and matched-input evaluation (CA-06 and R9-E01/E02). Preserve R9.2 hybrid result and R9.3 terminal contracts, existing roadmap and read-only lab authority. No new development started in R9.4. R9.5 independent re-audit remains mandatory.
+
+
+## 10. R9.4.0 — characterization и экспериментальный протокол, 27 ноября 2026
+
+**Baseline этапа:** `5448e8ee8b09a3ad8d079896d85367201ed13d5a`, ветка `work/v02-e26-r9-remediation`. **Статус:** CHARACTERIZATION / DESIGN ONLY. Новые owner Recovery результаты, инвентаризация файлов/функций, C01–C14 воспроизводители, определения метрик, controlled experiment matrix и критерии R9.4.1–R9.4.4 зафиксированы в [техническом отчёте R9.4.0](e2-6-r940-characterization-v02.md). [Characterization tests](../../tests/test_e26_r940_cycle_characterization.py) исполняют неизменённую baseline реализацию через synthetic terminal-valid responses; PASS означает воспроизведение ограничения, а не исправление.
+
+Подтверждённые механизмы: один возврат после model stop без оценки recoverability; отсутствие проверки sufficiency/gain после completed research read; cross-tool повтор одного event невидим для repeated_proposals; bounded empty search не имеет отдельного availability verdict; lexical lab Retrieval не выполняет semantic/alias matching. До получения Context недоступный working model может оставить вызов без turn result. Existing hybrid result уже отделяет stop/information/claims/prose и не утверждает Task success; provenance и R9.3 terminal checks сохраняются.
+
+Host projection не инициирует acquisition; повторные Raw reads для integrity нужно считать отдельно. Пары Native Control/Host из Recovery не являются matched-input causal experiment. Existing replay_request повторяет один exact request без service dispatch; full recorded/fresh trajectory replay остаётся отдельным запланированным опытом. Нужны explicit tool-call-ID policy, request order, cache и backend configuration.
+
+R9-Q02/Q03/Q04, CA-06 и R9-E01/E02 остаются открыты в прежней области; критерии не смягчены. Historical metrics и frozen evidence не изменены. No model/prompt/budget/tool permission changes, Knowledge writes или canonical integration. **Resume point:** рассмотреть результаты characterization и протокол; только затем начинать R9.4.1. Граница этой работы — R9.4.0, исправления не реализованы. Проверки текущего этапа и их граница записаны в §7 отчёта; independent re-audit остаётся R9.5.

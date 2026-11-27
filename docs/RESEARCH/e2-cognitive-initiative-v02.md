@@ -166,3 +166,8 @@ Core обязан продолжать жизненный цикл без LLM. �
 - **Общая картина «я»:** эгоцентрический viewpoint, память о собственных действиях и карте — это рабочая само-локализация, **не** утверждение о наличии субъективного сознания.
 
 **Первый технический шаг:** E2.3 opt-in view cone / relative observations + test fixture; параллельно подготовить минимальные `CognitiveStepProposal` / `DecisionRecord` контракты и сравнимый deterministic baseline. Никакой merge/release gate автоматически из этого design-текста не следует.
+
+
+## R9.4.0 — управление циклом: текущая исследовательская граница
+
+На baseline `5448e8ee8b09a3ad8d079896d85367201ed13d5a` подготовлены [инвентаризация, characterization, метрики и контролируемый протокол R9.4.0](e2-6-r940-characterization-v02.md). [Реестр R9](e2-6-r9-remediation-v02.md) сохраняет прежние finding IDs и исторические результаты. Зафиксированные ограничения sufficiency/continuation/redundancy/availability относятся к изолированному read-only lab loop; они не означают разрешение на изменение canonical coordinator. Реализация R9.4.1–R9.4.4 начинается только после рассмотрения characterization и протокола. Hybrid Cognitive Result, source binding и terminal contracts R9.3 сохранены; PASS воспроизводителя не закрывает дефект.

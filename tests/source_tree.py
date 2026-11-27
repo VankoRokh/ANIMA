@@ -59,6 +59,16 @@ _VAL_DOC_SOURCES = frozenset({
     Path("labs/virtual_anima_lab/python/cognition/coordinator.py"),
     Path("labs/virtual_anima_lab/python/cognition/contracts.py"),
     Path("labs/virtual_anima_lab/python/cognition/source_binding.py"),
+    # R9.4.0 inventory links; preserve bounded documentation snapshots.
+    Path("labs/virtual_anima_lab/python/cognition/completion.py"),
+    Path("labs/virtual_anima_lab/python/cognition/resource_budget.py"),
+    Path("labs/virtual_anima_lab/python/cognition/native_lab.py"),
+    Path("labs/virtual_anima_lab/python/cognition/source_policy.py"),
+    Path("labs/virtual_anima_lab/python/cognition/claim_verification.py"),
+    Path("labs/virtual_anima_lab/python/cognition/cognitive_result.py"),
+    Path("labs/virtual_anima_lab/python/cognition/result_reasoning.py"),
+    Path("labs/virtual_anima_lab/python/cognition/host_temporal_projection.py"),
+    Path("labs/virtual_anima_lab/python/lifecycle/e24_working_memory.py"),
 })
 
 # These are never source subdirectories, even when a filename looks like source.

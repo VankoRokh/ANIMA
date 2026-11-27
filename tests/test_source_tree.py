@@ -162,6 +162,15 @@ def test_r91_documented_val_sources_are_copied_without_other_lab_files(tmp_path)
         "cognition/coordinator.py",
         "cognition/contracts.py",
         "cognition/source_binding.py",
+        "cognition/completion.py",
+        "cognition/resource_budget.py",
+        "cognition/native_lab.py",
+        "cognition/source_policy.py",
+        "cognition/claim_verification.py",
+        "cognition/cognitive_result.py",
+        "cognition/result_reasoning.py",
+        "cognition/host_temporal_projection.py",
+        "lifecycle/e24_working_memory.py",
     )
     excluded = (
         "cognition/unreferenced.py",
