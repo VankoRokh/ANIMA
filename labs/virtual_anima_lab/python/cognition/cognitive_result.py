@@ -151,7 +151,7 @@ def _project_result(report, records, *, requirement, research_calls, claim_phase
         report, completion, research_calls=research_calls,
         claim_phase=claim_phase, evaluate_claims=evaluate_claims,
     )
-    return {
+    result = {
         "schema": SCHEMA,
         "identity": {
             "turn_id": report["turn_id"],
@@ -195,6 +195,11 @@ def _project_result(report, records, *, requirement, research_calls, claim_phase
         "reasoning": reasoning,
         "presentation": presentation,
     }
+
+    if report.get('control',{}).get('profile') == 'r945/0.1':
+        from .verified_presentation import project_verified_presentation
+        result['consumer_view'] = project_verified_presentation(result)
+    return result
 
 
 __all__ = ["SCHEMA", "build_cognitive_result"]

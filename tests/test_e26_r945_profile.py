@@ -133,3 +133,98 @@ def test_B_feedback_fits_existing_limit_without_fabricating_coverage(tmp_path,mo
     assert len(canonical(f).encode())<=2048 and f['missing_units_truncated']
     assert f['missing_units_total']==20 and f['checked_coverage']['covered_units']==0
     assert 'elapsed_ms_boundary_only' not in f['remaining_budget']
+
+
+def test_D_incomplete_accepted_prose_not_global_knowledge(tmp_path,monkeypatch):
+    from labs.virtual_anima_lab.python.cognition.cognitive_result import build_cognitive_result
+    mem=memory(tmp_path,monkeypatch)
+    c,r,records,a,w=execute(tmp_path,mem,[search(),completion(content='They are absent and verified.'),completion(content='All verified.')])
+    result=build_cognitive_result(c,r,requirement=OBS,research_calls=a.calls,claim_phase='claim_projection')
+    view=result['consumer_view']
+    assert view['schema']=='anima.lab.verified_presentation/0.1'
+    assert view['information']['status']=='INCOMPLETE' and view['verified_facts']==[]
+    assert view['information']['missing_units'][0]['required_operation']=='lookup_raw_evidence'
+    assert view['accepted_research_final']['status']=='ACCEPTED_PROTOCOL_FINAL'
+    assert view['unverified_model_prose']['research']=='All verified.'
+    assert view['projection']['accepted_final_status']=='NO_ACCEPTED_PROJECTION_FINAL'
+    assert view['global_verification']=='NOT_ESTABLISHED' and view['task_completion']=='NOT_ESTABLISHED'
+
+
+def test_D_system_termination_keeps_facts_without_fake_final(tmp_path,monkeypatch):
+    from labs.virtual_anima_lab.python.cognition.cognitive_result import build_cognitive_result
+    mem=memory(tmp_path,monkeypatch)
+    c,r,records,a,w=execute(tmp_path,mem,[lookup(crate_event(mem),'one')])
+    view=build_cognitive_result(c,r,requirement=OBS,research_calls=a.calls)['consumer_view']
+    assert view['verified_facts'] and view['information']['status']=='SATISFIED'
+    assert view['accepted_research_final']['status']=='NO_ACCEPTED_RESEARCH_FINAL'
+    assert view['unverified_model_prose']['research'] is None
+    assert view['verified_facts'][0]['verdict']['claim']['scope']=='source_sample'
+
+
+def test_D_partial_facts_preserved_after_incomplete_generation(tmp_path,monkeypatch):
+    from labs.virtual_anima_lab.python.cognition.cognitive_result import build_cognitive_result
+    mem=memory(tmp_path,monkeypatch);cut=completion(content='cut');cut['choices'][0]['finish_reason']='length'
+    c,r,records,a,w=execute(tmp_path,mem,[lookup(crate_event(mem),'hist'),cut],req=TEMPORAL)
+    result=build_cognitive_result(c,r,requirement=TEMPORAL,research_calls=a.calls)
+    assert len(w.requests)==2 and result['consumer_view']['verified_facts']
+    assert result['consumer_view']['information']['status']=='INCOMPLETE'
+    assert result['consumer_view']['unverified_model_prose']['research'] is None
+
+
+def test_D_new_profile_export_reconstruction_and_exact_replay(tmp_path,monkeypatch):
+    from labs.virtual_anima_lab.python.lifecycle import e26_reproducibility as f
+    from labs.virtual_anima_lab.python.lifecycle.e26_r941_experiments import recorded_trajectory
+    from labs.virtual_anima_lab.python.lifecycle.e26b_cognitive_suite import CASES
+    from labs.virtual_anima_lab.python.cognition.cognitive_result import build_cognitive_result
+    case=next(c for c in CASES if c['id']=='C01');mem=memory(tmp_path,monkeypatch)
+    c,r,records,a,w=execute(tmp_path,mem,[search(),completion(content='uncertain'),lookup(crate_event(mem),'raw')],task=case['task'])
+    result=build_cognitive_result(c,r,requirement=OBS,research_calls=a.calls,claim_phase='claim_projection')
+    aggregate={'variant':'temporal_completion','case':'C01','seed':7,'memory_enabled':True,'task':case['task'],
+               'model_calls':len(a.calls),'total_model_calls':len(a.calls),'turn_status':r['status'],
+               'cognitive_result':result,'information_completion':result['information']['completion'],'model_claims':result['evidence']['model_claims']['evaluation']}
+    out=tmp_path/'bundle';out.mkdir();raw=f.export_raw(mem,out,7)
+    f.export_case(out,7,'C01',r,records,a.calls,raw,result=aggregate)
+    fixture=f.read_json(out/'case-7-C01.json');f.verify_case(fixture,raw,require_native=True,require_cognitive_result=True)
+    replay=recorded_trajectory(fixture,raw,output=tmp_path/'replay',task=case['task'],requirement=OBS,max_steps=4,
+        adapter_flags={'canonical_sets':True,'temporal':True,'compact_temporal':True,'latest_observation':True},
+        coordinator_flags={'ranked':True,'latest_observation':True},claim_phase='claim_projection',policy_profile='r945/0.1')
+    assert replay['status']=='MATCHED' and replay['matched_requests']==3
+    forged=deepcopy(fixture);forged['result']['cognitive_result']['consumer_view']['global_verification']='VERIFIED'
+    with pytest.raises(ValueError,match='reconstruction'):f.verify_case(forged,raw,require_cognitive_result=True)
+
+
+def _existing_contract_cases():
+    # Reuse historical assertions unchanged, selecting the new profile only
+    # in a test-local constructor. Includes native normalization and source faults.
+    import tests.test_e26_r942_policy as contracts
+    for name,fn in vars(contracts).items():
+        if not name.startswith('test_'):continue
+        marks=[m for m in getattr(fn,'pytestmark',[]) if m.name=='parametrize']
+        if not marks:yield pytest.param(name,{},id=name)
+        else:
+            assert len(marks)==1
+            names=marks[0].args[0].split(',')
+            for value in marks[0].args[1]:
+                values=(value,) if len(names)==1 else value
+                yield pytest.param(name,dict(zip(names,values)),id=name+'-'+str(value))
+
+
+@pytest.mark.parametrize('name,arguments',list(_existing_contract_cases()))
+def test_r945_existing_safety_contracts(tmp_path,monkeypatch,name,arguments):
+    import inspect
+    import tests.test_e26_r942_policy as contracts
+    original=E25LabCognitiveCoordinator.__init__
+    def select(self,*args,**kwargs):
+        if kwargs.get('policy_profile')=='r942/0.1':kwargs['policy_profile']='r945/0.1'
+        original(self,*args,**kwargs)
+    monkeypatch.setattr(E25LabCognitiveCoordinator,'__init__',select)
+    fn=getattr(contracts,name);fixtures={'tmp_path':tmp_path,'monkeypatch':monkeypatch}
+    fn(**{k:fixtures[k] for k in inspect.signature(fn).parameters if k in fixtures},**arguments)
+
+
+def test_no_evaluator_dependency_in_new_runtime_contracts():
+    from pathlib import Path
+    root=Path('labs/virtual_anima_lab/python/cognition')
+    for name in ('retrieval_representation.py','requirement_feedback.py','verified_presentation.py'):
+        source=(root/name).read_text()
+        assert 'CASES' not in source and 'evaluator' not in source and 'held-out' not in source
