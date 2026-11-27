@@ -77,3 +77,5 @@ R9.4.3: [Retrieval Efficiency и R942 targeted hardening](e2-6-r943-retrieval-ef
 R9.4.4: [Controlled Evaluation](e2-6-r944-controlled-evaluation-v02.md), 560 paired T-fresh comparisons; benefit gate INCONCLUSIVE, отрицательный completeness finding сохранён.
 
 R9.4.5a: [Targeted Root Cause Analysis](e2-6-r945a-targeted-root-cause-v02.md), offline F01/F02 analysis и варианты R9.4.5b; без runtime changes или fresh inference.
+
+R9.4.5b: [Targeted Remediation](e2-6-r945b-targeted-remediation-v02.md), separate diagnostic и opt-in A/B/D; full fresh validation отложена R9.4.5c.

@@ -323,3 +323,8 @@ R9.4.4 execution завершён: 560 paired repetitions / 1120 trajectories / 
 ## 16. R9.4.5a — Targeted Root Cause Analysis
 
 [Технический отчёт](e2-6-r945a-targeted-root-cause-v02.md) разделяет CONFIRMED/HYPOTHESIS/NOT_ASSESSED для R944-F01/F02. Ranking/records F01 совпадают; model-visible strategy и IDs остаются confounded. Baseline continuation bound тоже завершает тот же two-stop sequence; cost savings в основном сокращают final/projection. Typed facts и unverified prose не смешиваются. Remediation A–D и ограниченный NOT-RUN diagnostic представлены для отдельного review; runtime/prompt/model/budget/authority не изменены. Findings OPEN, r943/0.1 не принят как stable, R9.5 не начинался.
+
+
+## 17. R9.4.5b — Targeted Remediation
+
+[Отчёт и frozen design](e2-6-r945b-targeted-remediation-v02.md): diagnostic до runtime изменений, затем separate A/B/D commits. C/verification optimization и R9.5 не входят в этап; R9.4.5c full fresh пока не запускается.
