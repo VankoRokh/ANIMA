@@ -11,3 +11,10 @@ Cells: 0 old strategy/original ID; 1 new strategy/original ID; 2 new strategy/re
 Analysis: within-block strategy effect при fixed ID (0/1 и 3/2), ID effect при fixed strategy (0/3 и 1/2). Tool/typed args, text stop, terminal, raw response hashes, usage и latency отдельно. Нет tool dispatch, retries, selective reruns или archived-response substitution. Transport/backend/config mismatch останавливает trial, failures остаются в planned denominator80; length/invalid terminals сохраняются. Один frozen context не превращается в20 independent scenarios; no full trajectory/generalized causal effect claim.
 
 Evidence root `/home/vanko/ANIMA-Evidence/v0.2/E2.6/R9.4/r945b-b3ce107/`: diagnostic/, synthetic/, validation/ раздельны. Diagnostic design и synthetic checks фиксируются отдельным commit до inference; results/conclusions фиксируются до A/B/D changes. Full T-fresh не запускается в этом этапе.
+
+
+### Diagnostic results — зафиксированы до runtime
+
+Clean diagnostic implementation `868ec81b33e60b430818807ab3ec1260747ba975`; frozen manifest SHA-256 `7b49545beabd09d50e9dd2480c9193baf5e1dd27d32285917b206c8f07db5f08`. 80 planned/attempted/received, 0 failed; no dispatch/retry/rerun. Cell0 old/original: 19 lookup_raw_evidence +1 text stop. Cells1/2/3: по20 lookup. Typed operations/arguments equality: strategy-original-ID19/20, strategy-renamed-ID20/20; ID-old-strategy19/20, ID-new-strategy20/20. Text/terminal/raw/usage сохранены в отдельных sample/exchange records; decoder проверил tool schema/typed args, не выполняя операции.
+
+Вывод: устойчивое ухудшение от new strategy в этом фиксированном request **не воспроизведено**; это не доказывает безвредность representation/IDs вообще, не устанавливает trajectory effect и не закрывает F01. Все80 сохранены, single stop не исключён. Cache/warm/slot state UNKNOWN; один context, никакого scenario-level significance/generalization. Backend executable/argv/model/PID/start/template pre/post matched в пределах сохранённых checks, environment/peer attestation отсутствует. `diagnostic/results-before-runtime.json` хранит результаты и ограничения до A/B/D.
