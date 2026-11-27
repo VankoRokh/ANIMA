@@ -362,6 +362,8 @@ class E25LabCognitiveCoordinator:
                 if completion_requirement is not None:
                     intermediate = {'turn_id':turn_id,'context_snapshot_id':ctx_id,
                                     'status':'STOPPED','outcomes':outcomes}
+                    if self._policy_profile == 'r945/0.1':
+                        intermediate['control']={'profile':self._policy_profile}
                     evaluation = evaluate_completion(completion_requirement, intermediate,
                                                      self.decision_records(turn_id))
                     if (not evaluation['information_requirement_satisfied']

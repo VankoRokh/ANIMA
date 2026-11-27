@@ -228,3 +228,17 @@ def test_no_evaluator_dependency_in_new_runtime_contracts():
     for name in ('retrieval_representation.py','requirement_feedback.py','verified_presentation.py'):
         source=(root/name).read_text()
         assert 'CASES' not in source and 'evaluator' not in source and 'held-out' not in source
+
+
+@pytest.mark.parametrize('profile,should_continue',[('r943/0.1',False),('r945/0.1',True)])
+def test_feedback_uses_current_profile_coverage_and_preserves_legacy(tmp_path,monkeypatch,profile,should_continue):
+    from labs.virtual_anima_lab.python.cognition.completion import CompletionRequirement
+    mem=memory(tmp_path,monkeypatch)
+    replies=[completion('retrieve_memory','{"query":"sscrate","top_k":1}',call_id='ss'),completion(content='done'),
+             completion('retrieve_memory','{"query":"ßcrate","top_k":1}',call_id='eszett'),completion(content='uncertain')]
+    _,r,records,a,w=execute(tmp_path,mem,replies,req=CompletionRequirement('empty_search',query='ßcrate'),profile=profile)
+    assert bool(r['continuation_decisions']) is should_continue
+    assert r['control']['state']['completion']['information_requirement_satisfied'] is False
+    if should_continue:
+        feedback=json.loads(w.requests[2]['messages'][-1]['content'])
+        assert feedback['missing_units']==[{'kind':'bounded_empty_search','query':'ßcrate'}]
