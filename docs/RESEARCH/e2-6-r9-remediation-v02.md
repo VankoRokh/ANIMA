@@ -316,3 +316,5 @@ I-event: 120/560 pairs меняют tool choice; I-tool: 480/480 operations/argu
 ## 15. R9.4.4 — Controlled Evaluation
 
 [Протокол и отчёт](e2-6-r944-controlled-evaluation-v02.md): experimental T-fresh runner и offline paired cluster evaluator; baseline/r943 profiles остаются неизменными. Design фиксируется до fresh inference; compatibility/held-out и presentation/completeness оцениваются раздельно.
+
+R9.4.4 execution завершён: 560 paired repetitions / 1120 trajectories / 3060 received requests, 0 transport failures. Cost снизился, completeness non-regression не подтверждён (control-7-C03: 20/20 A complete, 0/20 B); общий benefit gate INCONCLUSIVE. R944-F01/F02 сохранены без remediation/reruns. R9-Q02/F04 остаётся PARTIAL; R9.5 не начинался.

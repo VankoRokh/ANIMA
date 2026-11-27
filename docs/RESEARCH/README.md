@@ -74,4 +74,4 @@ R9.4.2: [Cognitive Control Policy](e2-6-r942-cognitive-control-v02.md), opt-in v
 
 R9.4.3: [Retrieval Efficiency и R942 targeted hardening](e2-6-r943-retrieval-efficiency-v02.md), versioned lexical profiles и separate held-out offline metrics.
 
-R9.4.4: [Controlled Evaluation](e2-6-r944-controlled-evaluation-v02.md), frozen paired T-fresh comparison существующих profiles.
+R9.4.4: [Controlled Evaluation](e2-6-r944-controlled-evaluation-v02.md), 560 paired T-fresh comparisons; benefit gate INCONCLUSIVE, отрицательный completeness finding сохранён.
