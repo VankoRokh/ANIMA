@@ -387,14 +387,21 @@ class E25LabCognitiveCoordinator:
                         continuation_decisions.append(decision)
                         if reason == 'CONTINUE':
                             # No new source IDs, tools, authority or automatic service calls.
-                            adapter.resume_after_stop(turn_id=turn_id,context_snapshot_id=ctx_id,
-                                feedback={'type':'information_requirement_feedback',
-                                          'status':'INCOMPLETE',
-                                          'reason_code':evaluation['reason_code'],
-                                          'remaining_model_calls':remaining,
-                                          **({'missing_requirements':evaluation['missing_requirements']}
-                                             if 'missing_requirements' in evaluation else {}),
-                                          'message':'The required information is not yet established. You may continue using the available tools or stop with uncertainty.'})
+                            feedback={'type':'information_requirement_feedback',
+                                      'status':'INCOMPLETE',
+                                      'reason_code':evaluation['reason_code'],
+                                      'remaining_model_calls':remaining,
+                                      **({'missing_requirements':evaluation['missing_requirements']}
+                                         if 'missing_requirements' in evaluation else {}),
+                                      'message':'The required information is not yet established. You may continue using the available tools or stop with uncertainty.'}
+                            if self._policy_profile == 'r945/0.1':
+                                from .requirement_feedback import build_feedback
+                                feedback=build_feedback(completion_requirement,context,self.decision_records(turn_id),
+                                                        adapter.allowed_ids,budget.snapshot(),remaining)
+                                decision['feedback_contract']=feedback['schema']
+                                decision['feedback_operation_prefix']=len(outcomes)
+                                decision['feedback_sha256']=_sha(_json(feedback))
+                            adapter.resume_after_stop(turn_id=turn_id,context_snapshot_id=ctx_id,feedback=feedback)
                             model_stopped = False
                             continue
                 break
