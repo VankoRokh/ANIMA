@@ -659,7 +659,10 @@ def run_manifest(manifest_path, *, arm, output, backend_pid=None, backend_state=
                 if req.kind != "historical_and_latest_observation":
                     summaries.append({"scenario":label,"arm":"H","status":"NOT_APPLICABLE_NON_TEMPORAL"})
                     continue
-                calls = [c for c in fixture["model_calls"] if c.get("phase","research") == "research"]
+                calls = [json.loads(line) for line in (root/(label+"-recorded")/"generated-calls.jsonl").read_text().splitlines() if line]
+                observed_calls = list(calls)
+                if report.get("claim_projection",{}).get("call") is not None:
+                    observed_calls.append(report["claim_projection"]["call"])
                 # H comparison excludes optional model claim projection in BOTH
                 # arms. Preserve research budget, excluding that presentation call.
                 pair_report = deepcopy(report)
@@ -671,7 +674,7 @@ def run_manifest(manifest_path, *, arm, output, backend_pid=None, backend_state=
                     pair_report["claim_projection"] = {"status":"RECORDED_NOT_EVALUATED","call":projection}
                 pair = host_pair(coord,pair_report,req,calls=calls)
                 frozen.write_json(root/(label+"-host-pair.json"),pair)
-                state = measure_turn(coord, report, baseline_sha=plan["baseline_sha"],case_id=entry["case"],requirement=req,calls=fixture["model_calls"])
+                state = measure_turn(coord, report, baseline_sha=plan["baseline_sha"],case_id=entry["case"],requirement=req,calls=observed_calls,claim_phase="claim_projection")
                 frozen.write_json(root/(label+"-observable.json"),state)
             continue
         selected = next(e for e in entry["arms"] if e["arm"] == arm)

@@ -232,3 +232,61 @@ def test_rejected_model_call_after_sufficiency_keeps_known_usage(tmp_path,monkey
     assert got["sufficiency"]["presentation_calls_after"] == 0
     assert got["prefixes"][-1]["resources"]["research"]["missing_input_tokens"] == 1
     assert got["prefixes"][-1]["acquisition"]["completed"] == 1
+
+
+def test_new_verified_predicate_has_gain_without_new_event_ids(tmp_path,monkeypatch):
+    mem=memory(tmp_path,monkeypatch)
+    event=crate_event(mem)
+    text=json.dumps({"answer":"Captured bearing", "claims":[{"entity_ref":CRATE,"predicate":"bearing_mdeg",
+        "value":10000,"event_id":event,"sample_seq":2,"scope":"source_sample"}]})
+    coord,report,_,adapter,_=run(mem,tmp_path,[lookup(event,"r"),completion(content=text)])
+    got=measured(coord,report,adapter,"predicate-gain",claim_phase="research")
+    assert [p["verified_fact_count"] for p in got["prefixes"]] == [0,1,2]
+    assert got["prefixes"][-1]["gain"]["evidence"] == 0
+    assert got["prefixes"][-1]["gain"]["verified_facts"] == 1
+    assert got["prefixes"][-1]["facts_by_origin"]["MODEL_CANDIDATE_VERIFIED"] == 1
+
+
+def test_later_read_does_not_reverify_an_earlier_model_claim(tmp_path,monkeypatch):
+    mem=memory(tmp_path,monkeypatch)
+    event=crate_event(mem)
+    text=json.dumps({"answer":"Claim before verification", "claims":[{"entity_ref":CRATE,"predicate":"bearing_mdeg",
+        "value":10000,"event_id":event,"sample_seq":2,"scope":"source_sample"}]})
+    coord,report,_,adapter,_=run(mem,tmp_path,[completion(content=text),lookup(event,"r"),completion(content="done")])
+    got=measured(coord,report,adapter,"no-retro-verdict",claim_phase="research")
+    assert [p["verified_fact_count"] for p in got["prefixes"]] == [0,0,1,1]
+    assert all(p["facts_by_origin"]["MODEL_CANDIDATE_VERIFIED"] == 0 for p in got["prefixes"])
+    assert got["prefixes"][1]["verification"]["verdicts"]["MODEL_CANDIDATE|UNSUPPORTED|SOURCE_SEQUENCE_NOT_BOUND"] == 1
+
+
+def test_incomplete_stop_only_call_trace_is_rejected(tmp_path,monkeypatch):
+    mem=memory(tmp_path,monkeypatch)
+    req=CompletionRequirement("no_service_read")
+    coord,report,_,adapter,_=run(mem,tmp_path,[completion(content="done")],requirement=req)
+    with pytest.raises(ValueError,match="call count"):
+        measure_turn(coord,report,calls=[],baseline_sha=BASELINE,case_id="missing-calls",requirement=req)
+
+
+def test_claim_projection_has_fact_gain_but_no_new_acquisition(tmp_path,monkeypatch):
+    from labs.virtual_anima_lab.python.cognition.native_lab import NativeLabAdapter
+    from labs.virtual_anima_lab.python.cognition.coordinator import E25LabCognitiveCoordinator
+    from labs.virtual_anima_lab.python.cognition.resource_budget import ResourceLimits
+    from tests.test_e26a_native_tools import Fake
+    mem=memory(tmp_path,monkeypatch)
+    event=crate_event(mem)
+    text=json.dumps({"answer":"Captured bearing", "claims":[{"entity_ref":CRATE,"predicate":"bearing_mdeg",
+        "value":10000,"event_id":event,"sample_seq":2,"scope":"source_sample"}]})
+    adapter=NativeLabAdapter(base_url="http://127.0.0.1:8085",model="test",trace_path=tmp_path/"calls.jsonl",task="Check",
+        transport=Fake(lookup(event,"r"),completion(content="done"),completion(content=text)),
+        temporal=True,compact_temporal=True,latest_observation=True)
+    coord=E25LabCognitiveCoordinator(mem,ranked=True,latest_observation=True)
+    report=coord.run_turn(adapter,turn_id="projection",completion_requirement=OBS,resource_limits=ResourceLimits(),project_result_claims=True)
+    calls=[*adapter.calls,report["claim_projection"]["call"]]
+    got=measure_turn(coord,report,baseline_sha=BASELINE,case_id="projection",requirement=OBS,calls=calls,claim_phase="claim_projection")
+    assert [p["verified_fact_count"] for p in got["prefixes"]] == [0,1,1,2]
+    assert got["prefixes"][-1]["acquisition"]["completed"] == 1
+    assert got["prefixes"][-1]["resources"]["model_claim_projection"]["calls"] == 1
+    assert got["prefixes"][-1]["gain"]["evidence"] == 0
+    assert got["prefixes"][-1]["gain"]["verified_facts"] == 1
+    with pytest.raises(ValueError,match="projection call count"):
+        measure_turn(coord,report,baseline_sha=BASELINE,case_id="incomplete",requirement=OBS,calls=adapter.calls)

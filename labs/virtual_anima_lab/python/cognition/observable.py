@@ -14,6 +14,7 @@ from anima.agent.native_tools import canonical
 from .cognitive_result import _bound_records
 from .claim_verification import ObservationClaim, ObservationClaimVerifier, _verify_captured_claim
 from .completion import CompletionRequirement, evaluate_completion
+from .model_claims import _evaluate_model_claims
 from .source_binding import admitted_source_rows
 from .source_policy import TurnSourcePolicy
 from ..lifecycle.e26_reproducibility import digest
@@ -163,7 +164,7 @@ def _text_stop(call):
 
 
 def measure_turn(coordinator, report, *, baseline_sha, case_id, requirement=None,
-                 calls=None, frozen_context=None):
+                 calls=None, frozen_context=None, claim_phase=None):
     """Build a detached sidecar. Missing calls/context stay UNKNOWN.
 
     The original completion contract is recorded separately from availability.
@@ -174,6 +175,8 @@ def measure_turn(coordinator, report, *, baseline_sha, case_id, requirement=None
         raise ValueError("full baseline SHA required")
     if requirement is not None and type(requirement) is not CompletionRequirement:
         raise TypeError("trusted completion requirement required")
+    if claim_phase not in (None,"research","claim_projection"):
+        raise ValueError("explicit trusted claim phase required")
     records = _bound_records(coordinator, report)
     ctx = deepcopy(frozen_context if frozen_context is not None else
                    records[0]["context_snapshot"] if records else None)
@@ -190,6 +193,14 @@ def measure_turn(coordinator, report, *, baseline_sha, case_id, requirement=None
                 or call.get("context_snapshot_id") != report["context_snapshot_id"]
                 or call.get("model_call_index", i) != i):
             raise ValueError("ordered calls do not bind turn/context")
+    if calls_known:
+        research_count = sum(_phase(c) == "research" for c in calls)
+        if report.get("model_calls_used",research_count) != research_count:
+            raise ValueError("research call count does not bind report")
+        expected_projection = report.get("claim_projection",{}).get("call")
+        projection_calls = [c for c in calls if _phase(c) == "model_claim_projection"]
+        if expected_projection is not None and projection_calls != [expected_projection]:
+            raise ValueError("projection call count does not bind report")
     # Native calls identify the operation proposed at that boundary. Stop calls
     # share step_index with the NEXT operation and must never pull it backward.
     boundaries = [(0, 0)]
@@ -223,6 +234,7 @@ def measure_turn(coordinator, report, *, baseline_sha, case_id, requirement=None
             io["failed_rereads"] += 1
         return view, failure
     prefixes, first_sufficient = [], None
+    model_fact_keys, model_assessments, model_seen_calls = set(), [], set()
     previous = dict(exposed_ids=0, evidence=0, verified_facts=0, covered_units=0,
                     search_outcomes=0, availability_state=0)
     for size, call_size in boundaries:
@@ -303,6 +315,30 @@ def measure_turn(coordinator, report, *, baseline_sha, case_id, requirement=None
                 io["claim_candidates"] += 1
                 if verdict["status"] == "VERIFIED":
                     facts.add(key)
+        deterministic_fact_count = len(facts)
+        if call_size and claim_phase is not None:
+            index = call_size - 1
+            call = calls[index]
+            selected_phase = "model_claim_projection" if claim_phase == "claim_projection" else "research"
+            if index not in model_seen_calls and _phase(call) == selected_phase and _text_stop(call):
+                model_seen_calls.add(index)
+                # A typed candidate is checked only when it appears. A later
+                # Raw acquisition must NEVER reverify an earlier unsupported
+                # model claim retroactively. This ledger is prefix-owned.
+                def verify_model(turn,claim):
+                    return _verify_captured_claim(turn,claim,prefix,load)
+                evaluation = _evaluate_model_claims(
+                    {"status":"STOPPED","turn_id":report["turn_id"],
+                     "context_snapshot_id":report["context_snapshot_id"]},
+                    [call],lambda:prefix,verify_model)
+                model_assessments.append({"call_index":index,"phase":claim_phase,
+                    "format_status":evaluation["format_status"],"verdicts":deepcopy(evaluation["verdicts"])})
+                for verdict in evaluation["verdicts"]:
+                    io["claim_candidates"] += 1
+                    verdict_counts[("MODEL_CANDIDATE",verdict["status"],verdict["reason_code"])] += 1
+                    if verdict["status"] == "VERIFIED":
+                        model_fact_keys.add(canonical(verdict["claim"]))
+        facts.update(model_fact_keys)
         provisional = {**report, "status": "STEP_BUDGET_EXHAUSTED", "outcomes": report["outcomes"][:size]}
         completion = evaluate_completion(requirement, provisional, prefix) if requirement else None
         if completion:
@@ -324,7 +360,9 @@ def measure_turn(coordinator, report, *, baseline_sha, case_id, requirement=None
         prefixes.append({"operation_prefix": size, "call_prefix": call_size if calls_known else None,
             "record_indices": list(range(size)), "call_indices": list(range(call_size)),
             "acquisition": {"attempts": attempts, "completed": completed, "rejected": rejected,
-                            "attempts_by_kind": dict(counts)},
+                            "attempts_by_kind": dict(counts),
+                            "untyped_rejections":sum(r["proposal"] is None for r in prefix),
+                            "attempts_assessment":"PARTIAL" if any(r["proposal"] is None for r in prefix) else "COMPLETE"},
             "exposure": {"initial_host_bindings": exposed_initial,
                          "host_bindings": policy.exposed_bindings() if policy else None,
                          "candidate_references": candidate_refs,
@@ -336,9 +374,12 @@ def measure_turn(coordinator, report, *, baseline_sha, case_id, requirement=None
             "redundancy": {"eligible_rows": occurrences, "same_tool": same, "cross_tool": cross,
                            "ratio": (same + cross) / occurrences if occurrences else None},
             "verified_fact_count": len(facts), "verified_fact_keys": sorted(facts),
+            "facts_by_origin":{"DETERMINISTIC_HOST":deterministic_fact_count,
+                               "MODEL_CANDIDATE_VERIFIED":len(model_fact_keys) if claim_phase and calls_known else None},
+            "model_claim_assessments":deepcopy(model_assessments) if claim_phase and calls_known else "NOT_ASSESSED",
             "verification": deepcopy(io), "coverage": coverage, "completion": completion,
             "availability": avail, "searches": list(searches.values()), "search_outcome_count": len(searches),
-            "gain": gain, "no_gain_candidate": all(v == 0 for v in gain.values()) if ctx else None,
+            "gain": gain, "no_gain_candidate": all(v == 0 for v in gain.values()) if ctx and not (call_size and _phase(calls[call_size-1]) == "model_claim_projection" and claim_phase is None) else None,
             "resources": _resources(calls[:call_size]) if calls_known else {"status": "UNKNOWN"}})
     final = prefixes[-1]
     continuation = []
@@ -372,7 +413,7 @@ def measure_turn(coordinator, report, *, baseline_sha, case_id, requirement=None
             "turn_id": report["turn_id"], "context_snapshot_id": report["context_snapshot_id"],
             "inputs": {"context_sha256": _hash(ctx) if ctx else None, "journal_sha256": _hash(records),
                        "report_sha256": _hash(report), "calls_sha256": _hash(calls) if calls_known else None},
-            "model_facing_authority": False, "semantic_utility": "NOT_ASSESSED",
+            "model_facing_authority": False, "semantic_utility": "NOT_ASSESSED", "model_claim_phase":claim_phase,
             "retrieval_relevance": "NOT_ASSESSED", "prefixes": prefixes, "continuation": continuation,
             "stop_attempts": sum(_text_stop(c) for c in calls if _phase(c) == "research") if calls_known else None,
             "eligible_continuation_opportunities": len(report.get("continuation_decisions", [])),
