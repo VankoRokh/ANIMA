@@ -311,3 +311,8 @@ I-event: 120/560 pairs меняют tool choice; I-tool: 480/480 operations/argu
 ## 14. R9.4.3 — Retrieval Efficiency
 
 [Отчёт](e2-6-r943-retrieval-efficiency-v02.md) фиксирует separate R942-R01/R02 hardening и r943/0.1 lexical retrieval: corrected query equivalence, semantic control-marker verification, explainable structural tie-break. Прежние profiles/evidence/metrics сохраняются. Offline control/held-out metrics не объявляются устранением recovery model-selection failure или causal fresh policy benefit. R9.4.4/T-fresh и canonical authority integration не реализованы.
+
+
+## 15. R9.4.4 — Controlled Evaluation
+
+[Протокол и отчёт](e2-6-r944-controlled-evaluation-v02.md): experimental T-fresh runner и offline paired cluster evaluator; baseline/r943 profiles остаются неизменными. Design фиксируется до fresh inference; compatibility/held-out и presentation/completeness оцениваются раздельно.
