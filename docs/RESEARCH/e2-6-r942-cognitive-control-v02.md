@@ -50,4 +50,26 @@ RED: `red.log` — 12 failed до появления profile. Intermediate `gree
 
 Limitations: profile не выбирает tools за модель и не гарантирует recoverability при UNKNOWN; фиксированная deterministic tool semantics не является semantic retrieval. При достаточности нет нового model final — presentation может быть partial/absent. Новые predicate requirements не вводятся. Per-turn state непостоянен, source scope не расширяется; default baseline сохраняется до отдельного выбора профиля trusted composition root. Fresh inference/2640-request rerun и causal claims о реальной модели — NOT_RUN. R9.5 independent review остаётся отдельным этапом.
 
-Implementation snapshot/full regression, historical T-recorded и final checks фиксируются ниже после clean commit. SHA реализации определяется `git log -1 --format=%H -- labs/virtual_anima_lab/python/cognition/control_policy.py`; последующий documentation-only commit записывает результаты без изменения tested code.
+Implementation snapshot/full regression, historical T-recorded и final checks приведены ниже. SHA реализации определяется `git log -1 --format=%H -- labs/virtual_anima_lab/python/cognition/control_policy.py`; последующий documentation-only commit записывает результаты без изменения tested code.
+
+
+## Окончательные результаты
+
+Clean implementation snapshot: `4a4a265903fd383a1d70da47b5cf14e6af39a8f9`. Последующий documentation-only commit не меняет tested implementation/tests bytes.
+
+| Gate | Результат | Постоянный evidence file |
+| --- | --- | --- |
+| RED до profile | 12 failed | red.log |
+| Controlled GREEN + Hybrid export/replay | 24 passed / 3.80 s | green4.log |
+| Targeted E2.6/E2.5a/canonical | 654 passed / 50.19 s | targeted.log |
+| Full regression на clean implementation | **3169 passed / 230.52 s** | full.log |
+| Historical baseline Control T-recorded | 14/14 MATCHED, 47 exact requests | baseline-control/summary.json |
+| Historical baseline Host T-recorded | 14/14 MATCHED, 46 exact requests | baseline-host/summary.json |
+| Owner evidence immutability | MATCHED_BEFORE_INVENTORY, 7 archives / 8 bundles / 206 Recovery files | evidence-after.json |
+| Project checks | PASS: 207 pages, 1468 links, 466 checked Python files, 21 Bash files | project-checks.log |
+
+Все 28 historical trajectories и 93 requests сохраняют baseline behavior без first divergence. Исторические characterization assertions и completion/scoring definitions не переписывались; изменён только приём дополнительного versioned host terminal state. Canonical model configuration, native tool catalog, prompts, ResourceLimits, ranking/vocabulary и permissions не менялись. Fresh inference и повтор 2640 requests R9.4.1b — NOT_RUN. Контролируемый профиль сам не создаёт accepted final; старый operation gate, требующий model STOPPED, не переименован в proof Task success.
+
+Conservative limitation: rejected duplicate proposal завершает research даже при возможном другом допустимом пути к missing evidence; автоматический новый выбор tool, fake broker response или retry после rejection не добавлены. Productive continuation показан только для controlled permitted response sequence. Новые semantic predicates/новый retrieval не имитируются. Неинструментированные physical verification bytes/hardware cost остаются NOT_ASSESSED; policy source-validation candidates и offline measurement rereads раздельны.
+
+Последующая точка — review поведения r942/0.1 и R9.4.4 causal fresh policy evaluation по отдельному разрешению. Никаких real-model quality claims из synthetic fixtures; R9.4.3 и T-fresh не реализованы. Финальная receipt и SHA результатов: `validation-final.json` под evidence root; final commit SHA публикуется через Git и receipt без самоссылки в документ.
