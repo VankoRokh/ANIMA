@@ -1,0 +1,155 @@
+{
+  "candidate_snapshot": "42d5dbbd6543a952d2aa88f42321f51104038b2f",
+  "schema": "anima.audit.r95_snapshot_bindings/0.1",
+  "scope": "references only; no finding status changes or independent verdicts",
+  "stages": [
+    {
+      "documentation_at_candidate": "https://github.com/VankoRokh/ANIMA/blob/42d5dbbd6543a952d2aa88f42321f51104038b2f/docs/RESEARCH/e2-6-r9-remediation-v02.md",
+      "documentation_commit": "7ebcb9dfec814fba89e8686004086b4bb4651090",
+      "documentation_sha256_at_candidate": "e77ba038898f860e10441101979afda84bcb34d8b2c8c26855ab1589fe64c537",
+      "evidence": [],
+      "implementation_snapshot": null,
+      "stage": "R9.0",
+      "unknown_values": "null means not established, not inferred from directory prefix"
+    },
+    {
+      "documentation_at_candidate": "https://github.com/VankoRokh/ANIMA/blob/42d5dbbd6543a952d2aa88f42321f51104038b2f/docs/RESEARCH/e2-6-r9-remediation-v02.md",
+      "documentation_commit": "85266f44eee89be2b467bb387f0fc98ae6099053",
+      "documentation_sha256_at_candidate": "e77ba038898f860e10441101979afda84bcb34d8b2c8c26855ab1589fe64c537",
+      "evidence": [],
+      "implementation_snapshot": "4d2e3c8739f58848cc636979be3078bf5c8b8125",
+      "stage": "R9.1",
+      "unknown_values": "null means not established, not inferred from directory prefix"
+    },
+    {
+      "documentation_at_candidate": "https://github.com/VankoRokh/ANIMA/blob/42d5dbbd6543a952d2aa88f42321f51104038b2f/docs/RESEARCH/e2-6-r9-remediation-v02.md",
+      "documentation_commit": null,
+      "documentation_sha256_at_candidate": "e77ba038898f860e10441101979afda84bcb34d8b2c8c26855ab1589fe64c537",
+      "evidence": [],
+      "implementation_snapshot": "e15da95a606eb03fa2f0b100a943e7bb90ba2b20",
+      "stage": "R9.2",
+      "unknown_values": "null means not established, not inferred from directory prefix"
+    },
+    {
+      "documentation_at_candidate": "https://github.com/VankoRokh/ANIMA/blob/42d5dbbd6543a952d2aa88f42321f51104038b2f/docs/RESEARCH/e2-6-r9-remediation-v02.md",
+      "documentation_commit": null,
+      "documentation_sha256_at_candidate": "e77ba038898f860e10441101979afda84bcb34d8b2c8c26855ab1589fe64c537",
+      "evidence": [],
+      "implementation_snapshot": null,
+      "recovery_execution_snapshot": "5448e8ee8b09a3ad8d079896d85367201ed13d5a",
+      "recovery_scope": "manifest git_sha in control/host Recovery bundles; not asserted to be final implementation SHA",
+      "stage": "R9.3",
+      "unknown_values": "null means not established, not inferred from directory prefix"
+    },
+    {
+      "documentation_at_candidate": "https://github.com/VankoRokh/ANIMA/blob/42d5dbbd6543a952d2aa88f42321f51104038b2f/docs/RESEARCH/e2-6-r940-characterization-v02.md",
+      "documentation_commit": "0cde809a9d0f5495d93706a25a9dbe404cc48515",
+      "documentation_sha256_at_candidate": "50ad282ea47486295e3a485dc702b359d2ebf97e0ca4510cd5f412ed5c03ab2e",
+      "evidence": [],
+      "implementation_snapshot": "dc737ec5df7162c59fd773f5d1db5dc0d2c87b3d",
+      "stage": "R9.4.0",
+      "unknown_values": "null means not established, not inferred from directory prefix"
+    },
+    {
+      "documentation_at_candidate": "https://github.com/VankoRokh/ANIMA/blob/42d5dbbd6543a952d2aa88f42321f51104038b2f/docs/RESEARCH/e2-6-r941a-observable-v02.md",
+      "documentation_commit": "d34b472e51cdddf6f8700f0d521d4df65e8b4216",
+      "documentation_sha256_at_candidate": "d6e59b286594641dc9e86223206197a07b296db6fd63cf31790e14fccd586b12",
+      "evidence": [],
+      "implementation_snapshot": "c1f1b0f7aa5c66c60c34398ba7fe7c98b41972d2",
+      "receipt_sha256": "be66e2edb5bae18d018d3c71c6c5d239326448dbe3be4ca48fefc4329852c1ad",
+      "stage": "R9.4.1a",
+      "unknown_values": "null means not established, not inferred from directory prefix",
+      "validation_receipt": "validation_receipts/R9.4.1a/validation-final.json"
+    },
+    {
+      "documentation_at_candidate": "https://github.com/VankoRokh/ANIMA/blob/42d5dbbd6543a952d2aa88f42321f51104038b2f/docs/RESEARCH/e2-6-r941b-baseline-model-experiments-v02.md",
+      "documentation_commit": "2a9cb1b202e3efcabaae0b2621320af3c431e242",
+      "documentation_sha256_at_candidate": "22ab559302b42781b653c59ed0b9fa11a2125c913ecace4f5579dc3577a9ce21",
+      "evidence": [
+        "EVIDENCE_ROOT/v0.2/E2.6/R9.4/ANIMA-E26-R941b-Baseline-Experiments-run-01.tar.gz"
+      ],
+      "implementation_snapshot": "d34b472e51cdddf6f8700f0d521d4df65e8b4216",
+      "receipt_sha256": "3d60c619c0fcf4ee1b88281e98c4923b9d6a97e80da298f0e95ccc6bddcbf730",
+      "stage": "R9.4.1b",
+      "unknown_values": "null means not established, not inferred from directory prefix",
+      "validation_receipt": "validation_receipts/R9.4.1b/r941b-run-01-validation-final-v2.json"
+    },
+    {
+      "documentation_at_candidate": "https://github.com/VankoRokh/ANIMA/blob/42d5dbbd6543a952d2aa88f42321f51104038b2f/docs/RESEARCH/e2-6-r942-cognitive-control-v02.md",
+      "documentation_commit": "95dd28504b1ed72d77dae4eadee8fce4d45cbd8f",
+      "documentation_sha256_at_candidate": "bf9f138b1605bfe990a61f1292977fb891d75cbcb9dbffcda491a36f2ea1dd1a",
+      "evidence": [],
+      "implementation_snapshot": "4a4a265903fd383a1d70da47b5cf14e6af39a8f9",
+      "receipt_sha256": "083c2556b789b1d2442182c8f84d6accacf468b2c08f9495856a71916ccc7515",
+      "stage": "R9.4.2",
+      "unknown_values": "null means not established, not inferred from directory prefix",
+      "validation_receipt": "validation_receipts/R9.4.2/validation-final.json"
+    },
+    {
+      "documentation_at_candidate": "https://github.com/VankoRokh/ANIMA/blob/42d5dbbd6543a952d2aa88f42321f51104038b2f/docs/RESEARCH/e2-6-r943-retrieval-efficiency-v02.md",
+      "documentation_commit": "15be9a55f7d18eec289d177d2008f4eccb190079",
+      "documentation_sha256_at_candidate": "a52f275d82aad5777d084cc4946fda3f7b3d7e4487e2796cd5e926eb9fbb1f22",
+      "evidence": [
+        "EVIDENCE_ROOT/v0.2/E2.6/R9.4/ANIMA-R943-95dd285-Evidence.tar.gz"
+      ],
+      "implementation_snapshot": "ac065b43d15e9aafc35e7595e6344b757ae5d692",
+      "receipt_sha256": "b7e2ed918dc6e9053c3fefd5150be4bd7933a7e7a5d1c91a769b900597b71a12",
+      "stage": "R9.4.3",
+      "unknown_values": "null means not established, not inferred from directory prefix",
+      "validation_receipt": "validation_receipts/R9.4.3/r943-validation-receipt.json"
+    },
+    {
+      "documentation_at_candidate": "https://github.com/VankoRokh/ANIMA/blob/42d5dbbd6543a952d2aa88f42321f51104038b2f/docs/RESEARCH/e2-6-r944-controlled-evaluation-v02.md",
+      "documentation_commit": "2f0f5e68d1e9485e08f62153bd38389d7fb3f08e",
+      "documentation_sha256_at_candidate": "cafc190d0a001802b6a11b877735b293b15ffbc550c9662da2e99cd86025e8da",
+      "evidence": [
+        "EVIDENCE_ROOT/v0.2/E2.6/R9.4/ANIMA-R944-15be9a5-Evidence.tar.gz"
+      ],
+      "implementation_snapshot": "b533475ba6e0e0c0ed7a31dae34782eea259c24b",
+      "receipt_sha256": "046bc44ccd011880604ed39586a09a8c1ad85cb3b7e72b15a6dcac74595407bf",
+      "stage": "R9.4.4",
+      "unknown_values": "null means not established, not inferred from directory prefix",
+      "validation_receipt": "validation_receipts/R9.4.4/r944-validation-receipt.json"
+    },
+    {
+      "documentation_at_candidate": "https://github.com/VankoRokh/ANIMA/blob/42d5dbbd6543a952d2aa88f42321f51104038b2f/docs/RESEARCH/e2-6-r945a-targeted-root-cause-v02.md",
+      "documentation_commit": "b3ce10767405b395541ea723116233ea8017a863",
+      "documentation_sha256_at_candidate": "938618e75ee14f79f844b27d68a066657e94b6ccf5e3ece1351407afaa6260fa",
+      "evidence": [
+        "EVIDENCE_ROOT/v0.2/E2.6/R9.4/ANIMA-R945a-2f0f5e6-Evidence.tar.gz"
+      ],
+      "implementation_snapshot": null,
+      "receipt_sha256": "197a391290b3a9b6be4350835d51989ddfbefbf51800efc5668d9f47339be6e4",
+      "stage": "R9.4.5a",
+      "unknown_values": "null means not established, not inferred from directory prefix",
+      "validation_receipt": "validation_receipts/R9.4.5a/r945a-validation-receipt.json"
+    },
+    {
+      "documentation_at_candidate": "https://github.com/VankoRokh/ANIMA/blob/42d5dbbd6543a952d2aa88f42321f51104038b2f/docs/RESEARCH/e2-6-r945b-targeted-remediation-v02.md",
+      "documentation_commit": "c4f4eb07984d8cc56e0d98dc76ab7014e7931421",
+      "documentation_sha256_at_candidate": "e997b19ba83c343d4bbb03fa0a76b06484c3eb2dffe0075deb9ac51feee7ab6c",
+      "evidence": [
+        "EVIDENCE_ROOT/v0.2/E2.6/R9.4/ANIMA-R945b-b3ce107-Evidence.tar.gz"
+      ],
+      "implementation_snapshot": "8b43bc2da58122a5c0ef31684067481eb4b366b1",
+      "receipt_sha256": "40575842828042037a0859beb64941aa12ff0d3f6ef14d8604e1a5c96d0480a5",
+      "stage": "R9.4.5b",
+      "unknown_values": "null means not established, not inferred from directory prefix",
+      "validation_receipt": "validation_receipts/R9.4.5b/r945b-validation-receipt.json"
+    },
+    {
+      "documentation_at_candidate": "https://github.com/VankoRokh/ANIMA/blob/42d5dbbd6543a952d2aa88f42321f51104038b2f/docs/RESEARCH/e2-6-r945c-confirmatory-evaluation-v02.md",
+      "documentation_commit": "42d5dbbd6543a952d2aa88f42321f51104038b2f",
+      "documentation_sha256_at_candidate": "92e04a8ab3d811bc0d1e30748af8f1979946d61d78e2be39eac950f5e357cae8",
+      "evidence": [
+        "EVIDENCE_ROOT/v0.2/E2.6/R9.4/ANIMA-R945c-c4f4eb0-Evidence.tar.gz"
+      ],
+      "implementation_snapshot": "2136b6eed0e6a7d5c776ce018592da1db310717c",
+      "receipt_sha256": "792a9d72f505e525f391db37121488684d5f5eae08121979a05af3ecafb74344",
+      "stage": "R9.4.5c",
+      "unknown_values": "null means not established, not inferred from directory prefix",
+      "validation_receipt": "validation_receipts/R9.4.5c/r945c-validation-receipt.json"
+    }
+  ],
+  "tested_implementation_snapshot": "2136b6eed0e6a7d5c776ce018592da1db310717c"
+}

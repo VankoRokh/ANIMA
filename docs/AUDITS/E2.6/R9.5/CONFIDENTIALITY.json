@@ -1,0 +1,31 @@
+{
+  "limitations": [
+    "pattern matching is not universal secret/PII detection",
+    "fixture model filenames are not assumed actual model weights",
+    "settings/caches/links candidates are not cleared for upload automatically",
+    "no primary material uploaded; no private visibility or post-upload integrity assertion"
+  ],
+  "new_archives_and_small_copies": {
+    "counts": {
+      "bytes_scanned": 4759824218,
+      "files_scanned": 224805,
+      "nested_archives": 6
+    },
+    "credential_pattern_matches": 0,
+    "review_required_paths": 736,
+    "scan_errors": 0
+  },
+  "original_archive_screen": {
+    "counts": {
+      "bytes_scanned": 8977715102,
+      "files_scanned": 338226,
+      "nested_archives": 26
+    },
+    "credential_pattern_matches": 0,
+    "review_required_paths": 10201,
+    "scan_errors": 0
+  },
+  "private_publication": "WITHHELD_AUTHENTICATION_CAPABILITY_AND_REVIEW",
+  "public_index": "ORGANIZATIONAL_METADATA_ONLY_NO_PRIMARY_PROSE_OR_LABELS",
+  "schema": "anima.audit.r95_publication_privacy/0.1"
+}
